@@ -1,0 +1,138 @@
+﻿* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #f8f9fa;
+  color: #1a1a2e;
+  line-height: 1.7;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.site-header {
+  background: #1a1a2e;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.site-header a { color: #a8d8f0; text-decoration: none; font-weight: 600; font-size: 1.1rem; }
+.site-header nav a { color: #ccc; font-size: 0.9rem; margin-left: 1.5rem; text-decoration: none; }
+.site-header nav a:hover { color: white; }
+
+.regime-badge {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.regime-BULL     { background: #d4edda; color: #155724; }
+.regime-BEAR     { background: #f8d7da; color: #721c24; }
+.regime-SIDEWAYS { background: #fff3cd; color: #856404; }
+
+.insight-box {
+  background: #eef4ff;
+  border-left: 4px solid #4a90e2;
+  border-radius: 0 8px 8px 0;
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0;
+  font-size: 1rem;
+  color: #1a3a6e;
+  font-weight: 500;
+}
+
+.post-meta {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.post-body h2 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  margin: 2rem 0 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid #e0e0e0;
+  color: #1a1a2e;
+}
+.post-body p  { margin-bottom: 0.9rem; }
+.post-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0 1rem;
+  font-size: 0.9rem;
+}
+.post-body th {
+  background: #f0f4ff;
+  padding: 7px 12px;
+  text-align: left;
+  border: 1px solid #dde;
+  font-weight: 600;
+}
+.post-body td {
+  padding: 7px 12px;
+  border: 1px solid #dde;
+}
+.post-body tr:nth-child(even) td { background: #fafafa; }
+.post-body code {
+  background: #f0f0f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.85em;
+}
+.post-body blockquote {
+  border-left: 3px solid #4a90e2;
+  padding: 0.5rem 1rem;
+  margin: 1rem 0;
+  color: #444;
+  background: #f8fbff;
+  border-radius: 0 6px 6px 0;
+}
+.post-body ul, .post-body ol { margin: 0.5rem 0 1rem 1.5rem; }
+.post-body li { margin-bottom: 0.3rem; }
+.post-body hr { border: none; border-top: 1px solid #e8e8e8; margin: 1.5rem 0; }
+
+.disclaimer {
+  font-size: 0.78rem;
+  color: #999;
+  border-top: 1px solid #eee;
+  padding-top: 1rem;
+  margin-top: 2rem;
+}
+
+.card-grid { display: grid; gap: 1rem; margin-top: 1.5rem; }
+.card {
+  background: white;
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: box-shadow 0.15s;
+}
+.card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+.card-date   { font-size: 0.8rem; color: #888; margin-bottom: 0.4rem; }
+.card-title  { font-size: 1rem; font-weight: 600; margin-bottom: 0.5rem; }
+.card-insight{ font-size: 0.88rem; color: #555; }
+.card-emoji  { font-size: 1.2rem; margin-right: 6px; }
+
+.hero {
+  background: #1a1a2e;
+  color: white;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+.hero h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+.hero p   { color: #aac; font-size: 1rem; }

@@ -1,0 +1,239 @@
+# .github/workflows/daily_publish.yml
+# ============================================================
+# ONE-HUB Daily Report 자동 퍼블리싱 파이프라인
+#
+# 실행 시점: 매일 오후 4:30 KST (= 07:30 UTC)
+# 수동 실행: GitHub Actions > Run workflow > 날짜 입력 가능
+#
+# 필요한 GitHub Secrets:
+#   CLAUDE_API_KEY        — Anthropic API 키
+#   EC2_HOST              — AWS EC2 퍼블릭 IP
+#   EC2_SSH_KEY           — SSH 프라이빗 키 (pem 전체 내용)
+#   EC2_USER              — EC2 접속 유저 (기본: ubuntu)
+#   TELEGRAM_BOT_TOKEN    — 텔레그램 봇 토큰
+#   TELEGRAM_CHAT_ID      — 텔레그램 채널/그룹 ID
+#
+# Phase 3에서 추가:
+#   BEEHIIV_API_KEY
+#   BEEHIIV_PUBLICATION_ID
+# ============================================================
+
+name: ONE-HUB Daily Report Publish
+
+on:
+  # 매일 07:30 UTC = 16:30 KST
+  schedule:
+    - cron: "30 7 * * 1-5"   # 월~금만 실행 (주말 제외)
+
+  # 수동 실행 — 날짜 직접 입력 가능
+  workflow_dispatch:
+    inputs:
+      report_date:
+        description: "리포트 날짜 (YYYY-MM-DD, 비워두면 오늘)"
+        required: false
+        default: ""
+      dry_run:
+        description: "DRY RUN (파일 저장 없이 미리보기)"
+        type: boolean
+        required: false
+        default: false
+
+env:
+  PYTHON_VERSION: "3.11"
+  EC2_USER: ubuntu
+  JOURNAL_REMOTE_PATH: "/home/ubuntu/one_hub_journals"
+
+jobs:
+  publish:
+    name: Generate & Publish Daily Report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # ── Step 1: 레포 체크아웃 ─────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Step 2: Python 환경 설정 ─────────────────────────
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install anthropic python-dotenv
+
+      # ── Step 3: 날짜 결정 ────────────────────────────────
+      - name: Determine report date
+        id: date
+        run: |
+          if [ -n "${{ github.event.inputs.report_date }}" ]; then
+            REPORT_DATE="${{ github.event.inputs.report_date }}"
+          else
+            # KST 기준 오늘 날짜 (UTC+9)
+            REPORT_DATE=$(TZ="Asia/Seoul" date "+%Y-%m-%d")
+          fi
+          echo "report_date=$REPORT_DATE" >> "$GITHUB_OUTPUT"
+          echo "📅 리포트 날짜: $REPORT_DATE"
+
+      # ── Step 4: EC2에서 저널 파일 가져오기 ──────────────
+      - name: Fetch journal from EC2
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          # SSH 키 설정
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/ec2_key.pem
+          chmod 600 ~/.ssh/ec2_key.pem
+
+          REPORT_DATE="${{ steps.date.outputs.report_date }}"
+          REMOTE_FILE="$JOURNAL_REMOTE_PATH/${REPORT_DATE}.md"
+          LOCAL_DIR="$HOME/one_hub_journals"
+          mkdir -p "$LOCAL_DIR"
+
+          echo "📥 EC2에서 저널 파일 다운로드: $REMOTE_FILE"
+
+          scp -i ~/.ssh/ec2_key.pem \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=30 \
+              "${EC2_USER}@${EC2_HOST}:${REMOTE_FILE}" \
+              "${LOCAL_DIR}/${REPORT_DATE}.md" 2>/dev/null || {
+            echo "⚠️ EC2 저널 없음 — 거래 없는 날 stub 생성으로 진행"
+          }
+
+          # SQLite DB도 함께 가져오기 (선택적)
+          scp -i ~/.ssh/ec2_key.pem \
+              -o StrictHostKeyChecking=no \
+              -o ConnectTimeout=30 \
+              "${EC2_USER}@${EC2_HOST}:/home/ubuntu/trading.db" \
+              "$HOME/trading.db" 2>/dev/null || {
+            echo "⚠️ DB 없음 — DB 기본값으로 진행"
+          }
+
+      # ── Step 5: daily_report_generator.py 실행 ───────────
+      - name: Generate daily report
+        env:
+          CLAUDE_API_KEY: ${{ secrets.CLAUDE_API_KEY }}
+        run: |
+          REPORT_DATE="${{ steps.date.outputs.report_date }}"
+          DRY_RUN="${{ github.event.inputs.dry_run }}"
+
+          ARGS="--date $REPORT_DATE"
+          if [ "$DRY_RUN" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          echo "🚀 daily_report_generator.py 실행: $ARGS"
+          python daily_report_generator.py $ARGS
+
+      # ── Step 6: 생성된 파일 확인 ─────────────────────────
+      - name: Verify generated file
+        run: |
+          REPORT_DATE="${{ steps.date.outputs.report_date }}"
+          TARGET_FILE="content/daily/${REPORT_DATE}.md"
+
+          if [ -f "$TARGET_FILE" ]; then
+            echo "✅ 파일 생성 확인: $TARGET_FILE"
+            echo "   크기: $(wc -c < "$TARGET_FILE") bytes"
+            echo ""
+            echo "--- YAML Front Matter ---"
+            head -20 "$TARGET_FILE"
+            echo "..."
+          else
+            echo "❌ 파일 생성 실패: $TARGET_FILE"
+            exit 1
+          fi
+
+      # ── Step 7: Git Push ─────────────────────────────────
+      - name: Commit and push
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: |
+          REPORT_DATE="${{ steps.date.outputs.report_date }}"
+
+          git config user.name  "ONE-HUB Bot"
+          git config user.email "bot@one-hub.io"
+
+          git add "content/daily/${REPORT_DATE}.md"
+
+          # 변경사항이 있을 때만 커밋
+          if git diff --staged --quiet; then
+            echo "변경사항 없음 — 커밋 스킵"
+          else
+            git commit -m "feat(daily): ${REPORT_DATE} 운영일지 자동 발행
+
+            - Regime: $(grep 'regime:' content/daily/${REPORT_DATE}.md | head -1 | awk '{print $2}' | tr -d '\"')
+            - ONE-HUB Insight 포함
+            - ONE-HUB Daily Report Generator v1.0"
+
+            git push origin main
+            echo "✅ Git Push 완료"
+          fi
+
+      # ── Step 8: Insight 추출 (알림용) ────────────────────
+      - name: Extract insight for notification
+        id: insight
+        run: |
+          REPORT_DATE="${{ steps.date.outputs.report_date }}"
+          TARGET_FILE="content/daily/${REPORT_DATE}.md"
+
+          # YAML Front Matter에서 insight 추출
+          INSIGHT=$(grep '^insight:' "$TARGET_FILE" | sed 's/^insight: "//' | sed 's/"$//' || echo "오늘도 시장은 배움을 주었습니다.")
+          REGIME=$(grep '^regime:' "$TARGET_FILE" | sed 's/^regime: "//' | sed 's/"$//' || echo "SIDEWAYS")
+          PNL_EMOJI=$(grep '^pnl_emoji:' "$TARGET_FILE" | sed 's/^pnl_emoji: "//' | sed 's/"$//' || echo "➖")
+
+          echo "insight=$INSIGHT" >> "$GITHUB_OUTPUT"
+          echo "regime=$REGIME"   >> "$GITHUB_OUTPUT"
+          echo "pnl_emoji=$PNL_EMOJI" >> "$GITHUB_OUTPUT"
+
+      # ── Step 9: 텔레그램 알림 ─────────────────────────────
+      - name: Send Telegram notification
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          REPORT_DATE="${{ steps.date.outputs.report_date }}"
+          INSIGHT="${{ steps.insight.outputs.insight }}"
+          REGIME="${{ steps.insight.outputs.regime }}"
+          PNL_EMOJI="${{ steps.insight.outputs.pnl_emoji }}"
+
+          # Vercel 배포 URL (레포 설정에 맞게 수정)
+          REPORT_URL="https://one-hub.io/daily/${REPORT_DATE}"
+
+          MESSAGE="ONE-HUB Daily ${REPORT_DATE} ${PNL_EMOJI}
+          
+Regime: ${REGIME}
+
+💡 오늘의 인사이트
+${INSIGHT}
+
+📖 전체 리포트
+${REPORT_URL}
+
+#ONE-HUB #자동매매 #AI투자"
+
+          curl -s -X POST \
+            "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d chat_id="$CHAT_ID" \
+            -d text="$MESSAGE" \
+            -d parse_mode="HTML" \
+            --max-time 10 || echo "⚠️ 텔레그램 발송 실패 (무시)"
+
+      # ── Step 10: 실패 시 텔레그램 오류 알림 ─────────────
+      - name: Notify failure
+        if: failure()
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          REPORT_DATE="${{ steps.date.outputs.report_date }}"
+          curl -s -X POST \
+            "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            -d chat_id="$CHAT_ID" \
+            -d text="❌ ONE-HUB Daily Report 자동 생성 실패 (${REPORT_DATE})%0A GitHub Actions 확인 필요: ${{ github.server_url }}/${{ github.repository }}/actions" \
+            --max-time 10 || true
