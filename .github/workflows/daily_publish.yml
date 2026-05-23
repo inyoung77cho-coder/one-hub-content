@@ -40,7 +40,7 @@ on:
 
 env:
   PYTHON_VERSION: "3.11"
-  EC2_USER: ${{ secrets.EC2_USER || 'ubuntu' }}
+  EC2_USER: ubuntu
   JOURNAL_REMOTE_PATH: "/home/ubuntu/one_hub_journals"
 
 jobs:
@@ -192,7 +192,7 @@ jobs:
 
       # ── Step 9: 텔레그램 알림 ─────────────────────────────
       - name: Send Telegram notification
-        if: ${{ github.event.inputs.dry_run != 'true' && secrets.TELEGRAM_BOT_TOKEN != '' }}
+        if: ${{ github.event.inputs.dry_run != 'true' }}
         env:
           BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
