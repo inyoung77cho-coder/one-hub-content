@@ -1,0 +1,6 @@
+﻿.env
+*.db
+one_hub_journals/
+__pycache__/
+*.pyc
+.DS_Store
