@@ -36,7 +36,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-
       - name: Install dependencies
         run: pip install anthropic python-dotenv
 
@@ -91,13 +90,13 @@ jobs:
           REPORT_DATE="${{ steps.date.outputs.report_date }}"
           git config user.name "ONE-HUB Bot"
           git config user.email "bot@one-hub.io"
+          git pull --rebase origin main
           git add "content/daily/${REPORT_DATE}.md"
           if git diff --staged --quiet; then
             echo "No changes"
           else
             git commit -m "feat(daily): ${REPORT_DATE} daily report"
-            git pull --rebase origin main
-          git push origin main
+            git push origin main
           fi
 
       - name: Telegram notify
