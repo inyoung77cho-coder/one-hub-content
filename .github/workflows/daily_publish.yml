@@ -90,7 +90,9 @@ jobs:
           REPORT_DATE="${{ steps.date.outputs.report_date }}"
           git config user.name "ONE-HUB Bot"
           git config user.email "bot@one-hub.io"
+          git stash
           git pull --rebase origin main
+          git stash pop
           git add "content/daily/${REPORT_DATE}.md"
           if git diff --staged --quiet; then
             echo "No changes"
@@ -114,3 +116,4 @@ jobs:
           CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           curl -s -X POST "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" -d chat_id="$CHAT_ID" -d text="ONE-HUB Daily Report failed" --max-time 10 || true
+
