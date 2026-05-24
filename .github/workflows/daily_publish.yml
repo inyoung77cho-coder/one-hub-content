@@ -96,7 +96,8 @@ jobs:
             echo "No changes"
           else
             git commit -m "feat(daily): ${REPORT_DATE} daily report"
-            git push origin main
+            git pull --rebase origin main
+          git push origin main
           fi
 
       - name: Telegram notify
