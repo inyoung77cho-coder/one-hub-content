@@ -136,3 +136,18 @@ body {
 }
 .hero h1 { font-size: 2rem; margin-bottom: 0.5rem; }
 .hero p   { color: #aac; font-size: 1rem; }
+
+.dashboard { background: white; border-radius: 12px; padding: 1.5rem; margin: 1.5rem 0; border: 1px solid #e8e8e8; }
+.section-title { font-size: 1.1rem; font-weight: 600; margin: 1.5rem 0 1rem; color: #1a1a2e; }
+.dashboard-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; margin-bottom: 1rem; }
+.dash-card { background: #f8f9fa; border-radius: 8px; padding: 1rem; text-align: center; }
+.dash-label { font-size: 0.75rem; color: #888; margin-bottom: 0.5rem; }
+.dash-value { font-size: 1.5rem; font-weight: 700; color: #1a1a2e; }
+.dash-sub { font-size: 0.75rem; color: #888; margin-top: 0.25rem; }
+.stats-row { display: flex; gap: 1rem; margin: 1rem 0 1.5rem; }
+.stat-item { flex: 1; background: #f8f9fa; border-radius: 8px; padding: 1rem; text-align: center; }
+.stat-num { font-size: 1.8rem; font-weight: 700; color: #1a1a2e; }
+.stat-label { font-size: 0.8rem; color: #888; margin-top: 0.25rem; }
+.heat-badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; background: #fff3cd; color: #856404; margin-left: 6px; }
+.card-meta { font-size: 0.8rem; color: #aaa; margin-top: 0.4rem; }
+@media (max-width: 600px) { .dashboard-grid { grid-template-columns: repeat(2, 1fr); } .stats-row { flex-wrap: wrap; } }
