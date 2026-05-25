@@ -4,3 +4,7 @@ one_hub_journals/
 __pycache__/
 *.pyc
 .DS_Store
+
+*.pem
+ed25519-key
+pubkey.txt
