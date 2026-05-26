@@ -18,7 +18,7 @@ from pathlib import Path
 import anthropic
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=False)
 
 JOURNAL_DIR = Path.home() / "one_hub_journals"
 OUTPUT_DIR  = Path("content") / "daily"
