@@ -502,12 +502,17 @@ def _get_held_codes() -> set:
         return set()
 
 
+_last_analysis_time = 0
+
 def morning_analysis():
     """
     v4.9e 유지: 카운터 기반 단일 슬롯 직렬화.
     v5.0 추가: _current_analysis_id 갱신을 락 내부에서 수행.
     """
-    global _analysis_count
+    global _analysis_count, _last_analysis_time
+    if time.time() - _last_analysis_time < 300:
+        return
+    _last_analysis_time = time.time()
     with _analysis_lock:
         if _analysis_count > 0:
             send("이미 분석 실행 중이거나 대기 중입니다.")
