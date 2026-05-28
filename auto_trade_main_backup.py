@@ -1334,10 +1334,19 @@ def handle_commands():
         time.sleep(2)
 
 
+_cmd_dedup: dict = {}  # {cmd: last_time} 명령어 중복 처리 방지
+
 def _handle_single_command(text):
     global daily_pnl, trade_count, trading_on, watchlist_today, pending
     global blocked_today, approved_today, monitor_positions, hold_today
-    global last_regime, _last_analyze_cmd_time
+    global last_regime, _last_analyze_cmd_time, _cmd_dedup
+    # 5초 내 동일 명령어 중복 차단
+    import time as _time
+    _now = _time.time()
+    if _cmd_dedup.get(text, 0) > _now - 5:
+        print(f"[CMD_DEDUP] 중복 차단: {text}")
+        return
+    _cmd_dedup[text] = _now
 
     # ── /buy ─────────────────────────────────────────────
     if text == "/buy":
