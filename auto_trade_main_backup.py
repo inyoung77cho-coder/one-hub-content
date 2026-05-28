@@ -969,7 +969,7 @@ def us_market_brief():
         else:
             signal = "NEUTRAL: 선별 접근"
 
-        brief  = "ONE-HUB Morning Brief 07:00\n\n"
+        brief  = f"ONE-HUB Morning Brief {__import__('datetime').datetime.now().strftime('%H:%M')} KST\n\n"
         brief += f"Nasdaq: {nasdaq.get('price','N/A')} ({nasdaq_chg}%)\n"
         brief += f"SOX: {sox.get('price','N/A')} ({sox_chg}%)\n"
         brief += f"VIX: {vix_v}\n"
@@ -1671,6 +1671,18 @@ def _handle_single_command(text):
         lines = [f"/approve_all — {len(safe_list)}종목 승인"]
         if skipped_list:
             lines.append(f"{len(skipped_list)}종목 제외 (검증 실패)")
+        # [v7.2] 승인 전 요약
+        _total_est = sum(_p.get("price", 0) * _p.get("qty", 1) for _, _p in safe_list)
+        _sum = [f"⚠️ approve_all 승인 예정 ({len(safe_list)}종목)"]
+        for _c, _p in safe_list:
+            _est = _p.get("price", 0) * _p.get("qty", 1)
+            _sum.append(f"  • {_p.get('name','?')}: ~{format(int(_est), ',')}원")
+        _sum.append(f"에상 투자금: ~{format(int(_total_est), ',')}원")
+        _sum.append("실행: /approve_all_confirm | 취소: /skip_all")
+        send("\n".join(_sum))
+        globals()["_approve_all_safe"] = safe_list[:]
+        return
+
         for code, p in safe_list:
             result_msg = _execute_buy(code, p, batch_mode=True)
             lines.append(result_msg)
@@ -1678,6 +1690,19 @@ def _handle_single_command(text):
         return
 
     # ── /skip_all ─────────────────────────────────────────
+    # [v7.2] /approve_all_confirm
+    if text == "/approve_all_confirm":
+        _safe = globals().get("_approve_all_safe", [])
+        if not _safe:
+            send("승인 대기 목록 없음. /approve_all 먼저 입력하세요.")
+            return
+        _out = [f"✅ 최종 승인 {len(_safe)}종목"]
+        for _c, _p in _safe:
+            _out.append(_execute_buy(_c, _p, batch_mode=True))
+        globals().pop("_approve_all_safe", None)
+        send("\n".join(_out))
+        return
+
     if text == "/skip_all":
         cnt = len(pending)
         pending.clear()
