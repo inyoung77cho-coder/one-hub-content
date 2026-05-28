@@ -104,7 +104,7 @@ def _weekday_only(fn):
     return wrapper
 # ──────────────────────────────────────────────────────────────────────
 
-from kis_api import (get_access_token, get_balance, buy_order, sell_order,
+from kis_api import (get_access_token, get_balance, buy_order, sell_order, get_api_health,
                      get_current_price, get_order_result)
 from config import MAX_BUY_AMOUNT, IS_REAL
 from news_collector import (get_news, get_global_market, get_economic_indicators,
@@ -127,7 +127,7 @@ from strategy import (calc_rsi, calc_atr, detect_market_regime,
                       calc_position_size_detailed,
                       calc_gap_filter, calc_sector_bonus, calc_regime_adjusted_threshold,
                       calc_technical_score, calc_macro_score, calc_final_score,
-                      should_sell_atr, reset_highest, is_trading_time, get_api_health,
+                      should_sell_atr, reset_highest, is_trading_time,
                       calc_position_size)
 from db_logger import (log_trade, log_ai, log_error, log_daily, get_daily_stats,
                        log_blocked, get_blocked_stats,
