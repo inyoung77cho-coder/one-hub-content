@@ -218,6 +218,7 @@ _report_running = False
 
 # ── v4.9: Auto-Stop ────────────────────────────────────────
 _auto_stop_timers: dict = {}
+_auto_stop_executing: set = set()  # [v7.4] 중복 실행 방지
 AUTO_STOP_DELAY_MINUTES: int = int(os.getenv("AUTO_STOP_DELAY_MINUTES", "30"))
 AUTO_STOP_WARN_MINUTES:  int = AUTO_STOP_DELAY_MINUTES - 10
 
@@ -2327,7 +2328,7 @@ def run_position_monitor():
     보유 포지션 목표가/손절가 도달 여부 자동 확인.
     10분마다 실행 (09:10~15:10)
     """
-    global monitor_positions, hold_today, _auto_stop_timers
+    global monitor_positions, hold_today, _auto_stop_timers, _auto_stop_executing
     if not monitor_positions or not is_trading_time():
         return
     try:
