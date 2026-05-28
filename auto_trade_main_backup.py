@@ -84,7 +84,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── [Fix 1] APP_VERSION 단일 상수 — /status, /help, 시작메시지 모두 여기서 참조 ──
-APP_VERSION     = "7.0"
+APP_VERSION     = "7.4"
 APP_VERSION_STR = f"v{APP_VERSION}"
 
 # ── [v7.0] 주말 차단 유틸 ──────────────────────────────────────────────
