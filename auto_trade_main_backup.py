@@ -2477,16 +2477,21 @@ def run_position_monitor():
                     if code in _auto_stop_timers and current > stop_loss:
                         _auto_stop_timers.pop(code, None)
                         send(f"✅ {name}({code}) 손절선 회복 → Auto-Stop 해제")
-                    elif profit_pct >= 5.0 and code not in _auto_sell_timers and (time.time() - _profit_alert_timers.get(code, 0) > 3600):
+                    # [v7.2] 수익 알림 구간제 — 5/10/15/20% 각 1회만
+                    _alerted = _profit_alert_timers.get(code, set())
+                    if not isinstance(_alerted, set): _alerted = set()
+                    _new_steps = [s for s in [5, 10, 15, 20] if profit_pct >= s and s not in _alerted]
+                    if _new_steps and code not in _auto_sell_timers:
+                        _step = max(_new_steps)
+                        _emoji = "🚀" if _step >= 15 else "📈"
                         send(
-                            f"📈 [수익 알림] {name}({code}) "
-                            f"현재 +{profit_pct}% "
-                            f"목표: {format(target, ',')}원"
+                            f"{_emoji} [수익 알림] {name}({code}) +{_step}% 구간 돌파\n"
+                            f"현재: +{profit_pct:.1f}% | 목표: {format(target, ',')}원\n"
+                            f"→ 익절 검토 구간"
                         )
-                        _profit_alert_timers[code] = time.time()
-
-                        _save_profit_timers()  # [v7.1] 영속 저장
-
+                        _alerted.add(_step)
+                        _profit_alert_timers[code] = _alerted
+                        _save_profit_timers()  # [v7.2] 영속 저장
                     # ── [v7.0 P4] 자동 분할 트리거 (auto 모드) ──────────
                     if SPLIT_MODE == "auto":
                         sp = split_plans.get(code)
