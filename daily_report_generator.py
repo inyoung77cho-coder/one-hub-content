@@ -21,7 +21,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 JOURNAL_DIR = Path.home() / "one_hub_journals"
-OUTPUT_DIR  = Path("content") / "daily"
+OUTPUT_DIR  = Path("/home/ubuntu/one-hub-publish/content/daily")
 DB_PATH     = Path.home() / "trading.db"
 DISCLAIMER  = "본 리포트는 투자 참고 자료이며 투자 권유가 아닙니다. 모든 투자 결과는 본인 책임입니다."
 
