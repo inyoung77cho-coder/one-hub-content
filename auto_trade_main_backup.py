@@ -2358,6 +2358,11 @@ def run_position_monitor():
                 )
                 timer["warned"] = True
 
+                # [v7.5] 중복 실행 방지
+                if code in _auto_stop_executing:
+                    print(f"[AUTO_STOP] {code} 이미 실행 중 — 중복 스킵")
+                    continue
+                _auto_stop_executing.add(code)
             if elapsed >= AUTO_STOP_DELAY_MINUTES:
                 try:
                     current = get_current_price(token, code)
@@ -2375,6 +2380,7 @@ def run_position_monitor():
                     monitor_positions.pop(code, None)
                     _auto_stop_timers.pop(code, None)
                     hold_today.pop(code, None)
+                    _auto_stop_executing.discard(code)  # [v7.5] 락 해제
                     close_risk_position(code, "AUTO_STOP")  # [v5.2 Fix C]
                     send_force(
                         f"🔴 [Auto-Stop 실행] {name}({code})\n"
@@ -2399,6 +2405,7 @@ def run_position_monitor():
                         f"수동으로 /sell {code} 처리하세요."
                     )
                     _auto_stop_timers.pop(code, None)
+                    _auto_stop_executing.discard(code)  # [v7.5] 실패 시 락 해제
 
         # 포지션 순회
         for code, pos in list(monitor_positions.items()):
