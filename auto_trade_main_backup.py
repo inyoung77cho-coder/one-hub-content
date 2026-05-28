@@ -157,21 +157,27 @@ from strategy_stats import (record_trade_result, format_perf_summary,
 WEEKLY_LOSS_LIMIT_PCT: float = float(os.getenv("WEEKLY_LOSS_LIMIT_PCT", "7.0"))
 MAX_POSITIONS:         int   = int(os.getenv("MAX_POSITIONS", "5"))  # 동시 보유 한도
 
-# [v7.0 P6] 웹 대시보드 (DASHBOARD_ENABLED=true 일 때만)
+# [v7.4] 웹 대시보드 — 포트 충돌 시 자동 스킵
 _DASHBOARD_ENABLED = os.getenv("DASHBOARD_ENABLED", "true").lower() == "true"
 if _DASHBOARD_ENABLED:
     try:
-        from dashboard import start_dashboard
-        import threading as _dash_thread
-        _dash_thread.Thread(
-            target=start_dashboard,
-            kwargs={"port": int(os.getenv("DASHBOARD_PORT", "5050"))},
-            daemon=True
-        ).start()
-        print("[DASHBOARD] http://localhost:5050 에서 접속 가능")
+        import socket as _sock
+        _s = _sock.socket(_sock.AF_INET, _sock.SOCK_STREAM)
+        _port_free = _s.connect_ex(("127.0.0.1", 5050)) != 0
+        _s.close()
+        if _port_free:
+            from dashboard import start_dashboard
+            import threading as _dash_thread
+            _dash_thread.Thread(
+                target=start_dashboard,
+                kwargs={"port": int(os.getenv("DASHBOARD_PORT", "5050"))},
+                daemon=True
+            ).start()
+            print("[DASHBOARD] http://localhost:5050 에서 접속 가능")
+        else:
+            print("[DASHBOARD] 포트 5050 이미 사용 중 — 대시보드 스킵")
     except Exception as _de:
-        print(f"[DASHBOARD] 시작 실패 (Flask 미설치?): {_de}")
-
+        print(f"[DASHBOARD] 시작 실패: {_de}")
 # ── 전역 상태 ──────────────────────────────────────────────
 daily_pnl      = 0
 trading_on     = True
