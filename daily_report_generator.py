@@ -18,7 +18,7 @@ from pathlib import Path
 import anthropic
 from dotenv import load_dotenv
 
-load_dotenv(override=False)
+load_dotenv()
 
 JOURNAL_DIR = Path.home() / "one_hub_journals"
 OUTPUT_DIR  = Path("content") / "daily"
@@ -131,7 +131,7 @@ Regime: {db['regime']} | Heat: {db['heat_score']}/100 ({db['heat_grade']})
     try:
         client  = anthropic.Anthropic(api_key=api_key)
         message = client.messages.create(
-            model="claude-sonnet-4-5",
+            model="claude-sonnet-4-6",
             max_tokens=150,
             messages=[{"role": "user", "content": prompt}]
         )
