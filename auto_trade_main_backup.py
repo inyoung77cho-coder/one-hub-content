@@ -127,7 +127,7 @@ from strategy import (calc_rsi, calc_atr, detect_market_regime,
                       calc_position_size_detailed,
                       calc_gap_filter, calc_sector_bonus, calc_regime_adjusted_threshold,
                       calc_technical_score, calc_macro_score, calc_final_score,
-                      should_sell_atr, reset_highest, is_trading_time,
+                      should_sell_atr, reset_highest, is_trading_time, get_api_health,
                       calc_position_size)
 from db_logger import (log_trade, log_ai, log_error, log_daily, get_daily_stats,
                        log_blocked, get_blocked_stats,
