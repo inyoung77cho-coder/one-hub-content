@@ -228,6 +228,72 @@ AUTO_SELL_TIMEOUT_MINUTES: int = int(os.getenv("AUTO_SELL_TIMEOUT_MINUTES", "10"
 _auto_sell_timers: dict = {}  # {code: {"alerted_at": float, "type": str, "warned": bool}}
 _profit_alert_timers: dict = {}  # {code: last_alert_time} — 1시간 중복 차단
 
+
+
+# ── [v7.1] profit_alert_timers 영속 저장 경로 ──
+
+_PROFIT_TIMER_FILE = os.path.join(os.path.dirname(__file__), "profit_alert_timers.json")
+
+
+
+def _load_profit_timers() -> dict:
+
+    """서버 재시작 시 저장된 타이머 로드 (만료된 항목 자동 제거)."""
+
+    try:
+
+        if os.path.exists(_PROFIT_TIMER_FILE):
+
+            import json as _json
+
+            with open(_PROFIT_TIMER_FILE, "r") as _f:
+
+                data = _json.load(_f)
+
+            now = time.time()
+
+            # 1시간(3600초) 이내 항목만 유지
+
+            return {k: v for k, v in data.items() if now - v < 3600}
+
+    except Exception as _e:
+
+        print(f"[WARN] profit_timers 로드 실패: {_e}")
+
+    return {}
+
+
+
+def _save_profit_timers() -> None:
+
+    """타이머 딕셔너리를 JSON 파일에 저장."""
+
+    try:
+
+        import json as _json
+
+        now = time.time()
+
+        # 만료된 항목 제거 후 저장
+
+        valid = {k: v for k, v in _profit_alert_timers.items() if now - v < 3600}
+
+        with open(_PROFIT_TIMER_FILE, "w") as _f:
+
+            _json.dump(valid, _f)
+
+    except Exception as _e:
+
+        print(f"[WARN] profit_timers 저장 실패: {_e}")
+
+
+
+# 시작 시 기존 타이머 로드
+
+_profit_alert_timers.update(_load_profit_timers())
+
+print(f"[STARTUP] profit_alert_timers 로드: {len(_profit_alert_timers)}건")
+
 # [AI-2] 강력 매수 신호 자동 즉시 실행 설정
 AI_STRONG_BUY_AUTO:    bool  = os.getenv("AI_STRONG_BUY_AUTO", "false").lower() == "true"
 AI_STRONG_BUY_SCORE:   float = float(os.getenv("AI_STRONG_BUY_SCORE", "80"))
@@ -588,25 +654,20 @@ def _run_analysis():
 
     # 뉴스 (아래 중복 블록 제거됨 — 위로 이동)
 
-    # KIS 잔고 조회 (장외 안전 처리)
+    # KIS 잔고 조회 [v7.1 장외 완전 차단]
     cash = 0
-    try:
-        token   = get_access_token()
-        balance = get_balance(token)
-        cash    = int(balance["output2"][0].get("dnca_tot_amt", 0))
-    except Exception as _kis_e:
-        err_str = str(_kis_e)
-        if "403" in err_str or "Forbidden" in err_str:
-            send(
-                "KIS API 접근 불가 (장 마감 시간)\n"
-                "잔고 조회 생략 후 분석 계속 진행합니다.\n"
-                "실제 매수는 장중에만 실행됩니다."
-            )
-            cash = 10_000_000
-        else:
-            send("KIS API 오류: " + err_str)
+    if is_trading_time():
+        try:
+            token   = get_access_token()
+            balance = get_balance(token)
+            cash    = int(balance["output2"][0].get("dnca_tot_amt", 0))
+        except Exception as _kis_e:
+            send("KIS API 오류: " + str(_kis_e))
             log_error(_kis_e, "_run_analysis KIS")
             return
+    else:
+        cash = 10_000_000
+        print("[v7.1] 장외시간 KIS 잔고 조회 생략")
 
     if daily_pnl <= MAX_DAILY_LOSS:
         send("CIRCUIT BREAKER: 일일 손실 한도 도달. 매매 중지.")
@@ -2398,6 +2459,8 @@ def run_position_monitor():
                             f"목표: {format(target, ',')}원"
                         )
                         _profit_alert_timers[code] = time.time()
+
+                        _save_profit_timers()  # [v7.1] 영속 저장
 
                     # ── [v7.0 P4] 자동 분할 트리거 (auto 모드) ──────────
                     if SPLIT_MODE == "auto":
