@@ -784,15 +784,19 @@ def _run_analysis():
                 print(f"log_blocked error: {_e}")
 
     # 분석 요약 (1회 전송, dedup 처리됨)
+    # [v7.3] 분석 요약 — ML차단 종목 명확히 분리
+    _ml_blocked = [s for s in blocked_stocks
+                   if any("ML_" in e for e in s.get("_errors", []))]
+    _other_blocked = [s for s in blocked_stocks if s not in _ml_blocked]
     send(
-        f"AI Top {len(top_stocks)}종목 분석 완료 (Regime: {regime})\n"
+        f"🤖 AI 분석 완료 ({regime} 장세)\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        f"매수 가능: {len(valid_stocks)}종목\n"
-        f"관찰 후보: {len(watchlist_stocks)}종목\n"
-        f"차단:      {len(blocked_stocks)}종목\n"
-        f"데이터오류: {len(error_stocks)}종목"
+        f"✅ 매수 가능:  {len(valid_stocks)}종목\n"
+        f"👀 관싼 후보: {len(watchlist_stocks)}종목\n"
+        f"❌ ML하락 신호: {len(_ml_blocked)}종목 (신규진입 권장 안함)\n"
+        f"⛔ 기타 차단:  {len(_other_blocked)}종목\n"
+        f"⚠️ 데이터오류: {len(error_stocks)}종목"
     )
-    time.sleep(0.5)
 
     # 유효 종목 처리
     new_pending_count = 0
