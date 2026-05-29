@@ -41,13 +41,13 @@ export default function Comments({ date }) {
 
     try {
 
-      const r = await fetch(`/api/comments?date=${date}`);
+      const r = await fetch('/api/comments?date=' + date);
 
       const d = await r.json();
 
       setComments(d.comments || []);
 
-    } catch { setComments([]); }
+    } catch(e) { setComments([]); }
 
     finally { setLoading(false); }
 
@@ -91,7 +91,7 @@ export default function Comments({ date }) {
 
     try {
 
-      const r = await fetch(`/api/comments?date=${date}`, {
+      const r = await fetch('/api/comments?date=' + date, {
 
         method: 'POST',
 
@@ -103,7 +103,7 @@ export default function Comments({ date }) {
 
       const d = await r.json();
 
-      if (!r.ok) throw new Error(d.error || '오류 발생');
+      if (!r.ok) throw new Error(d.error || 'error');
 
       setComments(prev => [...prev, d]);
 
@@ -113,7 +113,7 @@ export default function Comments({ date }) {
 
       setTimeout(() => setSuccess(false), 3000);
 
-    } catch (e) { setError(e.message); }
+    } catch(e) { setError(e.message); }
 
     finally { setPosting(false); }
 
@@ -133,7 +133,7 @@ export default function Comments({ date }) {
 
       });
 
-    } catch { return ''; }
+    } catch(e) { return ''; }
 
   }
 
@@ -145,7 +145,7 @@ export default function Comments({ date }) {
 
       <h3 className="comments-title">
 
-        <span>������</span> 댓글
+        <span>Comments</span>
 
         <span className="comments-count">{comments.length}</span>
 
@@ -157,11 +157,11 @@ export default function Comments({ date }) {
 
         {loading ? (
 
-          <div className="comments-empty">불러오는 중...</div>
+          <div className="comments-empty">Loading...</div>
 
         ) : comments.length === 0 ? (
 
-          <div className="comments-empty">첫 번째 댓글을 남겨보세요.</div>
+          <div className="comments-empty">No comments yet. Be the first!</div>
 
         ) : (
 
@@ -193,15 +193,15 @@ export default function Comments({ date }) {
 
         <form className="login-form" onSubmit={handleLogin}>
 
-          <p className="login-desc">닉네임을 입력하면 댓글을 남길 수 있습니다.</p>
+          <p className="login-desc">Enter a nickname to leave a comment.</p>
 
           <div className="login-row">
 
-            <input className="login-input" placeholder="닉네임 (최대 20자)"
+            <input className="login-input" placeholder="Nickname (max 20)"
 
               value={nick} onChange={e => setNick(e.target.value)} maxLength={20} />
 
-            <button className="login-btn" type="submit">확인</button>
+            <button className="login-btn" type="submit">OK</button>
 
           </div>
 
@@ -213,15 +213,15 @@ export default function Comments({ date }) {
 
           <div className="comment-form-header">
 
-            <span className="comment-form-nick">✏️ {nick}</span>
+            <span className="comment-form-nick">/ {nick}</span>
 
-            <button type="button" className="logout-btn" onClick={handleLogout}>닉네임 변경</button>
+            <button type="button" className="logout-btn" onClick={handleLogout}>change</button>
 
           </div>
 
           <textarea className="comment-textarea"
 
-            placeholder="오늘 시장에 대한 생각을 남겨주세요... (500자 이내)"
+            placeholder="Share your thoughts on today's market... (max 500)"
 
             value={text} onChange={e => setText(e.target.value)}
 
@@ -233,15 +233,15 @@ export default function Comments({ date }) {
 
             <button className="submit-btn" type="submit" disabled={posting || !text.trim()}>
 
-              {posting ? '등록 중...' : '댓글 등록'}
+              {posting ? 'Posting...' : 'Post'}
 
             </button>
 
           </div>
 
-          {error   && <div className="comment-error">⚠️ {error}</div>}
+          {error   && <div className="comment-error">Error: {error}</div>}
 
-          {success && <div className="comment-success">✅ 댓글이 등록됐습니다.</div>}
+          {success && <div className="comment-success">Posted!</div>}
 
         </form>
 
