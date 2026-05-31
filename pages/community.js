@@ -1,8 +1,9 @@
 import Head from "next/head";
+import { useState } from "react";
 
 const channels = [
   { icon: "✈️", name: "텔레그램 알림 봇", handle: "@onehub_jiy_bot", desc: "매매 신호, 일일 리포트, 엔진 상태 알림을 실시간으로 수신", status: "LIVE", action: "채널 참여", link: "https://t.me/onehub_jiy_bot" },
-  { icon: "📧", name: "뉴스레터", handle: "Weekly Digest", desc: "매주 금요일 — 주간 운영 성과 + AI 인사이트 요약 이메일 발송", status: "BUILDING", action: "준비 중", link: null },
+  { icon: "📧", name: "뉴스레터", handle: "Weekly Digest", desc: "매주 금요일 — 주간 운영 성과 + AI 인사이트 요약 이메일 발송", status: "LIVE", action: "구독하기", link: null, newsletter: true },
   { icon: "💬", name: "카카오 알림", handle: "KakaoTalk", desc: "중요 매매 신호 및 리스크 경고를 카카오톡으로 수신", status: "BUILDING", action: "준비 중", link: null },
 ];
 
@@ -13,6 +14,75 @@ const principles = [
   { icon: "📖", title: "학습 중심 커뮤니티", desc: "단기 수익보다 장기적 투자 사고방식을 공유." },
 ];
 
+function NewsletterForm() {
+  const [email, setEmail] = useState("");
+  const [status, setStatus] = useState("idle"); // idle | loading | success | error
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!email) return;
+    setStatus("loading");
+    try {
+      const res = await fetch(
+        `https://api.beehiiv.com/v2/publications/pub_28ffafd3-bba3-4810-86f8-a742eea7a8e0/subscriptions`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, reactivate_existing: false, send_welcome_email: true }),
+        }
+      );
+      if (res.ok) {
+        setStatus("success");
+        setEmail("");
+      } else {
+        setStatus("error");
+      }
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} style={{ marginTop: "12px" }}>
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+        <input
+          type="email"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+          placeholder="이메일 입력"
+          disabled={status === "loading" || status === "success"}
+          style={{
+            flex: 1, minWidth: "160px",
+            background: "#151a22", border: "1px solid #2a3344",
+            borderRadius: "6px", padding: "8px 12px",
+            fontFamily: "monospace", fontSize: "11px", color: "#e8edf5",
+            outline: "none",
+          }}
+        />
+        <button
+          type="submit"
+          disabled={status === "loading" || status === "success"}
+          style={{
+            background: status === "success" ? "#003d26" : "#00d084",
+            color: status === "success" ? "#00d084" : "#0a0c10",
+            border: "none", borderRadius: "6px",
+            padding: "8px 16px", fontFamily: "monospace",
+            fontSize: "11px", fontWeight: 700, cursor: "pointer",
+            flexShrink: 0,
+          }}
+        >
+          {status === "loading" ? "..." : status === "success" ? "✅ 구독완료" : "구독"}
+        </button>
+      </div>
+      {status === "error" && (
+        <p style={{ fontFamily: "monospace", fontSize: "10px", color: "#ff4757", marginTop: "6px" }}>
+          오류가 발생했습니다. 다시 시도해 주세요.
+        </p>
+      )}
+    </form>
+  );
+}
+
 export default function CommunityPage() {
   return (
     <>
@@ -21,9 +91,11 @@ export default function CommunityPage() {
         <main style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px" }}>
           <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#4a5568", textTransform: "uppercase", marginBottom: "8px" }}>Community</h1>
           <p style={{ fontSize: "13px", color: "#8a9ab5", marginBottom: "36px" }}>AI 자동매매 여정을 함께하는 채널</p>
+
+          {/* 채널 카드 */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px", marginBottom: "40px" }}>
             {channels.map(ch => (
-              <div key={ch.name} style={{ background: "#0f1218", border: "1px solid #1e2530", borderRadius: "12px", padding: "22px 20px", opacity: ch.status === "LIVE" ? 1 : 0.6, display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div key={ch.name} style={{ background: "#0f1218", border: "1px solid #1e2530", borderRadius: "12px", padding: "22px 20px", opacity: ch.status === "BUILDING" ? 0.6 : 1, display: "flex", flexDirection: "column", gap: "12px" }}>
                 <div style={{ fontSize: "28px" }}>{ch.icon}</div>
                 <div>
                   <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#e8edf5", marginBottom: "3px" }}>{ch.name}</div>
@@ -31,14 +103,24 @@ export default function CommunityPage() {
                 </div>
                 <p style={{ fontSize: "12px", color: "#8a9ab5", lineHeight: 1.6, margin: 0, flex: 1 }}>{ch.desc}</p>
                 <div>
-                  <span style={{ display: "inline-block", fontFamily: "monospace", fontSize: "10px", fontWeight: 700, padding: "3px 8px", borderRadius: "4px", background: ch.status === "LIVE" ? "#003d26" : "#3d3200", color: ch.status === "LIVE" ? "#00d084" : "#ffd700", marginBottom: "10px" }}>{ch.status}</span>
-                  {ch.link
-                    ? <a href={ch.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", fontFamily: "monospace", fontSize: "11px", color: "#00d084", textDecoration: "none" }}>{ch.action} →</a>
-                    : <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#4a5568" }}>{ch.action}</span>}
+                  <span style={{ display: "inline-block", fontFamily: "monospace", fontSize: "10px", fontWeight: 700, padding: "3px 8px", borderRadius: "4px", background: ch.status === "LIVE" ? "#003d26" : "#3d3200", color: ch.status === "LIVE" ? "#00d084" : "#ffd700", marginBottom: "10px" }}>
+                    {ch.status}
+                  </span>
+                  {ch.newsletter ? (
+                    <NewsletterForm />
+                  ) : ch.link ? (
+                    <a href={ch.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", fontFamily: "monospace", fontSize: "11px", color: "#00d084", textDecoration: "none" }}>
+                      {ch.action} →
+                    </a>
+                  ) : (
+                    <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#4a5568" }}>{ch.action}</span>
+                  )}
                 </div>
               </div>
             ))}
           </div>
+
+          {/* 커뮤니티 원칙 */}
           <div style={{ background: "#0f1218", border: "1px solid #1e2530", borderRadius: "12px", padding: "28px 24px" }}>
             <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#4a5568", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "20px" }}>커뮤니티 원칙</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
