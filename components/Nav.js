@@ -21,7 +21,6 @@ export default function Nav() {
       padding: "16px 32px",
       display: "flex",
       alignItems: "center",
-      justifyContent: "space-between",
       background: "#0f1218",
       position: "sticky",
       top: 0,
@@ -29,13 +28,8 @@ export default function Nav() {
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: "24px", flexWrap: "wrap" }}>
         <Link href="/" style={{
-          fontFamily: "monospace",
-          fontSize: "13px",
-          fontWeight: 700,
-          letterSpacing: "0.15em",
-          color: "#8a9ab5",
-          textDecoration: "none",
-          flexShrink: 0,
+          fontFamily: "monospace", fontSize: "13px", fontWeight: 700,
+          letterSpacing: "0.15em", color: "#8a9ab5", textDecoration: "none", flexShrink: 0,
         }}>
           ONE-<span style={{ color: "#00d084" }}>HUB</span>
         </Link>
@@ -44,13 +38,10 @@ export default function Nav() {
             const isActive = href === "/" ? current === "/" : current.startsWith(href);
             return (
               <Link key={href} href={href} style={{
-                fontFamily: "monospace",
-                fontSize: "11px",
+                fontFamily: "monospace", fontSize: "11px",
                 color: isActive ? "#00d084" : "#4a5568",
-                textDecoration: "none",
-                letterSpacing: "0.1em",
+                textDecoration: "none", letterSpacing: "0.1em",
                 fontWeight: isActive ? 700 : 400,
-                transition: "color .15s",
               }}>
                 {label}
               </Link>
