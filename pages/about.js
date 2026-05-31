@@ -9,10 +9,11 @@ const values = [
 ];
 
 const timeline = [
-  { date: "2026-05", label: "ONE-HUB v8.0", desc: "AWS 마이그레이션 완료, Engine Hub 공개, systemd 단독 관리" },
-  { date: "2026-05", label: "콘텐츠 플랫폼 전환", desc: "단순 매매봇 → Daily/Weekly 리포트 자동 발행 파이프라인 구축" },
-  { date: "2026-05", label: "자동매매 시작", desc: "KIS API 연동, ML 시그널 + 기술적 지표 기반 실전 운용 시작" },
-  { date: "2026-04", label: "ONE-HUB 프로젝트 시작", desc: "AI 자동매매 + 콘텐츠 플랫폼 아이디어 구체화" },
+  { date: "2026-05-31", label: "ONE-HUB v8.0", desc: "AWS 마이그레이션 완료, Engine Hub 공개, 전체 홈페이지 구축, systemd 단독 관리" },
+  { date: "2026-05-23", label: "콘텐츠 플랫폼 전환", desc: "단순 매매봇 → Daily/Weekly 리포트 자동 발행 파이프라인 구축, Vercel 배포" },
+  { date: "2026-05-21", label: "AWS 마이그레이션 시작", desc: "Lightsail 서버 구축, KIS API 연동, systemd 서비스 등록" },
+  { date: "2026-05-09", label: "자동매매 시작", desc: "KIS API 연동, ML 시그널 + 기술적 지표 기반 실전 운용 시작" },
+  { date: "2026-04-01", label: "ONE-HUB 프로젝트 시작", desc: "AI 자동매매 + 콘텐츠 플랫폼 아이디어 구체화, 첫 코드 작성" },
 ];
 
 export default function AboutPage() {
