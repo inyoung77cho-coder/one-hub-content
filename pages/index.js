@@ -97,6 +97,56 @@ export default function Home({ reports, stats }) {
         </div>
 
         <main className="main">
+
+        {/* ── HERO INTRO ── */}
+
+        <div className="hero-intro">
+
+          <div className="hero-intro-inner">
+
+            <div className="hero-intro-text">
+
+              <h1 className="hero-intro-title">
+
+                AI가 시장을 읽고,<br />
+
+                <span className="hero-intro-accent">사람이 판단합니다.</span>
+
+              </h1>
+
+              <p className="hero-intro-desc">
+
+                ONE-HUB는 한국 주식시장을 AI 엔진으로 분석하고 매일 15:30 KST 운영 리포트를 발행합니다.
+
+                수익률 숫자 대신, 판단 과정을 공개합니다.
+
+              </p>
+
+            </div>
+
+            <div className="hero-intro-cta">
+
+              <a href="https://www.beehiiv.com/subscribe/one-hub" target="_blank" rel="noopener noreferrer" className="cta-btn primary">
+
+                뉴스레터 구독 →
+
+              </a>
+
+              <a href="/daily" className="cta-btn secondary">
+
+                운영일지 보기
+
+              </a>
+
+            </div>
+
+          </div>
+
+        </div>
+
+
+
+
           {/* ── TODAY HERO ── */}
           {latest ? (
             <section className="hero-section">
@@ -163,39 +213,6 @@ export default function Home({ reports, stats }) {
               <div className="no-data">아직 데이터가 없습니다.</div>
             </section>
           )}
-
-          {/* ── AI 판단 차단 사유 시각화 ── */}
-          <section className="section">
-            <div className="section-header">
-              <h2 className="section-title">AI 판단 근거</h2>
-              <span className="section-subtitle mono">매매 차단 사유 분석</span>
-            </div>
-            <div className="block-reasons-grid">
-              {[
-                { label: '변동성 과다', value: 72, icon: '⚡', color: 'var(--amber)' },
-                { label: '추세 불명확', value: 58, icon: '〰', color: 'var(--text-dim)' },
-                { label: '거래량 부족', value: 45, icon: '📉', color: 'var(--blue)' },
-                { label: '리스크 한도', value: 31, icon: '🛑', color: 'var(--red)' },
-                { label: '횡보장 판단', value: 89, icon: '↔', color: 'var(--green)' },
-                { label: '매크로 이벤트', value: 24, icon: '🌐', color: 'var(--purple)' },
-              ].map(item => (
-                <div key={item.label} className="block-reason-item">
-                  <div className="br-top">
-                    <span className="br-icon">{item.icon}</span>
-                    <span className="br-label">{item.label}</span>
-                    <span className="br-value mono" style={{ color: item.color }}>{item.value}%</span>
-                  </div>
-                  <div className="br-bar-bg">
-                    <div
-                      className="br-bar-fill"
-                      style={{ width: `${item.value}%`, background: item.color }}
-                    ></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-
           {/* ── 누적 통계 ── */}
           <section className="section">
             <div className="section-header">
@@ -289,11 +306,11 @@ export default function Home({ reports, stats }) {
             <div className="hub-grid">
               {[
                 { href: '/daily', label: 'Daily Report', desc: '매일 AI 운영일지', status: 'live', week: null },
-                { href: '/weekly', label: 'Weekly Digest', desc: '주간 성과 요약', status: 'soon', week: '3주차' },
-                { href: '/engines', label: 'Engine Hub', desc: 'AI 엔진 현황판', status: 'soon', week: '4주차' },
+                { href: '/weekly', label: 'Weekly Digest', desc: '주간 성과 요약', status: 'live', week: null },
+                { href: '/engines', label: 'Engine Hub', desc: 'AI 엔진 현황판', status: 'live', week: null },
                 { href: '/strategies', label: 'Strategies', desc: '전략 라이브러리', status: 'soon', week: '4주차' },
                 { href: '/community', label: 'Community', desc: '텔레그램·카카오', status: 'soon', week: '2주차' },
-                { href: '/about', label: 'About', desc: 'ONE-HUB 철학', status: 'soon', week: '1주차' },
+                { href: '/about', label: 'About', desc: 'ONE-HUB 철학', status: 'live', week: null },
               ].map(item => (
                 <Link
                   key={item.href}
