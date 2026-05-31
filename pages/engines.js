@@ -46,12 +46,12 @@ export default function EnginesPage() {
                   : <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#4a5568" }}>개발 중</span>}
               </div>
             ))}
-              </div>
+          </div>
           {engineData && (
             <div style={{ marginTop: "32px", background: "#0f1218", border: "1px solid #1e2530", borderRadius: "12px", padding: "24px" }}>
               <div style={{ fontFamily: "monospace", fontSize: "11px", letterSpacing: "0.15em", color: "#4a5568", textTransform: "uppercase", marginBottom: "16px" }}>Auto Trade — 실시간 상세</div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
-                {[["프로세스 수", `${engineData.engine?.process_count ?? "—"}개`], ["PID", engineData.engine?.pids?.join(", ") || "—"], ["보유 종목", `${engineData.holdings?.length ?? 0}종목`]].map(([label, value]) => (
+                {[["프로세스 수", `${engineData.engine?.process_count ?? 0}개`], ["PID", engineData.engine?.pids?.join(", ") || "-"], ["보유 종목", `${engineData.holdings?.length ?? 0}종목`]].map(([label, value]) => (
                   <div key={label} style={{ background: "#151a22", border: "1px solid #1e2530", borderRadius: "8px", padding: "12px" }}>
                     <div style={{ fontFamily: "monospace", fontSize: "9px", color: "#4a5568", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "6px" }}>{label}</div>
                     <div style={{ fontFamily: "monospace", fontSize: "14px", fontWeight: 700, color: "#e8edf5" }}>{value}</div>
@@ -68,9 +68,3 @@ export default function EnginesPage() {
     </>
   );
 }
-          </div>
-          {engineData && (
-            <div style={{ marginTop: "32px", background: "#0f1218", border: "1px solid #1e2530", borderRadius: "12px", padding: "24px" }}>
-              <div style={{ fontFamily: "monospace", fontSize: "11px", letterSpacing: "0.15em", color: "#4a5568", textTransform: "uppercase", marginBottom: "16px" }}>Auto Trade — 실시간 상세</div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
-                {[["프로세스 수", `${engineData.engine?.process_count ?? "—"}개`], ["PID", engineData.engine?.pids?.join(", ") || "—"], ["보유 종목", `${engineData.holdings?.length ??
