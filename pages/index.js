@@ -126,7 +126,7 @@ export default function Home({ reports, stats }) {
 
             <div className="hero-intro-cta">
 
-              <a href="https://www.beehiiv.com/subscribe/one-hub" target="_blank" rel="noopener noreferrer" className="cta-btn primary">
+              <a href="https://inyoungs-newsletter.beehiiv.com/subscribe" target="_blank" rel="noopener noreferrer" className="cta-btn primary">
 
                 뉴스레터 구독 →
 
@@ -200,7 +200,7 @@ export default function Home({ reports, stats }) {
                     &ldquo;{latest.insight}&rdquo;
                   </blockquote>
                   <div className="insight-meta">
-                    <span className="mono dim">claude-3-5-sonnet · 15:30 KST</span>
+                    <span className="mono dim">claude-sonnet-4-6 · 15:30 KST</span>
                   </div>
                   <Link href={`/daily/${latest.date}`} className="insight-link">
                     전체 분석 보기 →
