@@ -126,7 +126,7 @@ export default function Home({ reports, stats }) {
 
             <div className="hero-intro-cta">
 
-              <a href="https://inyoungs-newsletter.beehiiv.com/subscribe" target="_blank" rel="noopener noreferrer" className="cta-btn primary">
+              <a href="https://onehub-newsletter.beehiiv.com/subscribe" target="_blank" rel="noopener noreferrer" className="cta-btn primary">
 
                 뉴스레터 구독 →
 
