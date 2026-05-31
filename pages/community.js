@@ -86,7 +86,31 @@ function NewsletterForm() {
 export default function CommunityPage() {
   return (
     <>
-      <Head><title>Community — ONE-HUB</title></Head>
+      <Head>
+
+        <title>Community — ONE-HUB</title>
+
+        <meta name="description" content="ONE-HUB 커뮤니티. 텔레그램 알림 봇과 뉴스레터로 AI 자동매매 운영 현황을 실시간으로 받아보세요." />
+
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        <meta property="og:title" content="Community — ONE-HUB" />
+
+        <meta property="og:description" content="ONE-HUB 커뮤니티. 텔레그램 알림 봇과 뉴스레터로 AI 자동매매 운영 현황을 실시간으로 받아보세요." />
+
+        <meta property="og:url" content="https://one-hub-content.vercel.app/community" />
+
+        <meta property="og:type" content="website" />
+
+        <meta property="og:site_name" content="ONE-HUB" />
+
+        <meta name="twitter:card" content="summary" />
+
+        <meta name="twitter:title" content="Community — ONE-HUB" />
+
+        <meta name="twitter:description" content="ONE-HUB 커뮤니티. 텔레그램 알림 봇과 뉴스레터로 AI 자동매매 운영 현황을 실시간으로 받아보세요." />
+
+      </Head>
       <div style={{ minHeight: "100vh", background: "#0a0c10", color: "#e8edf5", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px" }}>
           <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#4a5568", textTransform: "uppercase", marginBottom: "8px" }}>Community</h1>

@@ -7,7 +7,31 @@ import Head from 'next/head'
 export default function WeeklyIndex({ reports }) {
   return (
     <>
-      <Head><title>Weekly Reports — ONE-HUB</title></Head>
+      <Head>
+
+        <title>Weekly Reports — ONE-HUB</title>
+
+        <meta name="description" content="ONE-HUB 주간 운영 리포트. 매주 금요일 한 주간의 시장 분석과 운영 회고를 발행합니다." />
+
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        <meta property="og:title" content="Weekly Reports — ONE-HUB" />
+
+        <meta property="og:description" content="ONE-HUB 주간 운영 리포트. 매주 금요일 한 주간의 시장 분석과 운영 회고를 발행합니다." />
+
+        <meta property="og:url" content="https://one-hub-content.vercel.app/weekly" />
+
+        <meta property="og:type" content="website" />
+
+        <meta property="og:site_name" content="ONE-HUB" />
+
+        <meta name="twitter:card" content="summary" />
+
+        <meta name="twitter:title" content="Weekly Reports — ONE-HUB" />
+
+        <meta name="twitter:description" content="ONE-HUB 주간 운영 리포트. 매주 금요일 한 주간의 시장 분석과 운영 회고를 발행합니다." />
+
+      </Head>
       <div style={{ minHeight: "100vh", background: "#0a0c10", color: "#e8edf5", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "800px", margin: "0 auto", padding: "40px 24px" }}>
           <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#4a5568", textTransform: "uppercase", marginBottom: "32px" }}>

@@ -22,7 +22,31 @@ export default function EnginesPage() {
 
   return (
     <>
-      <Head><title>Engines — ONE-HUB</title></Head>
+      <Head>
+
+        <title>AI Engines — ONE-HUB</title>
+
+        <meta name="description" content="ONE-HUB AI 엔진 현황판. ML 시그널, Final Score, Regime 분석 엔진의 실시간 상태를 확인합니다." />
+
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        <meta property="og:title" content="AI Engines — ONE-HUB" />
+
+        <meta property="og:description" content="ONE-HUB AI 엔진 현황판. ML 시그널, Final Score, Regime 분석 엔진의 실시간 상태를 확인합니다." />
+
+        <meta property="og:url" content="https://one-hub-content.vercel.app/engines" />
+
+        <meta property="og:type" content="website" />
+
+        <meta property="og:site_name" content="ONE-HUB" />
+
+        <meta name="twitter:card" content="summary" />
+
+        <meta name="twitter:title" content="AI Engines — ONE-HUB" />
+
+        <meta name="twitter:description" content="ONE-HUB AI 엔진 현황판. ML 시그널, Final Score, Regime 분석 엔진의 실시간 상태를 확인합니다." />
+
+      </Head>
       <div style={{ minHeight: "100vh", background: "#0a0c10", color: "#e8edf5", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "900px", margin: "0 auto", padding: "40px 24px" }}>
           <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#4a5568", textTransform: "uppercase", marginBottom: "8px" }}>AI Engine Hub</h1>

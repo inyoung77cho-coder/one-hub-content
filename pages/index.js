@@ -41,6 +41,21 @@ export default function Home({ reports, stats }) {
         <title>ONE-HUB — AI 자동매매 플랫폼</title>
         <meta name="description" content="AI 엔진이 시장을 읽고, 사람이 판단합니다. ONE-HUB 자동매매 운영 현황." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta property="og:title" content="ONE-HUB — AI 자동매매 플랫폼" />
+
+        <meta property="og:description" content="AI 엔진이 시장을 읽고, 사람이 판단합니다. ONE-HUB 자동매매 운영 현황." />
+
+        <meta property="og:url" content="https://one-hub-content.vercel.app" />
+
+        <meta property="og:type" content="website" />
+
+        <meta property="og:site_name" content="ONE-HUB" />
+
+        <meta name="twitter:card" content="summary" />
+
+        <meta name="twitter:title" content="ONE-HUB — AI 자동매매 플랫폼" />
+
+        <meta name="twitter:description" content="AI 엔진이 시장을 읽고, 사람이 판단합니다." />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />

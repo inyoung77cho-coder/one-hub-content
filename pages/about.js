@@ -19,7 +19,31 @@ const timeline = [
 export default function AboutPage() {
   return (
     <>
-      <Head><title>About — ONE-HUB</title></Head>
+      <Head>
+
+        <title>About — ONE-HUB</title>
+
+        <meta name="description" content="ONE-HUB 소개. AI가 분석하고 사람이 판단하는 한국 주식 자동매매 시스템의 철학과 운영 원칙." />
+
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        <meta property="og:title" content="About — ONE-HUB" />
+
+        <meta property="og:description" content="ONE-HUB 소개. AI가 분석하고 사람이 판단하는 한국 주식 자동매매 시스템의 철학과 운영 원칙." />
+
+        <meta property="og:url" content="https://one-hub-content.vercel.app/about" />
+
+        <meta property="og:type" content="website" />
+
+        <meta property="og:site_name" content="ONE-HUB" />
+
+        <meta name="twitter:card" content="summary" />
+
+        <meta name="twitter:title" content="About — ONE-HUB" />
+
+        <meta name="twitter:description" content="ONE-HUB 소개. AI가 분석하고 사람이 판단하는 한국 주식 자동매매 시스템의 철학과 운영 원칙." />
+
+      </Head>
       <div style={{ minHeight: "100vh", background: "#0a0c10", color: "#e8edf5", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "780px", margin: "0 auto", padding: "40px 24px" }}>
           <div style={{ marginBottom: "48px" }}>

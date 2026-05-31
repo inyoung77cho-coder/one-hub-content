@@ -18,7 +18,31 @@ export default function DailyIndex({ posts }) {
 
   return (
     <>
-      <Head><title>Daily Reports — ONE-HUB</title></Head>
+      <Head>
+
+        <title>Daily Reports — ONE-HUB</title>
+
+        <meta name="description" content="ONE-HUB AI 자동매매 일일 운영일지. 매일 15:30 KST 시장 분석과 AI 판단 과정을 공개합니다." />
+
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        <meta property="og:title" content="Daily Reports — ONE-HUB" />
+
+        <meta property="og:description" content="ONE-HUB AI 자동매매 일일 운영일지. 매일 15:30 KST 시장 분석과 AI 판단 과정을 공개합니다." />
+
+        <meta property="og:url" content="https://one-hub-content.vercel.app/daily" />
+
+        <meta property="og:type" content="website" />
+
+        <meta property="og:site_name" content="ONE-HUB" />
+
+        <meta name="twitter:card" content="summary" />
+
+        <meta name="twitter:title" content="Daily Reports — ONE-HUB" />
+
+        <meta name="twitter:description" content="ONE-HUB AI 자동매매 일일 운영일지. 매일 15:30 KST 시장 분석과 AI 판단 과정을 공개합니다." />
+
+      </Head>
       <div style={{ minHeight: "100vh", background: "#0a0c10", color: "#e8edf5", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "800px", margin: "0 auto", padding: "40px 24px" }}>
           <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#4a5568", textTransform: "uppercase", marginBottom: "32px" }}>
