@@ -1,10 +1,10 @@
 import Head from "next/head";
 
 const strategies = [
-  { id: "ml_signal", name: "ML 시그널", icon: "🤖", status: "ACTIVE", weight: 40, desc: "머신러닝 모델이 종목별 매수/매도 확률을 스코어링. 과거 패턴 학습 기반.", rules: ["확률 > 0.65 → 매수 후보", "확률 < 0.35 → 매도 후보", "0.35~0.65 → 관망"] },
-  { id: "final_score", name: "Final Score", icon: "📊", status: "ACTIVE", weight: 35, desc: "RSI, MACD, 볼린저밴드 통합 기술적 점수. 0~100 스케일.", rules: ["Score ≥ 70 → 강매수", "Score 50~69 → 약매수", "Score < 50 → 차단"] },
-  { id: "risk_mgmt", name: "리스크 관리", icon: "🛡️", status: "ACTIVE", weight: 25, desc: "손절/익절 자동 실행 및 종목별 비중 제한으로 최대 손실 통제.", rules: ["손절 기준: -5%", "1종목 최대 비중: 30%", "장 외 시간 API 완전 차단"] },
-  { id: "macro_filter", name: "매크로 필터", icon: "🌐", status: "BUILDING", weight: 0, desc: "VIX, Fear&Greed, 금리 데이터로 시장 국면 판단 후 전체 매매 강도 조절.", rules: ["VIX > 30 → 전체 차단", "Fear < 20 → 비중 50% 축소", "금리 급등 → 성장주 차단"] },
+  { id: "ml_signal", name: "ML 시그널", icon: "烙", status: "ACTIVE", weight: 35, desc: "머신러닝 모델이 종목별 매수/매도 확률을 스코어링. 과거 패턴 학습 기반.", rules: ["확률 > 0.65 → 매수 후보", "확률 < 0.35 → 매도 후보", "0.35~0.65 → 관망"] },
+  { id: "final_score", name: "Final Score", icon: "", status: "ACTIVE", weight: 30, desc: "RSI, MACD, 볼린저밴드 통합 기술적 점수. 0~100 스케일.", rules: ["Score ≥ 70 → 강매수", "Score 50~69 → 약매수", "Score < 50 → 차단"] },
+  { id: "risk_mgmt", name: "리스크 관리", icon: "", status: "ACTIVE", weight: 20, desc: "손절/익절 자동 실행 및 종목별 비중 제한으로 최대 손실 통제.", rules: ["손절 기준: -5%", "1종목 최대 비중: 30%", "장 외 시간 API 완전 차단"] },
+  { id: "macro_filter", name: "매크로 필터", icon: "", status: "ACTIVE", weight: 15, desc: "VIX, Fear&Greed, 나스닥 지수로 시장 국면을 판단해 매수 기준점을 동적으로 조정합니다. BEAR 국면에서는 신규 매수를 전면 차단합니다.", rules: ["BEAR MARKET → 신규 매수 전면 차단", "VIX 상승 → 매수 기준 점수 자동 상향", "매크로 점수 낮으면 → 해당 종목 BLOCKED 처리"] },
 ];
 
 export default function StrategiesPage() {
