@@ -534,12 +534,14 @@ function EngineCard({ engine, version }) {
               {engine?.pids?.join(", ") || "—"}
             </div>
           </div>
+          {isOn && (
           <div className="meta-item" style={{ gridColumn: "1 / -1" }}>
             <div className="meta-label">마지막 시작</div>
             <div className="meta-value" style={{ fontSize: "12px" }}>
               {getKSTTime(engine?.started_at) || "—"}
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>
