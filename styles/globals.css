@@ -196,10 +196,10 @@ img { max-width: 100%; display: block; }
 .status-label {
   font-size: 11px;
   font-family: var(--font-mono);
-  color: var(--text-dim);
+  color: #C8C8C0;
   letter-spacing: 0.06em;
 }
-.status-divider { color: var(--bg-border); font-size: 12px; flex-shrink: 0; }
+.status-divider { color: #555550; font-size: 12px; flex-shrink: 0; }
 
 .status-dot {
   width: 6px;
