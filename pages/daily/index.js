@@ -185,64 +185,9 @@ export default function DailyIndex({ posts }) {
       </div>
 
     </>
-
   );
 
-}
 
-
-
-              <Link key={post.date} href={`/daily/${post.date}`} style={{ textDecoration: "none" }}>
-
-                <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "18px 20px", display: "grid", gridTemplateColumns: "40px 120px 1fr auto", alignItems: "center", gap: "16px", cursor: "pointer" }}
-
-                  onMouseEnter={e => e.currentTarget.style.borderColor = "#cbd5e0"}
-
-                  onMouseLeave={e => e.currentTarget.style.borderColor = "#e2e8f0"}>
-
-                  <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#a0aec0" }}>{String(i + 1).padStart(2, "0")}</span>
-
-                  <span style={{ fontFamily: "monospace", fontSize: "12px", color: "#718096" }}>{post.date}</span>
-
-                  <div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "6px" }}>
-
-                      <span style={{ fontFamily: "monospace", fontSize: "11px", fontWeight: 700, color: regimeColor(post.regime) }}>
-
-                        {regimeEmoji(post.regime)} {post.regime}
-
-                      </span>
-
-                      <span style={{ fontSize: "11px", color: "#a0aec0" }}>· Heat {post.heat_score}</span>
-
-                    </div>
-
-                    <p style={{ fontSize: "12px", color: "#718096", margin: 0, lineHeight: 1.5, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 1, WebkitBoxOrient: "vertical" }}>
-
-                      {post.insight}
-
-                    </p>
-
-                  </div>
-
-                  <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#a0aec0" }}>{post.trade_count}건</span>
-
-                </div>
-
-              </Link>
-
-            ))}
-
-          </div>
-
-        </main>
-
-      </div>
-
-    </>
-
-  );
 
 }
 
