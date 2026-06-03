@@ -522,16 +522,10 @@ function EngineCard({ engine, version }) {
           </div>
         </div>
         <div className="engine-meta">
-          <div className="meta-item">
-            <div className="meta-label">프로세스 수</div>
-            <div className={`meta-value ${isOn ? "green" : ""}`}>
-              {engine?.process_count ?? "—"}개
-            </div>
-          </div>
-          <div className="meta-item">
-            <div className="meta-label">PID</div>
-            <div className="meta-value">
-              {engine?.pids?.join(", ") || "—"}
+          <div className="meta-item" style={{ gridColumn: "1 / -1" }}>
+            <div className="meta-label">운영 상태</div>
+            <div className={`meta-value ${isOn ? "green" : ""}`} style={{ fontSize: "13px" }}>
+              {isOn ? "정상 가동 중" : engine?.status === "stopped" ? "장 마감 후 종료" : "서버 응답 없음"}
             </div>
           </div>
           {isOn && (
