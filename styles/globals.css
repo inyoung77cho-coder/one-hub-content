@@ -181,7 +181,7 @@ img { max-width: 100%; display: block; }
 ───────────────────────────────────────────────────────── */
 .status-bar {
   height: var(--status-height);
-  background: var(--bg-surface);
+  background: rgba(10, 12, 15, 0.92);
   border-bottom: 1px solid var(--bg-border);
   display: flex;
   align-items: center;
@@ -249,7 +249,8 @@ img { max-width: 100%; display: block; }
 .hero-date-line {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
   margin-bottom: 1.25rem;
   font-size: 13px;
 }
