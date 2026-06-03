@@ -1288,3 +1288,276 @@ img { max-width: 100%; display: block; }
 
 }
 
+
+
+
+/* ── TODAY JUDGMENT CARD ── */
+
+.today-judgment-card {
+
+  background: var(--card-bg);
+
+  border: 1px solid var(--border);
+
+  border-radius: 12px;
+
+  padding: 1.25rem;
+
+  margin-bottom: 1rem;
+
+}
+
+.tj-header {
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  margin-bottom: 1rem;
+
+}
+
+.tj-label {
+
+  font-family: var(--mono);
+
+  font-size: 0.7rem;
+
+  color: var(--text-dim);
+
+  letter-spacing: 0.08em;
+
+}
+
+.tj-regime {
+
+  font-size: 0.85rem;
+
+  font-weight: 600;
+
+}
+
+.tj-metrics {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 0;
+
+  margin-bottom: 1rem;
+
+  background: var(--bg-secondary);
+
+  border-radius: 8px;
+
+  padding: 0.75rem 0;
+
+}
+
+.tj-metric {
+
+  flex: 1;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  gap: 4px;
+
+}
+
+.tj-metric-divider {
+
+  width: 1px;
+
+  height: 32px;
+
+  background: var(--border);
+
+}
+
+.tj-metric-label {
+
+  font-size: 0.68rem;
+
+  color: var(--text-dim);
+
+}
+
+.tj-metric-val {
+
+  font-size: 1rem;
+
+  font-weight: 700;
+
+  font-family: var(--mono);
+
+  color: var(--text-primary);
+
+}
+
+.tj-blocked { color: var(--amber) !important; }
+
+.tj-executed { color: var(--green) !important; }
+
+.tj-summary {
+
+  background: var(--bg-secondary);
+
+  border-left: 3px solid var(--border-accent);
+
+  border-radius: 0 6px 6px 0;
+
+  padding: 0.6rem 0.9rem;
+
+  font-size: 0.85rem;
+
+  color: var(--text-secondary);
+
+  line-height: 1.5;
+
+}
+
+
+
+/* ── JUDGMENT REASON CARD ── */
+
+.judgment-reason-card {
+
+  background: var(--card-bg);
+
+  border: 1px solid var(--border);
+
+  border-radius: 12px;
+
+  padding: 1.25rem;
+
+}
+
+.jr-insight {
+
+  margin-bottom: 1rem;
+
+  padding-bottom: 1rem;
+
+  border-bottom: 1px solid var(--border);
+
+}
+
+.jr-quote {
+
+  font-size: 0.9rem;
+
+  color: var(--text-secondary);
+
+  line-height: 1.6;
+
+  font-style: italic;
+
+}
+
+.jr-factors {
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 0.6rem;
+
+  margin-bottom: 1rem;
+
+}
+
+.jr-factor {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 0.6rem;
+
+}
+
+.jr-factor-dot {
+
+  width: 8px;
+
+  height: 8px;
+
+  border-radius: 50%;
+
+  flex-shrink: 0;
+
+}
+
+.jr-factor-label {
+
+  flex: 1;
+
+  font-size: 0.85rem;
+
+  color: var(--text-secondary);
+
+}
+
+.jr-factor-val {
+
+  font-size: 0.85rem;
+
+  font-weight: 600;
+
+  font-family: var(--mono);
+
+}
+
+.jr-conclusion {
+
+  display: flex;
+
+  align-items: flex-start;
+
+  gap: 0.6rem;
+
+  background: var(--bg-secondary);
+
+  border-radius: 8px;
+
+  padding: 0.75rem;
+
+}
+
+.jr-conclusion-label {
+
+  font-size: 0.7rem;
+
+  font-family: var(--mono);
+
+  color: var(--text-dim);
+
+  background: var(--border);
+
+  padding: 2px 6px;
+
+  border-radius: 4px;
+
+  white-space: nowrap;
+
+  margin-top: 1px;
+
+}
+
+.jr-conclusion-text {
+
+  font-size: 0.85rem;
+
+  color: var(--text-primary);
+
+  line-height: 1.5;
+
+}
+
