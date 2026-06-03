@@ -59,6 +59,7 @@ export default function Home({ reports, stats }) {
             <div className="nav-links">
               <Link href="/" className="nav-link active">대시보드</Link>
               <Link href="/daily" className="nav-link">Daily</Link>
+              <Link href="/blog" className="nav-link dim">Blog</Link>
               <Link href="/weekly" className="nav-link dim">Weekly</Link>
               <Link href="/engines" className="nav-link dim">Engines</Link>
               <Link href="/strategies" className="nav-link dim">Strategies</Link>
