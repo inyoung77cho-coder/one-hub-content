@@ -53,37 +53,6 @@ export default function DailyReport({ meta, body, prev, next }) {
 
       <div className="page-wrapper">
 
-        <nav className="nav">
-
-          <div className="nav-inner">
-
-            <Link href="/" className="nav-logo">
-
-              <span className="logo-bracket">[</span>ONE-HUB<span className="logo-bracket">]</span>
-
-            </Link>
-
-            <div className="nav-links">
-
-              <Link href="/"           className="nav-link">대시보드</Link>
-
-              <Link href="/daily"      className="nav-link active">Daily</Link>
-
-              <Link href="/weekly"     className="nav-link dim">Weekly</Link>
-
-              <Link href="/engines"    className="nav-link dim">Engines</Link>
-
-              <Link href="/strategies" className="nav-link dim">Strategies</Link>
-
-              <Link href="/community"  className="nav-link dim">Community</Link>
-
-              <Link href="/about"      className="nav-link dim">About</Link>
-
-            </div>
-
-          </div>
-
-        </nav>
 
         <div className="status-bar">
 

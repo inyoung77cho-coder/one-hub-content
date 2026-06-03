@@ -34,27 +34,6 @@ export default function BlogPost({ meta, body }) {
 
       <div className="page-wrapper">
 
-        <nav className="nav">
-
-          <div className="nav-inner">
-
-            <Link href="/" className="nav-logo"><span className="logo-bracket">[</span>ONE-HUB<span className="logo-bracket">]</span></Link>
-
-            <div className="nav-links">
-
-              <Link href="/" className="nav-link">대시보드</Link>
-
-              <Link href="/daily" className="nav-link">Daily</Link>
-
-              <Link href="/blog" className="nav-link active">Blog</Link>
-
-              <Link href="/about" className="nav-link dim">About</Link>
-
-            </div>
-
-          </div>
-
-        </nav>
 
         <div className="status-bar">
 
