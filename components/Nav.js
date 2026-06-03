@@ -67,7 +67,7 @@ export default function Nav() {
 
           letterSpacing: "0.08em",
 
-          color: "#F8F7F2",
+          color: "#1A1A1A",
 
           textDecoration: "none", flexShrink: 0,
 
