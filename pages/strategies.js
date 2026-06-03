@@ -38,7 +38,7 @@ export default function StrategiesPage() {
         <meta name="twitter:description" content="ONE-HUB 전략 라이브러리. ML 시그널, Final Score 등 AI 매매 전략의 규칙과 가중치를 공개합니다." />
 
       </Head>
-      <div style={{ minHeight: "100vh", background: "#0a0c10", color: "#1A1A1A", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
+      <div style={{ minHeight: "100vh", background: "#F8F7F2", color: "#1A1A1A", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "900px", margin: "0 auto", padding: "40px 24px" }}>
           <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#9A9690", textTransform: "uppercase", marginBottom: "8px" }}>Strategy Library</h1>
           <p style={{ fontSize: "13px", color: "#6A6660", marginBottom: "36px" }}>ONE-HUB 자동매매 전략 구성 및 가중치</p>

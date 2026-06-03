@@ -64,7 +64,7 @@ function NewsletterForm() {
           disabled={status === "loading" || status === "success"}
           style={{
             background: status === "success" ? "#E8F8EF" : "#00AA55",
-            color: status === "success" ? "#00AA55" : "#0a0c10",
+            color: status === "success" ? "#00AA55" : "#F8F7F2",
             border: "none", borderRadius: "6px",
             padding: "8px 16px", fontFamily: "monospace",
             fontSize: "11px", fontWeight: 700, cursor: "pointer",
@@ -111,7 +111,7 @@ export default function CommunityPage() {
         <meta name="twitter:description" content="ONE-HUB 커뮤니티. 텔레그램 알림 봇과 뉴스레터로 AI 자동매매 운영 현황을 실시간으로 받아보세요." />
 
       </Head>
-      <div style={{ minHeight: "100vh", background: "#0a0c10", color: "#1A1A1A", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
+      <div style={{ minHeight: "100vh", background: "#F8F7F2", color: "#1A1A1A", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px" }}>
           <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#9A9690", textTransform: "uppercase", marginBottom: "8px" }}>Community</h1>
           <p style={{ fontSize: "13px", color: "#6A6660", marginBottom: "36px" }}>AI 자동매매 여정을 함께하는 채널</p>

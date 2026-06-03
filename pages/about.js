@@ -44,7 +44,7 @@ export default function AboutPage() {
         <meta name="twitter:description" content="ONE-HUB 소개. AI가 분석하고 사람이 판단하는 한국 주식 자동매매 시스템의 철학과 운영 원칙." />
 
       </Head>
-      <div style={{ minHeight: "100vh", background: "#0a0c10", color: "#1A1A1A", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
+      <div style={{ minHeight: "100vh", background: "#F8F7F2", color: "#1A1A1A", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "780px", margin: "0 auto", padding: "40px 24px" }}>
           <div style={{ marginBottom: "48px" }}>
             <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#9A9690", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "16px" }}>About ONE-HUB</div>
@@ -84,7 +84,7 @@ export default function AboutPage() {
             <div style={{ position: "relative", paddingLeft: "24px", borderLeft: "1px solid #E0DDD4" }}>
               {timeline.map((t, i) => (
                 <div key={i} style={{ position: "relative", paddingBottom: "24px" }}>
-                  <div style={{ position: "absolute", left: "-29px", top: "4px", width: "10px", height: "10px", borderRadius: "50%", background: i === 0 ? "#00AA55" : "#D0CCC4", border: "2px solid #0a0c10" }} />
+                  <div style={{ position: "absolute", left: "-29px", top: "4px", width: "10px", height: "10px", borderRadius: "50%", background: i === 0 ? "#00AA55" : "#D0CCC4", border: "2px solid #E0DDD4" }} />
                   <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", marginBottom: "4px" }}>{t.date}</div>
                   <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#1A1A1A", marginBottom: "4px" }}>{t.label}</div>
                   <div style={{ fontSize: "12px", color: "#6A6660", lineHeight: 1.5 }}>{t.desc}</div>
