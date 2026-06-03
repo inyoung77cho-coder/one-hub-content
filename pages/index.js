@@ -9,9 +9,14 @@ import MarketScore from '../components/MarketScore';
 export default function Home({ reports, stats }) {
   const latest = reports[0] || null;
   const [mounted, setMounted] = useState(false);
+  const [engineVersion, setEngineVersion] = useState("v8.0");
 
   useEffect(() => {
     setMounted(true);
+    fetch("/api/engine-status")
+      .then(r => r.json())
+      .then(d => { if (d.version) setEngineVersion(d.version); })
+      .catch(() => {});
   }, []);
 
   const heatColor = (grade) => {
