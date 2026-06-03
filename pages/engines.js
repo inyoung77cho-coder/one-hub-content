@@ -14,22 +14,22 @@ const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
 
   :root {
-    --bg:       #0a0c10;
-    --bg2:      #0f1218;
-    --bg3:      #151a22;
-    --border:   #1e2530;
+    --bg:        #F8F7F2;
+    --bg2:       #FFFFFF;
+    --bg3:       #F0EDE8;
+    --border:    #E0DDD4;
     --border2:  #2a3344;
-    --green:    #00d084;
-    --green-dim:#003d26;
-    --red:      #ff4757;
-    --red-dim:  #3d0010;
-    --yellow:   #ffd700;
+    --green:     #00AA55;
+    --green-dim: #E8F8EF;
+    --red:       #DD3333;
+    --red-dim:   #FDEAEA;
+    --yellow:    #CC8800;
     --yellow-dim:#3d3200;
     --blue:     #4fa3e0;
     --blue-dim: #0d2540;
-    --text:     #e8edf5;
-    --text2:    #8a9ab5;
-    --text3:    #4a5568;
+    --text:      #1A1A1A;
+    --text2:     #6A6660;
+    --text3:     #9A9690;
     --mono:     'Space Mono', monospace;
     --sans:     'Noto Sans KR', sans-serif;
   }
@@ -690,29 +690,13 @@ export default function EnginePage() {
       <style>{STYLES}</style>
 
       <div className="page">
-        {/* 헤더 */}
-        <header className="header">
-          <div className="header-left">
-            <a href="/" className="logo">
-              ONE-<span>HUB</span>
-            </a>
-            <nav className="nav-links">
-              <a href="/" className="nav-link">DAILY</a>
-              <a href="/weekly" className="nav-link">WEEKLY</a>
-              <a href="/engine" className="nav-link active">ENGINE</a>
-            </nav>
-          </div>
-          <div className="header-right">
-            <div className={`pulse-dot ${isOffline ? "offline" : ""}`} />
-            <span>
-              {loading
-                ? "연결 중..."
-                : isOffline
-                ? "서버 오프라인"
-                : `${countdown}초 후 갱신`}
-            </span>
-          </div>
-        </header>
+        {/* 상태바 */}
+        <div className="eng-status-bar">
+          <span className="esb-item">ENGINE HUB</span>
+          <span className="esb-div">|</span>
+          <span className="esb-item">{loading ? "연결 중..." : isOffline ? "⚠ 서버 오프라인" : `${countdown}초 후 갱신`}</span>
+          {!isOffline && <span className="esb-dot"></span>}
+        </div>
 
         {/* 오프라인 배너 */}
         {isOffline && (
