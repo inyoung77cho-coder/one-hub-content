@@ -29,16 +29,16 @@
   --purple:      #A855F7;
 
   /* Backgrounds */
-  --bg-base:     #0A0C0F;
-  --bg-surface:  #111418;
-  --bg-card:     #161B22;
-  --bg-hover:    #1C2330;
-  --bg-border:   #21293A;
+  --bg-base:     #F8F7F2;
+  --bg-surface:  #FFFFFF;
+  --bg-card:     #F0EDE8;
+  --bg-hover:    #EDECEA;
+  --bg-border:   #E0DDD4;
 
   /* Text */
-  --text-primary: #E8ECF0;
-  --text-secondary: #8B9BB4;
-  --text-dim:     #4A5568;
+  --text-primary: #1A1A1A;
+  --text-secondary: #6A6660;
+  --text-dim:     #9A9690;
 
   /* Fonts */
   --font-display: 'Syne', sans-serif;
@@ -802,8 +802,8 @@ img { max-width: 100%; display: block; }
    SCROLL BAR
 ───────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-track { background: var(--bg-base); }
-::-webkit-scrollbar-thumb { background: var(--bg-border); border-radius: 3px; }
+::-webkit-scrollbar-track { background: var(--bg-surface); }
+::-webkit-scrollbar-thumb { background: #C0BDB4 !important; background: var(--bg-border); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
 
 /* ─────────────────────────────────────────────────────────
@@ -1137,6 +1137,45 @@ img { max-width: 100%; display: block; }
   .pi-stats { width: 100%; }
 
   .pi-stat { flex: 1; }
+
+}
+
+
+
+
+/* ── 모바일 전역 최적화 ── */
+
+@media (max-width: 768px) {
+
+  .main { padding: 1rem !important; }
+
+  .section { margin-bottom: 1.5rem !important; }
+
+  .stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  .report-list { gap: 8px !important; }
+
+  .report-row { flex-wrap: wrap; gap: 4px !important; padding: 10px 12px !important; }
+
+  .rr-insight { display: none; }
+
+  .hero-grid { grid-template-columns: 1fr !important; }
+
+  .section-header { flex-direction: column; align-items: flex-start !important; gap: 4px; }
+
+  .platform-intro { flex-direction: column !important; }
+
+  .pi-stats { width: 100% !important; }
+
+  .pi-stat { flex: 1 !important; }
+
+}
+
+@media (max-width: 480px) {
+
+  .stats-grid { grid-template-columns: 1fr !important; }
+
+  .nav-inner { padding: 0 1rem !important; }
 
 }
 
