@@ -43,7 +43,7 @@ export default function Nav() {
 
       height: "56px",
 
-      background: "rgba(10,12,15,0.92)",
+      background: "rgba(248,247,242,0.97)",
 
       backdropFilter: "blur(12px)",
 
@@ -95,7 +95,7 @@ export default function Nav() {
 
                 borderRadius: "6px",
 
-                color: isActive ? "#1A1A1A" : "#C8C8C0",
+                color: isActive ? "#F8F7F2" : "#4A4A4A",
 
                 background: isActive ? "#1A1A1A" : "transparent",
 
