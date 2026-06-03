@@ -93,6 +93,21 @@ export default function Home({ reports, stats }) {
         </div>
 
         <main className="main">
+          {/* ── PLATFORM INTRO ── */}
+          <section className="platform-intro">
+            <div className="pi-copy">
+              <h1 className="pi-title">AI가 분석하고, 사람이 승인하는 반자동 투자 플랫폼</h1>
+              <p className="pi-sub">실제 운영 기록을 매일 공개합니다. 수익률이 아닌 판단 과정을 투명하게 보여드립니다.</p>
+            </div>
+            <div className="pi-stats">
+              <div className="pi-stat"><span className="pi-stat-val mono">{stats.totalDays}</span><span className="pi-stat-label">운영 일수</span></div>
+              <div className="pi-stat-div"></div>
+              <div className="pi-stat"><span className="pi-stat-val mono">{stats.totalReports}</span><span className="pi-stat-label">공개 리포트</span></div>
+              <div className="pi-stat-div"></div>
+              <div className="pi-stat"><span className="pi-stat-val mono">{stats.zeroTradeDays}</span><span className="pi-stat-label">매매 없음(신중)</span></div>
+            </div>
+          </section>
+
           {/* ── TODAY HERO ── */}
           {latest ? (
             <section className="hero-section">
