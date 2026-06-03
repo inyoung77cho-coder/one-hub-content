@@ -488,8 +488,8 @@ function EngineCard({ engine, version }) {
     <div className="card">
       <div className="card-header">
         <span className="card-title">⚙ Engine Status</span>
-        <span className={`card-badge ${isOn ? "badge-green" : "badge-red"}`}>
-          {isOn ? "RUNNING" : "STOPPED"}
+        <span className={`card-badge ${isOn ? "badge-green" : engine?.status === "stopped" ? "badge-gray" : "badge-red"}`}>
+          {isOn ? "RUNNING" : engine?.status === "stopped" ? "STOPPED" : "OFFLINE"}
         </span>
       </div>
       <div className="card-body">
@@ -498,10 +498,27 @@ function EngineCard({ engine, version }) {
             {isOn ? "⚡" : "💤"}
           </div>
           <div className="engine-info">
+
             <h2 className={isOn ? "on" : "off"}>
-              {isOn ? "ONLINE" : "OFFLINE"}
+
+              {isOn ? "RUNNING" : engine?.status === "stopped" ? "STOPPED" : "OFFLINE"}
+
             </h2>
-            <p>systemd · onehub.service · {version}</p>
+
+            <p style={{ marginBottom: "4px" }}>onehub.service · {version}</p>
+
+            {engine?.status === "stopped" && !isOn && (
+
+              <p style={{ fontSize: "11px", color: "var(--yellow)", fontFamily: "var(--mono)" }}>장 마감 후 정상 종료 상태입니다</p>
+
+            )}
+
+            {engine?.status === "offline" && (
+
+              <p style={{ fontSize: "11px", color: "var(--red)", fontFamily: "var(--mono)" }}>서버 응답 없음 — 네트워크 오류</p>
+
+            )}
+
           </div>
         </div>
         <div className="engine-meta">
@@ -563,8 +580,8 @@ function HoldingsCard({ holdings }) {
               </div>
             ))}
             <div className="total-row">
-              <span className="total-label">총 자산 (추정)</span>
-              <span className="total-value">약 9,787,567원</span>
+              <span className="total-label">총 매입금액 (추정)</span>
+              <span className="total-value">약 {holdings.reduce((s,h) => s+(h.avg_price*h.qty),0).toLocaleString("ko-KR")}원</span>
             </div>
           </>
         )}
