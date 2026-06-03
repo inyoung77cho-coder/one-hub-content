@@ -98,7 +98,7 @@ export default function AboutPage() {
               <div style={{ fontFamily: "monospace", fontSize: "16px", fontWeight: 700, color: "#00AA55" }}>LIVE · auto_trade v8.0</div>
               <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#6A6660", marginTop: "4px" }}>AWS Lightsail · 매일 15:30 KST 자동 리포트</div>
             </div>
-            <Link href="/engine" style={{ fontFamily: "monospace", fontSize: "11px", color: "#00AA55", textDecoration: "none", padding: "10px 16px", border: "1px solid #E8F8EF", borderRadius: "8px" }}>
+            <Link href="/engines" style={{ fontFamily: "monospace", fontSize: "11px", color: "#00AA55", textDecoration: "none", padding: "10px 16px", border: "1px solid #E8F8EF", borderRadius: "8px" }}>
               엔진 상태 보기 →
             </Link>
           </div>
