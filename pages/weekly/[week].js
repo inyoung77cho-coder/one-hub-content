@@ -12,7 +12,7 @@ export default function WeeklyReport({ meta, body }) {
         <title>{meta.week} — ONE-HUB Weekly</title>
         <meta name="description" content={`ONE-HUB 주간 리포트 ${meta.week}`} />
       </Head>
-      <div style={{ minHeight: "100vh", background: "#0a0c10", color: "#1A1A1A", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
+      <div style={{ minHeight: "100vh", background: "#F8F7F2", color: "#1a202c", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "780px", margin: "0 auto", padding: "40px 24px" }}>
           {/* 헤더 정보 */}
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
