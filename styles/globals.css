@@ -62,7 +62,7 @@ html {
 }
 
 body {
-  background: var(--bg-base);
+  background: #F8F7F2;
   color: var(--text-primary);
   font-family: var(--font-body);
   font-size: 15px;
@@ -1176,6 +1176,115 @@ img { max-width: 100%; display: block; }
   .stats-grid { grid-template-columns: 1fr !important; }
 
   .nav-inner { padding: 0 1rem !important; }
+
+}
+
+
+
+
+/* ══════════════════════════════════════════════
+
+   ONE-HUB 통일 디자인 시스템 (전체 페이지 공통)
+
+   ══════════════════════════════════════════════ */
+
+
+
+/* 공통 페이지 래퍼 */
+
+.oh-page { min-height: 100vh; background: #F8F7F2; color: #1A1A1A; font-family: 'Syne', sans-serif; padding-bottom: 4rem; }
+
+
+
+/* 상태바 (검은 띠) */
+
+.oh-bar { background: #1A1A1A; color: #F8F7F2; display: flex; align-items: center; gap: 0.75rem; padding: 0 1.5rem; height: 36px; font-family: 'Space Mono', monospace; font-size: 11px; overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
+
+.oh-bar::-webkit-scrollbar { display: none; }
+
+.oh-bar-sep { color: #4A4A4A; }
+
+
+
+/* 메인 콘텐츠 영역 */
+
+.oh-main { max-width: 1080px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+.oh-main-narrow { max-width: 760px; margin: 0 auto; padding: 2rem 1.5rem; }
+
+
+
+/* 카드 */
+
+.oh-card { background: #FFFFFF; border: 1px solid #E0DDD4; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.2rem; }
+
+.oh-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+
+.oh-card-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #9A9690; font-family: 'Space Mono', monospace; }
+
+
+
+/* 섹션 타이틀 */
+
+.oh-section-title { font-size: 1.1rem; font-weight: 700; color: #1A1A1A; margin-bottom: 0.4rem; }
+
+.oh-section-sub { font-size: 13px; color: #6A6660; margin-bottom: 1.2rem; }
+
+
+
+/* 배지 */
+
+.oh-badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 3px 10px; border-radius: 20px; font-family: 'Space Mono', monospace; }
+
+.oh-badge-green { background: #E8F8EF; color: #00AA55; border: 1px solid #00AA5540; }
+
+.oh-badge-red   { background: #FDEAEA; color: #DD3333; border: 1px solid #DD333340; }
+
+.oh-badge-amber { background: #FFF8E6; color: #CC8800; border: 1px solid #CC880040; }
+
+.oh-badge-gray  { background: #F0EDE8; color: #9A9690; border: 1px solid #E0DDD4; }
+
+.oh-badge-blue  { background: #EAF3FB; color: #3A8BD4; border: 1px solid #3A8BD440; }
+
+
+
+/* 링크 버튼 */
+
+.oh-btn { display: inline-block; font-size: 13px; font-weight: 600; padding: 10px 18px; border-radius: 8px; text-decoration: none; transition: all 0.15s; }
+
+.oh-btn-dark { background: #1A1A1A; color: #F8F7F2; }
+
+.oh-btn-dark:hover { background: #333; }
+
+.oh-btn-outline { background: #FFFFFF; color: #1A1A1A; border: 1px solid #E0DDD4; }
+
+.oh-btn-outline:hover { border-color: #1A1A1A; }
+
+
+
+/* 구분선 */
+
+.oh-divider { border: none; border-top: 1px solid #E0DDD4; margin: 1.5rem 0; }
+
+
+
+/* 그리드 */
+
+.oh-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+
+.oh-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+
+
+
+/* 모바일 */
+
+@media (max-width: 768px) {
+
+  .oh-main, .oh-main-narrow { padding: 1.2rem 1rem; }
+
+  .oh-grid-2, .oh-grid-3 { grid-template-columns: 1fr; }
+
+  .oh-card { padding: 1rem; }
 
 }
 

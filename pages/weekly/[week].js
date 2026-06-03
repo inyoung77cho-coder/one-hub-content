@@ -12,42 +12,42 @@ export default function WeeklyReport({ meta, body }) {
         <title>{meta.week} — ONE-HUB Weekly</title>
         <meta name="description" content={`ONE-HUB 주간 리포트 ${meta.week}`} />
       </Head>
-      <div style={{ minHeight: "100vh", background: "#0a0c10", color: "#e8edf5", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
+      <div style={{ minHeight: "100vh", background: "#0a0c10", color: "#1A1A1A", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "780px", margin: "0 auto", padding: "40px 24px" }}>
           {/* 헤더 정보 */}
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
-            <span style={{ fontFamily: "monospace", fontSize: "12px", color: "#4a5568" }}>{meta.monday} ~ {meta.friday}</span>
+            <span style={{ fontFamily: "monospace", fontSize: "12px", color: "#9A9690" }}>{meta.monday} ~ {meta.friday}</span>
             <span style={{ fontFamily: "monospace", fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px",
-              background: meta.dominant_regime === "BULL" ? "#3d0010" : meta.dominant_regime === "BEAR" ? "#0d2540" : "#151a22",
-              color: meta.dominant_regime === "BULL" ? "#ff4757" : meta.dominant_regime === "BEAR" ? "#4fa3e0" : "#8a9ab5" }}>
+              background: meta.dominant_regime === "BULL" ? "#FDEAEA" : meta.dominant_regime === "BEAR" ? "#EAF3FB" : "#F0EDE8",
+              color: meta.dominant_regime === "BULL" ? "#DD3333" : meta.dominant_regime === "BEAR" ? "#3A8BD4" : "#6A6660" }}>
               {meta.dominant_regime}
             </span>
-            <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#4a5568" }}>Heat {meta.avg_heat}/100</span>
-            <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#4a5568" }}>매매 {meta.total_trades}건</span>
+            <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#9A9690" }}>Heat {meta.avg_heat}/100</span>
+            <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#9A9690" }}>매매 {meta.total_trades}건</span>
           </div>
 
           {/* 제목 */}
-          <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#e8edf5", marginBottom: "20px", lineHeight: 1.4 }}>
+          <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#1A1A1A", marginBottom: "20px", lineHeight: 1.4 }}>
             {meta.week} 주간 리포트
           </h1>
 
           {/* AI Insight */}
           {meta.insight && (
-            <div style={{ background: "#0f1218", border: "1px solid #2a3344", borderRadius: "10px", padding: "18px 20px", marginBottom: "28px" }}>
-              <div style={{ fontFamily: "monospace", fontSize: "9px", color: "#4a5568", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "10px" }}>Weekly AI Insight</div>
-              <p style={{ fontSize: "14px", color: "#e8edf5", lineHeight: 1.7, margin: 0, fontStyle: "italic" }}>"{meta.insight}"</p>
+            <div style={{ background: "#FFFFFF", border: "1px solid #D0CCC4", borderRadius: "10px", padding: "18px 20px", marginBottom: "28px" }}>
+              <div style={{ fontFamily: "monospace", fontSize: "9px", color: "#9A9690", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "10px" }}>Weekly AI Insight</div>
+              <p style={{ fontSize: "14px", color: "#1A1A1A", lineHeight: 1.7, margin: 0, fontStyle: "italic" }}>"{meta.insight}"</p>
             </div>
           )}
 
           {/* 본문 */}
           {body && (
-            <div style={{ fontSize: "14px", color: "#8a9ab5", lineHeight: 1.8 }}
+            <div style={{ fontSize: "14px", color: "#6A6660", lineHeight: 1.8 }}
               dangerouslySetInnerHTML={{ __html: body }} />
           )}
 
           {/* 뒤로가기 */}
-          <div style={{ marginTop: "40px", paddingTop: "20px", borderTop: "1px solid #1e2530" }}>
-            <Link href="/weekly" style={{ fontFamily: "monospace", fontSize: "12px", color: "#4a5568", textDecoration: "none" }}>
+          <div style={{ marginTop: "40px", paddingTop: "20px", borderTop: "1px solid #E0DDD4" }}>
+            <Link href="/weekly" style={{ fontFamily: "monospace", fontSize: "12px", color: "#9A9690", textDecoration: "none" }}>
               ← 전체 목록으로
             </Link>
           </div>

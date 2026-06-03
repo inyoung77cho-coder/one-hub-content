@@ -46,7 +46,7 @@ export default function StrategiesPage() {
             <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "14px" }}>전략 가중치 분포</div>
             <div style={{ display: "flex", height: "8px", borderRadius: "4px", overflow: "hidden", gap: "2px" }}>
               {strategies.filter(s => s.weight > 0).map(s => (
-                <div key={s.id} style={{ width: `${s.weight}%`, background: s.id === "ml_signal" ? "#00AA55" : s.id === "final_score" ? "#4fa3e0" : "#CC8800", borderRadius: "2px" }} />
+                <div key={s.id} style={{ width: `${s.weight}%`, background: s.id === "ml_signal" ? "#00AA55" : s.id === "final_score" ? "#3A8BD4" : "#CC8800", borderRadius: "2px" }} />
               ))}
             </div>
             <div style={{ display: "flex", gap: "20px", marginTop: "10px" }}>
