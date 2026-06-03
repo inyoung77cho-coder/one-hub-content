@@ -1021,3 +1021,122 @@ img { max-width: 100%; display: block; }
 
 }
 
+
+
+
+/* ── Platform Intro (index.js) ── */
+
+.platform-intro {
+
+  background: #FFFFFF;
+
+  border: 1px solid #E0DDD4;
+
+  border-radius: 12px;
+
+  padding: 1.2rem 1.5rem;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 1.5rem;
+
+  flex-wrap: wrap;
+
+  margin-bottom: 0;
+
+}
+
+.pi-copy { flex: 1; min-width: 200px; }
+
+.pi-title {
+
+  font-size: 1.15rem;
+
+  font-weight: 700;
+
+  line-height: 1.4;
+
+  color: #1A1A1A;
+
+  letter-spacing: -0.01em;
+
+  margin-bottom: 0.4rem;
+
+}
+
+.pi-sub { font-size: 13px; color: #6A6660; line-height: 1.6; }
+
+.pi-stats {
+
+  display: flex;
+
+  align-items: center;
+
+  background: #F8F7F2;
+
+  border: 1px solid #E0DDD4;
+
+  border-radius: 8px;
+
+  overflow: hidden;
+
+  flex-shrink: 0;
+
+}
+
+.pi-stat {
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: center;
+
+  padding: 10px 16px;
+
+  gap: 2px;
+
+}
+
+.pi-stat-val {
+
+  font-family: var(--font-mono);
+
+  font-size: 1.2rem;
+
+  font-weight: 700;
+
+  color: #1A1A1A;
+
+}
+
+.pi-stat-label {
+
+  font-size: 10px;
+
+  color: #9A9690;
+
+  letter-spacing: 0.04em;
+
+  white-space: nowrap;
+
+}
+
+.pi-stat-div { width: 1px; height: 32px; background: #E0DDD4; }
+
+
+
+@media (max-width: 768px) {
+
+  .platform-intro { flex-direction: column; align-items: flex-start; }
+
+  .pi-stats { width: 100%; }
+
+  .pi-stat { flex: 1; }
+
+}
+
