@@ -48,30 +48,6 @@ export default function Home({ reports, stats }) {
       </Head>
 
       <div className="page-wrapper">
-        {/* ── NAV ── */}
-        <nav className="nav">
-          <div className="nav-inner">
-            <Link href="/" className="nav-logo">
-              <span className="logo-bracket">[</span>
-              ONE-HUB
-              <span className="logo-bracket">]</span>
-            </Link>
-            <div className="nav-links">
-              <Link href="/" className="nav-link active">대시보드</Link>
-              <Link href="/daily" className="nav-link">Daily</Link>
-              <Link href="/blog" className="nav-link dim">Blog</Link>
-              <Link href="/weekly" className="nav-link dim">Weekly</Link>
-              <Link href="/engines" className="nav-link dim">Engines</Link>
-              <Link href="/strategies" className="nav-link dim">Strategies</Link>
-              <Link href="/community" className="nav-link dim">Community</Link>
-              <Link href="/about" className="nav-link dim">About</Link>
-            </div>
-            <button className="nav-menu-btn" aria-label="메뉴" id="menu-btn">
-              <span></span><span></span><span></span>
-            </button>
-          </div>
-        </nav>
-
         {/* ── HERO STATUS BAR ── */}
         <div className="status-bar">
           <div className="status-item">
