@@ -80,10 +80,6 @@ export default function Home({ reports, stats }) {
           <div className="status-item">
             <span className="status-label mono">auto_trade v7.0</span>
           </div>
-          <div className="status-divider">|</div>
-          <div className="status-item">
-            <span className="status-label mono">AWS Lightsail · 54.180.144.53</span>
-          </div>
           {latest && (
             <>
               <div className="status-divider">|</div>
