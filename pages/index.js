@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
+import MarketScore from '../components/MarketScore';
 
 export default function Home({ reports, stats }) {
   const latest = reports[0] || null;
@@ -111,6 +112,12 @@ export default function Home({ reports, stats }) {
           {/* ── TODAY HERO ── */}
           {latest ? (
             <section className="hero-section">
+              <div style={{marginBottom:'1rem'}}>
+
+                <MarketScore score={latest.market_score || latest.heat_score} heatGrade={latest.heat_grade} regime={latest.regime} />
+
+              </div>
+
               <div className="hero-date-line">
                 <span className="mono dim">{latest.date}</span>
                 <span className="hero-separator">—</span>
@@ -357,6 +364,7 @@ export async function getStaticProps() {
         date: data.date || file.replace('.md', ''),
         regime: data.regime || 'SIDEWAYS',
         heat_score: data.heat_score || 50,
+        market_score: data.market_score || data.heat_score || 50,
         heat_grade: data.heat_grade || 'WARM',
         pnl_emoji: data.pnl_emoji || '➖',
         trade_count: data.trade_count || 0,
