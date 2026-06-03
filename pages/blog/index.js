@@ -98,7 +98,7 @@ export default function Blog({ posts }) {
 
       </div>
 
-      <style jsx global>{\`
+      <style jsx global>{`
 
         .page-wrapper{min-height:100vh;background:#F8F7F2;color:#1A1A1A;font-family:'Syne',sans-serif;}
 
@@ -122,7 +122,7 @@ export default function Blog({ posts }) {
 
         .status-bar{background:#1A1A1A;color:#F8F7F2;display:flex;align-items:center;padding:0 1.5rem;height:36px;}
 
-      \`}</style>
+      `}</style>
 
     </>
 

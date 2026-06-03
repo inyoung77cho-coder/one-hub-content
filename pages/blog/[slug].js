@@ -100,7 +100,7 @@ export default function BlogPost({ meta, body }) {
 
       </div>
 
-      <style jsx global>{\`
+      <style jsx global>{`
 
         .page-wrapper{min-height:100vh;background:#F8F7F2;color:#1A1A1A;font-family:'Syne',sans-serif;padding-bottom:3rem;}
 
@@ -140,7 +140,7 @@ export default function BlogPost({ meta, body }) {
 
         .post-body code{font-family:'Space Mono',monospace;font-size:12px;background:#F0EDE8;padding:2px 6px;border-radius:4px;}
 
-      \`}</style>
+      `}</style>
 
     </>
 
