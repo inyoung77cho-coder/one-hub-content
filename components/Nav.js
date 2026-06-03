@@ -15,6 +15,7 @@ export default function Nav() {
     ["대시보드", "/"],
 
     ["Daily", "/daily"],
+    ["Blog", "/blog"],
 
     ["Weekly", "/weekly"],
 
@@ -42,7 +43,7 @@ export default function Nav() {
 
       height: "56px",
 
-      background: "rgba(248,247,242,0.95)",
+      background: "rgba(10,12,15,0.92)",
 
       backdropFilter: "blur(12px)",
 
@@ -66,7 +67,7 @@ export default function Nav() {
 
           letterSpacing: "0.08em",
 
-          color: "#1A1A1A",
+          color: "#F8F7F2",
 
           textDecoration: "none", flexShrink: 0,
 
@@ -94,7 +95,7 @@ export default function Nav() {
 
                 borderRadius: "6px",
 
-                color: isActive ? "#F8F7F2" : "#4A4A4A",
+                color: isActive ? "#1A1A1A" : "#C8C8C0",
 
                 background: isActive ? "#1A1A1A" : "transparent",
 
