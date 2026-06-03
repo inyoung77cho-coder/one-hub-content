@@ -214,6 +214,7 @@ export default function DailyReport({ meta, body, prev, next }) {
         </nav>
 
 
+      </div>
       <style jsx>{`
 
         .page-wrapper{min-height:100vh;background:#F8F7F2;color:#1A1A1A;font-family:'Syne',sans-serif;padding-bottom:80px;}
