@@ -9,9 +9,14 @@ import MarketScore from '../components/MarketScore';
 export default function Home({ reports, stats }) {
   const latest = reports[0] || null;
   const [mounted, setMounted] = useState(false);
+  const [engineVersion, setEngineVersion] = useState('v8.0');
 
   useEffect(() => {
     setMounted(true);
+    fetch('/api/engine-status')
+      .then(r => r.json())
+      .then(d => { if (d.version) setEngineVersion(d.version); })
+      .catch(() => {});
   }, []);
 
   const heatColor = (grade) => {
@@ -56,7 +61,7 @@ export default function Home({ reports, stats }) {
           </div>
           <div className="status-divider">|</div>
           <div className="status-item">
-            <span className="status-label mono">auto_trade v8.0</span>
+            <span className="status-label mono">auto_trade {engineVersion}</span>
           </div>
           {latest && (
             <>
@@ -314,7 +319,7 @@ export default function Home({ reports, stats }) {
           <div className="footer-inner">
             <span className="mono dim">ONE-HUB © 2026</span>
             <span className="footer-sep">·</span>
-            <span className="mono dim">auto_trade v8.0 running on AWS Lightsail</span>
+            <span className="mono dim">auto_trade {engineVersion} running on AWS Lightsail</span>
             <span className="footer-sep">·</span>
             <span className="mono dim">매일 15:30 KST 자동 업데이트</span>
           </div>
