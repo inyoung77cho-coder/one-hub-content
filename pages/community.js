@@ -53,9 +53,9 @@ function NewsletterForm() {
           disabled={status === "loading" || status === "success"}
           style={{
             flex: 1, minWidth: "160px",
-            background: "#151a22", border: "1px solid #2a3344",
+            background: "#F0EDE8", border: "1px solid #D0CCC4",
             borderRadius: "6px", padding: "8px 12px",
-            fontFamily: "monospace", fontSize: "11px", color: "#e8edf5",
+            fontFamily: "monospace", fontSize: "11px", color: "#1A1A1A",
             outline: "none",
           }}
         />
@@ -63,8 +63,8 @@ function NewsletterForm() {
           type="submit"
           disabled={status === "loading" || status === "success"}
           style={{
-            background: status === "success" ? "#003d26" : "#00d084",
-            color: status === "success" ? "#00d084" : "#0a0c10",
+            background: status === "success" ? "#E8F8EF" : "#00AA55",
+            color: status === "success" ? "#00AA55" : "#0a0c10",
             border: "none", borderRadius: "6px",
             padding: "8px 16px", fontFamily: "monospace",
             fontSize: "11px", fontWeight: 700, cursor: "pointer",
@@ -75,7 +75,7 @@ function NewsletterForm() {
         </button>
       </div>
       {status === "error" && (
-        <p style={{ fontFamily: "monospace", fontSize: "10px", color: "#ff4757", marginTop: "6px" }}>
+        <p style={{ fontFamily: "monospace", fontSize: "10px", color: "#DD3333", marginTop: "6px" }}>
           오류가 발생했습니다. 다시 시도해 주세요.
         </p>
       )}
@@ -111,33 +111,33 @@ export default function CommunityPage() {
         <meta name="twitter:description" content="ONE-HUB 커뮤니티. 텔레그램 알림 봇과 뉴스레터로 AI 자동매매 운영 현황을 실시간으로 받아보세요." />
 
       </Head>
-      <div style={{ minHeight: "100vh", background: "#0a0c10", color: "#e8edf5", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
+      <div style={{ minHeight: "100vh", background: "#0a0c10", color: "#1A1A1A", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "860px", margin: "0 auto", padding: "40px 24px" }}>
-          <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#4a5568", textTransform: "uppercase", marginBottom: "8px" }}>Community</h1>
-          <p style={{ fontSize: "13px", color: "#8a9ab5", marginBottom: "36px" }}>AI 자동매매 여정을 함께하는 채널</p>
+          <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#9A9690", textTransform: "uppercase", marginBottom: "8px" }}>Community</h1>
+          <p style={{ fontSize: "13px", color: "#6A6660", marginBottom: "36px" }}>AI 자동매매 여정을 함께하는 채널</p>
 
           {/* 채널 카드 */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "14px", marginBottom: "40px" }}>
             {channels.map(ch => (
-              <div key={ch.name} style={{ background: "#0f1218", border: "1px solid #1e2530", borderRadius: "12px", padding: "22px 20px", opacity: ch.status === "BUILDING" ? 0.6 : 1, display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div key={ch.name} style={{ background: "#FFFFFF", border: "1px solid #E0DDD4", borderRadius: "12px", padding: "22px 20px", opacity: ch.status === "BUILDING" ? 0.6 : 1, display: "flex", flexDirection: "column", gap: "12px" }}>
                 <div style={{ fontSize: "28px" }}>{ch.icon}</div>
                 <div>
-                  <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#e8edf5", marginBottom: "3px" }}>{ch.name}</div>
-                  <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#4a5568" }}>{ch.handle}</div>
+                  <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#1A1A1A", marginBottom: "3px" }}>{ch.name}</div>
+                  <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690" }}>{ch.handle}</div>
                 </div>
-                <p style={{ fontSize: "12px", color: "#8a9ab5", lineHeight: 1.6, margin: 0, flex: 1 }}>{ch.desc}</p>
+                <p style={{ fontSize: "12px", color: "#6A6660", lineHeight: 1.6, margin: 0, flex: 1 }}>{ch.desc}</p>
                 <div>
-                  <span style={{ display: "inline-block", fontFamily: "monospace", fontSize: "10px", fontWeight: 700, padding: "3px 8px", borderRadius: "4px", background: ch.status === "LIVE" ? "#003d26" : "#3d3200", color: ch.status === "LIVE" ? "#00d084" : "#ffd700", marginBottom: "10px" }}>
+                  <span style={{ display: "inline-block", fontFamily: "monospace", fontSize: "10px", fontWeight: 700, padding: "3px 8px", borderRadius: "4px", background: ch.status === "LIVE" ? "#E8F8EF" : "#FFF8E6", color: ch.status === "LIVE" ? "#00AA55" : "#CC8800", marginBottom: "10px" }}>
                     {ch.status}
                   </span>
                   {ch.newsletter ? (
                     <NewsletterForm />
                   ) : ch.link ? (
-                    <a href={ch.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", fontFamily: "monospace", fontSize: "11px", color: "#00d084", textDecoration: "none" }}>
+                    <a href={ch.link} target="_blank" rel="noopener noreferrer" style={{ display: "block", fontFamily: "monospace", fontSize: "11px", color: "#00AA55", textDecoration: "none" }}>
                       {ch.action} →
                     </a>
                   ) : (
-                    <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#4a5568" }}>{ch.action}</span>
+                    <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#9A9690" }}>{ch.action}</span>
                   )}
                 </div>
               </div>
@@ -145,15 +145,15 @@ export default function CommunityPage() {
           </div>
 
           {/* 커뮤니티 원칙 */}
-          <div style={{ background: "#0f1218", border: "1px solid #1e2530", borderRadius: "12px", padding: "28px 24px" }}>
-            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#4a5568", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "20px" }}>커뮤니티 원칙</div>
+          <div style={{ background: "#FFFFFF", border: "1px solid #E0DDD4", borderRadius: "12px", padding: "28px 24px" }}>
+            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "20px" }}>커뮤니티 원칙</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
               {principles.map(p => (
                 <div key={p.title} style={{ display: "flex", gap: "14px", alignItems: "flex-start" }}>
                   <span style={{ fontSize: "20px", flexShrink: 0 }}>{p.icon}</span>
                   <div>
-                    <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#e8edf5", marginBottom: "4px" }}>{p.title}</div>
-                    <div style={{ fontSize: "12px", color: "#8a9ab5", lineHeight: 1.5 }}>{p.desc}</div>
+                    <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#1A1A1A", marginBottom: "4px" }}>{p.title}</div>
+                    <div style={{ fontSize: "12px", color: "#6A6660", lineHeight: 1.5 }}>{p.desc}</div>
                   </div>
                 </div>
               ))}
