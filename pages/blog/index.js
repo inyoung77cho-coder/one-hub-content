@@ -43,6 +43,16 @@ export default function Blog({ posts }) {
 
           <div style={{display:'flex',flexDirection:'column',gap:'12px'}}>
 
+            {posts.length === 0 && (
+
+              <div style={{padding:'2rem',textAlign:'center',color:'#9A9690',fontSize:'14px'}}>
+
+                아직 게시된 글이 없습니다.
+
+              </div>
+
+            )}
+
             {posts.map(post => (
 
               <Link key={post.slug} href={'/blog/'+post.slug} style={{display:'block',background:'#FFFFFF',border:'1px solid #E0DDD4',borderRadius:'12px',padding:'1.2rem 1.4rem',textDecoration:'none'}}>
@@ -77,31 +87,6 @@ export default function Blog({ posts }) {
 
       </div>
 
-      <style jsx global>{`
-
-        .page-wrapper{min-height:100vh;background:#F8F7F2;color:#1A1A1A;font-family:'Syne',sans-serif;}
-
-        .nav{position:sticky;top:0;z-index:100;background:rgba(248,247,242,0.95);backdrop-filter:blur(12px);border-bottom:1px solid #E0DDD4;height:56px;}
-
-        .nav-inner{max-width:1080px;margin:0 auto;padding:0 1.5rem;height:100%;display:flex;align-items:center;gap:2rem;}
-
-        .nav-logo{font-family:'Space Mono',monospace;font-size:14px;font-weight:700;color:#1A1A1A;}
-
-        .logo-bracket{color:#00AA55;}
-
-        .nav-links{display:flex;gap:0.1rem;flex:1;overflow-x:auto;scrollbar-width:none;}
-
-        .nav-link{font-size:13px;font-weight:600;padding:6px 12px;border-radius:6px;color:#4A4A4A;transition:all 0.15s;}
-
-        .nav-link:hover{background:#EDECEA;color:#1A1A1A;}
-
-        .nav-link.active{background:#1A1A1A;color:#F8F7F2;}
-
-        .nav-link.dim{color:#9A9690;}
-
-        .status-bar{background:#1A1A1A;color:#F8F7F2;display:flex;align-items:center;padding:0 1.5rem;height:36px;}
-
-      `}</style>
 
     </>
 
