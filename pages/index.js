@@ -94,16 +94,17 @@ export default function Home({ reports, stats }) {
           {/* ── PLATFORM INTRO ── */}
           <section className="platform-intro">
             <div className="pi-copy">
-              <h1 className="pi-title">AI가 분석하고, 사람이 승인하는 반자동 투자 플랫폼</h1>
-              <p className="pi-sub">실제 운영 기록을 매일 공개합니다. 수익률이 아닌 판단 과정을 투명하게 보여드립니다.</p>
+              <h1 className="pi-title">AI가 시장을 읽고, 사람이 최종 판단합니다.</h1>
+              <p className="pi-sub">ONE-HUB는 매매 결과보다 판단 과정을 공개합니다. 왜 샀는지보다, 왜 안 샀는지를 기록합니다.</p>
             </div>
             <div className="pi-stats">
               <div className="pi-stat"><span className="pi-stat-val mono">{stats.totalDays}</span><span className="pi-stat-label">운영 일수</span></div>
               <div className="pi-stat-div"></div>
               <div className="pi-stat"><span className="pi-stat-val mono">{stats.totalReports}</span><span className="pi-stat-label">공개 리포트</span></div>
               <div className="pi-stat-div"></div>
-              <div className="pi-stat"><span className="pi-stat-val mono">{stats.zeroTradeDays}</span><span className="pi-stat-label">매매 없음(신중)</span></div>
-            </div>
+              <div className="pi-stat"><span className="pi-stat-val mono">{stats.totalTrades}</span><span className="pi-stat-label">총 실행 건수</span></div>
+              <div className="pi-stat-div"></div>
+              <div className="pi-stat"><span className="pi-stat-val mono">{stats.zeroTradeDays}</span><span className="pi-stat-label">신중 판단(0건)</span></div>            </div>
           </section>
 
           {/* ── TODAY HERO ── */}
@@ -486,7 +487,14 @@ export async function getStaticProps() {
     bearDays: reports.filter(r => r.regime === 'BEAR').length,
     sidewaysDays: reports.filter(r => r.regime === 'SIDEWAYS').length,
     zeroTradeDays: reports.filter(r => r.trade_count === 0).length,
+    totalTrades: reports.reduce((sum, r) => sum + (r.trade_count || 0), 0),
+    totalBlocked: reports.reduce((sum, r) => sum + (r.block_count || 0), 0),
+    blockRate: reports.length > 0
+      ? Math.round(
+          reports.reduce((sum, r) => sum + (r.block_count || 0), 0) /
+          Math.max(reports.reduce((sum, r) => sum + (r.trade_count || 0) + (r.block_count || 0), 0), 1) * 100
+        )
+      : 0,
   };
-
-  return { props: { reports, stats } };
+    return { props: { reports, stats } };
 }
