@@ -10,6 +10,7 @@ export default function Home({ reports, stats }) {
   const latest = reports[0] || null;
   const [mounted, setMounted] = useState(false);
   const [engineVersion, setEngineVersion] = useState("v8.0");
+  const [blockCount, setBlockCount] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -104,7 +105,7 @@ export default function Home({ reports, stats }) {
               <div className="pi-stat-div"></div>
               <div className="pi-stat"><span className="pi-stat-val mono">{stats.totalTrades}</span><span className="pi-stat-label">총 실행 건수</span></div>
               <div className="pi-stat-div"></div>
-              <div className="pi-stat"><span className="pi-stat-val mono">{stats.zeroTradeDays}</span><span className="pi-stat-label">신중 판단(0건)</span></div>            </div>
+              <div className="pi-stat"><span className="pi-stat-val mono">{stats.zeroTradeDays}</span><span className="pi-stat-label">신중 판단({blockcount}건)</span></div>            </div>
           </section>
 
           {/* ── TODAY HERO ── */}
