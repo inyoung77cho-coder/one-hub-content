@@ -84,7 +84,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── [Fix 1] APP_VERSION 단일 상수 — /status, /help, 시작메시지 모두 여기서 참조 ──
-APP_VERSION     = "7.0"
+APP_VERSION     = "7.4"
 APP_VERSION_STR = f"v{APP_VERSION}"
 
 # ── [v7.0] 주말 차단 유틸 ──────────────────────────────────────────────
@@ -104,7 +104,7 @@ def _weekday_only(fn):
     return wrapper
 # ──────────────────────────────────────────────────────────────────────
 
-from kis_api import (get_access_token, get_balance, buy_order, sell_order,
+from kis_api import (get_access_token, get_balance, buy_order, sell_order, get_api_health,
                      get_current_price, get_order_result)
 from config import MAX_BUY_AMOUNT, IS_REAL
 from news_collector import (get_news, get_global_market, get_economic_indicators,
@@ -157,21 +157,27 @@ from strategy_stats import (record_trade_result, format_perf_summary,
 WEEKLY_LOSS_LIMIT_PCT: float = float(os.getenv("WEEKLY_LOSS_LIMIT_PCT", "7.0"))
 MAX_POSITIONS:         int   = int(os.getenv("MAX_POSITIONS", "5"))  # 동시 보유 한도
 
-# [v7.0 P6] 웹 대시보드 (DASHBOARD_ENABLED=true 일 때만)
+# [v7.4] 웹 대시보드 — 포트 충돌 시 자동 스킵
 _DASHBOARD_ENABLED = os.getenv("DASHBOARD_ENABLED", "true").lower() == "true"
 if _DASHBOARD_ENABLED:
     try:
-        from dashboard import start_dashboard
-        import threading as _dash_thread
-        _dash_thread.Thread(
-            target=start_dashboard,
-            kwargs={"port": int(os.getenv("DASHBOARD_PORT", "5050"))},
-            daemon=True
-        ).start()
-        print("[DASHBOARD] http://localhost:5050 에서 접속 가능")
+        import socket as _sock
+        _s = _sock.socket(_sock.AF_INET, _sock.SOCK_STREAM)
+        _port_free = _s.connect_ex(("127.0.0.1", 5050)) != 0
+        _s.close()
+        if _port_free:
+            from dashboard import start_dashboard
+            import threading as _dash_thread
+            _dash_thread.Thread(
+                target=start_dashboard,
+                kwargs={"port": int(os.getenv("DASHBOARD_PORT", "5050"))},
+                daemon=True
+            ).start()
+            print("[DASHBOARD] http://localhost:5050 에서 접속 가능")
+        else:
+            print("[DASHBOARD] 포트 5050 이미 사용 중 — 대시보드 스킵")
     except Exception as _de:
-        print(f"[DASHBOARD] 시작 실패 (Flask 미설치?): {_de}")
-
+        print(f"[DASHBOARD] 시작 실패: {_de}")
 # ── 전역 상태 ──────────────────────────────────────────────
 daily_pnl      = 0
 trading_on     = True
@@ -212,6 +218,7 @@ _report_running = False
 
 # ── v4.9: Auto-Stop ────────────────────────────────────────
 _auto_stop_timers: dict = {}
+_auto_stop_executing: set = set()  # [v7.4] 중복 실행 방지
 AUTO_STOP_DELAY_MINUTES: int = int(os.getenv("AUTO_STOP_DELAY_MINUTES", "30"))
 AUTO_STOP_WARN_MINUTES:  int = AUTO_STOP_DELAY_MINUTES - 10
 
@@ -227,6 +234,72 @@ ANALYZE_CMD_COOLDOWN: int = 30  # 30초 내 재입력 무시
 AUTO_SELL_TIMEOUT_MINUTES: int = int(os.getenv("AUTO_SELL_TIMEOUT_MINUTES", "10"))
 _auto_sell_timers: dict = {}  # {code: {"alerted_at": float, "type": str, "warned": bool}}
 _profit_alert_timers: dict = {}  # {code: last_alert_time} — 1시간 중복 차단
+
+
+
+# ── [v7.1] profit_alert_timers 영속 저장 경로 ──
+
+_PROFIT_TIMER_FILE = os.path.join(os.path.dirname(__file__), "profit_alert_timers.json")
+
+
+
+def _load_profit_timers() -> dict:
+
+    """서버 재시작 시 저장된 타이머 로드 (만료된 항목 자동 제거)."""
+
+    try:
+
+        if os.path.exists(_PROFIT_TIMER_FILE):
+
+            import json as _json
+
+            with open(_PROFIT_TIMER_FILE, "r") as _f:
+
+                data = _json.load(_f)
+
+            now = time.time()
+
+            # 1시간(3600초) 이내 항목만 유지
+
+            return {k: v for k, v in data.items() if now - v < 3600}
+
+    except Exception as _e:
+
+        print(f"[WARN] profit_timers 로드 실패: {_e}")
+
+    return {}
+
+
+
+def _save_profit_timers() -> None:
+
+    """타이머 딕셔너리를 JSON 파일에 저장."""
+
+    try:
+
+        import json as _json
+
+        now = time.time()
+
+        # 만료된 항목 제거 후 저장
+
+        valid = {k: v for k, v in _profit_alert_timers.items() if now - v < 3600}
+
+        with open(_PROFIT_TIMER_FILE, "w") as _f:
+
+            _json.dump(valid, _f)
+
+    except Exception as _e:
+
+        print(f"[WARN] profit_timers 저장 실패: {_e}")
+
+
+
+# 시작 시 기존 타이머 로드
+
+_profit_alert_timers.update(_load_profit_timers())
+
+print(f"[STARTUP] profit_alert_timers 로드: {len(_profit_alert_timers)}건")
 
 # [AI-2] 강력 매수 신호 자동 즉시 실행 설정
 AI_STRONG_BUY_AUTO:    bool  = os.getenv("AI_STRONG_BUY_AUTO", "false").lower() == "true"
@@ -588,25 +661,20 @@ def _run_analysis():
 
     # 뉴스 (아래 중복 블록 제거됨 — 위로 이동)
 
-    # KIS 잔고 조회 (장외 안전 처리)
+    # KIS 잔고 조회 [v7.1 장외 완전 차단]
     cash = 0
-    try:
-        token   = get_access_token()
-        balance = get_balance(token)
-        cash    = int(balance["output2"][0].get("dnca_tot_amt", 0))
-    except Exception as _kis_e:
-        err_str = str(_kis_e)
-        if "403" in err_str or "Forbidden" in err_str:
-            send(
-                "KIS API 접근 불가 (장 마감 시간)\n"
-                "잔고 조회 생략 후 분석 계속 진행합니다.\n"
-                "실제 매수는 장중에만 실행됩니다."
-            )
-            cash = 10_000_000
-        else:
-            send("KIS API 오류: " + err_str)
+    if is_trading_time():
+        try:
+            token   = get_access_token()
+            balance = get_balance(token)
+            cash    = int(balance["output2"][0].get("dnca_tot_amt", 0))
+        except Exception as _kis_e:
+            send("KIS API 오류: " + str(_kis_e))
             log_error(_kis_e, "_run_analysis KIS")
             return
+    else:
+        cash = 10_000_000
+        print("[v7.1] 장외시간 KIS 잔고 조회 생략")
 
     if daily_pnl <= MAX_DAILY_LOSS:
         send("CIRCUIT BREAKER: 일일 손실 한도 도달. 매매 중지.")
@@ -723,15 +791,19 @@ def _run_analysis():
                 print(f"log_blocked error: {_e}")
 
     # 분석 요약 (1회 전송, dedup 처리됨)
+    # [v7.3] 분석 요약 — ML차단 종목 명확히 분리
+    _ml_blocked = [s for s in blocked_stocks
+                   if any("ML_" in e for e in s.get("_errors", []))]
+    _other_blocked = [s for s in blocked_stocks if s not in _ml_blocked]
     send(
-        f"AI Top {len(top_stocks)}종목 분석 완료 (Regime: {regime})\n"
+        f"🤖 AI 분석 완료 ({regime} 장세)\n"
         "━━━━━━━━━━━━━━━━━━\n"
-        f"매수 가능: {len(valid_stocks)}종목\n"
-        f"관찰 후보: {len(watchlist_stocks)}종목\n"
-        f"차단:      {len(blocked_stocks)}종목\n"
-        f"데이터오류: {len(error_stocks)}종목"
+        f"✅ 매수 가능:  {len(valid_stocks)}종목\n"
+        f"👀 관싼 후보: {len(watchlist_stocks)}종목\n"
+        f"❌ ML하락 신호: {len(_ml_blocked)}종목 (신규진입 권장 안함)\n"
+        f"⛔ 기타 차단:  {len(_other_blocked)}종목\n"
+        f"⚠️ 데이터오류: {len(error_stocks)}종목"
     )
-    time.sleep(0.5)
 
     # 유효 종목 처리
     new_pending_count = 0
@@ -908,7 +980,7 @@ def us_market_brief():
         else:
             signal = "NEUTRAL: 선별 접근"
 
-        brief  = "ONE-HUB Morning Brief 07:00\n\n"
+        brief  = f"ONE-HUB Morning Brief {__import__('datetime').datetime.now().strftime('%H:%M')} KST\n\n"
         brief += f"Nasdaq: {nasdaq.get('price','N/A')} ({nasdaq_chg}%)\n"
         brief += f"SOX: {sox.get('price','N/A')} ({sox_chg}%)\n"
         brief += f"VIX: {vix_v}\n"
@@ -1610,6 +1682,18 @@ def _handle_single_command(text):
         lines = [f"/approve_all — {len(safe_list)}종목 승인"]
         if skipped_list:
             lines.append(f"{len(skipped_list)}종목 제외 (검증 실패)")
+        # [v7.2] 승인 전 요약
+        _total_est = sum(_p.get("price", 0) * _p.get("qty", 1) for _, _p in safe_list)
+        _sum = [f"⚠️ approve_all 승인 예정 ({len(safe_list)}종목)"]
+        for _c, _p in safe_list:
+            _est = _p.get("price", 0) * _p.get("qty", 1)
+            _sum.append(f"  • {_p.get('name','?')}: ~{format(int(_est), ',')}원")
+        _sum.append(f"에상 투자금: ~{format(int(_total_est), ',')}원")
+        _sum.append("실행: /approve_all_confirm | 취소: /skip_all")
+        send("\n".join(_sum))
+        globals()["_approve_all_safe"] = safe_list[:]
+        return
+
         for code, p in safe_list:
             result_msg = _execute_buy(code, p, batch_mode=True)
             lines.append(result_msg)
@@ -1617,6 +1701,19 @@ def _handle_single_command(text):
         return
 
     # ── /skip_all ─────────────────────────────────────────
+    # [v7.2] /approve_all_confirm
+    if text == "/approve_all_confirm":
+        _safe = globals().get("_approve_all_safe", [])
+        if not _safe:
+            send("승인 대기 목록 없음. /approve_all 먼저 입력하세요.")
+            return
+        _out = [f"✅ 최종 승인 {len(_safe)}종목"]
+        for _c, _p in _safe:
+            _out.append(_execute_buy(_c, _p, batch_mode=True))
+        globals().pop("_approve_all_safe", None)
+        send("\n".join(_out))
+        return
+
     if text == "/skip_all":
         cnt = len(pending)
         pending.clear()
@@ -2231,7 +2328,7 @@ def run_position_monitor():
     보유 포지션 목표가/손절가 도달 여부 자동 확인.
     10분마다 실행 (09:10~15:10)
     """
-    global monitor_positions, hold_today, _auto_stop_timers
+    global monitor_positions, hold_today, _auto_stop_timers, _auto_stop_executing
     if not monitor_positions or not is_trading_time():
         return
     try:
@@ -2261,6 +2358,11 @@ def run_position_monitor():
                 )
                 timer["warned"] = True
 
+                # [v7.5] 중복 실행 방지
+                if code in _auto_stop_executing:
+                    print(f"[AUTO_STOP] {code} 이미 실행 중 — 중복 스킵")
+                    continue
+                _auto_stop_executing.add(code)
             if elapsed >= AUTO_STOP_DELAY_MINUTES:
                 try:
                     current = get_current_price(token, code)
@@ -2278,6 +2380,7 @@ def run_position_monitor():
                     monitor_positions.pop(code, None)
                     _auto_stop_timers.pop(code, None)
                     hold_today.pop(code, None)
+                    _auto_stop_executing.discard(code)  # [v7.5] 락 해제
                     close_risk_position(code, "AUTO_STOP")  # [v5.2 Fix C]
                     send_force(
                         f"🔴 [Auto-Stop 실행] {name}({code})\n"
@@ -2302,6 +2405,7 @@ def run_position_monitor():
                         f"수동으로 /sell {code} 처리하세요."
                     )
                     _auto_stop_timers.pop(code, None)
+                    _auto_stop_executing.discard(code)  # [v7.5] 실패 시 락 해제
 
         # 포지션 순회
         for code, pos in list(monitor_positions.items()):
@@ -2391,14 +2495,21 @@ def run_position_monitor():
                     if code in _auto_stop_timers and current > stop_loss:
                         _auto_stop_timers.pop(code, None)
                         send(f"✅ {name}({code}) 손절선 회복 → Auto-Stop 해제")
-                    elif profit_pct >= 5.0 and code not in _auto_sell_timers and (time.time() - _profit_alert_timers.get(code, 0) > 3600):
+                    # [v7.2] 수익 알림 구간제 — 5/10/15/20% 각 1회만
+                    _alerted = _profit_alert_timers.get(code, set())
+                    if not isinstance(_alerted, set): _alerted = set()
+                    _new_steps = [s for s in [5, 10, 15, 20] if profit_pct >= s and s not in _alerted]
+                    if _new_steps and code not in _auto_sell_timers:
+                        _step = max(_new_steps)
+                        _emoji = "🚀" if _step >= 15 else "📈"
                         send(
-                            f"📈 [수익 알림] {name}({code}) "
-                            f"현재 +{profit_pct}% "
-                            f"목표: {format(target, ',')}원"
+                            f"{_emoji} [수익 알림] {name}({code}) +{_step}% 구간 돌파\n"
+                            f"현재: +{profit_pct:.1f}% | 목표: {format(target, ',')}원\n"
+                            f"→ 익절 검토 구간"
                         )
-                        _profit_alert_timers[code] = time.time()
-
+                        _alerted.add(_step)
+                        _profit_alert_timers[code] = _alerted
+                        _save_profit_timers()  # [v7.2] 영속 저장
                     # ── [v7.0 P4] 자동 분할 트리거 (auto 모드) ──────────
                     if SPLIT_MODE == "auto":
                         sp = split_plans.get(code)
