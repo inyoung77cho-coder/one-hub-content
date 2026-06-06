@@ -1,0 +1,8 @@
+{
+  "functions": {
+    "pages/api/engine-status.js": {
+      "maxDuration": 15
+    }
+  },
+  "regions": ["icn1"]
+}

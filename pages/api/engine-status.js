@@ -4,7 +4,7 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
   try {
     const upstream = await fetch(`${ENGINE_API}/api/engine-status`, {
-      signal: AbortSignal.timeout(5000),
+      signal: AbortSignal.timeout(8000),
     });
     if (!upstream.ok) throw new Error(`Upstream error: ${upstream.status}`);
     const data = await upstream.json();
