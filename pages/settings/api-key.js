@@ -1,4 +1,4 @@
-// -*- coding: utf-8 -*-
+﻿// -*- coding: utf-8 -*-
 import Head from 'next/head';
 import { useState } from 'react';
 
@@ -35,7 +35,7 @@ export default function ApiKeySettings() {
     setMessage('');
     try {
       const ENGINE_API = process.env.NEXT_PUBLIC_ENGINE_API_URL || 'http://54.180.54.132:5001';
-      const res = await fetch(`${ENGINE_API}/api/trader/register`, {
+      const res = await fetch(`/api/trader-register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -61,7 +61,7 @@ export default function ApiKeySettings() {
     setMessage('API 키 검증 중...');
     try {
       const ENGINE_API = process.env.NEXT_PUBLIC_ENGINE_API_URL || 'http://54.180.54.132:5001';
-      const res = await fetch(`${ENGINE_API}/api/trader/verify/${form.trader_id}`);
+      const res = await fetch(`/api/trader-verify?trader_id=${form.trader_id}`);
       const data = await res.json();
       if (data.ok) {
         setStatus('success');
