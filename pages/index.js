@@ -10,7 +10,6 @@ export default function Home({ reports, stats }) {
   const latest = reports[0] || null;
   const [mounted, setMounted] = useState(false);
   const [engineVersion, setEngineVersion] = useState("v8.0");
-  const [blockCount, setBlockCount] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -20,42 +19,16 @@ export default function Home({ reports, stats }) {
       .catch(() => {});
   }, []);
 
-  const heatColor = (grade) => {
-    const map = {
-      'HOT': 'heat-hot',
-      'WARM': 'heat-warm',
-      'COOL': 'heat-cool',
-      'COLD': 'heat-cold',
-    };
-    return map[grade] || 'heat-cool';
-  };
-
   const regimeIcon = (regime) => {
     if (regime === 'BULL') return '📈';
     if (regime === 'BEAR') return '📉';
     return '➖';
   };
-
   const regimeLabel = (regime) => {
     if (regime === 'BULL') return '상승장';
     if (regime === 'BEAR') return '하락장';
     return '횡보장';
   };
-
-  const aiTrust = (score, regime) => {
-
-    if (regime === 'BEAR') return 45;
-
-    if (score >= 70) return 85;
-
-    if (score >= 50) return 72;
-
-    return 58;
-
-  };
-
-
-
   const regimeClass = (regime) => {
     if (regime === 'BULL') return '시장 흐름-bull';
     if (regime === 'BEAR') return '시장 흐름-bear';
@@ -65,8 +38,8 @@ export default function Home({ reports, stats }) {
   return (
     <>
       <Head>
-        <title>ONE-HUB — AI 자동매매 플랫폼</title>
-        <meta name="description" content="AI 엔진이 시장을 읽고, 사람이 판단합니다. ONE-HUB 자동매매 운영 현황." />
+        <title>ONE-HUB — AI 투자 의사결정 기록 플랫폼</title>
+        <meta name="description" content="AI가 매일 어떤 종목을 왜 분석하고, 왜 차단했는지 투명하게 기록합니다. 수익보다 판단 과정이 먼저입니다." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -98,50 +71,80 @@ export default function Home({ reports, stats }) {
         </div>
 
         <main className="main">
+
           {/* ── PLATFORM INTRO ── */}
           <section className="platform-intro">
             <div className="pi-copy">
-              <h1 className="pi-title">AI가 매일 주식시장을 분석하고, 실제로 매매합니다.</h1>
-              <p className="pi-sub">AI가 오늘 어떤 종목을 왜 샀는지, 왜 안 샀는지 매일 공개합니다. 수익보다 과정이 먼저입니다.</p>
+              <h1 className="pi-title">AI가 매일 어떻게 판단하는지, 투명하게 기록합니다.</h1>
+              <p className="pi-sub">왜 샀는지, 왜 안 샀는지, 왜 차단했는지 매일 공개합니다. 수익보다 판단 과정이 먼저입니다.</p>
             </div>
             <div className="pi-stats">
-              <div className="pi-stat"><span className="pi-stat-val mono">{stats.totalDays}</span><span className="pi-stat-label">운영 일수</span></div>
+              <div className="pi-stat">
+                <span className="pi-stat-val mono">{stats.totalAnalyzed.toLocaleString()}</span>
+                <span className="pi-stat-label">누적 분석</span>
+              </div>
               <div className="pi-stat-div"></div>
-              <div className="pi-stat"><span className="pi-stat-val mono">{stats.totalReports}</span><span className="pi-stat-label">공개 리포트</span></div>
+              <div className="pi-stat">
+                <span className="pi-stat-val mono">{stats.totalBlocked.toLocaleString()}</span>
+                <span className="pi-stat-label">AI 차단</span>
+              </div>
               <div className="pi-stat-div"></div>
-              <div className="pi-stat"><span className="pi-stat-val mono">{stats.totalTrades}</span><span className="pi-stat-label">총 실제 매매 건수</span></div>
+              <div className="pi-stat">
+                <span className="pi-stat-val mono">{stats.totalTrades}</span>
+                <span className="pi-stat-label">최종 실행</span>
+              </div>
               <div className="pi-stat-div"></div>
-              <div className="pi-stat"><span className="pi-stat-val mono">{stats.totalBlocked}</span><span className="pi-stat-label">AI 차단 종목</span></div>            </div>
+              <div className="pi-stat">
+                <span className="pi-stat-val mono">{stats.totalDays}</span>
+                <span className="pi-stat-label">운영 일수</span>
+              </div>
+            </div>
           </section>
 
-          {/* ── 사이트 소개 섹션 ── */}
-        <section className="intro-guide">
-          <div className="ig-grid">
-            <div className="ig-card">
-              <div className="ig-icon">🤖</div>
-              <div className="ig-title">AI가 매일 분석합니다</div>
-              <div className="ig-desc">삼성전자, SK하이닉스 등 주요 종목을 AI가 매일 자동으로 분석합니다. 사람이 잠든 사이에도 시장을 지켜봅니다.</div>
-            </div>
-            <div className="ig-card">
-              <div className="ig-icon">📋</div>
-              <div className="ig-title">판단 과정을 공개합니다</div>
-              <div className="ig-desc">왜 샀는지, 왜 안 샀는지 매일 기록합니다. 수익 자랑이 아닌 진짜 판단 근거를 투명하게 공개합니다.</div>
-            </div>
-            <div className="ig-card">
-              <div className="ig-icon">📈</div>
-              <div className="ig-title">실제 계좌로 운영합니다</div>
-              <div className="ig-desc">가상 매매가 아닙니다. 실제 증권 계좌와 연결된 AI가 직접 매수·매도합니다. 손실도 그대로 공개합니다.</div>
-            </div>
-          </div>
-        </section>
+          {/* ── 오늘 AI 활동 요약 ── */}
+          {latest && (
+            <section className="section">
+              <div className="section-header">
+                <h2 className="section-title">오늘 AI는 무엇을 했는가?</h2>
+                <span className="section-subtitle mono">{latest.date}</span>
+              </div>
+              <div className="today-activity-card">
+                <div className="ta-funnel">
+                  <div className="ta-step">
+                    <span className="ta-step-icon">🔍</span>
+                    <span className="ta-step-val">{(latest.block_count ?? 0) + (latest.trade_count ?? 0)}개</span>
+                    <span className="ta-step-label">분석</span>
+                  </div>
+                  <span className="ta-arrow">→</span>
+                  <div className="ta-step blocked">
+                    <span className="ta-step-icon">🚫</span>
+                    <span className="ta-step-val">{latest.block_count ?? 0}개</span>
+                    <span className="ta-step-label">차단</span>
+                  </div>
+                  <span className="ta-arrow">→</span>
+                  <div className="ta-step executed">
+                    <span className="ta-step-icon">✅</span>
+                    <span className="ta-step-val">{latest.trade_count}건</span>
+                    <span className="ta-step-label">실행</span>
+                  </div>
+                </div>
+                <div className="ta-reason">
+                  <span className="ta-reason-text">
+                    {latest.trade_count === 0
+                      ? `${regimeLabel(latest.regime)} 판단으로 신규 진입을 차단했습니다.`
+                      : `조건을 충족한 ${latest.trade_count}건만 선별 실행했습니다.`}
+                  </span>
+                </div>
+                <Link href={`/daily/${latest.date}`} className="ta-link">이유 보기 →</Link>
+              </div>
+            </section>
+          )}
 
-        {/* ── TODAY HERO ── */}
+          {/* ── TODAY HERO ── */}
           {latest ? (
             <section className="hero-section">
               <div style={{marginBottom:'1rem'}}>
-
                 <MarketScore score={latest.market_score || latest.heat_score} heatGrade={latest.heat_grade} regime={latest.regime} />
-
               </div>
 
               <div className="hero-date-line">
@@ -156,85 +159,47 @@ export default function Home({ reports, stats }) {
                   <div className="today-judgment-card">
 
                     <div className="tj-header">
-
                       <span className="tj-label">TODAY&apos;S JUDGMENT</span>
-
                       <span className={`tj-시장 흐름 ${regimeClass(latest.regime)}`}>
-
                         {regimeIcon(latest.regime)} {regimeLabel(latest.regime)}
-
                       </span>
-
                     </div>
 
                     <div className="tj-metrics">
-
                       <div className="tj-metric">
-
-                        <span className="tj-metric-label">오늘 시장 흐름</span>
-
+                        <span className="tj-metric-label">시장 흐름</span>
                         <span className={`tj-metric-val ${regimeClass(latest.regime)}`}>{regimeLabel(latest.regime)}</span>
-
                       </div>
-
                       <div className="tj-metric-divider"></div>
-
                       <div className="tj-metric">
-
-                        <span className="tj-metric-label">AI 판단 신뢰도</span>
-
-                        <span className="tj-metric-val">{aiTrust(latest.market_score || latest.heat_score, latest.regime)}점</span>
-
+                        <span className="tj-metric-label">Heat Score</span>
+                        <span className="tj-metric-val">{latest.market_score || latest.heat_score}/100</span>
                       </div>
-
                       <div className="tj-metric-divider"></div>
-
                       <div className="tj-metric">
-
                         <span className="tj-metric-label">분석 종목</span>
-
-                        <span className="tj-metric-val" style={{color:"var(--color-text-primary)"}}>{(latest.block_count ?? 0) + (latest.trade_count ?? 0)}개</span>
-
+                        <span className="tj-metric-val">{(latest.block_count ?? 0) + (latest.trade_count ?? 0)}개</span>
                       </div>
-
                       <div className="tj-metric-divider"></div>
-
                       <div className="tj-metric">
-
-                        <span className="tj-metric-label">AI 차단 종목</span>
-
+                        <span className="tj-metric-label">AI 차단</span>
                         <span className="tj-metric-val tj-blocked">{latest.block_count ?? 0}건</span>
-
                       </div>
-
                       <div className="tj-metric-divider"></div>
-
                       <div className="tj-metric">
-
-                        <span className="tj-metric-label">실제 매매 건수</span>
-
+                        <span className="tj-metric-label">최종 실행</span>
                         <span className="tj-metric-val tj-executed">{latest.trade_count}건</span>
-
                       </div>
-
                     </div>
 
                     <div className="tj-summary">
-
                       <span className="tj-summary-text">
-
                         {latest.trade_count === 0
-
-                          ? `${latest.regime === 'SIDEWAYS' ? '횡보장' : latest.regime === 'BULL' ? '상승장' : '하락장'} 판단으로 신규 진입을 차단했습니다.`
-
+                          ? `${regimeLabel(latest.regime)} 판단으로 신규 진입을 차단했습니다.`
                           : `조건을 충족한 ${latest.trade_count}건만 선별 실행했습니다.`}
-
                       </span>
-
                     </div>
-
                   </div>
-
 
                   <div className="tags-row">
                     {latest.tags && latest.tags.map(tag => (
@@ -243,19 +208,19 @@ export default function Home({ reports, stats }) {
                   </div>
                 </div>
 
-                {/* 오른쪽: Claude Insight */}
+                {/* 오른쪽: ONE-HUB Insight */}
                 <div className="insight-card">
                   <div className="insight-header">
                     <span className="insight-engine-badge">
                       <span className="insight-dot"></span>
-                      Claude AI Insight
+                      ONE-HUB Insight
                     </span>
                   </div>
                   <blockquote className="insight-text">
                     &ldquo;{latest.insight}&rdquo;
                   </blockquote>
                   <div className="insight-meta">
-                    <span className="mono dim">claude-3-5-sonnet · 15:30 KST</span>
+                    <span className="mono dim">AI 분석 · 15:30 KST</span>
                   </div>
                   <Link href={`/daily/${latest.date}`} className="insight-link">
                     전체 분석 보기 →
@@ -269,90 +234,51 @@ export default function Home({ reports, stats }) {
             </section>
           )}
 
-          {/* ── AI 판단 차단 사유 시각화 ── */}
+          {/* ── AI 판단 근거 ── */}
           <section className="section">
             <div className="section-header">
               <h2 className="section-title">AI 판단 근거</h2>
               <span className="section-subtitle mono">매매 차단 사유 분석</span>
             </div>
             <div className="judgment-reason-card">
-
               {latest && (
-
                 <>
-
                   <div className="jr-insight">
-
                     <span className="jr-quote">&ldquo;{latest.insight}&rdquo;</span>
-
                   </div>
-
                   <div className="jr-factors">
-
                     <div className="jr-factor">
-
                       <span className="jr-factor-dot" style={{background:'var(--amber)'}}></span>
-
                       <span className="jr-factor-label">Fear &amp; Greed 지수</span>
-
                       <span className="jr-factor-val" style={{color:'var(--amber)'}}>극단적 공포</span>
-
                     </div>
-
                     <div className="jr-factor">
-
                       <span className="jr-factor-dot" style={{background:'var(--blue)'}}></span>
-
                       <span className="jr-factor-label">시장 흐름</span>
-
                       <span className={`jr-factor-val ${regimeClass(latest.regime)}`}>{latest.regime}</span>
-
                     </div>
-
                     <div className="jr-factor">
-
                       <span className="jr-factor-dot" style={{background:'var(--green)'}}></span>
-
                       <span className="jr-factor-label">Heat Score</span>
-
                       <span className="jr-factor-val">{latest.market_score || latest.heat_score}/100</span>
-
                     </div>
-
                     <div className="jr-factor">
-
                       <span className="jr-factor-dot" style={{background:'var(--red)'}}></span>
-
-                      <span className="jr-factor-label">ML 필터 차단</span>
-
+                      <span className="jr-factor-label">AI 차단 종목</span>
                       <span className="jr-factor-val" style={{color:'var(--red)'}}>{latest.block_count ?? 0}건</span>
-
                     </div>
-
                   </div>
-
                   <div className="jr-conclusion">
-
                     <span className="jr-conclusion-label">결론</span>
-
                     <span className="jr-conclusion-text">
-
                       {latest.trade_count === 0
-
                         ? '오늘은 매매하지 않는 것이 최선의 판단이었습니다.'
-
                         : `조건을 충족한 ${latest.trade_count}건만 선별 실행했습니다.`}
-
                     </span>
-
                   </div>
-
                 </>
-
               )}
-
             </div>
-
           </section>
 
           {/* ── 누적 통계 ── */}
@@ -387,26 +313,12 @@ export default function Home({ reports, stats }) {
                 <span className="stat-value dim">{stats.zeroTradeDays}<span className="stat-unit">일</span></span>
               </div>
             </div>
-
-            {/* 시장 흐름 히트맵 바 */}
             <div className="시장 흐름-bar-section">
               <span className="시장 흐름-bar-label mono dim">장세 분포</span>
               <div className="시장 흐름-bar">
-                <div
-                  className="시장 흐름-bar-segment bull"
-                  style={{ width: `${stats.totalDays > 0 ? (stats.bullDays / stats.totalDays) * 100 : 33}%` }}
-                  title={`📈 상승장 ${stats.bullDays}일`}
-                ></div>
-                <div
-                  className="시장 흐름-bar-segment side"
-                  style={{ width: `${stats.totalDays > 0 ? (stats.sidewaysDays / stats.totalDays) * 100 : 34}%` }}
-                  title={`➖ 횡보장 ${stats.sidewaysDays}일`}
-                ></div>
-                <div
-                  className="시장 흐름-bar-segment bear"
-                  style={{ width: `${stats.totalDays > 0 ? (stats.bearDays / stats.totalDays) * 100 : 33}%` }}
-                  title={`📉 하락장 ${stats.bearDays}일`}
-                ></div>
+                <div className="시장 흐름-bar-segment bull" style={{ width: `${stats.totalDays > 0 ? (stats.bullDays / stats.totalDays) * 100 : 33}%` }} title={`📈 상승장 ${stats.bullDays}일`}></div>
+                <div className="시장 흐름-bar-segment side" style={{ width: `${stats.totalDays > 0 ? (stats.sidewaysDays / stats.totalDays) * 100 : 34}%` }} title={`➖ 횡보장 ${stats.sidewaysDays}일`}></div>
+                <div className="시장 흐름-bar-segment bear" style={{ width: `${stats.totalDays > 0 ? (stats.bearDays / stats.totalDays) * 100 : 33}%` }} title={`📉 하락장 ${stats.bearDays}일`}></div>
               </div>
               <div className="시장 흐름-bar-legend">
                 <span className="rbl-item"><span className="rbl-dot bull"></span>📈 상승장 {stats.bullDays}일</span>
@@ -427,9 +339,7 @@ export default function Home({ reports, stats }) {
                 <Link key={r.date} href={`/daily/${r.date}`} className="report-row">
                   <span className="rr-index mono dim">{String(i + 1).padStart(2, '0')}</span>
                   <span className="rr-date mono">{r.date}</span>
-                  <span className={`rr-시장 흐름 ${regimeClass(r.regime)}`}>
-                    {regimeIcon(r.regime)} {r.regime}
-                  </span>
+                  <span className={`rr-시장 흐름 ${regimeClass(r.regime)}`}>{regimeIcon(r.regime)} {r.regime}</span>
                   <span className="rr-emoji">{r.pnl_emoji}</span>
                   <span className="rr-insight">{r.insight}</span>
                   <span className="rr-trades mono dim">{r.trade_count}건</span>
@@ -439,7 +349,7 @@ export default function Home({ reports, stats }) {
             </div>
           </section>
 
-          {/* ── 커밍순 페이지 허브 ── */}
+          {/* ── 플랫폼 로드맵 ── */}
           <section className="section">
             <div className="section-header">
               <h2 className="section-title">플랫폼 로드맵</h2>
@@ -454,11 +364,7 @@ export default function Home({ reports, stats }) {
                 { href: '/community', label: 'Community', desc: '텔레그램·카카오', status: 'soon', week: '2주차' },
                 { href: '/about', label: 'About', desc: 'ONE-HUB 철학', status: 'soon', week: '1주차' },
               ].map(item => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`hub-card ${item.status}`}
-                >
+                <Link key={item.href} href={item.href} className={`hub-card ${item.status}`}>
                   <div className="hc-top">
                     <span className="hc-label">{item.label}</span>
                     {item.status === 'live'
@@ -471,6 +377,7 @@ export default function Home({ reports, stats }) {
               ))}
             </div>
           </section>
+
         </main>
 
         {/* ── FOOTER ── */}
@@ -503,12 +410,13 @@ export async function getStaticProps() {
       const { data } = matter(raw);
       return {
         date: data.date || file.replace('.md', ''),
-        regime: data.regime || '➖ 횡보장',
+        regime: data.regime || 'SIDEWAYS',
         heat_score: data.heat_score || 50,
         market_score: data.market_score || data.heat_score || 50,
         heat_grade: data.heat_grade || 'WARM',
         pnl_emoji: data.pnl_emoji || '➖',
         trade_count: data.trade_count || 0,
+        block_count: data.block_count || 0,
         tags: data.tags || [],
         insight: data.insight || '',
         published: data.published !== false,
@@ -527,6 +435,7 @@ export async function getStaticProps() {
     zeroTradeDays: reports.filter(r => r.trade_count === 0).length,
     totalTrades: reports.reduce((sum, r) => sum + (r.trade_count || 0), 0),
     totalBlocked: reports.reduce((sum, r) => sum + (r.block_count || 0), 0),
+    totalAnalyzed: reports.reduce((sum, r) => sum + (r.block_count || 0) + (r.trade_count || 0), 0),
     blockRate: reports.length > 0
       ? Math.round(
           reports.reduce((sum, r) => sum + (r.block_count || 0), 0) /
@@ -534,5 +443,5 @@ export async function getStaticProps() {
         )
       : 0,
   };
-    return { props: { reports, stats } };
+  return { props: { reports, stats } };
 }

@@ -1615,3 +1615,57 @@ img { max-width: 100%; display: block; }
   color: var(--color-muted);
   line-height: 1.7;
 }
+/* ── 오늘 AI 활동 카드 ── */
+.today-activity-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 1.5rem;
+}
+.ta-funnel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+.ta-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 60px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 0.875rem 0.5rem;
+}
+.ta-step.blocked { border-color: #F09595; background: #FCEBEB; }
+.ta-step.executed { border-color: #5DCAA5; background: #E1F5EE; }
+.ta-step-icon { font-size: 1.25rem; }
+.ta-step-val { font-size: 1.25rem; font-weight: 700; font-family: 'Space Mono', monospace; color: var(--color-text); }
+.ta-step.blocked .ta-step-val { color: #A32D2D; }
+.ta-step.executed .ta-step-val { color: #085041; }
+.ta-step-label { font-size: 0.7rem; color: var(--color-muted); font-weight: 600; }
+.ta-arrow { font-size: 1.25rem; color: var(--color-muted); flex-shrink: 0; }
+.ta-reason {
+  font-size: 0.875rem;
+  color: var(--color-muted);
+  line-height: 1.6;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: var(--color-bg);
+  border-radius: 8px;
+  border-left: 3px solid var(--color-border);
+}
+.ta-reason-text { }
+.ta-link {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+  font-family: 'Space Mono', monospace;
+}
+.ta-link:hover { text-decoration: underline; }
