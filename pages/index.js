@@ -1,4 +1,4 @@
-import Head from 'next/head';
+﻿import Head from 'next/head';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import fs from 'fs';
@@ -111,7 +111,7 @@ export default function Home({ reports, stats }) {
               <div className="pi-stat-div"></div>
               <div className="pi-stat"><span className="pi-stat-val mono">{stats.totalTrades}</span><span className="pi-stat-label">총 실제 매매 건수</span></div>
               <div className="pi-stat-div"></div>
-              <div className="pi-stat"><span className="pi-stat-val mono">{stats.zeroTradeDays}</span><span className="pi-stat-label">신중 판단({blockCount}건)</span></div>            </div>
+              <div className="pi-stat"><span className="pi-stat-val mono">{stats.totalBlocked}</span><span className="pi-stat-label">AI 차단 종목</span></div>            </div>
           </section>
 
           {/* ── 사이트 소개 섹션 ── */}
@@ -191,9 +191,19 @@ export default function Home({ reports, stats }) {
 
                       <div className="tj-metric">
 
-                        <span className="tj-metric-label">안 산 종목 수</span>
+                        <span className="tj-metric-label">분석 종목</span>
 
-                        <span className="tj-metric-val tj-blocked">{latest.block_count ?? 7}건</span>
+                        <span className="tj-metric-val" style={{color:"var(--color-text-primary)"}}>{(latest.block_count ?? 0) + (latest.trade_count ?? 0)}개</span>
+
+                      </div>
+
+                      <div className="tj-metric-divider"></div>
+
+                      <div className="tj-metric">
+
+                        <span className="tj-metric-label">AI 차단 종목</span>
+
+                        <span className="tj-metric-val tj-blocked">{latest.block_count ?? 0}건</span>
 
                       </div>
 
@@ -315,7 +325,7 @@ export default function Home({ reports, stats }) {
 
                       <span className="jr-factor-label">ML 필터 차단</span>
 
-                      <span className="jr-factor-val" style={{color:'var(--red)'}}>{latest.block_count ?? 7}건</span>
+                      <span className="jr-factor-val" style={{color:'var(--red)'}}>{latest.block_count ?? 0}건</span>
 
                     </div>
 
