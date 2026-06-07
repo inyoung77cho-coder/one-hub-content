@@ -25,7 +25,7 @@ async function handler(req, res) {
     });
     try {
         const upstream = await fetch(`${ENGINE_API}/api/engine-status`, {
-            signal: AbortSignal.timeout(5000)
+            signal: AbortSignal.timeout(8000)
         });
         if (!upstream.ok) throw new Error(`Upstream error: ${upstream.status}`);
         const data = await upstream.json();

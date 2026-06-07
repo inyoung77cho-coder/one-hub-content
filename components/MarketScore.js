@@ -1,4 +1,4 @@
-export default function MarketScore({ score, heatGrade, regime }) {
+﻿export default function MarketScore({ score, heatGrade, regime }) {
 
   const s = parseInt(score) || 0
 
@@ -58,9 +58,9 @@ export default function MarketScore({ score, heatGrade, regime }) {
 
         <div className="ms-detail">
 
-          <div className="ms-row"><span className="ms-lbl">Heat Grade</span><span className="ms-val">{heatGrade || "-"}</span></div>
+          <div className="ms-row"><span className="ms-lbl">시장 온도</span><span className="ms-val">{heatGrade || "-"}</span></div>
 
-          <div className="ms-row"><span className="ms-lbl">Regime</span><span className="ms-val">{regime || "-"}</span></div>
+          <div className="ms-row"><span className="ms-lbl">시장 흐름</span><span className="ms-val">{regime === 'BULL' ? '📈 상승장' : regime === 'BEAR' ? '📉 하락장' : regime === 'SIDEWAYS' ? '➖ 횡보장' : '-'}</span></div>
 
           <div className="ms-row"><span className="ms-lbl">판단</span><span className="ms-val" style={{ color, fontWeight: 600 }}>{text}</span></div>
 
