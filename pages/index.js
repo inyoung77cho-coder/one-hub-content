@@ -59,7 +59,7 @@ export default function Home({ reports, stats }) {
   const regimeClass = (regime) => {
     if (regime === 'BULL') return '시장 흐름-bull';
     if (regime === 'BEAR') return '시장 흐름-bear';
-    return '시장 흐름-side';
+    return 'REGIME-side';
   };
 
   return (
@@ -173,7 +173,7 @@ export default function Home({ reports, stats }) {
 
                         <span className="tj-metric-label">오늘 시장 흐름</span>
 
-                        <span className={`tj-metric-val ${regimeClass(latest.regime)}`}>{latest.regime}</span>
+                        <span className={`tj-metric-val ${regimeClass(latest.regime)}`}>{regimeLabel(latest.regime)}</span>
 
                       </div>
 
@@ -361,16 +361,16 @@ export default function Home({ reports, stats }) {
                 <span className="stat-value">{stats.totalReports}<span className="stat-unit">건</span></span>
               </div>
               <div className="stat-card">
-                <span className="stat-label">BULL 장세</span>
+                <span className="stat-label">📈 상승장</span>
                 <span className="stat-value 시장 흐름-bull">{stats.bullDays}<span className="stat-unit">일</span></span>
               </div>
               <div className="stat-card">
-                <span className="stat-label">BEAR 장세</span>
+                <span className="stat-label">📉 하락장</span>
                 <span className="stat-value 시장 흐름-bear">{stats.bearDays}<span className="stat-unit">일</span></span>
               </div>
               <div className="stat-card">
-                <span className="stat-label">SIDEWAYS</span>
-                <span className="stat-value 시장 흐름-side">{stats.sidewaysDays}<span className="stat-unit">일</span></span>
+                <span className="stat-label">➖ 횡보장</span>
+                <span className="stat-value REGIME-side">{stats.sidewaysDays}<span className="stat-unit">일</span></span>
               </div>
               <div className="stat-card">
                 <span className="stat-label">AI 매매 없음</span>
@@ -385,23 +385,23 @@ export default function Home({ reports, stats }) {
                 <div
                   className="시장 흐름-bar-segment bull"
                   style={{ width: `${stats.totalDays > 0 ? (stats.bullDays / stats.totalDays) * 100 : 33}%` }}
-                  title={`BULL ${stats.bullDays}일`}
+                  title={`📈 상승장 ${stats.bullDays}일`}
                 ></div>
                 <div
                   className="시장 흐름-bar-segment side"
                   style={{ width: `${stats.totalDays > 0 ? (stats.sidewaysDays / stats.totalDays) * 100 : 34}%` }}
-                  title={`SIDEWAYS ${stats.sidewaysDays}일`}
+                  title={`➖ 횡보장 ${stats.sidewaysDays}일`}
                 ></div>
                 <div
                   className="시장 흐름-bar-segment bear"
                   style={{ width: `${stats.totalDays > 0 ? (stats.bearDays / stats.totalDays) * 100 : 33}%` }}
-                  title={`BEAR ${stats.bearDays}일`}
+                  title={`📉 하락장 ${stats.bearDays}일`}
                 ></div>
               </div>
               <div className="시장 흐름-bar-legend">
-                <span className="rbl-item"><span className="rbl-dot bull"></span>BULL {stats.bullDays}일</span>
-                <span className="rbl-item"><span className="rbl-dot side"></span>SIDEWAYS {stats.sidewaysDays}일</span>
-                <span className="rbl-item"><span className="rbl-dot bear"></span>BEAR {stats.bearDays}일</span>
+                <span className="rbl-item"><span className="rbl-dot bull"></span>📈 상승장 {stats.bullDays}일</span>
+                <span className="rbl-item"><span className="rbl-dot side"></span>➖ 횡보장 {stats.sidewaysDays}일</span>
+                <span className="rbl-item"><span className="rbl-dot bear"></span>📉 하락장 {stats.bearDays}일</span>
               </div>
             </div>
           </section>
@@ -493,7 +493,7 @@ export async function getStaticProps() {
       const { data } = matter(raw);
       return {
         date: data.date || file.replace('.md', ''),
-        regime: data.regime || 'SIDEWAYS',
+        regime: data.regime || '➖ 횡보장',
         heat_score: data.heat_score || 50,
         market_score: data.market_score || data.heat_score || 50,
         heat_grade: data.heat_grade || 'WARM',
