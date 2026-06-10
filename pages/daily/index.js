@@ -12,9 +12,11 @@ import { useState, useEffect } from "react";
 
 
 
-export default function DailyIndex({ posts }) {
+export default function DailyIndex({ posts, postsB }) {
 
   const [isMobile, setIsMobile] = useState(false);
+  const [trader, setTrader] = useState("A");
+  const activePosts = trader === "A" ? posts : (postsB || []);
 
   useEffect(() => {
 
@@ -94,7 +96,7 @@ export default function DailyIndex({ posts }) {
 
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
 
-            {posts.map((post, i) => (
+            {activePosts.map((post, i) => (
 
               <Link key={post.date} href={`/daily/${post.date}`} style={{ textDecoration: "none" }}>
 
@@ -210,5 +212,22 @@ export async function getStaticProps() {
       };
     });
   } catch (e) {}
-  return { props: { posts } };
+  // Trader B
+  const contentDirB = path.join(process.cwd(), "content", "daily-b");
+  let postsB = [];
+  try {
+    const filesB = fs.readdirSync(contentDirB).filter(f => f.endsWith(".md")).sort().reverse();
+    postsB = filesB.map(file => {
+      const raw = fs.readFileSync(path.join(contentDirB, file), "utf-8");
+      const { data } = matter(raw);
+      return {
+        date: data.date || file.replace(".md", ""),
+        regime: data.regime || "SIDEWAYS",
+        heat_score: data.heat_score || 50,
+        insight: data.insight || "",
+        trade_count: data.trade_count || 0,
+      };
+    });
+  } catch (e) {}
+  return { props: { posts, postsB } };
 }
