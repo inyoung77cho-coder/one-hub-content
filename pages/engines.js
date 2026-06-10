@@ -744,6 +744,16 @@ export default function EnginePage() {
             KST
           </div>
         )}
+
+        {/* 바로가기 링크 */}
+        <div style={{ display: "flex", gap: "1rem", justifyContent: "center", padding: "1.5rem 0", flexWrap: "wrap" }}>
+          <a href="/ai-accuracy" style={{ fontFamily: "Space Mono, monospace", fontSize: "0.8rem", color: "var(--color-muted, #8A7E6A)", textDecoration: "none", border: "1px solid #333", borderRadius: "6px", padding: "0.4rem 1rem" }}>
+            AI Accuracy →
+          </a>
+          <a href="/decision-log" style={{ fontFamily: "Space Mono, monospace", fontSize: "0.8rem", color: "var(--color-muted, #8A7E6A)", textDecoration: "none", border: "1px solid #333", borderRadius: "6px", padding: "0.4rem 1rem" }}>
+            Decision Log →
+          </a>
+        </div>
       </div>
     </>
   );
