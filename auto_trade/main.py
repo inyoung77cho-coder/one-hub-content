@@ -90,8 +90,8 @@ APP_VERSION_STR = f"v{APP_VERSION}"
 
 # ── [v7.0] 주말 차단 유틸 ──────────────────────────────────────────────
 def _is_weekday() -> bool:
-    """월~금(0~4) 여부 — 스케줄 함수에 사용."""
-    return now_kst().weekday() < 5
+    """월~금: 항상 허용 / 토 16:00 이후~일 16:00 이전: 휴식."""
+    return True  # 임시: 주말 차단 해제 (Trader B 테스트용)
 
 def _weekday_only(fn):
     """주말 실행 방지 데코레이터."""
@@ -186,6 +186,27 @@ blocked_today  = {}         # 오늘 차단: {code: (stock_dict, errors)}
 approved_today = {}         # 오늘 승인 완료: {code: datetime}
 tg_offset      = 0
 trade_count    = 0
+# ── Trader 설정 ──────────────────────────────────────────────
+TRADER_ID = os.getenv("TRADER_ID", "A").upper()
+
+if TRADER_ID == "B":
+    _b_token   = os.getenv("TRADER_B_TELEGRAM_TOKEN", "")
+    _b_chat_id = os.getenv("TRADER_B_TELEGRAM_CHAT_ID", "")
+    if _b_token:
+        os.environ["TELEGRAM_TOKEN"]   = _b_token
+    if _b_chat_id:
+        os.environ["TELEGRAM_CHAT_ID"] = _b_chat_id
+    _b_key    = os.getenv("TRADER_B_KIS_APP_KEY", "")
+    _b_secret = os.getenv("TRADER_B_KIS_APP_SECRET", "")
+    _b_acct   = os.getenv("TRADER_B_KIS_ACCOUNT_NO", "")
+    _b_code   = os.getenv("TRADER_B_KIS_ACCOUNT_CODE", "01")
+    _b_real   = os.getenv("TRADER_B_IS_REAL", "0")
+    if _b_key:    os.environ["KIS_APP_KEY"]      = _b_key
+    if _b_secret: os.environ["KIS_APP_SECRET"]   = _b_secret
+    if _b_acct:   os.environ["KIS_ACCOUNT_NO"]   = _b_acct
+    if _b_code:   os.environ["KIS_ACCOUNT_CODE"] = _b_code
+    os.environ["KIS_IS_REAL"] = _b_real
+
 CHAT_ID_STR    = os.getenv("TELEGRAM_CHAT_ID", "")
 MAX_DAILY_LOSS = -1_000_000
 
@@ -336,8 +357,9 @@ def on_startup():
     global monitor_positions
     print("[STARTUP] 보유종목 복구 시작...")
     try:
-        token    = get_access_token()
-        balance  = get_balance(token)
+        _cfg     = __import__("kis_api").get_trader_config(TRADER_ID)
+        token    = get_access_token(TRADER_ID, _cfg)
+        balance  = get_balance(token, TRADER_ID, _cfg)
         holdings = balance.get("output1", [])
 
         # KIS 실계좌에서 실제 보유 중인 코드 추출 (qty > 0)
@@ -960,6 +982,11 @@ def _run_analysis():
 # ══════════════════════════════════════════════════════════
 
 def us_market_brief():
+    _today = now_kst().strftime("%Y-%m-%d")
+    if getattr(us_market_brief, '_last_date', '') == _today:
+        print('[DEDUP] us_market_brief 오늘 이미 실행됨')
+        return
+    us_market_brief._last_date = _today
     try:
         # v5.0: get_global_summary() 사용 (락 포함, F&G 캐시 사용)
         msg, regime, emoji, gm, macro_score = get_global_summary()
@@ -2111,8 +2138,9 @@ def _handle_single_command(text):
     # ── /status ───────────────────────────────────────────
     if text == "/status":
         try:
-            token   = get_access_token()
-            balance = get_balance(token)
+            _cfg    = __import__("kis_api").get_trader_config(TRADER_ID)
+            token   = get_access_token(TRADER_ID, _cfg)
+            balance = get_balance(token, TRADER_ID, _cfg)
             cash    = int(balance["output2"][0].get("dnca_tot_amt", 0))
             stocks  = balance.get("output1", [])
             stats   = get_daily_stats()
@@ -2647,7 +2675,7 @@ schedule.every().day.at("23:30").do(_weekday_only(reset_daily_state))
 schedule.every().day.at("22:00").do(_weekday_only(us_market_brief))
 schedule.every().day.at("23:50").do(_weekday_only(morning_analysis))
 schedule.every().day.at("04:30").do(_weekday_only(morning_analysis))
-schedule.every().day.at("06:40").do(_weekday_only(evening_report))
+schedule.every().day.at("00:40").do(_weekday_only(evening_report))
 # [v8] morning_analysis 11:00 제거 (중복)
 # 일요일 20:00 주간 Preview (유일한 주말 허용)
 schedule.every().day.at("11:00").do(_sunday_preview)
@@ -2688,8 +2716,9 @@ print("=" * 60)
 
 # [v8] 시작 메시지 당일 1회만 전송
 _startup_date = __import__("datetime").date.today().isoformat()
-if getattr(__import__("builtins"), "_onehub_started_date", None) != _startup_date:
-    import builtins; builtins._onehub_started_date = _startup_date
+_startup_key  = f"_onehub_started_{TRADER_ID}_{_startup_date}"
+if getattr(__import__("builtins"), _startup_key, None) != _startup_date:
+    import builtins; setattr(builtins, _startup_key, _startup_date)
     _do_send_startup = True
 else:
     _do_send_startup = False
