@@ -280,6 +280,46 @@ def get_dedup_stats() -> str:
     active  = len(_dedup_cache)
     blocked = _dedup_blocked_count
     return f"Dedup cache: {active}개 활성  |  누적 차단: {blocked}건"
+
+def send_keyboard(message: str, buttons: list):
+    """인라인 키보드 버튼과 함께 메시지 전송.
+    buttons 형식: [[{"text": "버튼명", "callback_data": "데이터"}]]
+    """
+    _trader = os.getenv("TRADER_ID", "A")
+    _token  = TOKEN_B if _trader == "B" and TOKEN_B else TOKEN
+    _chat   = CHAT_ID_B if _trader == "B" and CHAT_ID_B else CHAT_ID
+    if not _token or not _chat:
+        return None
+    try:
+        import json
+        res = requests.post(
+            f"https://api.telegram.org/bot{_token}/sendMessage",
+            json={
+                "chat_id":      _chat,
+                "text":         message,
+                "parse_mode":   "HTML",
+                "reply_markup": {"inline_keyboard": buttons}
+            },
+            timeout=10
+        )
+        return res.json()
+    except Exception as e:
+        print(f"Telegram keyboard error: {e}")
+        return None
+
+def answer_callback(callback_query_id: str):
+    """콜백 쿼리 응답 (버튼 로딩 표시 제거)"""
+    _trader = os.getenv("TRADER_ID", "A")
+    _token  = TOKEN_B if _trader == "B" and TOKEN_B else TOKEN
+    try:
+        requests.post(
+            f"https://api.telegram.org/bot{_token}/answerCallbackQuery",
+            json={"callback_query_id": callback_query_id},
+            timeout=5
+        )
+    except Exception:
+        pass
+
 def send_to_trader(message: str, trader_id: str = "A"):
     """trader_id별 텔레그램 채널로 알림 발송"""
     chat_id = CHAT_ID_B if trader_id == "B" and CHAT_ID_B else CHAT_ID

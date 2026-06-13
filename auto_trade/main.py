@@ -1453,6 +1453,24 @@ def _execute_buy(code, p, batch_mode=False, leg_num: int = 1):
 # 커맨드 핸들러
 # ══════════════════════════════════════════════════════════
 
+def _send_main_menu():
+    """메인 메뉴 인라인 키보드 전송"""
+    from telegram_bot import send_keyboard
+    send_keyboard(
+        "ONE-HUB 메뉴 — 원하는 항목을 선택하세요:",
+        [
+            [{"text": "📊 시장현황", "callback_data": "/global"},
+             {"text": "🤖 AI분석",   "callback_data": "/analyze"}],
+            [{"text": "💰 계좌현황", "callback_data": "/status"},
+             {"text": "📋 대기종목", "callback_data": "/pending"}],
+            [{"text": "🚫 차단종목", "callback_data": "/blocked"},
+             {"text": "👁 관찰종목", "callback_data": "/watchlist"}],
+            [{"text": "📈 성과",     "callback_data": "/perf"},
+             {"text": "⚙️ AI모드",   "callback_data": "/aimode"}],
+            [{"text": "🔍 종목검색", "callback_data": "/search"}],
+        ]
+    )
+
 def handle_commands():
     global tg_offset, trading_on
     while True:
@@ -1460,13 +1478,27 @@ def handle_commands():
             updates = get_updates(offset=tg_offset)
             for update in updates:
                 tg_offset = update["update_id"] + 1
+                # 콜백 쿼리 처리 (버튼 클릭)
+                callback = update.get("callback_query", {})
+                if callback:
+                    from telegram_bot import answer_callback
+                    answer_callback(callback.get("id", ""))
+                    cb_text = callback.get("data", "").strip()
+                    cb_chat = str(callback.get("message", {}).get("chat", {}).get("id", ""))
+                    if cb_chat == CHAT_ID_STR:
+                        print("[CALLBACK]", cb_text)
+                        _handle_single_command(cb_text)
+                    continue
                 msg  = update.get("message", {})
                 text = msg.get("text", "").strip()
                 chat = str(msg.get("chat", {}).get("id", ""))
                 if chat != CHAT_ID_STR:
                     continue
                 print("[CMD]", text)
-                _handle_single_command(text)
+                if text in ("/menu", "/start"):
+                    _send_main_menu()
+                else:
+                    _handle_single_command(text)
         except Exception as e:
             log_error(e, "handle_commands")
             print("Command error:", e)
@@ -1487,6 +1519,56 @@ def _handle_single_command(text):
         return
     _cmd_dedup[text] = _now
 
+    # ── /search (종목 검색) ───────────────────────────────
+    if text == "/search":
+        send("🔍 종목 검색\n\n종목명을 입력하세요.\n예: 삼성전자, 하이닉스, 현대차\n\n입력 형식: /찾기 종목명")
+        return
+    if text.startswith("/찾기 ") or text.startswith("/f "):
+        keyword = text.split(" ", 1)[1].strip().lower()
+        from stock_screener import STOCK_POOL
+        results = [s for s in STOCK_POOL if keyword in s["name"].lower() or keyword in s.get("name_kr", "").lower()]
+        if not results:
+            send(f"'{keyword}' 종목을 찾을 수 없습니다.\n\n예: /찾기 삼성, /찾기 하이닉스")
+            return
+        from telegram_bot import send_keyboard
+        buttons = []
+        for s in results[:8]:
+            buttons.append([{"text": f"{s['name']} ({s['code']})", "callback_data": f"/stock {s['code']}"}])
+        send_keyboard(f"🔍 '{keyword}' 검색 결과 {len(results)}건:", buttons)
+        return
+    if text.startswith("/stock "):
+        code = text.split()[1].strip()
+        from stock_screener import STOCK_POOL
+        stock_info = next((s for s in STOCK_POOL if s["code"] == code), None)
+        name = stock_info["name"] if stock_info else code
+        send(f"🔍 {name}({code}) AI 분석 중...\n잠시 기다려주세요.")
+        try:
+            from ai_analyzer import analyze
+            from news_collector import get_news
+            news = get_news() or []
+            result = analyze(code, name, {}, news)
+            action = result.get("action", "HOLD")
+            score  = result.get("ai_score", 50)
+            reason = result.get("reason", "")
+            # 이유 텍스트 정리 (200자 제한)
+            reason_clean = reason.replace("##", "").replace("**", "").replace("#", "").strip()
+            reason_short = reason_clean[:200] + "..." if len(reason_clean) > 200 else reason_clean
+            action_emoji = "🟢 매수" if action=="BUY" else "🔴 매도" if action=="SELL" else "⚪ 관망"
+            target   = result.get("target", 0)
+            stoploss = result.get("stoploss", 0)
+            send(
+                f"📊 {name}({code}) AI 분석\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"판단: {action_emoji}\n"
+                f"점수: {score}pt\n"
+                + (f"목표가: {format(int(target),',')}원\n" if target else "")
+                + (f"손절가: {format(int(stoploss),',')}원\n" if stoploss else "")
+                + f"━━━━━━━━━━━━━━━━━━\n"
+                f"📝 {reason_short}"
+            )
+        except Exception as _e:
+            send(f"{name} 분석 실패: {str(_e)[:50]}")
+        return
     # ── /buy ─────────────────────────────────────────────
     if text == "/buy":
         send("종목코드를 함께 입력하세요.\n예: /buy 005930")
