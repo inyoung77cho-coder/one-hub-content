@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 
 export default function PWADashboard() {
-  const API = process.env.NEXT_PUBLIC_ENGINE_API_URL || "http://54.180.54.132:5001";
   const [data, setData] = useState(null);
   const [trader, setTrader] = useState('A');
   const [error, setError] = useState(null);
@@ -19,20 +18,15 @@ export default function PWADashboard() {
       .then(r => r.json())
       .then(d => {
         if (d.ok) setData(d);
-        else setError(d.error || '?곗씠?곕? 遺덈윭?????놁뒿?덈떎.');
+        else setError(d.error || 'failed to load');
       })
       .catch(e => setError(String(e)));
   }, [mounted, trader]);
 
-  const regimeIcon = (regime) => {
-    if (regime === 'BULL') return '?뱢';
-    if (regime === 'BEAR') return '?뱣';
-    return '??;
-  };
   const regimeLabel = (regime) => {
-    if (regime === 'BULL') return '?곸듅??;
-    if (regime === 'BEAR') return '?섎씫??;
-    return '?〓낫??;
+    if (regime === 'BULL') return 'UP';
+    if (regime === 'BEAR') return 'DOWN';
+    return 'SIDE';
   };
   const regimeClass = (regime) => {
     if (regime === 'BULL') return 'bull';
@@ -40,15 +34,15 @@ export default function PWADashboard() {
     return 'side';
   };
 
-  const eventIcon = (type) => {
+  const eventLabel = (type) => {
     switch (type) {
-      case 'BUY': return '?윟';
-      case 'SELL': return '?뵶';
-      case 'BLOCK': return '?슟';
-      case 'ANALYZE': return '?뵇';
-      case 'HEAT_UPDATE': return '?뙜截?;
-      case 'DAILY_SUMMARY': return '?뱥';
-      default: return '??;
+      case 'BUY': return 'BUY';
+      case 'SELL': return 'SELL';
+      case 'BLOCK': return 'BLOCK';
+      case 'ANALYZE': return 'AI';
+      case 'HEAT_UPDATE': return 'HEAT';
+      case 'DAILY_SUMMARY': return 'SUMMARY';
+      default: return '-';
     }
   };
 
@@ -64,7 +58,7 @@ export default function PWADashboard() {
   return (
     <>
       <Head>
-        <title>ONE-HUB ???ㅻ뒛????쒕낫??/title>
+        <title>ONE-HUB Dashboard</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -73,42 +67,40 @@ export default function PWADashboard() {
 
       <div className="pwa-wrapper">
         <header className="pwa-header">
-          <h1 className="pwa-title">?ㅻ뒛??ONE-HUB</h1>
+          <h1 className="pwa-title">Today ONE-HUB</h1>
           <div className="pwa-trader-toggle">
             <button className={trader === 'A' ? 'active' : ''} onClick={() => setTrader('A')}>A</button>
             <button className={trader === 'B' ? 'active' : ''} onClick={() => setTrader('B')}>B</button>
           </div>
         </header>
 
-        {error && <div className="pwa-error">?좑툘 {error}</div>}
-        {!data && !error && <div className="pwa-loading">遺덈윭?ㅻ뒗 以?..</div>}
+        {error && <div className="pwa-error">Error: {error}</div>}
+        {!data && !error && <div className="pwa-loading">Loading...</div>}
 
         {data && (
           <main className="pwa-main">
 
-            {/* 1. ?쒖옣 ?곹깭 */}
             <section className="pwa-card">
-              <span className="pwa-card-label">?쒖옣 ?곹깭</span>
+              <span className="pwa-card-label">Market Status</span>
               <div className="pwa-market-row">
                 <span className={`pwa-regime ${regimeClass(data.market?.regime)}`}>
-                  {regimeIcon(data.market?.regime)} {regimeLabel(data.market?.regime)}
+                  {regimeLabel(data.market?.regime)}
                 </span>
-                <span className="pwa-market-stat">李⑤떒 {data.market?.block_count ?? 0}嫄?/span>
-                <span className="pwa-market-stat">?됯??먯씡 {data.balance?.unrealized_pnl?.toLocaleString() ?? '-'}</span>
+                <span className="pwa-market-stat">Blocked {data.market?.block_count ?? 0}</span>
+                <span className="pwa-market-stat">Unrealized {data.balance?.unrealized_pnl?.toLocaleString() ?? '-'}</span>
               </div>
             </section>
 
-            {/* 2. 蹂댁쑀 醫낅ぉ */}
             <section className="pwa-card">
-              <span className="pwa-card-label">蹂댁쑀 醫낅ぉ</span>
+              <span className="pwa-card-label">Positions</span>
               {positions.length === 0 ? (
-                <div className="pwa-empty">蹂댁쑀 以묒씤 醫낅ぉ???놁뒿?덈떎.</div>
+                <div className="pwa-empty">No positions.</div>
               ) : (
                 <div className="pwa-positions">
                   {positions.map((p, i) => (
                     <div key={i} className="pwa-position-row">
                       <span className="pwa-pos-name">{p.name}</span>
-                      <span className="pwa-pos-qty mono dim">{p.qty}二?/span>
+                      <span className="pwa-pos-qty mono dim">{p.qty} sh</span>
                       <span className={`pwa-pos-pnl ${p.pnl_amount >= 0 ? 'pos' : 'neg'}`}>
                         {p.pnl_rate >= 0 ? '+' : ''}{p.pnl_rate}%
                       </span>
@@ -117,15 +109,14 @@ export default function PWADashboard() {
                 </div>
               )}
               <div className="pwa-balance-summary mono dim">
-                珥앹옄??{data.balance?.total_asset?.toLocaleString() ?? '-'} 쨌 ?꾧툑 {data.balance?.cash?.toLocaleString() ?? '-'}
+                Total {data.balance?.total_asset?.toLocaleString() ?? '-'} / Cash {data.balance?.cash?.toLocaleString() ?? '-'}
               </div>
             </section>
 
-            {/* 3. ?ㅻ뒛 ?≪뀡 */}
             <section className="pwa-card">
-              <span className="pwa-card-label">?ㅻ뒛 ?≪뀡</span>
+              <span className="pwa-card-label">Today Actions</span>
               {(!data.today_buys || data.today_buys.length === 0) ? (
-                <div className="pwa-empty">?ㅻ뒛 ?좉퇋 留ㅼ닔媛 ?놁뒿?덈떎.</div>
+                <div className="pwa-empty">No new buys today.</div>
               ) : (
                 <div className="pwa-action-list">
                   {data.today_buys.map((b, i) => (
@@ -139,11 +130,10 @@ export default function PWADashboard() {
               )}
             </section>
 
-            {/* 4. AI 洹쇨굅 ???ㅻ뒛??李⑤떒 */}
             <section className="pwa-card">
-              <span className="pwa-card-label">AI 洹쇨굅 ???ㅻ뒛??李⑤떒</span>
+              <span className="pwa-card-label">AI Reasoning - Blocked Today</span>
               {(!data.today_blocked || data.today_blocked.length === 0) ? (
-                <div className="pwa-empty">?ㅻ뒛 李⑤떒???좏샇媛 ?놁뒿?덈떎.</div>
+                <div className="pwa-empty">No blocked signals today.</div>
               ) : (
                 <div className="pwa-blocked-list">
                   {data.today_blocked.slice(0, 5).map((b, i) => (
@@ -157,16 +147,15 @@ export default function PWADashboard() {
               )}
             </section>
 
-            {/* 5. 理쒓렐 寃곗젙 */}
             <section className="pwa-card">
-              <span className="pwa-card-label">理쒓렐 寃곗젙</span>
+              <span className="pwa-card-label">Recent Decisions</span>
               {(!data.recent_decisions || data.recent_decisions.length === 0) ? (
-                <div className="pwa-empty">?꾩쭅 湲곕줉??寃곗젙???놁뒿?덈떎. ?곗씠?곌? ?꾩쟻?섎㈃ ?ш린???쒖떆?⑸땲??</div>
+                <div className="pwa-empty">No recorded decisions yet. Will populate as data accumulates.</div>
               ) : (
                 <div className="pwa-timeline">
                   {data.recent_decisions.map((e, i) => (
                     <div key={i} className="pwa-timeline-row">
-                      <span className="pwa-tl-icon">{eventIcon(e.event_type)}</span>
+                      <span className="pwa-tl-icon mono">{eventLabel(e.event_type)}</span>
                       <span className="pwa-tl-time mono dim">{e.date?.slice(5, 16)}</span>
                       <span className="pwa-tl-summary">{e.summary}</span>
                     </div>
@@ -179,7 +168,7 @@ export default function PWADashboard() {
         )}
 
         <footer className="pwa-footer">
-          <Link href="/" className="mono dim">??ONE-HUB ?덉쑝濡?/Link>
+          <Link href="/" className="mono dim">{'<- Back to ONE-HUB'}</Link>
         </footer>
       </div>
 
@@ -306,7 +295,11 @@ export default function PWADashboard() {
           border-top: 1px solid #1C2026;
           padding-top: 0.5rem;
         }
-        .pwa-tl-icon { font-size: 1rem; }
+        .pwa-tl-icon {
+          font-size: 0.7rem;
+          min-width: 4rem;
+          color: #B5AFA3;
+        }
         .pwa-tl-time { font-size: 0.75rem; min-width: 4.5rem; }
         .pwa-footer {
           margin-top: 1.5rem;
