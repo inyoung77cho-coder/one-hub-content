@@ -12,6 +12,7 @@
     "marked": "^12.0.0",
     "next": "^16.2.6",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "recharts": "^3.8.1"
   }
 }
