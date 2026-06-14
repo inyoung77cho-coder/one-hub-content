@@ -223,26 +223,30 @@ def get_risk_positions() -> list:
 
 # ── 기존 함수들 (변경 없음) ─────────────────────────────────────
 
-def log_trade(stock, action, price, qty, pnl, reason, regime="", ai_score=0):
+def log_trade(stock, action, price, qty, pnl, reason, regime="", ai_score=0, trader_id=None):
+    if trader_id is None:
+        trader_id = os.getenv("TRADER_ID", "A").upper()
     conn = sqlite3.connect(DB_PATH)
     c    = conn.cursor()
     c.execute("""
         INSERT INTO trades
-        (date,stock,action,price,qty,pnl,reason,regime,ai_score)
-        VALUES (?,?,?,?,?,?,?,?,?)
+        (date,stock,action,price,qty,pnl,reason,regime,ai_score,trader_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?)
     """, (now_kst().strftime("%Y-%m-%d %H:%M:%S"),
-          stock, action, price, qty, pnl, reason, regime, ai_score))
+          stock, action, price, qty, pnl, reason, regime, ai_score, trader_id))
     conn.commit()
     conn.close()
 
 
-def log_ai(stock, ai_result):
+def log_ai(stock, ai_result, trader_id=None):
+    if trader_id is None:
+        trader_id = os.getenv("TRADER_ID", "A").upper()
     conn = sqlite3.connect(DB_PATH)
     c    = conn.cursor()
     c.execute("""
         INSERT INTO ai_logs
-        (date,stock,action,confidence,ai_score,global_risk,key_signal,reason,raw)
-        VALUES (?,?,?,?,?,?,?,?,?)
+        (date,stock,action,confidence,ai_score,global_risk,key_signal,reason,raw,trader_id)
+        VALUES (?,?,?,?,?,?,?,?,?,?)
     """, (now_kst().strftime("%Y-%m-%d %H:%M:%S"),
           stock,
           ai_result.get("action", ""),
@@ -251,31 +255,36 @@ def log_ai(stock, ai_result):
           ai_result.get("global_risk", ""),
           ai_result.get("key_signal", ""),
           ai_result.get("reason", ""),
-          ai_result.get("raw", "")))
+          ai_result.get("raw", ""),
+          trader_id))
     conn.commit()
     conn.close()
 
 
-def log_error(error, context=""):
+def log_error(error, context="", trader_id=None):
+    if trader_id is None:
+        trader_id = os.getenv("TRADER_ID", "A").upper()
     conn = sqlite3.connect(DB_PATH)
     c    = conn.cursor()
     c.execute("""
-        INSERT INTO errors (date,error,context) VALUES (?,?,?)
+        INSERT INTO errors (date,error,context,trader_id) VALUES (?,?,?,?)
     """, (now_kst().strftime("%Y-%m-%d %H:%M:%S"),
-          str(error), context))
+          str(error), context, trader_id))
     conn.commit()
     conn.close()
 
 
-def log_daily(regime, final_value, daily_pnl, trade_count, block_count=0):
+def log_daily(regime, final_value, daily_pnl, trade_count, block_count=0, trader_id=None):
+    if trader_id is None:
+        trader_id = os.getenv("TRADER_ID", "A").upper()
     conn = sqlite3.connect(DB_PATH)
     c    = conn.cursor()
     c.execute("""
         INSERT INTO daily_summary
-        (date,regime,final_value,daily_pnl,trade_count,block_count)
-        VALUES (?,?,?,?,?,?)
+        (date,regime,final_value,daily_pnl,trade_count,block_count,trader_id)
+        VALUES (?,?,?,?,?,?,?)
     """, (now_kst().strftime("%Y-%m-%d"),
-          regime, final_value, daily_pnl, trade_count, block_count))
+          regime, final_value, daily_pnl, trade_count, block_count, trader_id))
     conn.commit()
     conn.close()
 
@@ -352,3 +361,110 @@ def get_daily_stats():
 
 init_db()
 print("DB initialized OK")
+
+
+# ── PWA: cache_balance ───────────────────────────────────────
+def update_cache_balance(trader_id, total_asset, realized_pnl, unrealized_pnl, cash, positions_json):
+    conn = sqlite3.connect(DB_PATH)
+    c    = conn.cursor()
+    c.execute("""
+        INSERT INTO cache_balance
+        (trader_id,total_asset,realized_pnl,unrealized_pnl,cash,positions_json,updated_at)
+        VALUES (?,?,?,?,?,?,?)
+        ON CONFLICT(trader_id) DO UPDATE SET
+            total_asset=excluded.total_asset,
+            realized_pnl=excluded.realized_pnl,
+            unrealized_pnl=excluded.unrealized_pnl,
+            cash=excluded.cash,
+            positions_json=excluded.positions_json,
+            updated_at=excluded.updated_at
+    """, (trader_id, total_asset, realized_pnl, unrealized_pnl, cash, positions_json,
+          now_kst().strftime("%Y-%m-%d %H:%M:%S")))
+    conn.commit()
+    conn.close()
+
+
+def get_cache_balance(trader_id):
+    conn = sqlite3.connect(DB_PATH)
+    c    = conn.cursor()
+    row = c.execute(
+        "SELECT total_asset,realized_pnl,unrealized_pnl,cash,positions_json,updated_at FROM cache_balance WHERE trader_id=?",
+        (trader_id,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return None
+    return {
+        "total_asset": row[0],
+        "realized_pnl": row[1],
+        "unrealized_pnl": row[2],
+        "cash": row[3],
+        "positions_json": row[4],
+        "updated_at": row[5],
+    }
+
+
+def get_dashboard_data(trader_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    today = now_kst().strftime("%Y-%m-%d")
+
+    row = c.execute("SELECT total_asset,realized_pnl,unrealized_pnl,cash,positions_json,updated_at FROM cache_balance WHERE trader_id=?", (trader_id,)).fetchone()
+    balance = None
+    if row:
+        balance = {"total_asset": row[0], "realized_pnl": row[1], "unrealized_pnl": row[2], "cash": row[3], "positions": row[4], "updated_at": row[5]}
+
+    ds = c.execute("SELECT regime, block_count, final_value, daily_pnl FROM daily_summary WHERE trader_id=? ORDER BY id DESC LIMIT 1", (trader_id,)).fetchone()
+    market = None
+    if ds:
+        market = {"regime": ds[0], "block_count": ds[1], "final_value": ds[2], "daily_pnl": ds[3]}
+
+    buys = c.execute("SELECT stock, ai_score, reason FROM ai_logs WHERE date LIKE ? AND action = ? AND trader_id=? ORDER BY id DESC LIMIT 5", (today + "%", "BUY", trader_id)).fetchall()
+    buy_list = [{"stock": r[0], "score": r[1], "reason": r[2]} for r in buys]
+
+    blocked = c.execute("SELECT stock, ml_signal, final_score, errors FROM blocked_signals WHERE date LIKE ? ORDER BY id DESC LIMIT 10", (today + "%",)).fetchall()
+    blocked_list = [{"stock": r[0], "signal": r[1], "score": r[2], "reason": r[3]} for r in blocked]
+
+    conn.close()
+    return {"balance": balance, "market": market, "today_buys": buy_list, "today_blocked": blocked_list}
+
+
+def get_watchlist(trader_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    rows = c.execute("SELECT id, symbol, name, created_at FROM watchlist WHERE trader_id=? ORDER BY id DESC", (trader_id,)).fetchall()
+    conn.close()
+    return [{"id": r[0], "symbol": r[1], "name": r[2], "created_at": r[3]} for r in rows]
+
+
+def add_watchlist(trader_id, symbol, name):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("INSERT INTO watchlist (trader_id, symbol, name, created_at) VALUES (?,?,?,?)", (trader_id, symbol, name, now_kst().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        ok = True
+        err = None
+    except sqlite3.IntegrityError as e:
+        ok = False
+        err = str(e)
+    conn.close()
+    return ok, err
+
+
+def remove_watchlist(trader_id, item_id):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM watchlist WHERE id=? AND trader_id=?", (item_id, trader_id))
+    deleted = c.rowcount
+    conn.commit()
+    conn.close()
+    return deleted
+
+
+def get_ai_history(trader_id, limit=30):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    rows = c.execute("SELECT date, stock, action, confidence, ai_score, global_risk, key_signal, reason FROM ai_logs WHERE trader_id=? ORDER BY id DESC LIMIT ?", (trader_id, limit)).fetchall()
+    conn.close()
+    return [{"date": r[0], "stock": r[1], "action": r[2], "confidence": r[3], "ai_score": r[4], "global_risk": r[5], "key_signal": r[6], "reason": r[7]} for r in rows]

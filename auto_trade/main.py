@@ -2753,6 +2753,55 @@ def _sunday_preview():
     except Exception as _e:
         log_error(_e, "sunday_preview")
 
+
+
+# ── PWA: 계좌 캐시 갱신 (1분 주기) ─────────────────────────────
+def refresh_cache_balance():
+    try:
+        import json as _json
+        from db_logger import update_cache_balance, get_daily_stats
+        _cfg    = __import__("kis_api").get_trader_config(TRADER_ID)
+        token   = get_access_token(TRADER_ID, _cfg)
+        balance = get_balance(token, TRADER_ID, _cfg)
+        if not balance or "output2" not in balance:
+            return
+
+        out2 = balance["output2"][0] if balance.get("output2") else {}
+        out1 = balance.get("output1", [])
+
+        total_asset    = int(out2.get("tot_evlu_amt", 0))
+        cash           = int(out2.get("dnca_tot_amt", 0))
+        unrealized_pnl = int(out2.get("evlu_pfls_smtl_amt", 0))
+
+        try:
+            stats = get_daily_stats()
+            realized_pnl = int(stats.get("pnl", 0))
+        except Exception:
+            realized_pnl = 0
+
+        positions = []
+        for h in out1:
+            qty = int(h.get("hldg_qty", 0))
+            if qty <= 0:
+                continue
+            positions.append({
+                "code":   h.get("pdno", ""),
+                "name":   h.get("prdt_name", ""),
+                "qty":    qty,
+                "avg_price": float(h.get("pchs_avg_pric", 0)),
+                "current_price": float(h.get("prpr", 0)),
+                "eval_amount": int(h.get("evlu_amt", 0)),
+                "pnl_amount": int(h.get("evlu_pfls_amt", 0)),
+                "pnl_rate": float(h.get("evlu_pfls_rt", 0)),
+            })
+
+        update_cache_balance(
+            TRADER_ID, total_asset, realized_pnl, unrealized_pnl, cash,
+            _json.dumps(positions, ensure_ascii=False)
+        )
+    except Exception as e:
+        log_error(e, "refresh_cache_balance")
+
 schedule.every().day.at("23:30").do(_weekday_only(reset_daily_state))
 schedule.every().day.at("22:00").do(_weekday_only(us_market_brief))
 schedule.every().day.at("23:50").do(_weekday_only(morning_analysis))
@@ -2783,6 +2832,7 @@ def _market_hours_monitor():
 
 
 schedule.every(10).minutes.do(_market_hours_monitor)
+schedule.every(1).minutes.do(refresh_cache_balance)
 # [v6.1] 카카오 토큰 5시간마다 자동 갱신 (유효기간 6시간)
 if _KAKAO_AVAILABLE:
     schedule.every(5).hours.do(kakao_refresh)

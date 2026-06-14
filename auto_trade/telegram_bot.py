@@ -14,7 +14,7 @@
 import os
 import hashlib
 import time as _time
-from datetime import datetime
+from datetime import datetime, date
 from kst_time import now_kst, today_kst, now_kst_str, is_weekend_kst, KST
 import requests
 from dotenv import load_dotenv
@@ -122,18 +122,33 @@ def _is_weekend() -> bool:
 
 
 def _should_block_weekend(level: str) -> bool:
-    return False  # 임시 차단 해제
     """
     [v7.0 N2 정밀화] 주말 차단 세부 기준:
       - 토요일 00:00~12:59 : Critical 외 차단 안 함 (오전 장 후 분석 허용)
       - 토요일 13:00 이후  : Critical 외 전부 차단
       - 일요일 00:00~19:59 : Critical 외 전부 차단
       - 일요일 20:00 이후  : INFO 레벨 Preview 1회만 허용 (주간 Preview)
+
+    [한시적 예외 - 2026-06-22까지]
+      - 토요일: 차단 없음 (전체 허용)
+      - 일요일: 12:00 이전 차단, 12:00 이후 허용
+      2026-06-22(월)부터 위 정식 기준으로 자동 복귀.
     """
     now = now_kst()
     wd  = now.weekday()   # 5=토, 6=일
     h   = now.hour
 
+    # 한시적 예외 (이번 주만, 2026-06-22 이전)
+    if now.date() < date(2026, 6, 22):
+        if wd == 5:  # 토요일 - 전체 허용
+            return False
+        if wd == 6:  # 일요일 - 12:00 이전만 차단
+            if h < 12:
+                return level != LEVEL_CRITICAL
+            return False
+        return False
+
+    # 정식 기준 (2026-06-22부터)
     if wd == 5:  # 토요일
         if h < 16:
             return False          # 토 16:00 이전 허용
