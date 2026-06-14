@@ -1,4 +1,4 @@
-import Head from 'next/head';
+﻿import Head from 'next/head';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 
@@ -15,24 +15,24 @@ export default function PWADashboard() {
 
   useEffect(() => {
     if (!mounted) return;
-    fetch(`${API}/api/pwa/dashboard?trader=${trader}`)
+    fetch(`/api/pwa-dashboard?trader=${trader}`)
       .then(r => r.json())
       .then(d => {
         if (d.ok) setData(d);
-        else setError(d.error || '데이터를 불러올 수 없습니다.');
+        else setError(d.error || '?곗씠?곕? 遺덈윭?????놁뒿?덈떎.');
       })
       .catch(e => setError(String(e)));
   }, [mounted, trader]);
 
   const regimeIcon = (regime) => {
-    if (regime === 'BULL') return '📈';
-    if (regime === 'BEAR') return '📉';
-    return '➖';
+    if (regime === 'BULL') return '?뱢';
+    if (regime === 'BEAR') return '?뱣';
+    return '??;
   };
   const regimeLabel = (regime) => {
-    if (regime === 'BULL') return '상승장';
-    if (regime === 'BEAR') return '하락장';
-    return '횡보장';
+    if (regime === 'BULL') return '?곸듅??;
+    if (regime === 'BEAR') return '?섎씫??;
+    return '?〓낫??;
   };
   const regimeClass = (regime) => {
     if (regime === 'BULL') return 'bull';
@@ -42,13 +42,13 @@ export default function PWADashboard() {
 
   const eventIcon = (type) => {
     switch (type) {
-      case 'BUY': return '🟢';
-      case 'SELL': return '🔴';
-      case 'BLOCK': return '🚫';
-      case 'ANALYZE': return '🔍';
-      case 'HEAT_UPDATE': return '🌡️';
-      case 'DAILY_SUMMARY': return '📋';
-      default: return '•';
+      case 'BUY': return '?윟';
+      case 'SELL': return '?뵶';
+      case 'BLOCK': return '?슟';
+      case 'ANALYZE': return '?뵇';
+      case 'HEAT_UPDATE': return '?뙜截?;
+      case 'DAILY_SUMMARY': return '?뱥';
+      default: return '??;
     }
   };
 
@@ -64,7 +64,7 @@ export default function PWADashboard() {
   return (
     <>
       <Head>
-        <title>ONE-HUB — 오늘의 대시보드</title>
+        <title>ONE-HUB ???ㅻ뒛????쒕낫??/title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -73,42 +73,42 @@ export default function PWADashboard() {
 
       <div className="pwa-wrapper">
         <header className="pwa-header">
-          <h1 className="pwa-title">오늘의 ONE-HUB</h1>
+          <h1 className="pwa-title">?ㅻ뒛??ONE-HUB</h1>
           <div className="pwa-trader-toggle">
             <button className={trader === 'A' ? 'active' : ''} onClick={() => setTrader('A')}>A</button>
             <button className={trader === 'B' ? 'active' : ''} onClick={() => setTrader('B')}>B</button>
           </div>
         </header>
 
-        {error && <div className="pwa-error">⚠️ {error}</div>}
-        {!data && !error && <div className="pwa-loading">불러오는 중...</div>}
+        {error && <div className="pwa-error">?좑툘 {error}</div>}
+        {!data && !error && <div className="pwa-loading">遺덈윭?ㅻ뒗 以?..</div>}
 
         {data && (
           <main className="pwa-main">
 
-            {/* 1. 시장 상태 */}
+            {/* 1. ?쒖옣 ?곹깭 */}
             <section className="pwa-card">
-              <span className="pwa-card-label">시장 상태</span>
+              <span className="pwa-card-label">?쒖옣 ?곹깭</span>
               <div className="pwa-market-row">
                 <span className={`pwa-regime ${regimeClass(data.market?.regime)}`}>
                   {regimeIcon(data.market?.regime)} {regimeLabel(data.market?.regime)}
                 </span>
-                <span className="pwa-market-stat">차단 {data.market?.block_count ?? 0}건</span>
-                <span className="pwa-market-stat">평가손익 {data.balance?.unrealized_pnl?.toLocaleString() ?? '-'}</span>
+                <span className="pwa-market-stat">李⑤떒 {data.market?.block_count ?? 0}嫄?/span>
+                <span className="pwa-market-stat">?됯??먯씡 {data.balance?.unrealized_pnl?.toLocaleString() ?? '-'}</span>
               </div>
             </section>
 
-            {/* 2. 보유 종목 */}
+            {/* 2. 蹂댁쑀 醫낅ぉ */}
             <section className="pwa-card">
-              <span className="pwa-card-label">보유 종목</span>
+              <span className="pwa-card-label">蹂댁쑀 醫낅ぉ</span>
               {positions.length === 0 ? (
-                <div className="pwa-empty">보유 중인 종목이 없습니다.</div>
+                <div className="pwa-empty">蹂댁쑀 以묒씤 醫낅ぉ???놁뒿?덈떎.</div>
               ) : (
                 <div className="pwa-positions">
                   {positions.map((p, i) => (
                     <div key={i} className="pwa-position-row">
                       <span className="pwa-pos-name">{p.name}</span>
-                      <span className="pwa-pos-qty mono dim">{p.qty}주</span>
+                      <span className="pwa-pos-qty mono dim">{p.qty}二?/span>
                       <span className={`pwa-pos-pnl ${p.pnl_amount >= 0 ? 'pos' : 'neg'}`}>
                         {p.pnl_rate >= 0 ? '+' : ''}{p.pnl_rate}%
                       </span>
@@ -117,15 +117,15 @@ export default function PWADashboard() {
                 </div>
               )}
               <div className="pwa-balance-summary mono dim">
-                총자산 {data.balance?.total_asset?.toLocaleString() ?? '-'} · 현금 {data.balance?.cash?.toLocaleString() ?? '-'}
+                珥앹옄??{data.balance?.total_asset?.toLocaleString() ?? '-'} 쨌 ?꾧툑 {data.balance?.cash?.toLocaleString() ?? '-'}
               </div>
             </section>
 
-            {/* 3. 오늘 액션 */}
+            {/* 3. ?ㅻ뒛 ?≪뀡 */}
             <section className="pwa-card">
-              <span className="pwa-card-label">오늘 액션</span>
+              <span className="pwa-card-label">?ㅻ뒛 ?≪뀡</span>
               {(!data.today_buys || data.today_buys.length === 0) ? (
-                <div className="pwa-empty">오늘 신규 매수가 없습니다.</div>
+                <div className="pwa-empty">?ㅻ뒛 ?좉퇋 留ㅼ닔媛 ?놁뒿?덈떎.</div>
               ) : (
                 <div className="pwa-action-list">
                   {data.today_buys.map((b, i) => (
@@ -139,11 +139,11 @@ export default function PWADashboard() {
               )}
             </section>
 
-            {/* 4. AI 근거 — 오늘의 차단 */}
+            {/* 4. AI 洹쇨굅 ???ㅻ뒛??李⑤떒 */}
             <section className="pwa-card">
-              <span className="pwa-card-label">AI 근거 — 오늘의 차단</span>
+              <span className="pwa-card-label">AI 洹쇨굅 ???ㅻ뒛??李⑤떒</span>
               {(!data.today_blocked || data.today_blocked.length === 0) ? (
-                <div className="pwa-empty">오늘 차단된 신호가 없습니다.</div>
+                <div className="pwa-empty">?ㅻ뒛 李⑤떒???좏샇媛 ?놁뒿?덈떎.</div>
               ) : (
                 <div className="pwa-blocked-list">
                   {data.today_blocked.slice(0, 5).map((b, i) => (
@@ -157,11 +157,11 @@ export default function PWADashboard() {
               )}
             </section>
 
-            {/* 5. 최근 결정 */}
+            {/* 5. 理쒓렐 寃곗젙 */}
             <section className="pwa-card">
-              <span className="pwa-card-label">최근 결정</span>
+              <span className="pwa-card-label">理쒓렐 寃곗젙</span>
               {(!data.recent_decisions || data.recent_decisions.length === 0) ? (
-                <div className="pwa-empty">아직 기록된 결정이 없습니다. 데이터가 누적되면 여기에 표시됩니다.</div>
+                <div className="pwa-empty">?꾩쭅 湲곕줉??寃곗젙???놁뒿?덈떎. ?곗씠?곌? ?꾩쟻?섎㈃ ?ш린???쒖떆?⑸땲??</div>
               ) : (
                 <div className="pwa-timeline">
                   {data.recent_decisions.map((e, i) => (
@@ -179,7 +179,7 @@ export default function PWADashboard() {
         )}
 
         <footer className="pwa-footer">
-          <Link href="/" className="mono dim">← ONE-HUB 홈으로</Link>
+          <Link href="/" className="mono dim">??ONE-HUB ?덉쑝濡?/Link>
         </footer>
       </div>
 
