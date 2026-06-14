@@ -63,7 +63,7 @@ export default function HeatHistory() {
       })
       .then((data) => {
         if (cancelled) return;
-        const list = Array.isArray(data) ? data : data.history || [];
+        const list = Array.isArray(data) ? data : data.items || data.history || [];
         setHistory(list);
         setLoading(false);
       })
