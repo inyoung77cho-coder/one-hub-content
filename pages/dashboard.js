@@ -388,9 +388,12 @@ export default function Dashboard() {
             )}
           </div>
 
-          <div style={{ marginTop: "2rem" }}>
+          <div style={{ marginTop: "2rem", display: "flex", gap: "1.5rem" }}>
             <Link href="/" style={{ color: "var(--color-muted)", fontSize: "0.85rem", textDecoration: "none", ...mono }}>
               ← Home
+            </Link>
+            <Link href="/history" style={{ color: "var(--color-muted)", fontSize: "0.85rem", textDecoration: "none", ...mono }}>
+              AI 분석 히스토리 →
             </Link>
           </div>
         </main>
