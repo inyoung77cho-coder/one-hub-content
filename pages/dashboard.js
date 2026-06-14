@@ -7,6 +7,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [trader, setTrader] = useState("A");
 
+  const [watchlist, setWatchlist] = useState([]);
+  const [wlSymbol, setWlSymbol] = useState("");
+  const [wlName, setWlName] = useState("");
+  const [wlBusy, setWlBusy] = useState(false);
+  const [wlError, setWlError] = useState("");
+
   useEffect(() => {
     setLoading(true);
     fetch(`/api/pwa-dashboard?trader=${trader}`)
@@ -14,6 +20,57 @@ export default function Dashboard() {
       .then(d => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
   }, [trader]);
+
+  const loadWatchlist = () => {
+    fetch(`/api/pwa-watchlist?trader=${trader}`)
+      .then(r => r.json())
+      .then(d => setWatchlist(d.items || []))
+      .catch(() => setWatchlist([]));
+  };
+
+  useEffect(() => {
+    loadWatchlist();
+  }, [trader]);
+
+  const addWatchlist = async (e) => {
+    e.preventDefault();
+    const symbol = wlSymbol.trim();
+    if (!symbol) return;
+    setWlBusy(true);
+    setWlError("");
+    try {
+      const res = await fetch("/api/pwa-watchlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ trader, symbol, name: wlName.trim() }),
+      });
+      const d = await res.json();
+      if (!d.ok) {
+        setWlError(d.error || "등록에 실패했습니다.");
+      } else {
+        setWatchlist(d.items || []);
+        setWlSymbol("");
+        setWlName("");
+      }
+    } catch (err) {
+      setWlError("등록에 실패했습니다.");
+    } finally {
+      setWlBusy(false);
+    }
+  };
+
+  const removeWatchlist = async (id) => {
+    setWlBusy(true);
+    try {
+      const res = await fetch(`/api/pwa-watchlist?id=${id}&trader=${trader}`, { method: "DELETE" });
+      const d = await res.json();
+      if (d.ok) setWatchlist(d.items || []);
+    } catch (err) {
+      // ignore
+    } finally {
+      setWlBusy(false);
+    }
+  };
 
   const regimeColor = (r) => {
     if (r === "BULL")     return "#0F6E56";
@@ -260,6 +317,76 @@ export default function Dashboard() {
               )}
             </>
           )}
+
+          {/* 관심종목 */}
+          <div style={cardStyle}>
+            <h3 style={titleStyle}>👁 관심종목</h3>
+            <form onSubmit={addWatchlist} style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
+              <input
+                type="text"
+                placeholder="종목코드 (예: 005930)"
+                value={wlSymbol}
+                onChange={(e) => setWlSymbol(e.target.value)}
+                style={{
+                  padding: "0.5rem 0.75rem", borderRadius: "6px",
+                  border: "1px solid var(--color-border)",
+                  background: "transparent", color: "var(--color-text)",
+                  ...mono, fontSize: "0.85rem", flex: "1 1 140px",
+                }}
+              />
+              <input
+                type="text"
+                placeholder="종목명 (선택)"
+                value={wlName}
+                onChange={(e) => setWlName(e.target.value)}
+                style={{
+                  padding: "0.5rem 0.75rem", borderRadius: "6px",
+                  border: "1px solid var(--color-border)",
+                  background: "transparent", color: "var(--color-text)",
+                  ...mono, fontSize: "0.85rem", flex: "1 1 140px",
+                }}
+              />
+              <button type="submit" disabled={wlBusy} style={{
+                padding: "0.5rem 1.2rem", borderRadius: "6px",
+                border: "none", background: "var(--color-accent)",
+                color: "#fff", cursor: wlBusy ? "default" : "pointer",
+                ...mono, fontSize: "0.85rem", fontWeight: 700,
+                opacity: wlBusy ? 0.6 : 1,
+              }}>
+                추가
+              </button>
+            </form>
+
+            {wlError && (
+              <div style={{ color: "#A32D2D", fontSize: "0.8rem", marginBottom: "0.75rem" }}>{wlError}</div>
+            )}
+
+            {watchlist.length === 0 ? (
+              <div style={muted}>등록된 관심종목이 없습니다.</div>
+            ) : (
+              <div>
+                {watchlist.map((item) => (
+                  <div key={item.id} style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "0.6rem 0", borderBottom: "1px solid var(--color-border)",
+                  }}>
+                    <div>
+                      <span style={{ fontWeight: 700, marginRight: "0.5rem" }}>{item.name || item.symbol}</span>
+                      <span style={{ ...mono, ...muted }}>{item.symbol}</span>
+                    </div>
+                    <button onClick={() => removeWatchlist(item.id)} disabled={wlBusy} style={{
+                      background: "transparent", border: "1px solid var(--color-border)",
+                      borderRadius: "6px", padding: "0.3rem 0.7rem",
+                      color: "#A32D2D", cursor: wlBusy ? "default" : "pointer",
+                      ...mono, fontSize: "0.75rem",
+                    }}>
+                      삭제
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div style={{ marginTop: "2rem" }}>
             <Link href="/" style={{ color: "var(--color-muted)", fontSize: "0.85rem", textDecoration: "none", ...mono }}>
