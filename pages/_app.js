@@ -1,7 +1,15 @@
 import "../styles/globals.css";
 import Nav from "../components/Nav";
 import Head from "next/head";
+import { useEffect } from "react";
+
 export default function App({ Component, pageProps }) {
+  useEffect(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
+
   return (
     <>
       <Head>
