@@ -78,15 +78,18 @@ export default function HeatHistory() {
     };
   }, [trader]);
 
+  const sortedHistory = [...history].sort((a, b) => (a.date < b.date ? 1 : -1));
+
   const chartData = [...history]
-    .slice()
-    .reverse()
+    .sort((a, b) => (a.date > b.date ? 1 : -1))
     .map((item) => ({
       ...item,
       label: formatChartTime(item.date),
     }));
 
-  const current = history[0];
+  const current = history.length > 0
+    ? history.reduce((latest, item) => (item.date > latest.date ? item : latest), history[0])
+    : null;
 
   return (
     <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#e0e0e8' }}>
@@ -197,7 +200,7 @@ export default function HeatHistory() {
                 </tr>
               </thead>
               <tbody>
-                {history.map((item, idx) => (
+                {sortedHistory.map((item, idx) => (
                   <tr key={idx} style={{ borderBottom: '1px solid #1f1f2b' }}>
                     <td style={tdStyle}>{formatTime(item.date)}</td>
                     <td style={{ ...tdStyle, fontWeight: 700 }}>{item.heat_score}</td>
