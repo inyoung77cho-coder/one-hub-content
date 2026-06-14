@@ -16,7 +16,10 @@ export default async function handler(req, res) {
     if (req.method === "POST") {
       const upstream = await fetch(`${ENGINE_API}/api/pwa/watchlist`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-API-Key": process.env.PWA_API_KEY || "",
+        },
         body: JSON.stringify(req.body),
         signal: AbortSignal.timeout(8000),
       });
@@ -29,6 +32,9 @@ export default async function handler(req, res) {
       if (!id) return res.status(400).json({ ok: false, error: "id required" });
       const upstream = await fetch(`${ENGINE_API}/api/pwa/watchlist/${encodeURIComponent(id)}?trader=${encodeURIComponent(trader)}`, {
         method: "DELETE",
+        headers: {
+          "X-API-Key": process.env.PWA_API_KEY || "",
+        },
         signal: AbortSignal.timeout(8000),
       });
       const data = await upstream.json();
