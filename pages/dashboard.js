@@ -8,9 +8,8 @@ export default function Dashboard() {
   const [trader, setTrader] = useState("A");
 
   useEffect(() => {
-    const API = process.env.NEXT_PUBLIC_ENGINE_API_URL || "http://54.180.54.132:5001";
     setLoading(true);
-    fetch(`${API}/api/pwa/dashboard?trader=${trader}`)
+    fetch(`/api/pwa-dashboard?trader=${trader}`)
       .then(r => r.json())
       .then(d => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
