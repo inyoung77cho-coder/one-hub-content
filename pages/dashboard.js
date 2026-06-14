@@ -395,6 +395,9 @@ export default function Dashboard() {
             <Link href="/history" style={{ color: "var(--color-muted)", fontSize: "0.85rem", textDecoration: "none", ...mono }}>
               AI 분석 히스토리 →
             </Link>
+            <Link href="/heat-history" style={{ color: "var(--color-muted)", fontSize: "0.85rem", textDecoration: "none", ...mono }}>
+              Heat Score History →
+            </Link>
           </div>
         </main>
       </div>
