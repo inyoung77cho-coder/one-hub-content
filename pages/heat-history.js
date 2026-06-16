@@ -1,4 +1,4 @@
-// pages/heat-history.js
+﻿// pages/heat-history.js
 import Head from 'next/head';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
@@ -73,9 +73,7 @@ export default function HeatHistory() {
         setLoading(false);
       });
 
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [trader]);
 
   const sortedHistory = [...history].sort((a, b) => (a.date < b.date ? 1 : -1));
@@ -105,8 +103,7 @@ export default function HeatHistory() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>📈 Heat Score History</h1>
-
+          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>🌡 Heat Score History</h1>
           <div style={{ display: 'flex', gap: 8 }}>
             {['A', 'B'].map((t) => (
               <button
@@ -134,38 +131,21 @@ export default function HeatHistory() {
           </div>
         )}
 
-        {loading && <div style={{ padding: 32, textAlign: 'center', color: '#888' }}>불러오는 중...</div>}
+        {loading && (
+          <div style={{ padding: 32, textAlign: 'center', color: '#888' }}>불러오는 중...</div>
+        )}
 
         {!loading && !error && current && (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-              gap: 12,
-              marginBottom: 24,
-            }}
-          >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12, marginBottom: 24 }}>
             <StatCard label="현재 점수" value={current.heat_score} color="#39ff88" />
-            <StatCard
-              label="등급"
-              value={current.heat_grade}
-              color={GRADE_COLORS[current.heat_grade] || '#e0e0e8'}
-            />
+            <StatCard label="등급" value={current.heat_grade} color={GRADE_COLORS[current.heat_grade] || '#e0e0e8'} />
             <StatCard label="시장 상태" value={REGIME_LABELS[current.regime] || current.regime} />
-            <StatCard label="갱신 시각" value={formatTime(current.date)} small />
+            <StatCard label="마지막 업데이트" value={formatTime(current.date)} small />
           </div>
         )}
 
         {!loading && !error && chartData.length > 0 && (
-          <div
-            style={{
-              background: '#15151f',
-              borderRadius: 12,
-              padding: '16px 8px',
-              marginBottom: 24,
-              border: '1px solid #2a2a35',
-            }}
-          >
+          <div style={{ background: '#15151f', borderRadius: 12, padding: '16px 8px', marginBottom: 24, border: '1px solid #2a2a35' }}>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={chartData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a35" />
@@ -188,7 +168,7 @@ export default function HeatHistory() {
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid #2a2a35', textAlign: 'left' }}>
-                  <th style={thStyle}>시각</th>
+                  <th style={thStyle}>시간</th>
                   <th style={thStyle}>Heat</th>
                   <th style={thStyle}>등급</th>
                   <th style={thStyle}>Regime</th>
@@ -196,7 +176,7 @@ export default function HeatHistory() {
                   <th style={thStyle}>Nasdaq</th>
                   <th style={thStyle}>SOX</th>
                   <th style={thStyle}>VIX</th>
-                  <th style={thStyle}>F&amp;G</th>
+                  <th style={thStyle}>F&G</th>
                 </tr>
               </thead>
               <tbody>
@@ -204,9 +184,7 @@ export default function HeatHistory() {
                   <tr key={idx} style={{ borderBottom: '1px solid #1f1f2b' }}>
                     <td style={tdStyle}>{formatTime(item.date)}</td>
                     <td style={{ ...tdStyle, fontWeight: 700 }}>{item.heat_score}</td>
-                    <td style={{ ...tdStyle, color: GRADE_COLORS[item.heat_grade] || '#e0e0e8' }}>
-                      {item.heat_grade}
-                    </td>
+                    <td style={{ ...tdStyle, color: GRADE_COLORS[item.heat_grade] || '#e0e0e8' }}>{item.heat_grade}</td>
                     <td style={tdStyle}>{REGIME_LABELS[item.regime] || item.regime}</td>
                     <td style={tdStyle}>{item.usdkrw}</td>
                     <td style={tdStyle}>{formatPct(item.nasdaq_chg)}</td>
@@ -217,7 +195,6 @@ export default function HeatHistory() {
                 ))}
               </tbody>
             </table>
-
             {history.length === 0 && (
               <div style={{ padding: 32, textAlign: 'center', color: '#888' }}>아직 데이터가 없습니다.</div>
             )}
@@ -231,20 +208,13 @@ export default function HeatHistory() {
 function formatPct(val) {
   if (val === null || val === undefined) return '-';
   const num = Number(val);
-  const arrow = num > 0 ? '▲' : num < 0 ? '▼' : '➖';
+  const arrow = num > 0 ? '▲' : num < 0 ? '▼' : '−';
   return `${arrow} ${Math.abs(num).toFixed(2)}%`;
 }
 
 function StatCard({ label, value, color, small }) {
   return (
-    <div
-      style={{
-        background: '#15151f',
-        border: '1px solid #2a2a35',
-        borderRadius: 10,
-        padding: '12px 14px',
-      }}
-    >
+    <div style={{ background: '#15151f', border: '1px solid #2a2a35', borderRadius: 10, padding: '12px 14px' }}>
       <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{label}</div>
       <div style={{ fontSize: small ? 13 : 20, fontWeight: 700, color: color || '#e0e0e8' }}>{value}</div>
     </div>
