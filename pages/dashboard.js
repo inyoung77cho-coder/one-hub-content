@@ -1,4 +1,4 @@
-import Head from "next/head";
+﻿import Head from "next/head";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 
@@ -28,9 +28,7 @@ export default function Dashboard() {
       .catch(() => setWatchlist([]));
   };
 
-  useEffect(() => {
-    loadWatchlist();
-  }, [trader]);
+  useEffect(() => { loadWatchlist(); }, [trader]);
 
   const addWatchlist = async (e) => {
     e.preventDefault();
@@ -46,14 +44,14 @@ export default function Dashboard() {
       });
       const d = await res.json();
       if (!d.ok) {
-        setWlError(d.error || "등록에 실패했습니다.");
+        setWlError(d.error || "추가에 실패했습니다.");
       } else {
         setWatchlist(d.items || []);
         setWlSymbol("");
         setWlName("");
       }
     } catch (err) {
-      setWlError("등록에 실패했습니다.");
+      setWlError("추가에 실패했습니다.");
     } finally {
       setWlBusy(false);
     }
@@ -65,11 +63,8 @@ export default function Dashboard() {
       const res = await fetch(`/api/pwa-watchlist?id=${id}&trader=${trader}`, { method: "DELETE" });
       const d = await res.json();
       if (d.ok) setWatchlist(d.items || []);
-    } catch (err) {
-      // ignore
-    } finally {
-      setWlBusy(false);
-    }
+    } catch (err) {}
+    finally { setWlBusy(false); }
   };
 
   const regimeColor = (r) => {
@@ -82,23 +77,24 @@ export default function Dashboard() {
     if (r === "BULL")     return "상승장";
     if (r === "BEAR")     return "하락장";
     if (r === "SIDEWAYS") return "횡보장";
-    return r || "분석 중";
+    return r || "정보 없음";
   };
   const pnlColor = (v) => {
     if (v > 0) return "#0F6E56";
     if (v < 0) return "#A32D2D";
     return "var(--color-muted)";
   };
-  const pnlArrow = (v) => (v > 0 ? "▲" : v < 0 ? "▼" : "➖");
+  const pnlArrow = (v) => (v > 0 ? "▲" : v < 0 ? "▼" : "−");
   const signalColor = (s) => {
     if (s === "BUY")  return "#0F6E56";
-    if (s === "SELL") return "#A32D2D";
+    if (s === "SELL" || s === "STRONG_SELL") return "#A32D2D";
     return "#8A7E6A";
   };
   const signalLabel = (s) => {
-    if (s === "BUY")  return "🟢 매수";
-    if (s === "SELL") return "🔴 매도";
-    return "⚪ 관망";
+    if (s === "BUY")         return "✅ 매수";
+    if (s === "SELL")        return "🔴 매도";
+    if (s === "STRONG_SELL") return "🔴 강매도";
+    return "⏸ 관망";
   };
   const fmt = (n) => {
     if (n === null || n === undefined) return "-";
@@ -112,9 +108,7 @@ export default function Dashboard() {
   let positions = [];
   try {
     positions = balance?.positions ? JSON.parse(balance.positions) : [];
-  } catch (e) {
-    positions = [];
-  }
+  } catch (e) { positions = []; }
 
   const cardStyle = {
     background: "var(--color-surface)",
@@ -135,8 +129,8 @@ export default function Dashboard() {
   return (
     <>
       <Head>
-        <title>Dashboard — ONE-HUB</title>
-        <meta name="description" content="ONE-HUB 오늘의 투자 액션 대시보드" />
+        <title>Dashboard | ONE-HUB</title>
+        <meta name="description" content="ONE-HUB 트레이더 실시간 현황 대시보드" />
         <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700&display=swap" rel="stylesheet" />
       </Head>
       <div className="page-wrapper">
@@ -145,7 +139,7 @@ export default function Dashboard() {
             <h1 style={{ fontFamily: "Syne, sans-serif", fontSize: "1.75rem", fontWeight: 700, marginBottom: "0.5rem" }}>
               ONE-HUB Dashboard
             </h1>
-            <p style={muted}>오늘, 무엇을 하면 좋을까요</p>
+            <p style={muted}>실시간, 포지션과 AI 결정 현황</p>
           </div>
 
           <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
@@ -167,9 +161,9 @@ export default function Dashboard() {
             <div style={{ color: "#A32D2D", ...mono }}>데이터를 불러올 수 없습니다.</div>
           ) : (
             <>
-              {/* 오늘의 액션 */}
+              {/* 오늘의 활동 */}
               <div style={cardStyle}>
-                <h3 style={titleStyle}>🔥 오늘의 액션</h3>
+                <h3 style={titleStyle}>📋 오늘의 활동</h3>
                 <div style={{ display: "flex", gap: "1.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
                   <div>
                     <div style={{ fontSize: "1.5rem", fontWeight: 700, color: "#0F6E56" }}>{buys.length}</div>
@@ -197,19 +191,19 @@ export default function Dashboard() {
                       marginBottom: "0.5rem",
                     }}>
                       <div style={{ fontWeight: 700, marginBottom: "0.25rem" }}>
-                        🟢 매수 — {b.stock} <span style={{ ...mono, fontSize: "0.8rem", color: "var(--color-muted)" }}>({b.score}pt)</span>
+                        ✅ 매수 → {b.stock} <span style={{ ...mono, fontSize: "0.8rem", color: "var(--color-muted)" }}>({b.score}pt)</span>
                       </div>
                       <div style={{ ...muted, fontSize: "0.8rem" }}>{b.reason}</div>
                     </div>
                   ))
                 ) : (
-                  <div style={muted}>오늘은 매수 신호가 없습니다.</div>
+                  <div style={muted}>오늘 매수 신호가 없습니다.</div>
                 )}
               </div>
 
               {/* 시장 상태 */}
               <div style={cardStyle}>
-                <h3 style={titleStyle}>📈 시장 상태</h3>
+                <h3 style={titleStyle}>🌡 시장 상태</h3>
                 <div style={{ display: "flex", alignItems: "baseline", gap: "0.75rem" }}>
                   <span style={{
                     fontFamily: "Syne, sans-serif", fontSize: "1.4rem", fontWeight: 700,
@@ -225,7 +219,7 @@ export default function Dashboard() {
 
               {/* 계좌 현황 */}
               <div style={cardStyle}>
-                <h3 style={titleStyle}>💰 계좌 현황</h3>
+                <h3 style={titleStyle}>💼 계좌 현황</h3>
                 {balance ? (
                   <>
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: "1rem", marginBottom: "1rem" }}>
@@ -256,7 +250,7 @@ export default function Dashboard() {
                         <table style={{ width: "100%", borderCollapse: "collapse", ...mono, fontSize: "0.8rem" }}>
                           <thead>
                             <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                              {["종목", "수량", "평균가", "현재가", "평가손익"].map(h => (
+                              {["종목", "수량", "평균단가", "현재가", "평가손익"].map(h => (
                                 <th key={h} style={{ padding: "0.5rem 0.5rem", textAlign: "left", color: "var(--color-muted)", fontWeight: 400 }}>{h}</th>
                               ))}
                             </tr>
@@ -278,7 +272,7 @@ export default function Dashboard() {
                       </div>
                     )}
                     <div style={{ ...muted, marginTop: "0.75rem", fontSize: "0.75rem" }}>
-                      마지막 갱신: {balance.updated_at}
+                      잔고 마지막 갱신: {balance.updated_at}
                     </div>
                   </>
                 ) : (
@@ -286,15 +280,15 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* 오늘의 신호 전체 (관망/차단 포함) */}
+              {/* 오늘의 신호 전체 (관망·차단 포함) */}
               {blocked.length > 0 && (
                 <div style={cardStyle}>
-                  <h3 style={titleStyle}>🧠 오늘의 AI 신호</h3>
+                  <h3 style={titleStyle}>🚫 오늘의 AI 신호</h3>
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", ...mono, fontSize: "0.78rem" }}>
                       <thead>
                         <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
-                          {["종목", "판단", "점수", "이유"].map(h => (
+                          {["종목", "판단", "점수", "사유"].map(h => (
                             <th key={h} style={{ padding: "0.5rem 0.5rem", textAlign: "left", color: "var(--color-muted)", fontWeight: 400 }}>{h}</th>
                           ))}
                         </tr>
@@ -320,7 +314,7 @@ export default function Dashboard() {
 
           {/* 관심종목 */}
           <div style={cardStyle}>
-            <h3 style={titleStyle}>👁 관심종목</h3>
+            <h3 style={titleStyle}>⭐ 관심종목</h3>
             <form onSubmit={addWatchlist} style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" }}>
               <input
                 type="text"
