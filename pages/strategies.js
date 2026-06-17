@@ -1,10 +1,10 @@
-import Head from "next/head";
+﻿import Head from "next/head";
 
 const strategies = [
-  { id: "ml_signal", name: "ML 시그널", icon: "烙", status: "ACTIVE", weight: 35, desc: "머신러닝 모델이 종목별 매수/매도 확률을 스코어링. 과거 패턴 학습 기반.", rules: ["확률 > 0.65 → 매수 후보", "확률 < 0.35 → 매도 후보", "0.35~0.65 → 관망"] },
-  { id: "final_score", name: "Final Score", icon: "", status: "ACTIVE", weight: 30, desc: "RSI, MACD, 볼린저밴드 통합 기술적 점수. 0~100 스케일.", rules: ["Score ≥ 70 → 강매수", "Score 50~69 → 약매수", "Score < 50 → 차단"] },
-  { id: "risk_mgmt", name: "리스크 관리", icon: "", status: "ACTIVE", weight: 20, desc: "손절/익절 자동 실행 및 종목별 비중 제한으로 최대 손실 통제.", rules: ["손절 기준: -5%", "1종목 최대 비중: 30%", "장 외 시간 API 완전 차단"] },
-  { id: "macro_filter", name: "매크로 필터", icon: "", status: "ACTIVE", weight: 15, desc: "VIX, Fear&Greed, 나스닥 지수로 시장 국면을 판단해 매수 기준점을 동적으로 조정합니다. BEAR 국면에서는 신규 매수를 전면 차단합니다.", rules: ["BEAR MARKET → 신규 매수 전면 차단", "VIX 상승 → 매수 기준 점수 자동 상향", "매크로 점수 낮으면 → 해당 종목 BLOCKED 처리"] },
+  { id: "ml_signal", name: "ML 예측기", icon: "🤖", status: "ACTIVE", weight: 35, desc: "머신러닝 모델이 종목별 매수/매도 확률을 예측합니다. 과거 패턴 학습 기반.", rules: ["확률 > 0.65 → 매수 신호", "확률 < 0.35 → 매도 신호", "0.35~0.65 → 관망"] },
+  { id: "final_score", name: "Final Score", icon: "📊", status: "ACTIVE", weight: 30, desc: "RSI, MACD, 볼린저밴드 기반 종합 점수. 0~100 스케일.", rules: ["Score ≥ 70 → 매수후보", "Score 50~69 → 중립후보", "Score < 50 → 차단"] },
+  { id: "risk_mgmt", name: "리스크 관리", icon: "🛡", status: "ACTIVE", weight: 20, desc: "손절/익절 자동 실행 및 종목별 최대 비중 제한으로 전체 손실 방지.", rules: ["손절 기준: -5%", "1종목 최대 비중: 30%", "장외 시간 API 전면 차단"] },
+  { id: "macro_filter", name: "거시경제 필터", icon: "🌐", status: "ACTIVE", weight: 15, desc: "VIX, Fear&Greed, 나스닥 지수로 시장 환경을 판단합니다. BEAR 환경에서는 전체 매수를 차단합니다.", rules: ["BEAR MARKET → 전체 매수 전면 차단", "VIX 급등 → 매수 점수 기준 자동 상향", "거시경제 점수 낮으면 해당 종목 BLOCKED 처리"] },
 ];
 
 export default function StrategiesPage() {
@@ -14,29 +14,17 @@ export default function StrategiesPage() {
   return (
     <>
       <Head>
-
-        <title>Strategies — ONE-HUB</title>
-
-        <meta name="description" content="ONE-HUB 전략 라이브러리. ML 시그널, Final Score 등 AI 매매 전략의 규칙과 가중치를 공개합니다." />
-
+        <title>Strategies | ONE-HUB</title>
+        <meta name="description" content="ONE-HUB 전략 라이브러리. ML 예측기, Final Score 등 AI 매매 전략의 구성과 가중치를 공개합니다." />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-
-        <meta property="og:title" content="Strategies — ONE-HUB" />
-
-        <meta property="og:description" content="ONE-HUB 전략 라이브러리. ML 시그널, Final Score 등 AI 매매 전략의 규칙과 가중치를 공개합니다." />
-
+        <meta property="og:title" content="Strategies | ONE-HUB" />
+        <meta property="og:description" content="ONE-HUB 전략 라이브러리. ML 예측기, Final Score 등 AI 매매 전략의 구성과 가중치를 공개합니다." />
         <meta property="og:url" content="https://one-hub-content.vercel.app/strategies" />
-
         <meta property="og:type" content="website" />
-
         <meta property="og:site_name" content="ONE-HUB" />
-
         <meta name="twitter:card" content="summary" />
-
-        <meta name="twitter:title" content="Strategies — ONE-HUB" />
-
-        <meta name="twitter:description" content="ONE-HUB 전략 라이브러리. ML 시그널, Final Score 등 AI 매매 전략의 규칙과 가중치를 공개합니다." />
-
+        <meta name="twitter:title" content="Strategies | ONE-HUB" />
+        <meta name="twitter:description" content="ONE-HUB 전략 라이브러리. ML 예측기, Final Score 등 AI 매매 전략의 구성과 가중치를 공개합니다." />
       </Head>
       <div style={{ minHeight: "100vh", background: "#F8F7F2", color: "#1A1A1A", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "900px", margin: "0 auto", padding: "40px 24px" }}>
@@ -72,7 +60,7 @@ export default function StrategiesPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
                   {s.rules.map((rule, i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                      <span style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690" }}>›</span>
+                      <span style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690" }}>→</span>
                       <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#6A6660" }}>{rule}</span>
                     </div>
                   ))}
