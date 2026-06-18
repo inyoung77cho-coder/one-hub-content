@@ -1,4 +1,4 @@
-﻿import Head from 'next/head';
+import Head from 'next/head';
 import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
 
@@ -51,14 +51,24 @@ export default function PWADashboard() {
   }, []);
 
   const regimeClass = (r) => r === 'BULL' ? 'bull' : r === 'BEAR' ? 'bear' : 'side';
-  const regimeLabel = (r) => r === 'BULL' ? 'UP' : r === 'BEAR' ? 'DOWN' : 'SIDE';
+  const regimeLabel = (r) => r === 'BULL' ? '📈 BULL' : r === 'BEAR' ? '📉 BEAR' : '➡️ SIDE';
+  const regimeSub = (r) => r === 'BULL' ? '상승장 — 적극 매수' : r === 'BEAR' ? '하락장 — 헤지/방어 스캔' : '횡보장 — 선별 접근';
   const actionColor = (a) => a === 'BUY' ? '#00FF85' : a === 'SELL' ? '#FF4444' : '#888';
   const eventLabel = (t) => ({ BUY:'BUY', SELL:'SELL', BLOCK:'BLOCK', ANALYZE:'AI', HEAT_UPDATE:'HEAT', DAILY_SUMMARY:'SUM' }[t] || '-');
+  const heatColor = (h) => h >= 70 ? '#00FF85' : h >= 40 ? '#FFAA00' : '#FF4444';
+  const heatLabel = (h) => h >= 70 ? 'HOT' : h >= 40 ? 'WARM' : 'COLD';
 
   let positions = [];
   if (data?.balance?.positions) {
     try { positions = JSON.parse(data.balance.positions); } catch(e) {}
   }
+
+  // Mission stats 계산
+  const buyCount = data?.today_buys?.length ?? 0;
+  const blockCount = data?.market?.block_count ?? 0;
+  const watchCount = data?.recent_decisions?.filter(e => e.event_type === 'ANALYZE').length ?? 0;
+  const heat = data?.market?.heat_score ?? null;
+  const regime = data?.market?.regime ?? null;
 
   return (
     <>
@@ -79,30 +89,67 @@ export default function PWADashboard() {
         <nav className="pwa-tabs">
           {['dashboard','analyze','portfolio','report'].map(t => (
             <button key={t} className={`pwa-tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
-              {t==='dashboard'?'Home':t==='analyze'?'Analyze':t==='portfolio'?'Portfolio':'Report'}
+              {t==='dashboard'?'Today':t==='analyze'?'Analyze':t==='portfolio'?'Portfolio':'Report'}
             </button>
           ))}
         </nav>
 
         {error && <div className="pwa-error">Error: {error}</div>}
 
-        {/* ── Dashboard Tab ── */}
+        {/* ── Dashboard Tab — Mission View ── */}
         {tab === 'dashboard' && (
           <main className="pwa-main">
-            {!data && !error && <div className="pwa-loading">Loading...</div>}
+            {!data && !error && (
+              <div className="pwa-loading">
+                <div className="pwa-spinner" />
+                <span>데이터 로딩 중...</span>
+              </div>
+            )}
             {data && (<>
+
+              {/* Regime 헤더 카드 */}
+              <section className={`pwa-card regime-card regime-${regimeClass(regime)}`}>
+                <div className="regime-main">
+                  <span className={`regime-badge ${regimeClass(regime)}`}>{regimeLabel(regime)}</span>
+                  <span className="regime-sub">{regimeSub(regime)}</span>
+                </div>
+                {heat !== null && (
+                  <div className="heat-pill" style={{borderColor: heatColor(heat)}}>
+                    <span className="heat-label" style={{color: heatColor(heat)}}>HEAT</span>
+                    <span className="heat-val" style={{color: heatColor(heat)}}>{heat}</span>
+                    <span className="heat-tag" style={{color: heatColor(heat)}}>{heatLabel(heat)}</span>
+                  </div>
+                )}
+              </section>
+
+              {/* AI 활동 요약 — 4칸 그리드 */}
               <section className="pwa-card">
-                <span className="pwa-card-label">Market Status</span>
-                <div className="pwa-market-row">
-                  <span className={`pwa-regime ${regimeClass(data.market?.regime)}`}>{regimeLabel(data.market?.regime)}</span>
-                  <span className="pwa-market-stat">Blocked {data.market?.block_count ?? 0}</span>
-                  <span className="pwa-market-stat">PnL {data.balance?.unrealized_pnl?.toLocaleString() ?? '-'}</span>
+                <span className="pwa-card-label">오늘 AI가 한 일</span>
+                <div className="mission-grid">
+                  <div className="mission-cell">
+                    <span className="mission-num bull">{buyCount}</span>
+                    <span className="mission-lbl">매수</span>
+                  </div>
+                  <div className="mission-cell">
+                    <span className="mission-num bear">{blockCount}</span>
+                    <span className="mission-lbl">차단</span>
+                  </div>
+                  <div className="mission-cell">
+                    <span className="mission-num side">{watchCount}</span>
+                    <span className="mission-lbl">분석</span>
+                  </div>
+                  <div className="mission-cell">
+                    <span className="mission-num dim">{positions.length}</span>
+                    <span className="mission-lbl">보유</span>
+                  </div>
                 </div>
               </section>
+
+              {/* 오늘 매수 */}
               <section className="pwa-card">
-                <span className="pwa-card-label">Today Actions</span>
-                {(!data.today_buys || data.today_buys.length === 0)
-                  ? <div className="pwa-empty">No new buys today.</div>
+                <span className="pwa-card-label">✅ 매수 실행</span>
+                {buyCount === 0
+                  ? <div className="pwa-empty">오늘 매수 없음 — {regime === 'BEAR' ? '헤지/방어 스캔 중' : '관망 중'}</div>
                   : <div className="pwa-action-list">{data.today_buys.map((b,i) => (
                       <div key={i} className="pwa-action-row">
                         <span className="pwa-action-stock">{b.stock}</span>
@@ -111,18 +158,37 @@ export default function PWADashboard() {
                       </div>))}
                     </div>}
               </section>
+
+              {/* 차단 top3 */}
+              {blockCount > 0 && (
+                <section className="pwa-card">
+                  <span className="pwa-card-label">⛔ 차단 사유 (상위 3)</span>
+                  <div className="pwa-blocked-list">
+                    {(data.today_blocked || []).slice(0,3).map((b,i) => (
+                      <div key={i} className="pwa-blocked-row">
+                        <span className="pwa-blocked-stock">{b.stock}</span>
+                        <span className="pwa-blocked-signal mono dim bear">{b.signal}</span>
+                        <span className="pwa-blocked-reason">{b.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* 최근 활동 타임라인 */}
               <section className="pwa-card">
-                <span className="pwa-card-label">Recent Decisions</span>
+                <span className="pwa-card-label">📋 최근 활동</span>
                 {(!data.recent_decisions || data.recent_decisions.length === 0)
-                  ? <div className="pwa-empty">No recorded decisions yet.</div>
-                  : <div className="pwa-timeline">{data.recent_decisions.map((e,i) => (
+                  ? <div className="pwa-empty">기록된 활동 없음</div>
+                  : <div className="pwa-timeline">{data.recent_decisions.slice(0,8).map((e,i) => (
                       <div key={i} className="pwa-timeline-row">
-                        <span className="pwa-tl-icon mono">{eventLabel(e.event_type)}</span>
+                        <span className={`pwa-tl-icon mono tl-${e.event_type?.toLowerCase()}`}>{eventLabel(e.event_type)}</span>
                         <span className="pwa-tl-time mono dim">{e.date?.slice(5,16)}</span>
                         <span className="pwa-tl-summary">{e.summary}</span>
                       </div>))}
                     </div>}
               </section>
+
             </>)}
           </main>
         )}
@@ -195,7 +261,6 @@ export default function PWADashboard() {
                     </div>
                   </div>
                 </section>
-
                 {analyzeResult.key_signal && (
                   <section className="pwa-card">
                     <span className="pwa-card-label">🔑 핵심신호</span>
@@ -234,7 +299,7 @@ export default function PWADashboard() {
         {/* ── Portfolio Tab ── */}
         {tab === 'portfolio' && (
           <main className="pwa-main">
-            {!data && !error && <div className="pwa-loading">Loading...</div>}
+            {!data && !error && <div className="pwa-loading"><div className="pwa-spinner" /><span>Loading...</span></div>}
             {data && (<>
               <section className="pwa-card">
                 <span className="pwa-card-label">계좌 현황</span>
@@ -276,7 +341,7 @@ export default function PWADashboard() {
                     </div>}
               </section>
               <section className="pwa-card">
-                <span className="pwa-card-label">AI Reasoning - Blocked</span>
+                <span className="pwa-card-label">AI Reasoning — Blocked</span>
                 {(!data.today_blocked || data.today_blocked.length===0)
                   ? <div className="pwa-empty">차단 종목 없음</div>
                   : <div className="pwa-blocked-list">{data.today_blocked.slice(0,5).map((b,i) => (
@@ -308,8 +373,9 @@ export default function PWADashboard() {
                 <span className="pwa-card-label">오늘 요약</span>
                 <div className="pwa-report-summary">
                   <div className="pwa-rs-row"><span className="dim">Regime</span><span className={`mono ${regimeClass(data.market?.regime)}`}>{data.market?.regime}</span></div>
-                  <div className="pwa-rs-row"><span className="dim">Heat</span><span className="mono">{data.market?.heat_score ?? '-'}/100</span></div>
-                  <div className="pwa-rs-row"><span className="dim">Blocked</span><span className="mono">{data.market?.block_count ?? 0}건</span></div>
+                  <div className="pwa-rs-row"><span className="dim">Heat</span><span className="mono" style={{color: heatColor(heat)}}>{heat ?? '-'}/100</span></div>
+                  <div className="pwa-rs-row"><span className="dim">매수</span><span className="mono bull">{buyCount}건</span></div>
+                  <div className="pwa-rs-row"><span className="dim">차단</span><span className="mono bear">{blockCount}건</span></div>
                   <div className="pwa-rs-row"><span className="dim">실현손익</span><span className={`mono ${(data.balance?.realized_pnl??0)>=0?'bull':'bear'}`}>{data.balance?.realized_pnl?.toLocaleString() ?? 0}원</span></div>
                 </div>
               </section>
@@ -325,26 +391,62 @@ export default function PWADashboard() {
       <style jsx>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         .pwa-wrapper { min-height: 100vh; background: #0B0E14; color: #E8E6E3; font-family: 'Space Mono', monospace; padding-bottom: 40px; }
+
+        /* Header */
         .pwa-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px 10px; border-bottom: 1px solid #1E2330; }
         .pwa-title { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 800; color: #00FF85; letter-spacing: 0.08em; }
         .pwa-trader-toggle { display: flex; gap: 6px; }
         .pwa-trader-toggle button { background: #1A1F2E; border: 1px solid #2A3040; color: #888; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 0.75rem; }
         .pwa-trader-toggle button.active { background: #00FF85; color: #0B0E14; border-color: #00FF85; font-weight: 700; }
+
+        /* Tabs */
         .pwa-tabs { display: flex; border-bottom: 1px solid #1E2330; }
         .pwa-tab { flex: 1; padding: 10px 4px; background: none; border: none; color: #555; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid transparent; transition: all 0.15s; }
         .pwa-tab.active { color: #00FF85; border-bottom-color: #00FF85; }
+
+        /* Layout */
         .pwa-main { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; }
         .pwa-card { background: #12161F; border: 1px solid #1E2330; border-radius: 8px; padding: 14px; }
         .pwa-card-label { display: block; font-size: 0.6rem; letter-spacing: 0.12em; color: #00FF85; text-transform: uppercase; margin-bottom: 10px; }
-        .pwa-market-row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-        .pwa-regime { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; }
-        .pwa-regime.bull { color: #00FF85; }
-        .pwa-regime.bear { color: #FF4444; }
-        .pwa-regime.side { color: #FFAA00; }
+
+        /* Regime 카드 */
+        .regime-card { display: flex; justify-content: space-between; align-items: center; }
+        .regime-card.regime-bull { border-color: #00FF8533; }
+        .regime-card.regime-bear { border-color: #FF444433; }
+        .regime-card.regime-side { border-color: #FFAA0033; }
+        .regime-main { display: flex; flex-direction: column; gap: 4px; }
+        .regime-badge { font-family: 'Syne', sans-serif; font-size: 1.3rem; font-weight: 800; }
+        .regime-badge.bull { color: #00FF85; }
+        .regime-badge.bear { color: #FF4444; }
+        .regime-badge.side { color: #FFAA00; }
+        .regime-sub { font-size: 0.65rem; color: #888; }
+        .heat-pill { border: 1px solid; border-radius: 8px; padding: 8px 14px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 64px; }
+        .heat-label { font-size: 0.55rem; letter-spacing: 0.1em; }
+        .heat-val { font-family: 'Syne', sans-serif; font-size: 1.4rem; font-weight: 800; line-height: 1; }
+        .heat-tag { font-size: 0.55rem; letter-spacing: 0.08em; }
+
+        /* Mission 4칸 그리드 */
+        .mission-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .mission-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; background: #0B0E14; border-radius: 6px; border: 1px solid #1E2330; }
+        .mission-num { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; line-height: 1; }
+        .mission-lbl { font-size: 0.58rem; color: #555; letter-spacing: 0.06em; }
+
+        /* 공통 색상 */
         .bull { color: #00FF85; }
         .bear { color: #FF4444; }
         .side { color: #FFAA00; }
-        .pwa-market-stat { font-size: 0.75rem; color: #888; }
+        .dim { color: #555; }
+        .mono { font-family: 'Space Mono', monospace; }
+
+        /* 타임라인 이벤트 색상 */
+        .tl-buy { background: #00FF8522; color: #00FF85; }
+        .tl-sell { background: #FF444422; color: #FF4444; }
+        .tl-block { background: #FF444422; color: #FF8888; }
+        .tl-analyze { background: #4488FF22; color: #4488FF; }
+        .tl-heat_update { background: #FFAA0022; color: #FFAA00; }
+        .tl-daily_summary { background: #88888822; color: #888; }
+
+        /* 검색 */
         .pwa-search-wrap { margin-bottom: 8px; }
         .pwa-search-input { width: 100%; background: #0B0E14; border: 1px solid #2A3040; border-radius: 6px; padding: 10px 12px; color: #E8E6E3; font-family: 'Space Mono', monospace; font-size: 0.8rem; outline: none; }
         .pwa-search-input:focus { border-color: #00FF85; }
@@ -354,9 +456,13 @@ export default function PWADashboard() {
         .pwa-si-name { color: #E8E6E3; font-size: 0.8rem; flex: 1; }
         .pwa-si-code { font-size: 0.7rem; }
         .pwa-si-theme { font-size: 0.65rem; }
+
+        /* 분석 중 */
         .pwa-analyzing { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 24px; }
-        .pwa-spinner { width: 20px; height: 20px; border: 2px solid #1E2330; border-top-color: #00FF85; border-radius: 50%; animation: spin 0.8s linear infinite; }
+        .pwa-spinner { width: 20px; height: 20px; border: 2px solid #1E2330; border-top-color: #00FF85; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* 분석 결과 */
         .pwa-analyze-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
         .pwa-analyze-action { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 700; }
         .pwa-analyze-conf { font-size: 0.7rem; }
@@ -367,6 +473,8 @@ export default function PWADashboard() {
         .pwa-analyze-text { font-size: 0.75rem; line-height: 1.6; color: #C8C6C3; }
         .pwa-verdict { border-color: #00FF8533; }
         .pwa-caution { border-color: #FFAA0033; }
+
+        /* 포트폴리오 */
         .pwa-balance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .pwa-bal-item { display: flex; flex-direction: column; gap: 3px; }
         .pwa-bal-item span:first-child { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: #888; }
@@ -376,17 +484,23 @@ export default function PWADashboard() {
         .pwa-pos-name { flex: 1; font-size: 0.8rem; }
         .pwa-pos-qty { font-size: 0.7rem; }
         .pwa-pos-pnl { font-size: 0.8rem; font-weight: 700; }
+
+        /* 액션/차단 리스트 */
         .pwa-action-list, .pwa-blocked-list { display: flex; flex-direction: column; gap: 8px; }
         .pwa-action-row, .pwa-blocked-row { display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; border-bottom: 1px solid #1E2330; }
         .pwa-action-row:last-child, .pwa-blocked-row:last-child { border-bottom: none; }
         .pwa-action-stock, .pwa-blocked-stock { font-size: 0.8rem; color: #E8E6E3; }
         .pwa-action-score, .pwa-blocked-signal { font-size: 0.65rem; }
         .pwa-action-reason, .pwa-blocked-reason { font-size: 0.7rem; color: #888; }
+
+        /* 타임라인 */
         .pwa-timeline { display: flex; flex-direction: column; gap: 8px; }
         .pwa-timeline-row { display: flex; align-items: flex-start; gap: 8px; }
-        .pwa-tl-icon { font-size: 0.6rem; background: #1E2330; padding: 2px 5px; border-radius: 3px; white-space: nowrap; }
+        .pwa-tl-icon { font-size: 0.6rem; padding: 2px 5px; border-radius: 3px; white-space: nowrap; background: #1E2330; color: #888; }
         .pwa-tl-time { font-size: 0.65rem; white-space: nowrap; }
         .pwa-tl-summary { font-size: 0.7rem; color: #888; }
+
+        /* 리포트 */
         .pwa-report-links { display: flex; flex-direction: column; gap: 8px; }
         .pwa-report-btn { display: block; padding: 12px; background: #0B0E14; border: 1px solid #2A3040; border-radius: 6px; color: #E8E6E3; text-decoration: none; font-size: 0.8rem; transition: border-color 0.15s; }
         .pwa-report-btn:hover { border-color: #00FF85; color: #00FF85; }
@@ -395,13 +509,12 @@ export default function PWADashboard() {
         .pwa-rs-row:last-child { border-bottom: none; }
         .pwa-rs-row span:first-child { font-size: 0.7rem; }
         .pwa-rs-row span:last-child { font-size: 0.8rem; }
-        .pwa-balance-summary { font-size: 0.65rem; margin-top: 8px; }
+
+        /* 공통 */
         .pwa-empty { font-size: 0.75rem; color: #555; padding: 8px 0; }
-        .pwa-loading { text-align: center; padding: 40px; font-size: 0.8rem; color: #555; }
+        .pwa-loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 40px; font-size: 0.8rem; color: #555; }
         .pwa-error { color: #FF4444; font-size: 0.75rem; padding: 12px 16px; }
         .pwa-footer { padding: 20px; text-align: center; }
-        .mono { font-family: 'Space Mono', monospace; }
-        .dim { color: #555; }
       `}</style>
     </>
   );
