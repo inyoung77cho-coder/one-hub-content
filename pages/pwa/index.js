@@ -16,6 +16,13 @@ export default function PWADashboard() {
   const [analyzeResult, setAnalyzeResult] = useState(null);
   const [analyzeError, setAnalyzeError] = useState(null);
 
+  // [v8.3] 승인대기 (Mission Menu) state
+  const [activePanel, setActivePanel] = useState(null); // null | 'market' | 'ai' | 'pending' | 'watchlist' | 'holdings' | 'trades'
+  const [pendingList, setPendingList] = useState([]);
+  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingError, setPendingError] = useState(null);
+  const [actingCode, setActingCode] = useState(null); // 승인/거절 처리 중인 종목코드
+
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
@@ -25,6 +32,42 @@ export default function PWADashboard() {
       .then(d => { if (d.ok) setData(d); else setError(d.error || 'failed'); })
       .catch(e => setError(String(e)));
   }, [mounted, trader]);
+
+  const loadPending = useCallback(async () => {
+    setPendingLoading(true);
+    setPendingError(null);
+    try {
+      const res = await fetch(`/api/pwa-pending?trader=${trader}`);
+      const d = await res.json();
+      if (d.ok) setPendingList(d.items || []);
+      else setPendingError(d.error || '조회 실패');
+    } catch (e) { setPendingError(String(e)); }
+    finally { setPendingLoading(false); }
+  }, [trader]);
+
+  useEffect(() => {
+    if (!mounted) return;
+    if (activePanel === 'pending') loadPending();
+  }, [mounted, activePanel, loadPending]);
+
+  const actOnPending = useCallback(async (code, action) => {
+    setActingCode(code);
+    try {
+      const res = await fetch(`/api/${action}-pending`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, trader }),
+      });
+      const d = await res.json();
+      if (d.ok) {
+        // 낙관적 업데이트: 처리된 항목 즉시 목록에서 제거
+        setPendingList(prev => prev.filter(p => p.code !== code));
+      } else {
+        setPendingError(d.error || '처리 실패');
+      }
+    } catch (e) { setPendingError(String(e)); }
+    finally { setActingCode(null); }
+  }, [trader]);
 
   const searchStocks = useCallback(async (q) => {
     if (!q || q.length < 1) { setSearchResults([]); return; }
@@ -144,6 +187,132 @@ export default function PWADashboard() {
                   </div>
                 </div>
               </section>
+
+              {/* [v8.3] 6버튼 메뉴판 — 텔레그램 명령어 없이 버튼만으로 의사결정 */}
+              <section className="pwa-card">
+                <span className="pwa-card-label">바로가기</span>
+                <div className="menu-grid">
+                  <button className={`menu-btn ${activePanel==='market'?'active':''}`} onClick={()=>setActivePanel(p=>p==='market'?null:'market')}>
+                    <span className="menu-icon">📊</span><span className="menu-lbl">오늘 시장</span>
+                  </button>
+                  <button className={`menu-btn ${activePanel==='ai'?'active':''}`} onClick={()=>setActivePanel(p=>p==='ai'?null:'ai')}>
+                    <span className="menu-icon">🤖</span><span className="menu-lbl">AI 추천</span>
+                  </button>
+                  <button className={`menu-btn ${activePanel==='pending'?'active':''}`} onClick={()=>setActivePanel(p=>p==='pending'?null:'pending')}>
+                    <span className="menu-icon">⏳</span><span className="menu-lbl">승인대기</span>
+                    {pendingList.length > 0 && <span className="menu-badge">{pendingList.length}</span>}
+                  </button>
+                  <button className={`menu-btn ${activePanel==='watchlist'?'active':''}`} onClick={()=>setActivePanel(p=>p==='watchlist'?null:'watchlist')}>
+                    <span className="menu-icon">👁️</span><span className="menu-lbl">관심종목</span>
+                  </button>
+                  <button className="menu-btn" onClick={()=>{setActivePanel(null); setTab('portfolio');}}>
+                    <span className="menu-icon">💼</span><span className="menu-lbl">내 보유종목</span>
+                  </button>
+                  <button className={`menu-btn ${activePanel==='trades'?'active':''}`} onClick={()=>setActivePanel(p=>p==='trades'?null:'trades')}>
+                    <span className="menu-icon">📝</span><span className="menu-lbl">오늘 매매</span>
+                  </button>
+                </div>
+              </section>
+
+              {/* 승인대기 패널 */}
+              {activePanel === 'pending' && (
+                <section className="pwa-card pending-panel">
+                  <span className="pwa-card-label">⏳ 승인대기 ({pendingList.length}건)</span>
+                  {pendingLoading && <div className="pwa-empty">불러오는 중...</div>}
+                  {pendingError && <div className="pwa-error">{pendingError}</div>}
+                  {!pendingLoading && !pendingError && pendingList.length === 0 && (
+                    <div className="pwa-empty">현재 승인 대기 중인 종목이 없습니다.</div>
+                  )}
+                  {!pendingLoading && pendingList.length > 0 && (
+                    <div className="pending-list">
+                      {pendingList.map((p) => (
+                        <div key={p.code} className="pending-card">
+                          <div className="pending-top">
+                            <span className="pending-name">{p.name} <span className="dim mono">({p.code})</span></span>
+                            <span className={`pending-regime mono ${regimeClass(p.regime)}`}>{p.regime}</span>
+                          </div>
+                          <div className="pending-mid mono">
+                            <span className="dim">score</span> <span>{p.final_score}</span>
+                            <span className="dim" style={{marginLeft:10}}>{p.ml_signal}</span>
+                          </div>
+                          <div className="pending-price-grid mono">
+                            <div><span className="dim">목표가</span> <span className="bull">{Number(p.target||0).toLocaleString()}원</span></div>
+                            <div><span className="dim">손절가</span> <span className="bear">{Number(p.stop_loss||0).toLocaleString()}원</span></div>
+                          </div>
+                          {p.reason && <div className="pending-reason">{p.reason}</div>}
+                          <div className="pending-actions">
+                            <button
+                              className="pending-btn approve"
+                              disabled={actingCode === p.code}
+                              onClick={() => actOnPending(p.code, 'approve')}
+                            >{actingCode === p.code ? '처리 중...' : '✅ 승인'}</button>
+                            <button
+                              className="pending-btn reject"
+                              disabled={actingCode === p.code}
+                              onClick={() => actOnPending(p.code, 'skip')}
+                            >{actingCode === p.code ? '처리 중...' : '❌ 거절'}</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {/* AI 추천 패널 — 오늘 매수 실행분 재노출 */}
+              {activePanel === 'ai' && (
+                <section className="pwa-card">
+                  <span className="pwa-card-label">🤖 AI 추천 (오늘 매수 실행분)</span>
+                  {buyCount === 0
+                    ? <div className="pwa-empty">오늘 AI 매수 추천 없음</div>
+                    : <div className="pwa-action-list">{data.today_buys.map((b,i) => (
+                        <div key={i} className="pwa-action-row">
+                          <span className="pwa-action-stock">{b.stock}</span>
+                          <span className="pwa-action-score mono dim">score {b.score}</span>
+                          <span className="pwa-action-reason">{b.reason}</span>
+                        </div>))}
+                      </div>}
+                </section>
+              )}
+
+              {/* 관심종목 패널 — Portfolio 탭 관심종목 섹션으로 이동 안내 */}
+              {activePanel === 'watchlist' && (
+                <section className="pwa-card">
+                  <span className="pwa-card-label">👁️ 관심종목</span>
+                  <div className="pwa-empty">
+                    관심종목 추가/조회는 Portfolio 탭에서 확인할 수 있습니다.
+                  </div>
+                  <button className="pwa-report-btn" style={{marginTop:8, cursor:'pointer'}} onClick={()=>{setActivePanel(null); setTab('portfolio');}}>
+                    Portfolio 탭으로 이동 →
+                  </button>
+                </section>
+              )}
+
+              {/* 오늘 시장 패널 — Regime/Heat 상세 */}
+              {activePanel === 'market' && (
+                <section className="pwa-card">
+                  <span className="pwa-card-label">📊 오늘 시장</span>
+                  <div className="pwa-rs-row"><span className="dim">Regime</span><span className={`mono ${regimeClass(regime)}`}>{regimeLabel(regime)}</span></div>
+                  <div className="pwa-rs-row"><span className="dim">Heat Score</span><span className="mono" style={{color: heatColor(heat ?? 0)}}>{heat ?? '-'}</span></div>
+                  <div className="pwa-rs-row"><span className="dim">차단 건수</span><span className="mono bear">{blockCount}건</span></div>
+                </section>
+              )}
+
+              {/* 오늘 매매 패널 — 매수/매도 타임라인 단축뷰 */}
+              {activePanel === 'trades' && (
+                <section className="pwa-card">
+                  <span className="pwa-card-label">📝 오늘 매매</span>
+                  {(!data.recent_decisions || data.recent_decisions.filter(e => ['BUY','SELL'].includes(e.event_type)).length === 0)
+                    ? <div className="pwa-empty">오늘 매매 기록 없음</div>
+                    : <div className="pwa-timeline">{data.recent_decisions.filter(e => ['BUY','SELL'].includes(e.event_type)).slice(0,10).map((e,i) => (
+                        <div key={i} className="pwa-timeline-row">
+                          <span className={`pwa-tl-icon mono tl-${e.event_type?.toLowerCase()}`}>{eventLabel(e.event_type)}</span>
+                          <span className="pwa-tl-time mono dim">{e.date?.slice(5,16)}</span>
+                          <span className="pwa-tl-summary">{e.summary}</span>
+                        </div>))}
+                      </div>}
+                </section>
+              )}
 
               {/* 오늘 매수 */}
               <section className="pwa-card">
@@ -430,6 +599,34 @@ export default function PWADashboard() {
         .mission-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; background: #0B0E14; border-radius: 6px; border: 1px solid #1E2330; }
         .mission-num { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; line-height: 1; }
         .mission-lbl { font-size: 0.58rem; color: #555; letter-spacing: 0.06em; }
+
+        /* [v8.3] 6버튼 메뉴판 */
+        .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+        .menu-btn { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 6px; background: #0B0E14; border: 1px solid #1E2330; border-radius: 8px; color: #C8C6C3; cursor: pointer; font-family: 'Space Mono', monospace; transition: all 0.15s; }
+        .menu-btn:hover { border-color: #2A3040; }
+        .menu-btn.active { border-color: #00FF85; background: #00FF8511; color: #00FF85; }
+        .menu-icon { font-size: 1.2rem; line-height: 1; }
+        .menu-lbl { font-size: 0.68rem; letter-spacing: 0.02em; }
+        .menu-badge { position: absolute; top: 6px; right: 8px; background: #FF4444; color: #fff; font-size: 0.6rem; font-weight: 700; border-radius: 10px; padding: 1px 6px; min-width: 16px; text-align: center; }
+
+        /* [v8.3] 승인대기 카드 */
+        .pending-panel { border-color: #00FF8533; }
+        .pending-list { display: flex; flex-direction: column; gap: 10px; }
+        .pending-card { background: #0B0E14; border: 1px solid #1E2330; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .pending-top { display: flex; justify-content: space-between; align-items: center; }
+        .pending-name { font-size: 0.85rem; color: #E8E6E3; }
+        .pending-regime { font-size: 0.65rem; padding: 2px 8px; border: 1px solid currentColor; border-radius: 4px; }
+        .pending-mid { font-size: 0.72rem; }
+        .pending-price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.75rem; }
+        .pending-price-grid > div { display: flex; flex-direction: column; gap: 2px; }
+        .pending-reason { font-size: 0.7rem; color: #888; line-height: 1.5; }
+        .pending-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
+        .pending-btn { padding: 10px 0; border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: 1px solid; transition: opacity 0.15s; }
+        .pending-btn:disabled { opacity: 0.5; cursor: default; }
+        .pending-btn.approve { background: #00FF8522; border-color: #00FF85; color: #00FF85; }
+        .pending-btn.approve:hover:not(:disabled) { background: #00FF8533; }
+        .pending-btn.reject { background: #FF444422; border-color: #FF4444; color: #FF4444; }
+        .pending-btn.reject:hover:not(:disabled) { background: #FF444433; }
 
         /* 공통 색상 */
         .bull { color: #00FF85; }
