@@ -6,6 +6,7 @@
 
 /* ── Google Fonts ── */
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap');
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
 
 /* ── Reset ── */
 *, *::before, *::after {
@@ -14,45 +15,59 @@
   padding: 0;
 }
 
+/* [v8.6] 디자인 전면 개편 — Bloomberg Terminal/Hacker 톤 → Apple Finance / Notion / Toss 톤
+   Light Sky Blue Dashboard. 변수 이름은 그대로 유지하고 값만 교체해 모든 페이지에 일괄 적용. */
 /* ── Design Tokens ── */
 :root {
   /* Brand colors */
-  --green:       #00FF85;
-  --green-dim:   #00C267;
-  --green-dark:  #003D20;
-  --amber:       #F5A623;
-  --amber-dim:   #B87A1A;
-  --red:         #FF4D4D;
-  --red-dim:     #CC2E2E;
-  --blue:        #4D9FFF;
-  --blue-dim:    #1A6FCC;
+  --green:       #00D26A;
+  --green-dim:   #00A857;
+  --green-dark:  #046A3D;
+  --amber:       #FFA73C;
+  --amber-dim:   #E08A1E;
+  --red:         #FF5B5B;
+  --red-dim:     #E14B4B;
+  --blue:        #4A90E2;
+  --blue-dim:    #3576C4;
   --purple:      #A855F7;
 
   /* Backgrounds */
-  --bg-base:     #F8F7F2;
+  --bg-base:     #F4F9FF;
   --bg-surface:  #FFFFFF;
-  --bg-card:     #F0EDE8;
-  --bg-hover:    #EDECEA;
-  --bg-border:   #E0DDD4;
+  --bg-card:     #EAF3FC;
+  --bg-hover:    #DCE9F7;
+  --bg-border:   #DCE9F7;
 
   /* Text */
-  --text-primary: #1A1A1A;
-  --text-secondary: #6A6660;
-  --text-dim:     #9A9690;
+  --text-primary: #16213D;
+  --text-secondary: #5B7088;
+  --text-dim:     #93A6BC;
+
+  /* [v8.6] dashboard.js / today-activity 위젯이 참조하던 별칭 — 이전엔 정의가 없어 배경/테두리가 비어 보이는 버그가 있었음 */
+  --color-bg:      var(--bg-base);
+  --color-surface: var(--bg-surface);
+  --color-card:    var(--bg-card);
+  --color-border:  var(--bg-border);
+  --color-text:    var(--text-primary);
+  --color-muted:   var(--text-secondary);
+  --color-accent:  var(--green);
 
   /* Fonts */
   --font-display: 'Syne', sans-serif;
   --font-mono:    'Space Mono', monospace;
-  --font-body:    'Syne', sans-serif;
+  --font-body:    'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
 
   /* Spacing */
   --nav-height: 56px;
   --status-height: 36px;
   --max-width: 1080px;
   --section-gap: 4rem;
-  --radius-sm: 4px;
-  --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+
+  /* [v8.6] 카드 그림자 — 라이트 테마 입체감 */
+  --card-shadow: 0 2px 16px rgba(20, 38, 68, 0.06);
 }
 
 /* ── Base ── */
@@ -62,7 +77,7 @@ html {
 }
 
 body {
-  background: #F8F7F2;
+  background: var(--bg-base);
   color: var(--text-primary);
   font-family: var(--font-body);
   font-size: 15px;
@@ -96,9 +111,9 @@ img { max-width: 100%; display: block; }
   border-radius: 20px;
   border: 1px solid;
 }
-.heat-hot  { color: var(--red);   border-color: var(--red-dim);   background: rgba(255,77,77,0.08); }
-.heat-warm { color: var(--amber); border-color: var(--amber-dim); background: rgba(245,166,35,0.08); }
-.heat-cool { color: var(--blue);  border-color: var(--blue-dim);  background: rgba(77,159,255,0.08); }
+.heat-hot  { color: var(--red);   border-color: var(--red-dim);   background: rgba(255,91,91,0.08); }
+.heat-warm { color: var(--amber); border-color: var(--amber-dim); background: rgba(255,167,60,0.08); }
+.heat-cool { color: var(--blue);  border-color: var(--blue-dim);  background: rgba(74,144,226,0.08); }
 .heat-cold { color: var(--text-secondary); border-color: var(--bg-border); background: transparent; }
 
 /* ─────────────────────────────────────────────────────────
@@ -211,8 +226,8 @@ img { max-width: 100%; display: block; }
   animation: pulse 2s infinite;
 }
 @keyframes pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 255, 133, 0.5); }
-  50%       { opacity: 0.8; box-shadow: 0 0 0 4px rgba(0, 255, 133, 0); }
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 210, 106, 0.5); }
+  50%       { opacity: 0.8; box-shadow: 0 0 0 4px rgba(0, 210, 106, 0); }
 }
 
 .regime-badge {
@@ -222,9 +237,9 @@ img { max-width: 100%; display: block; }
   padding: 1px 8px;
   border-radius: 20px;
 }
-.regime-badge.regime-bull { background: rgba(0,255,133,0.1); color: var(--green); border: 1px solid var(--green-dim); }
-.regime-badge.regime-bear { background: rgba(255,77,77,0.1); color: var(--red); border: 1px solid var(--red-dim); }
-.regime-badge.regime-side { background: rgba(245,166,35,0.1); color: var(--amber); border: 1px solid var(--amber-dim); }
+.regime-badge.regime-bull { background: rgba(0,210,106,0.1); color: var(--green); border: 1px solid var(--green-dim); }
+.regime-badge.regime-bear { background: rgba(255,91,91,0.1); color: var(--red); border: 1px solid var(--red-dim); }
+.regime-badge.regime-side { background: rgba(255,167,60,0.1); color: var(--amber); border: 1px solid var(--amber-dim); }
 
 /* ─────────────────────────────────────────────────────────
    MAIN LAYOUT
@@ -665,10 +680,10 @@ img { max-width: 100%; display: block; }
   transition: border-color 0.2s, background 0.2s;
 }
 .hub-card.live {
-  border-color: rgba(0, 255, 133, 0.25);
+  border-color: rgba(0, 210, 106, 0.25);
 }
 .hub-card.live:hover {
-  background: rgba(0, 255, 133, 0.04);
+  background: rgba(0, 210, 106, 0.04);
   border-color: var(--green-dim);
 }
 .hub-card.soon {
@@ -698,7 +713,7 @@ img { max-width: 100%; display: block; }
   flex-shrink: 0;
 }
 .hc-badge.live {
-  background: rgba(0, 255, 133, 0.12);
+  background: rgba(0, 210, 106, 0.12);
   color: var(--green);
   border: 1px solid var(--green-dim);
 }
@@ -811,7 +826,7 @@ img { max-width: 100%; display: block; }
    SELECTION
 ───────────────────────────────────────────────────────── */
 ::selection {
-  background: rgba(0, 255, 133, 0.2);
+  background: rgba(0, 210, 106, 0.2);
   color: var(--text-primary);
 }
 
@@ -1031,7 +1046,7 @@ img { max-width: 100%; display: block; }
 
   background: #FFFFFF;
 
-  border: 1px solid #E0DDD4;
+  border: 1px solid #DCE9F7;
 
   border-radius: 12px;
 
@@ -1061,7 +1076,7 @@ img { max-width: 100%; display: block; }
 
   line-height: 1.4;
 
-  color: #1A1A1A;
+  color: #16213D;
 
   letter-spacing: -0.01em;
 
@@ -1069,7 +1084,7 @@ img { max-width: 100%; display: block; }
 
 }
 
-.pi-sub { font-size: 13px; color: #6A6660; line-height: 1.6; }
+.pi-sub { font-size: 13px; color: #5B7088; line-height: 1.6; }
 
 .pi-stats {
 
@@ -1077,9 +1092,9 @@ img { max-width: 100%; display: block; }
 
   align-items: center;
 
-  background: #F8F7F2;
+  background: #F4F9FF;
 
-  border: 1px solid #E0DDD4;
+  border: 1px solid #DCE9F7;
 
   border-radius: 8px;
 
@@ -1117,7 +1132,7 @@ img { max-width: 100%; display: block; }
 
   font-weight: 700;
 
-  color: #1A1A1A;
+  color: #16213D;
 
 }
 
@@ -1125,7 +1140,7 @@ img { max-width: 100%; display: block; }
 
   font-size: 10px;
 
-  color: #9A9690;
+  color: #93A6BC;
 
   letter-spacing: 0.04em;
 
@@ -1133,7 +1148,7 @@ img { max-width: 100%; display: block; }
 
 }
 
-.pi-stat-div { width: 1px; height: 32px; background: #E0DDD4; }
+.pi-stat-div { width: 1px; height: 32px; background: #DCE9F7; }
 
 
 
@@ -1199,13 +1214,13 @@ img { max-width: 100%; display: block; }
 
 /* 공통 페이지 래퍼 */
 
-.oh-page { min-height: 100vh; background: #F8F7F2; color: #1A1A1A; font-family: 'Syne', sans-serif; padding-bottom: 4rem; }
+.oh-page { min-height: 100vh; background: #F4F9FF; color: #16213D; font-family: 'Syne', sans-serif; padding-bottom: 4rem; }
 
 
 
 /* 상태바 (검은 띠) */
 
-.oh-bar { background: #1A1A1A; color: #F8F7F2; display: flex; align-items: center; gap: 0.75rem; padding: 0 1.5rem; height: 36px; font-family: 'Space Mono', monospace; font-size: 11px; overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
+.oh-bar { background: #16213D; color: #F4F9FF; display: flex; align-items: center; gap: 0.75rem; padding: 0 1.5rem; height: 36px; font-family: 'Space Mono', monospace; font-size: 11px; overflow-x: auto; scrollbar-width: none; white-space: nowrap; }
 
 .oh-bar::-webkit-scrollbar { display: none; }
 
@@ -1223,19 +1238,19 @@ img { max-width: 100%; display: block; }
 
 /* 카드 */
 
-.oh-card { background: #FFFFFF; border: 1px solid #E0DDD4; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.2rem; }
+.oh-card { background: #FFFFFF; border: 1px solid #DCE9F7; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.2rem; }
 
 .oh-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
 
-.oh-card-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #9A9690; font-family: 'Space Mono', monospace; }
+.oh-card-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #93A6BC; font-family: 'Space Mono', monospace; }
 
 
 
 /* 섹션 타이틀 */
 
-.oh-section-title { font-size: 1.1rem; font-weight: 700; color: #1A1A1A; margin-bottom: 0.4rem; }
+.oh-section-title { font-size: 1.1rem; font-weight: 700; color: #16213D; margin-bottom: 0.4rem; }
 
-.oh-section-sub { font-size: 13px; color: #6A6660; margin-bottom: 1.2rem; }
+.oh-section-sub { font-size: 13px; color: #5B7088; margin-bottom: 1.2rem; }
 
 
 
@@ -1249,7 +1264,7 @@ img { max-width: 100%; display: block; }
 
 .oh-badge-amber { background: #FFF8E6; color: #CC8800; border: 1px solid #CC880040; }
 
-.oh-badge-gray  { background: #F0EDE8; color: #9A9690; border: 1px solid #E0DDD4; }
+.oh-badge-gray  { background: #EAF3FC; color: #93A6BC; border: 1px solid #DCE9F7; }
 
 .oh-badge-blue  { background: #EAF3FB; color: #3A8BD4; border: 1px solid #3A8BD440; }
 
@@ -1259,19 +1274,19 @@ img { max-width: 100%; display: block; }
 
 .oh-btn { display: inline-block; font-size: 13px; font-weight: 600; padding: 10px 18px; border-radius: 8px; text-decoration: none; transition: all 0.15s; }
 
-.oh-btn-dark { background: #1A1A1A; color: #F8F7F2; }
+.oh-btn-dark { background: #16213D; color: #F4F9FF; }
 
 .oh-btn-dark:hover { background: #333; }
 
-.oh-btn-outline { background: #FFFFFF; color: #1A1A1A; border: 1px solid #E0DDD4; }
+.oh-btn-outline { background: #FFFFFF; color: #16213D; border: 1px solid #DCE9F7; }
 
-.oh-btn-outline:hover { border-color: #1A1A1A; }
+.oh-btn-outline:hover { border-color: #16213D; }
 
 
 
 /* 구분선 */
 
-.oh-divider { border: none; border-top: 1px solid #E0DDD4; margin: 1.5rem 0; }
+.oh-divider { border: none; border-top: 1px solid #DCE9F7; margin: 1.5rem 0; }
 
 
 

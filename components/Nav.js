@@ -33,7 +33,7 @@ export default function Nav() {
 
     <header style={{
 
-      borderBottom: "1px solid #E0DDD4",
+      borderBottom: "1px solid #DCE9F7",
 
       padding: "0 1.5rem",
 
@@ -43,7 +43,7 @@ export default function Nav() {
 
       height: "56px",
 
-      background: "rgba(248,247,242,0.97)",
+      background: "rgba(244,249,255,0.97)",
 
       backdropFilter: "blur(12px)",
 
@@ -67,7 +67,7 @@ export default function Nav() {
 
           letterSpacing: "0.08em",
 
-          color: "#1A1A1A",
+          color: "#16213D",
 
           textDecoration: "none", flexShrink: 0,
 
@@ -93,11 +93,11 @@ export default function Nav() {
 
                 padding: "6px 12px",
 
-                borderRadius: "6px",
+                borderRadius: "999px",
 
-                color: isActive ? "#F8F7F2" : "#4A4A4A",
+                color: isActive ? "#F4F9FF" : "#5B7088",
 
-                background: isActive ? "#1A1A1A" : "transparent",
+                background: isActive ? "#16213D" : "transparent",
 
                 textDecoration: "none",
 
