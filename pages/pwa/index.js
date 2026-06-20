@@ -601,6 +601,12 @@ export default function PWADashboard() {
                             </span>
                           </div>
                         </div>
+                        {p.entry_hypothesis && (
+                          <div className="position-card-ai">
+                            <span className="position-card-ai-label">🤖 AI 의견</span>
+                            <p className="position-card-ai-text">{p.entry_hypothesis}</p>
+                          </div>
+                        )}
                       </div>))}
                     </div>}
               </section>
@@ -867,6 +873,9 @@ export default function PWADashboard() {
         .position-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
         .position-card-cell { display: flex; flex-direction: column; gap: 2px; font-size: 0.8rem; }
         .position-card-cell .dim { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .position-card-ai { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+        .position-card-ai-label { display: block; font-size: 0.62rem; letter-spacing: 0.04em; color: var(--accent-info); margin-bottom: 4px; font-weight: 700; }
+        .position-card-ai-text { font-size: 0.76rem; line-height: 1.55; color: var(--text-secondary); }
 
         /* [v8.6] 홈 화면 보유종목 미리보기 */
         .position-card-mini { display: flex; justify-content: space-between; align-items: center; background: var(--inset-bg); border-radius: var(--radius-sm); padding: 10px 14px; }
