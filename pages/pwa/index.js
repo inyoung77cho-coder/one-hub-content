@@ -9,6 +9,9 @@ export default function PWADashboard() {
   const [error, setError] = useState(null);
   const [mounted, setMounted] = useState(false);
 
+  // [v8.6] 라이트 테마 기본, 다크(터미널) 테마는 옵션으로 보존 — localStorage에 저장
+  const [theme, setTheme] = useState('light');
+
   // Analyze tab state
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -32,6 +35,19 @@ export default function PWADashboard() {
       const saved = window.localStorage.getItem('onehub_recent_searches');
       if (saved) setRecentSearches(JSON.parse(saved));
     } catch (e) { /* localStorage 미지원 환경 — 무시 */ }
+    // [v8.6] 저장된 테마 불러오기 (기본값: light)
+    try {
+      const savedTheme = window.localStorage.getItem('onehub_theme');
+      if (savedTheme === 'light' || savedTheme === 'dark') setTheme(savedTheme);
+    } catch (e) { /* 무시 */ }
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme(prev => {
+      const next = prev === 'light' ? 'dark' : 'light';
+      try { window.localStorage.setItem('onehub_theme', next); } catch (e) {}
+      return next;
+    });
   }, []);
 
   useEffect(() => {
@@ -111,12 +127,14 @@ export default function PWADashboard() {
   }, []);
 
   const regimeClass = (r) => r === 'BULL' ? 'bull' : r === 'BEAR' ? 'bear' : 'side';
-  const regimeLabel = (r) => r === 'BULL' ? '📈 BULL' : r === 'BEAR' ? '📉 BEAR' : '➡️ SIDE';
-  const regimeSub = (r) => r === 'BULL' ? '상승장 — 적극 매수' : r === 'BEAR' ? '하락장 — 헤지/방어 스캔' : '횡보장 — 선별 접근';
-  const actionColor = (a) => a === 'BUY' ? '#00FF85' : a === 'SELL' ? '#FF4444' : '#888';
+  const regimeIcon = (r) => r === 'BULL' ? '☀️' : r === 'BEAR' ? '🌧️' : '☁️';
+  const regimeMarket = (r) => r === 'BULL' ? 'BULL MARKET' : r === 'BEAR' ? 'BEAR MARKET' : 'SIDEWAYS MARKET';
+  const regimeKo = (r) => r === 'BULL' ? '상승장' : r === 'BEAR' ? '하락장' : '횡보장';
+  const actionColor = (a) => a === 'BUY' ? 'var(--accent-buy)' : a === 'SELL' ? 'var(--accent-sell)' : 'var(--text-tertiary)';
   const eventLabel = (t) => ({ BUY:'BUY', SELL:'SELL', BLOCK:'BLOCK', ANALYZE:'AI', HEAT_UPDATE:'HEAT', DAILY_SUMMARY:'SUM' }[t] || '-');
-  const heatColor = (h) => h >= 70 ? '#00FF85' : h >= 40 ? '#FFAA00' : '#FF4444';
-  const heatLabel = (h) => h >= 70 ? 'HOT' : h >= 40 ? 'WARM' : 'COLD';
+  const heatTier = (h) => h == null ? null : h >= 70 ? 'hot' : h >= 40 ? 'warm' : 'cold';
+  const heatColor = (h) => { const t = heatTier(h); return t === 'hot' ? 'var(--accent-buy)' : t === 'warm' ? 'var(--accent-warn)' : 'var(--accent-sell)'; };
+  const heatLabel = (h) => { const t = heatTier(h); return t === 'hot' ? 'HOT' : t === 'warm' ? 'WARM' : 'COLD'; };
   // [v8.5] 차단 신호 한글 라벨 — STRONG_SELL 등 ML 용어를 일반 투자자가 바로 이해하도록 변환
   const blockedLabel = (signal) => {
     const s = (signal || '').toUpperCase();
@@ -124,6 +142,28 @@ export default function PWADashboard() {
     if (s.includes('SELL')) return '매수 차단 · AI 매도신호';
     if (s.includes('ML')) return '매수 차단 · ML 하락예측';
     return '매수 차단';
+  };
+  // [v8.6] Hero 추천행동 — "AI가 뭘 했는가"가 아니라 "지금 내가 뭘 해야 하는가"를 한 줄로
+  const heroVerdict = (regime, heat) => {
+    const t = heatTier(heat);
+    if (regime === 'BEAR') return '방어 우선';
+    if (regime === 'BULL') return t === 'hot' ? '신중 매수' : '적극 매수';
+    return t === 'hot' ? '신중 관망' : '관망';
+  };
+  const heroMessage = (regime, heat) => {
+    const t = heatTier(heat);
+    if (regime === 'BULL') {
+      if (t === 'hot') return '시장이 뜨겁습니다 — 추격매수보다 눌림목을 기다리세요';
+      if (t === 'warm') return '상승 흐름 속 선별 매수하기 좋은 날이에요';
+      return '상승장이지만 아직 과열은 아니에요 — 비중을 조금씩 늘려보세요';
+    }
+    if (regime === 'BEAR') return '하락장 — 신규 매수보다 보유 종목 방어에 집중하세요';
+    if (t === 'hot') return '횡보장 속 과열 신호 — 신중하게 접근하세요';
+    return '뚜렷한 방향이 없어요 — 관망하며 기회를 기다리세요';
+  };
+  const heroBorderTint = (regime) => {
+    const c = regime === 'BULL' ? 'var(--accent-buy)' : regime === 'BEAR' ? 'var(--accent-sell)' : 'var(--accent-warn)';
+    return `color-mix(in srgb, ${c} 25%, var(--border))`;
   };
 
   let positions = [];
@@ -137,20 +177,36 @@ export default function PWADashboard() {
   const watchCount = data?.recent_decisions?.filter(e => e.event_type === 'ANALYZE').length ?? 0;
   const heat = data?.market?.heat_score ?? null;
   const regime = data?.market?.regime ?? null;
+  const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null;
 
   return (
     <>
       <Head>
         <title>ONE-HUB Dashboard</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content={theme === 'light' ? '#F4F9FF' : '#0B0E14'} />
         <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+        <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet" />
       </Head>
-      <div className="pwa-wrapper">
+      <div className={`pwa-wrapper theme-${theme}`}>
         <header className="pwa-header">
-          <h1 className="pwa-title">ONE-HUB</h1>
-          <div className="pwa-trader-toggle">
-            <button className={trader==='A'?'active':''} onClick={()=>setTrader('A')}>A</button>
-            <button className={trader==='B'?'active':''} onClick={()=>setTrader('B')}>B</button>
+          <div className="pwa-brand">
+            <span className="pwa-brand-dot" />
+            <h1 className="pwa-title">ONE-HUB</h1>
+          </div>
+          <div className="pwa-header-actions">
+            <div className="pwa-trader-toggle">
+              <button className={trader==='A'?'active':''} onClick={()=>setTrader('A')}>A</button>
+              <button className={trader==='B'?'active':''} onClick={()=>setTrader('B')}>B</button>
+            </div>
+            <button
+              className="pwa-theme-toggle"
+              onClick={toggleTheme}
+              aria-label="테마 전환"
+              title={theme === 'light' ? '다크 모드로 전환' : '라이트 모드로 전환'}
+            >
+              {theme === 'light' ? '🌙' : '☀️'}
+            </button>
           </div>
         </header>
 
@@ -164,7 +220,7 @@ export default function PWADashboard() {
 
         {error && <div className="pwa-error">Error: {error}</div>}
 
-        {/* ── Dashboard Tab — Mission View ── */}
+        {/* ── Dashboard Tab — "오늘 뭘 해야 하는가" 우선순위 ── */}
         {tab === 'dashboard' && (
           <main className="pwa-main">
             {!data && !error && (
@@ -175,45 +231,58 @@ export default function PWADashboard() {
             )}
             {data && (<>
 
-              {/* Regime 헤더 카드 */}
-              <section className={`pwa-card regime-card regime-${regimeClass(regime)}`}>
-                <div className="regime-main">
-                  <span className={`regime-badge ${regimeClass(regime)}`}>{regimeLabel(regime)}</span>
-                  <span className="regime-sub">{regimeSub(regime)}</span>
+              {/* [v8.6] Hero — 오늘의 시장. 기존 regime 카드를 대체하는 시그니처 요소 */}
+              <section className="hero-card" style={{ borderColor: heroBorderTint(regime) }}>
+                <div className="hero-eyebrow">{regimeIcon(regime)} 오늘의 시장</div>
+                <div className="hero-regime">
+                  <span className={`hero-regime-text ${regimeClass(regime)}`}>{regimeMarket(regime)}</span>
+                  <span className="hero-regime-ko dim">{regimeKo(regime)}</span>
                 </div>
                 {heat !== null && (
-                  <svg viewBox="0 0 80 80" className="heat-gauge">
-                    <circle cx="40" cy="40" r="32" fill="none" stroke="#1E2330" strokeWidth="7" />
-                    <circle
-                      cx="40" cy="40" r="32" fill="none"
-                      stroke={heatColor(heat)} strokeWidth="7" strokeLinecap="round"
-                      strokeDasharray={`${Math.max(0, Math.min(heat, 100)) / 100 * 201.06} 201.06`}
-                      transform="rotate(-90 40 40)"
-                    />
-                    <text x="40" y="38" textAnchor="middle" className="heat-gauge-val" fill={heatColor(heat)}>{heat}</text>
-                    <text x="40" y="52" textAnchor="middle" className="heat-gauge-tag" fill={heatColor(heat)}>{heatLabel(heat)}</text>
-                  </svg>
+                  <div className="hero-heat">
+                    <div className="hero-heat-top">
+                      <span className="hero-heat-label">AI 투자온도</span>
+                      <span className="hero-heat-val" style={{ color: heatColor(heat) }}>
+                        {heat}<span className="hero-heat-unit">점 · {heatLabel(heat)}</span>
+                      </span>
+                    </div>
+                    <div className="heat-bar" role="img" aria-label={`투자온도 ${heat}점`}>
+                      {Array.from({ length: 10 }).map((_, i) => (
+                        <span
+                          key={i}
+                          className="heat-bar-seg"
+                          style={i < Math.round(heat / 10) ? { background: heatColor(heat) } : undefined}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 )}
+                <div className="hero-action">
+                  <span className="hero-action-badge" style={{ color: actionColor(heroAction), borderColor: actionColor(heroAction) }}>
+                    추천행동 · {heroVerdict(regime, heat)}
+                  </span>
+                  <p className="hero-action-text">{heroMessage(regime, heat)}</p>
+                </div>
               </section>
 
               {/* AI 활동 요약 — 4칸 그리드 */}
               <section className="pwa-card">
                 <span className="pwa-card-label">오늘 AI가 한 일</span>
                 <div className="mission-grid">
-                  <div className="mission-cell">
-                    <span className="mission-num bull">{buyCount}</span>
+                  <div className="mission-cell buy">
+                    <span className="mission-num">{buyCount}</span>
                     <span className="mission-lbl">매수</span>
                   </div>
-                  <div className="mission-cell">
-                    <span className="mission-num bear">{blockCount}</span>
+                  <div className="mission-cell block">
+                    <span className="mission-num">{blockCount}</span>
                     <span className="mission-lbl">차단</span>
                   </div>
-                  <div className="mission-cell">
-                    <span className="mission-num side">{watchCount}</span>
+                  <div className="mission-cell analyze">
+                    <span className="mission-num">{watchCount}</span>
                     <span className="mission-lbl">분석</span>
                   </div>
-                  <div className="mission-cell">
-                    <span className="mission-num dim">{positions.length}</span>
+                  <div className="mission-cell hold">
+                    <span className="mission-num">{positions.length}</span>
                     <span className="mission-lbl">보유</span>
                   </div>
                 </div>
@@ -271,9 +340,9 @@ export default function PWADashboard() {
                 </>)}
               </section>
 
-              {/* 오늘 매수 — [v8.5] 기존 "AI 추천" 패널과 내용이 100% 중복되어 하나로 통합 */}
+              {/* 추천종목 — 오늘 매수 실행 */}
               <section className="pwa-card">
-                <span className="pwa-card-label">✅ 매수 실행</span>
+                <span className="pwa-card-label">✅ 추천종목 · 매수 실행</span>
                 {buyCount === 0
                   ? <div className="pwa-empty">오늘 매수 없음 — {regime === 'BEAR' ? '헤지/방어 스캔 중' : '관망 중'}</div>
                   : <div className="pwa-action-list">{data.today_buys.map((b,i) => (
@@ -283,6 +352,28 @@ export default function PWADashboard() {
                         <span className="pwa-action-reason">{b.reason}</span>
                       </div>))}
                     </div>}
+              </section>
+
+              {/* [v8.6] 보유종목 미리보기 — Hero 다음 우선순위로 신설 (전체 화면은 보유 탭) */}
+              <section className="pwa-card">
+                <span className="pwa-card-label">💼 보유 종목</span>
+                {positions.length === 0
+                  ? <div className="pwa-empty">보유 종목 없음</div>
+                  : (<>
+                      <div className="position-cards">
+                        {positions.slice(0, 3).map((p, i) => (
+                          <div key={i} className="position-card-mini">
+                            <span className="position-mini-name">{p.name}</span>
+                            <span className={`position-mini-pnl ${p.pnl_rate>=0?'bull':'bear'}`}>
+                              {p.pnl_rate>=0?'+':''}{p.pnl_rate}%
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <button className="pwa-link-btn" onClick={() => setTab('portfolio')}>
+                        보유종목 전체보기 ({positions.length}건) →
+                      </button>
+                    </>)}
               </section>
 
               {/* 차단 top3 — [v8.5] STRONG_SELL 등 원시 ML 코드 대신 한글 설명 노출 */}
@@ -579,177 +670,249 @@ export default function PWADashboard() {
 
       <style jsx>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        .pwa-wrapper { min-height: 100vh; background: #0B0E14; color: #E8E6E3; font-family: 'Space Mono', monospace; padding-bottom: 40px; }
+
+        /* [v8.6] 라이트(기본) — Apple Finance / Toss / Notion 톤. */
+        .pwa-wrapper.theme-light {
+          --bg: #F4F9FF;
+          --card-bg: #FFFFFF;
+          --inset-bg: #EAF3FC;
+          --border: #DCE9F7;
+          --text-primary: #16213D;
+          --text-secondary: #5B7088;
+          --text-tertiary: #93A6BC;
+          --accent-buy: #00D26A;
+          --accent-sell: #FF5B5B;
+          --accent-warn: #FFA73C;
+          --accent-info: #4A90E2;
+          --label-color: var(--text-secondary);
+          --font-display: 'Syne', sans-serif;
+          --font-body: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
+          --font-mono: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+          --radius-card: 20px;
+          --radius-md: 14px;
+          --radius-sm: 10px;
+          --radius-pill: 999px;
+          --card-shadow: 0 2px 16px rgba(20, 38, 68, 0.07);
+          --hero-bg: linear-gradient(135deg, #EAF3FC 0%, #FFFFFF 65%);
+        }
+
+        /* [v8.6] 다크(터미널) — 기존 디자인을 옵션으로 보존 */
+        .pwa-wrapper.theme-dark {
+          --bg: #0B0E14;
+          --card-bg: #12161F;
+          --inset-bg: #0B0E14;
+          --border: #1E2330;
+          --text-primary: #E8E6E3;
+          --text-secondary: #888888;
+          --text-tertiary: #555555;
+          --accent-buy: #00FF85;
+          --accent-sell: #FF4444;
+          --accent-warn: #FFAA00;
+          --accent-info: #4488FF;
+          --label-color: var(--accent-buy);
+          --font-display: 'Syne', sans-serif;
+          --font-body: 'Space Mono', monospace;
+          --font-mono: 'Space Mono', monospace;
+          --radius-card: 8px;
+          --radius-md: 6px;
+          --radius-sm: 6px;
+          --radius-pill: 6px;
+          --card-shadow: none;
+          --hero-bg: var(--card-bg);
+        }
+
+        .pwa-wrapper { min-height: 100vh; background: var(--bg); color: var(--text-primary); font-family: var(--font-body); padding-bottom: 40px; transition: background 0.2s ease, color 0.2s ease; }
+        button, input { font-family: inherit; }
+        button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-info); outline-offset: 2px; }
+        :global(.pwa-wrapper a:focus-visible) { outline: 2px solid var(--accent-info); outline-offset: 2px; }
+        @media (prefers-reduced-motion: reduce) { .pwa-spinner { animation-duration: 0.001s; } }
 
         /* Header */
-        .pwa-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px 10px; border-bottom: 1px solid #1E2330; }
-        .pwa-title { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 800; color: #00FF85; letter-spacing: 0.08em; }
-        .pwa-trader-toggle { display: flex; gap: 6px; }
-        .pwa-trader-toggle button { background: #1A1F2E; border: 1px solid #2A3040; color: #888; padding: 4px 12px; border-radius: 4px; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 0.75rem; }
-        .pwa-trader-toggle button.active { background: #00FF85; color: #0B0E14; border-color: #00FF85; font-weight: 700; }
+        .pwa-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px 12px; }
+        .pwa-brand { display: flex; align-items: center; gap: 8px; }
+        .pwa-brand-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-buy); flex-shrink: 0; }
+        .pwa-title { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; letter-spacing: 0.04em; color: var(--text-primary); }
+        .pwa-header-actions { display: flex; align-items: center; gap: 8px; }
+        .pwa-trader-toggle { display: flex; gap: 3px; background: var(--inset-bg); padding: 3px; border-radius: var(--radius-pill); }
+        .pwa-trader-toggle button { background: none; border: none; color: var(--text-secondary); padding: 5px 13px; border-radius: var(--radius-pill); cursor: pointer; font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; }
+        .pwa-trader-toggle button.active { background: var(--card-bg); color: var(--accent-info); box-shadow: var(--card-shadow); }
+        .theme-dark .pwa-trader-toggle button.active { background: var(--accent-buy); color: var(--bg); box-shadow: none; }
+        .pwa-theme-toggle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--card-bg); cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
         /* Tabs */
-        .pwa-tabs { display: flex; border-bottom: 1px solid #1E2330; }
-        .pwa-tab { flex: 1; padding: 10px 4px; background: none; border: none; color: #555; cursor: pointer; font-family: 'Space Mono', monospace; font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 2px solid transparent; transition: all 0.15s; }
-        .pwa-tab.active { color: #00FF85; border-bottom-color: #00FF85; }
+        .pwa-tabs { display: flex; }
+        .pwa-tab { flex: 1; padding: 10px 4px; background: none; border: none; cursor: pointer; color: var(--text-tertiary); font-family: var(--font-display); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; }
+        .theme-light .pwa-tabs { background: var(--inset-bg); padding: 4px; border-radius: var(--radius-md); margin: 4px 16px 8px; gap: 2px; }
+        .theme-light .pwa-tab.active { background: var(--card-bg); color: var(--text-primary); border-radius: 10px; box-shadow: var(--card-shadow); }
+        .theme-dark .pwa-tabs { border-bottom: 1px solid var(--border); }
+        .theme-dark .pwa-tab { text-transform: uppercase; font-family: var(--font-mono); font-size: 0.65rem; border-bottom: 2px solid transparent; }
+        .theme-dark .pwa-tab.active { color: var(--accent-buy); border-bottom-color: var(--accent-buy); }
 
         /* Layout */
-        .pwa-main { padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; }
-        .pwa-card { background: #12161F; border: 1px solid #1E2330; border-radius: 8px; padding: 14px; }
-        .pwa-card-label { display: block; font-size: 0.6rem; letter-spacing: 0.12em; color: #00FF85; text-transform: uppercase; margin-bottom: 10px; }
+        .pwa-main { padding: 8px 16px 12px; display: flex; flex-direction: column; gap: 12px; }
+        .pwa-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 16px; box-shadow: var(--card-shadow); }
+        .pwa-card-label { display: block; font-size: 0.68rem; letter-spacing: 0.08em; color: var(--label-color); text-transform: uppercase; margin-bottom: 10px; font-weight: 700; }
 
-        /* Regime 카드 */
-        .regime-card { display: flex; justify-content: space-between; align-items: center; }
-        .regime-card.regime-bull { border-color: #00FF8533; }
-        .regime-card.regime-bear { border-color: #FF444433; }
-        .regime-card.regime-side { border-color: #FFAA0033; }
-        .regime-main { display: flex; flex-direction: column; gap: 4px; }
-        .regime-badge { font-family: 'Syne', sans-serif; font-size: 1.3rem; font-weight: 800; }
-        .regime-badge.bull { color: #00FF85; }
-        .regime-badge.bear { color: #FF4444; }
-        .regime-badge.side { color: #FFAA00; }
-        .regime-sub { font-size: 0.65rem; color: #888; }
-        .heat-gauge { width: 64px; height: 64px; flex-shrink: 0; }
-        .heat-gauge-val { font-family: 'Syne', sans-serif; font-size: 17px; font-weight: 800; }
-        .heat-gauge-tag { font-family: 'Space Mono', monospace; font-size: 7px; letter-spacing: 0.06em; }
+        /* [v8.6] Hero 카드 — "오늘의 시장" */
+        .hero-card { background: var(--hero-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 20px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; gap: 14px; }
+        .hero-eyebrow { font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; }
+        .hero-regime { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+        .hero-regime-text { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; }
+        .hero-regime-ko { font-size: 0.8rem; }
+        .hero-heat-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+        .hero-heat-label { font-size: 0.72rem; color: var(--text-secondary); }
+        .hero-heat-val { font-family: var(--font-display); font-size: 1.3rem; font-weight: 800; }
+        .hero-heat-unit { font-family: var(--font-body); font-size: 0.7rem; font-weight: 500; margin-left: 4px; color: var(--text-secondary); }
+        .heat-bar { display: flex; gap: 3px; }
+        .heat-bar-seg { flex: 1; height: 10px; border-radius: 4px; background: var(--inset-bg); }
+        .hero-action { display: flex; flex-direction: column; gap: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
+        .hero-action-badge { align-self: flex-start; font-size: 0.72rem; font-weight: 700; padding: 5px 12px; border: 1px solid; border-radius: var(--radius-pill); }
+        .hero-action-text { font-size: 0.8rem; line-height: 1.5; color: var(--text-primary); }
 
         /* Mission 4칸 그리드 */
         .mission-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-        .mission-cell { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; background: #0B0E14; border-radius: 6px; border: 1px solid #1E2330; }
-        .mission-num { font-family: 'Syne', sans-serif; font-size: 1.6rem; font-weight: 800; line-height: 1; }
-        .mission-lbl { font-size: 0.58rem; color: #555; letter-spacing: 0.06em; }
+        .mission-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 4px; border-radius: var(--radius-md); }
+        .mission-num { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; line-height: 1; }
+        .mission-lbl { font-size: 0.6rem; color: var(--text-secondary); letter-spacing: 0.04em; margin-top: 2px; }
+        .mission-cell.buy { background: color-mix(in srgb, var(--accent-buy) 12%, var(--card-bg)); }
+        .mission-cell.buy .mission-num { color: var(--accent-buy); }
+        .mission-cell.block { background: color-mix(in srgb, var(--accent-sell) 12%, var(--card-bg)); }
+        .mission-cell.block .mission-num { color: var(--accent-sell); }
+        .mission-cell.analyze { background: color-mix(in srgb, var(--accent-info) 12%, var(--card-bg)); }
+        .mission-cell.analyze .mission-num { color: var(--accent-info); }
+        .mission-cell.hold { background: var(--inset-bg); }
+        .mission-cell.hold .mission-num { color: var(--text-primary); }
 
-        /* [v8.3] 6버튼 메뉴판 */
-        .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
-        .menu-btn { position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 6px; background: #0B0E14; border: 1px solid #1E2330; border-radius: 8px; color: #C8C6C3; cursor: pointer; font-family: 'Space Mono', monospace; transition: all 0.15s; }
-        .menu-btn:hover { border-color: #2A3040; }
-        .menu-btn.active { border-color: #00FF85; background: #00FF8511; color: #00FF85; }
-        .menu-icon { font-size: 1.2rem; line-height: 1; }
-        .menu-lbl { font-size: 0.68rem; letter-spacing: 0.02em; }
-        .menu-badge { position: absolute; top: 6px; right: 8px; background: #FF4444; color: #fff; font-size: 0.6rem; font-weight: 700; border-radius: 10px; padding: 1px 6px; min-width: 16px; text-align: center; }
-
-        /* [v8.3] 승인대기 카드 */
-        .pending-panel { border-color: #00FF8533; }
+        /* 승인대기 카드 */
+        .pending-panel { border-color: color-mix(in srgb, var(--accent-buy) 25%, var(--border)); }
         .pending-list { display: flex; flex-direction: column; gap: 10px; }
-        .pending-card { background: #0B0E14; border: 1px solid #1E2330; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .pending-card { background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; display: flex; flex-direction: column; gap: 8px; }
         .pending-top { display: flex; justify-content: space-between; align-items: center; }
-        .pending-name { font-size: 0.85rem; color: #E8E6E3; }
-        .pending-regime { font-size: 0.65rem; padding: 2px 8px; border: 1px solid currentColor; border-radius: 4px; }
-        .pending-mid { font-size: 0.72rem; }
-        .pending-price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.75rem; }
+        .pending-name { font-size: 0.85rem; color: var(--text-primary); }
+        .pending-regime { font-size: 0.65rem; padding: 2px 8px; border: 1px solid currentColor; border-radius: var(--radius-pill); }
+        .pending-mid { font-size: 0.75rem; }
+        .pending-price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.78rem; }
         .pending-price-grid > div { display: flex; flex-direction: column; gap: 2px; }
-        .pending-reason { font-size: 0.7rem; color: #888; line-height: 1.5; }
+        .pending-reason { font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5; }
         .pending-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
-        .pending-btn { padding: 10px 0; border-radius: 6px; font-family: 'Space Mono', monospace; font-size: 0.78rem; font-weight: 700; cursor: pointer; border: 1px solid; transition: opacity 0.15s; }
+        .pending-btn { padding: 11px 0; border-radius: var(--radius-sm); font-family: var(--font-display); font-size: 0.8rem; font-weight: 700; cursor: pointer; border: 1px solid; transition: opacity 0.15s, transform 0.1s; }
+        .pending-btn:active { transform: scale(0.98); }
         .pending-btn:disabled { opacity: 0.5; cursor: default; }
-        .pending-btn.approve { background: #00FF8522; border-color: #00FF85; color: #00FF85; }
-        .pending-btn.approve:hover:not(:disabled) { background: #00FF8533; }
-        .pending-btn.reject { background: #FF444422; border-color: #FF4444; color: #FF4444; }
-        .pending-btn.reject:hover:not(:disabled) { background: #FF444433; }
+        .pending-btn.approve { background: color-mix(in srgb, var(--accent-buy) 14%, var(--card-bg)); border-color: var(--accent-buy); color: var(--accent-buy); }
+        .pending-btn.approve:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-buy) 24%, var(--card-bg)); }
+        .pending-btn.reject { background: color-mix(in srgb, var(--accent-sell) 14%, var(--card-bg)); border-color: var(--accent-sell); color: var(--accent-sell); }
+        .pending-btn.reject:hover:not(:disabled) { background: color-mix(in srgb, var(--accent-sell) 24%, var(--card-bg)); }
 
         /* 공통 색상 */
-        .bull { color: #00FF85; }
-        .bear { color: #FF4444; }
-        .side { color: #FFAA00; }
-        .dim { color: #555; }
-        .mono { font-family: 'Space Mono', monospace; }
+        .bull { color: var(--accent-buy); }
+        .bear { color: var(--accent-sell); }
+        .side { color: var(--accent-warn); }
+        .dim { color: var(--text-tertiary); }
+        .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
         /* 타임라인 이벤트 색상 */
-        .tl-buy { background: #00FF8522; color: #00FF85; }
-        .tl-sell { background: #FF444422; color: #FF4444; }
-        .tl-block { background: #FF444422; color: #FF8888; }
-        .tl-analyze { background: #4488FF22; color: #4488FF; }
-        .tl-heat_update { background: #FFAA0022; color: #FFAA00; }
-        .tl-daily_summary { background: #88888822; color: #888; }
+        .tl-buy { background: color-mix(in srgb, var(--accent-buy) 14%, var(--card-bg)); color: var(--accent-buy); }
+        .tl-sell { background: color-mix(in srgb, var(--accent-sell) 14%, var(--card-bg)); color: var(--accent-sell); }
+        .tl-block { background: color-mix(in srgb, var(--accent-sell) 14%, var(--card-bg)); color: var(--accent-sell); }
+        .tl-analyze { background: color-mix(in srgb, var(--accent-info) 14%, var(--card-bg)); color: var(--accent-info); }
+        .tl-heat_update { background: color-mix(in srgb, var(--accent-warn) 14%, var(--card-bg)); color: var(--accent-warn); }
+        .tl-daily_summary { background: var(--inset-bg); color: var(--text-secondary); }
 
         /* 검색 */
         .pwa-search-wrap { margin-bottom: 8px; }
-        .pwa-search-input { width: 100%; background: #0B0E14; border: 1px solid #2A3040; border-radius: 6px; padding: 10px 12px; color: #E8E6E3; font-family: 'Space Mono', monospace; font-size: 0.8rem; outline: none; }
-        .pwa-search-input:focus { border-color: #00FF85; }
-        .pwa-search-results { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
-        .recent-search-wrap { margin-top: 10px; }
-        .recent-search-label { display: block; font-size: 0.6rem; letter-spacing: 0.08em; color: #555; text-transform: uppercase; margin-bottom: 6px; }
+        .pwa-search-input { width: 100%; background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 11px 14px; color: var(--text-primary); font-family: var(--font-body); font-size: 0.85rem; outline: none; transition: border-color 0.15s; }
+        .pwa-search-input:focus { border-color: var(--accent-info); }
+        .pwa-search-results { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+        .recent-search-wrap { margin-top: 12px; }
+        .recent-search-label { display: block; font-size: 0.65rem; letter-spacing: 0.04em; color: var(--text-tertiary); margin-bottom: 6px; }
         .recent-search-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-        .recent-search-chip { background: #0B0E14; border: 1px solid #2A3040; border-radius: 14px; padding: 5px 12px; color: #C8C6C3; font-family: 'Space Mono', monospace; font-size: 0.7rem; cursor: pointer; transition: border-color 0.15s; }
-        .recent-search-chip:hover { border-color: #00FF85; color: #00FF85; }
-        .pwa-search-item { background: #0B0E14; border: 1px solid #2A3040; border-radius: 6px; padding: 8px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; text-align: left; }
-        .pwa-search-item:hover { border-color: #00FF85; }
-        .pwa-si-name { color: #E8E6E3; font-size: 0.8rem; flex: 1; }
-        .pwa-si-code { font-size: 0.7rem; }
-        .pwa-si-theme { font-size: 0.65rem; }
+        .recent-search-chip { background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 6px 14px; color: var(--text-secondary); font-family: var(--font-body); font-size: 0.75rem; cursor: pointer; transition: all 0.15s; }
+        .recent-search-chip:hover { border-color: var(--accent-buy); color: var(--accent-buy); }
+        .pwa-search-item { background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; cursor: pointer; display: flex; align-items: center; gap: 10px; text-align: left; width: 100%; transition: border-color 0.15s; }
+        .pwa-search-item:hover { border-color: var(--accent-buy); }
+        .pwa-si-name { color: var(--text-primary); font-size: 0.85rem; flex: 1; }
+        .pwa-si-code { font-size: 0.72rem; }
+        .pwa-si-theme { font-size: 0.68rem; color: var(--text-tertiary); }
 
         /* 분석 중 */
-        .pwa-analyzing { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 24px; }
-        .pwa-spinner { width: 20px; height: 20px; border: 2px solid #1E2330; border-top-color: #00FF85; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+        .pwa-analyzing { display: flex; align-items: center; gap: 12px; justify-content: center; padding: 28px; }
+        .pwa-spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent-buy); border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
         /* 분석 결과 */
         .pwa-analyze-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
-        .pwa-analyze-action { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 700; }
-        .pwa-analyze-conf { font-size: 0.7rem; }
-        .pwa-analyze-conf-badge { font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border: 1px solid; border-radius: 12px; }
-        .pwa-price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .pwa-analyze-action { font-family: var(--font-display); font-size: 1.25rem; font-weight: 800; }
+        .pwa-analyze-conf-badge { font-size: 0.75rem; font-weight: 700; padding: 5px 12px; border: 1px solid; border-radius: var(--radius-pill); }
+        .pwa-price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .pwa-price-item { display: flex; flex-direction: column; gap: 3px; }
-        .pwa-price-item span:first-child { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; }
-        .pwa-price-item span:last-child { font-size: 0.85rem; }
-        .pwa-analyze-text { font-size: 0.75rem; line-height: 1.6; color: #C8C6C3; }
-        .pwa-verdict { border-color: #00FF8533; }
-        .pwa-caution { border-color: #FFAA0033; }
+        .pwa-price-item span:first-child { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-tertiary); }
+        .pwa-price-item span:last-child { font-size: 0.88rem; color: var(--text-primary); }
+        .pwa-analyze-text { font-size: 0.8rem; line-height: 1.65; color: var(--text-secondary); }
+        .pwa-verdict { border-color: color-mix(in srgb, var(--accent-buy) 30%, var(--border)); }
+        .pwa-caution { border-color: color-mix(in srgb, var(--accent-warn) 30%, var(--border)); }
 
         /* 포트폴리오 */
-        .pwa-balance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .pwa-balance-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
         .pwa-bal-item { display: flex; flex-direction: column; gap: 3px; }
-        .pwa-bal-item span:first-child { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; color: #888; }
-        .pwa-bal-item span:last-child { font-size: 0.8rem; }
+        .pwa-bal-item span:first-child { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-tertiary); }
+        .pwa-bal-item span:last-child { font-size: 0.85rem; color: var(--text-primary); }
         /* [v8.5] 보유종목 카드 */
         .position-cards { display: flex; flex-direction: column; gap: 10px; }
-        .position-card { background: #0B0E14; border: 1px solid #1E2330; border-radius: 8px; padding: 12px; }
+        .position-card { background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; }
         .position-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .position-card-name { font-size: 0.85rem; color: #E8E6E3; }
-        .position-card-badge { font-size: 0.78rem; font-weight: 700; padding: 3px 9px; border-radius: 10px; }
-        .position-card-badge.bull { background: #00FF8522; }
-        .position-card-badge.bear { background: #FF444422; }
+        .position-card-name { font-size: 0.88rem; color: var(--text-primary); font-weight: 600; }
+        .position-card-badge { font-size: 0.8rem; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-pill); }
+        .position-card-badge.bull { background: color-mix(in srgb, var(--accent-buy) 16%, var(--card-bg)); }
+        .position-card-badge.bear { background: color-mix(in srgb, var(--accent-sell) 16%, var(--card-bg)); }
         .position-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
-        .position-card-cell { display: flex; flex-direction: column; gap: 2px; font-size: 0.78rem; }
-        .position-card-cell .dim { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; }
+        .position-card-cell { display: flex; flex-direction: column; gap: 2px; font-size: 0.8rem; }
+        .position-card-cell .dim { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.03em; }
+
+        /* [v8.6] 홈 화면 보유종목 미리보기 */
+        .position-card-mini { display: flex; justify-content: space-between; align-items: center; background: var(--inset-bg); border-radius: var(--radius-sm); padding: 10px 14px; }
+        .position-mini-name { font-size: 0.82rem; color: var(--text-primary); }
+        .position-mini-pnl { font-size: 0.82rem; font-weight: 700; }
+        .pwa-link-btn { width: 100%; background: none; border: none; padding: 10px 0 0; color: var(--accent-info); font-size: 0.75rem; font-weight: 700; cursor: pointer; text-align: center; }
 
         /* [v8.5] 리포트 카드 */
         .report-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .report-card { display: flex; flex-direction: column; gap: 4px; background: #0B0E14; border: 1px solid #2A3040; border-radius: 8px; padding: 14px 12px; text-decoration: none; transition: border-color 0.15s; }
-        .report-card:hover { border-color: #00FF85; }
-        .report-card-icon { font-size: 1.3rem; }
-        .report-card-title { font-size: 0.8rem; color: #E8E6E3; font-weight: 700; }
-        .report-card-desc { font-size: 0.65rem; color: #555; }
+        .report-card { display: flex; flex-direction: column; gap: 5px; background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 14px; text-decoration: none; transition: border-color 0.15s, transform 0.1s; }
+        .report-card:hover { border-color: var(--accent-buy); }
+        .report-card:active { transform: scale(0.98); }
+        .report-card-icon { font-size: 1.4rem; }
+        .report-card-title { font-size: 0.85rem; color: var(--text-primary); font-weight: 700; }
+        .report-card-desc { font-size: 0.68rem; color: var(--text-tertiary); }
 
         /* 액션/차단 리스트 */
-        .pwa-action-list, .pwa-blocked-list { display: flex; flex-direction: column; gap: 8px; }
-        .pwa-action-row, .pwa-blocked-row { display: flex; flex-direction: column; gap: 2px; padding-bottom: 8px; border-bottom: 1px solid #1E2330; }
-        .pwa-action-row:last-child, .pwa-blocked-row:last-child { border-bottom: none; }
-        .pwa-action-stock, .pwa-blocked-stock { font-size: 0.8rem; color: #E8E6E3; }
-        .pwa-action-score, .pwa-blocked-signal { font-size: 0.65rem; }
-        .pwa-action-reason, .pwa-blocked-reason { font-size: 0.7rem; color: #888; }
+        .pwa-action-list, .pwa-blocked-list { display: flex; flex-direction: column; gap: 10px; }
+        .pwa-action-row, .pwa-blocked-row { display: flex; flex-direction: column; gap: 3px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+        .pwa-action-row:last-child, .pwa-blocked-row:last-child { border-bottom: none; padding-bottom: 0; }
+        .pwa-action-stock, .pwa-blocked-stock { font-size: 0.85rem; color: var(--text-primary); font-weight: 600; }
+        .pwa-action-score, .pwa-blocked-signal { font-size: 0.68rem; }
+        .pwa-action-reason, .pwa-blocked-reason { font-size: 0.74rem; color: var(--text-secondary); }
 
         /* 타임라인 */
-        .pwa-timeline { display: flex; flex-direction: column; gap: 8px; }
+        .pwa-timeline { display: flex; flex-direction: column; gap: 10px; }
         .pwa-timeline-row { display: flex; align-items: flex-start; gap: 8px; }
-        .pwa-tl-icon { font-size: 0.6rem; padding: 2px 5px; border-radius: 3px; white-space: nowrap; background: #1E2330; color: #888; }
-        .pwa-tl-time { font-size: 0.65rem; white-space: nowrap; }
-        .pwa-tl-summary { font-size: 0.7rem; color: #888; }
+        .pwa-tl-icon { font-size: 0.62rem; padding: 3px 7px; border-radius: var(--radius-pill); white-space: nowrap; font-weight: 700; }
+        .pwa-tl-time { font-size: 0.68rem; white-space: nowrap; color: var(--text-tertiary); }
+        .pwa-tl-summary { font-size: 0.75rem; color: var(--text-secondary); }
 
         /* 리포트 */
-        .pwa-report-btn { display: block; padding: 12px; background: #0B0E14; border: 1px solid #2A3040; border-radius: 6px; color: #E8E6E3; text-decoration: none; font-size: 0.8rem; transition: border-color 0.15s; }
-        .pwa-report-btn:hover { border-color: #00FF85; color: #00FF85; }
-        .pwa-report-summary { display: flex; flex-direction: column; gap: 8px; }
-        .pwa-rs-row { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid #1E2330; }
+        .pwa-report-btn { display: block; padding: 13px; background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); text-decoration: none; font-size: 0.82rem; font-weight: 600; transition: border-color 0.15s; }
+        .pwa-report-btn:hover { border-color: var(--accent-buy); color: var(--accent-buy); }
+        .pwa-report-summary { display: flex; flex-direction: column; gap: 4px; }
+        .pwa-rs-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
         .pwa-rs-row:last-child { border-bottom: none; }
-        .pwa-rs-row span:first-child { font-size: 0.7rem; }
-        .pwa-rs-row span:last-child { font-size: 0.8rem; }
+        .pwa-rs-row span:first-child { font-size: 0.75rem; color: var(--text-secondary); }
+        .pwa-rs-row span:last-child { font-size: 0.85rem; color: var(--text-primary); }
 
         /* 공통 */
-        .pwa-empty { font-size: 0.75rem; color: #555; padding: 8px 0; }
-        .pwa-loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 40px; font-size: 0.8rem; color: #555; }
-        .pwa-error { color: #FF4444; font-size: 0.75rem; padding: 12px 16px; }
-        .pwa-footer { padding: 20px; text-align: center; }
+        .pwa-empty { font-size: 0.78rem; color: var(--text-tertiary); padding: 10px 0; }
+        .pwa-loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 48px; font-size: 0.82rem; color: var(--text-tertiary); }
+        .pwa-error { color: var(--accent-sell); font-size: 0.78rem; padding: 14px 16px; }
+        .pwa-footer { padding: 24px; text-align: center; }
+        .pwa-footer :global(a) { color: var(--text-tertiary); text-decoration: none; font-size: 0.75rem; }
       `}</style>
     </>
   );
