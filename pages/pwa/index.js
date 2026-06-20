@@ -15,9 +15,10 @@ export default function PWADashboard() {
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeResult, setAnalyzeResult] = useState(null);
   const [analyzeError, setAnalyzeError] = useState(null);
+  const [analyzeExpanded, setAnalyzeExpanded] = useState(false); // [v8.5] 요약 우선 노출, 상세는 더보기로 접음
 
-  // [v8.3] 승인대기 (Mission Menu) state
-  const [activePanel, setActivePanel] = useState(null); // null | 'market' | 'ai' | 'pending' | 'watchlist' | 'holdings' | 'trades'
+  // [v8.5] 승인대기 카드 상태 — 중복 메뉴(6버튼 그리드) 제거 후 단일 상태로 단순화
+  const [pendingOpen, setPendingOpen] = useState(false);
   const [pendingList, setPendingList] = useState([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingError, setPendingError] = useState(null);
@@ -45,10 +46,11 @@ export default function PWADashboard() {
     finally { setPendingLoading(false); }
   }, [trader]);
 
+  // [v8.5] 대시보드 진입 시 즉시 1회 로드 → 배지 숫자가 처음부터 정확하게 표시됨 (기존엔 패널을 한 번 열어야만 숫자가 채워졌음)
   useEffect(() => {
     if (!mounted) return;
-    if (activePanel === 'pending') loadPending();
-  }, [mounted, activePanel, loadPending]);
+    loadPending();
+  }, [mounted, loadPending]);
 
   const actOnPending = useCallback(async (code, action) => {
     setActingCode(code);
@@ -82,6 +84,7 @@ export default function PWADashboard() {
     setAnalyzing(true);
     setAnalyzeResult(null);
     setAnalyzeError(null);
+    setAnalyzeExpanded(false);
     setSearchResults([]);
     setSearchQuery(name);
     try {
@@ -100,6 +103,14 @@ export default function PWADashboard() {
   const eventLabel = (t) => ({ BUY:'BUY', SELL:'SELL', BLOCK:'BLOCK', ANALYZE:'AI', HEAT_UPDATE:'HEAT', DAILY_SUMMARY:'SUM' }[t] || '-');
   const heatColor = (h) => h >= 70 ? '#00FF85' : h >= 40 ? '#FFAA00' : '#FF4444';
   const heatLabel = (h) => h >= 70 ? 'HOT' : h >= 40 ? 'WARM' : 'COLD';
+  // [v8.5] 차단 신호 한글 라벨 — STRONG_SELL 등 ML 용어를 일반 투자자가 바로 이해하도록 변환
+  const blockedLabel = (signal) => {
+    const s = (signal || '').toUpperCase();
+    if (s.includes('STRONG_SELL')) return '매수 차단 · AI 강한 매도신호';
+    if (s.includes('SELL')) return '매수 차단 · AI 매도신호';
+    if (s.includes('ML')) return '매수 차단 · ML 하락예측';
+    return '매수 차단';
+  };
 
   let positions = [];
   if (data?.balance?.positions) {
@@ -132,7 +143,7 @@ export default function PWADashboard() {
         <nav className="pwa-tabs">
           {['dashboard','analyze','portfolio','report'].map(t => (
             <button key={t} className={`pwa-tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
-              {t==='dashboard'?'Today':t==='analyze'?'Analyze':t==='portfolio'?'Portfolio':'Report'}
+              {t==='dashboard'?'홈':t==='analyze'?'분석':t==='portfolio'?'보유':'기록'}
             </button>
           ))}
         </nav>
@@ -188,36 +199,17 @@ export default function PWADashboard() {
                 </div>
               </section>
 
-              {/* [v8.3] 6버튼 메뉴판 — 텔레그램 명령어 없이 버튼만으로 의사결정 */}
-              <section className="pwa-card">
-                <span className="pwa-card-label">바로가기</span>
-                <div className="menu-grid">
-                  <button className={`menu-btn ${activePanel==='market'?'active':''}`} onClick={()=>setActivePanel(p=>p==='market'?null:'market')}>
-                    <span className="menu-icon">📊</span><span className="menu-lbl">오늘 시장</span>
-                  </button>
-                  <button className={`menu-btn ${activePanel==='ai'?'active':''}`} onClick={()=>setActivePanel(p=>p==='ai'?null:'ai')}>
-                    <span className="menu-icon">🤖</span><span className="menu-lbl">AI 추천</span>
-                  </button>
-                  <button className={`menu-btn ${activePanel==='pending'?'active':''}`} onClick={()=>setActivePanel(p=>p==='pending'?null:'pending')}>
-                    <span className="menu-icon">⏳</span><span className="menu-lbl">승인대기</span>
-                    {pendingList.length > 0 && <span className="menu-badge">{pendingList.length}</span>}
-                  </button>
-                  <button className={`menu-btn ${activePanel==='watchlist'?'active':''}`} onClick={()=>setActivePanel(p=>p==='watchlist'?null:'watchlist')}>
-                    <span className="menu-icon">👁️</span><span className="menu-lbl">관심종목</span>
-                  </button>
-                  <button className="menu-btn" onClick={()=>{setActivePanel(null); setTab('portfolio');}}>
-                    <span className="menu-icon">💼</span><span className="menu-lbl">내 보유종목</span>
-                  </button>
-                  <button className={`menu-btn ${activePanel==='trades'?'active':''}`} onClick={()=>setActivePanel(p=>p==='trades'?null:'trades')}>
-                    <span className="menu-icon">📝</span><span className="menu-lbl">오늘 매매</span>
-                  </button>
-                </div>
-              </section>
-
-              {/* 승인대기 패널 */}
-              {activePanel === 'pending' && (
-                <section className="pwa-card pending-panel">
-                  <span className="pwa-card-label">⏳ 승인대기 ({pendingList.length}건)</span>
+              {/* [v8.5] 승인대기 카드 — 기존 6버튼 그리드를 제거하고 단일 카드로 통합 (중복 메뉴 해소) */}
+              <section className="pwa-card pending-panel">
+                <button
+                  className="pwa-card-label"
+                  style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', alignItems:'center', gap:8, width:'100%' }}
+                  onClick={() => setPendingOpen(o => !o)}
+                >
+                  <span style={{flex:1, textAlign:'left'}}>⏳ 승인대기 ({pendingList.length}건)</span>
+                  <span className="dim mono" style={{fontSize:'0.7rem'}}>{pendingOpen ? '접기 ▲' : '펼치기 ▼'}</span>
+                </button>
+                {pendingOpen && (<>
                   {pendingLoading && <div className="pwa-empty">불러오는 중...</div>}
                   {pendingError && <div className="pwa-error">{pendingError}</div>}
                   {!pendingLoading && !pendingError && pendingList.length === 0 && (
@@ -256,65 +248,10 @@ export default function PWADashboard() {
                       ))}
                     </div>
                   )}
-                </section>
-              )}
+                </>)}
+              </section>
 
-              {/* AI 추천 패널 — 오늘 매수 실행분 재노출 */}
-              {activePanel === 'ai' && (
-                <section className="pwa-card">
-                  <span className="pwa-card-label">🤖 AI 추천 (오늘 매수 실행분)</span>
-                  {buyCount === 0
-                    ? <div className="pwa-empty">오늘 AI 매수 추천 없음</div>
-                    : <div className="pwa-action-list">{data.today_buys.map((b,i) => (
-                        <div key={i} className="pwa-action-row">
-                          <span className="pwa-action-stock">{b.stock}</span>
-                          <span className="pwa-action-score mono dim">score {b.score}</span>
-                          <span className="pwa-action-reason">{b.reason}</span>
-                        </div>))}
-                      </div>}
-                </section>
-              )}
-
-              {/* 관심종목 패널 — Portfolio 탭 관심종목 섹션으로 이동 안내 */}
-              {activePanel === 'watchlist' && (
-                <section className="pwa-card">
-                  <span className="pwa-card-label">👁️ 관심종목</span>
-                  <div className="pwa-empty">
-                    관심종목 추가/조회는 Portfolio 탭에서 확인할 수 있습니다.
-                  </div>
-                  <button className="pwa-report-btn" style={{marginTop:8, cursor:'pointer'}} onClick={()=>{setActivePanel(null); setTab('portfolio');}}>
-                    Portfolio 탭으로 이동 →
-                  </button>
-                </section>
-              )}
-
-              {/* 오늘 시장 패널 — Regime/Heat 상세 */}
-              {activePanel === 'market' && (
-                <section className="pwa-card">
-                  <span className="pwa-card-label">📊 오늘 시장</span>
-                  <div className="pwa-rs-row"><span className="dim">Regime</span><span className={`mono ${regimeClass(regime)}`}>{regimeLabel(regime)}</span></div>
-                  <div className="pwa-rs-row"><span className="dim">Heat Score</span><span className="mono" style={{color: heatColor(heat ?? 0)}}>{heat ?? '-'}</span></div>
-                  <div className="pwa-rs-row"><span className="dim">차단 건수</span><span className="mono bear">{blockCount}건</span></div>
-                </section>
-              )}
-
-              {/* 오늘 매매 패널 — 매수/매도 타임라인 단축뷰 */}
-              {activePanel === 'trades' && (
-                <section className="pwa-card">
-                  <span className="pwa-card-label">📝 오늘 매매</span>
-                  {(!data.recent_decisions || data.recent_decisions.filter(e => ['BUY','SELL'].includes(e.event_type)).length === 0)
-                    ? <div className="pwa-empty">오늘 매매 기록 없음</div>
-                    : <div className="pwa-timeline">{data.recent_decisions.filter(e => ['BUY','SELL'].includes(e.event_type)).slice(0,10).map((e,i) => (
-                        <div key={i} className="pwa-timeline-row">
-                          <span className={`pwa-tl-icon mono tl-${e.event_type?.toLowerCase()}`}>{eventLabel(e.event_type)}</span>
-                          <span className="pwa-tl-time mono dim">{e.date?.slice(5,16)}</span>
-                          <span className="pwa-tl-summary">{e.summary}</span>
-                        </div>))}
-                      </div>}
-                </section>
-              )}
-
-              {/* 오늘 매수 */}
+              {/* 오늘 매수 — [v8.5] 기존 "AI 추천" 패널과 내용이 100% 중복되어 하나로 통합 */}
               <section className="pwa-card">
                 <span className="pwa-card-label">✅ 매수 실행</span>
                 {buyCount === 0
@@ -328,15 +265,15 @@ export default function PWADashboard() {
                     </div>}
               </section>
 
-              {/* 차단 top3 */}
+              {/* 차단 top3 — [v8.5] STRONG_SELL 등 원시 ML 코드 대신 한글 설명 노출 */}
               {blockCount > 0 && (
                 <section className="pwa-card">
-                  <span className="pwa-card-label">⛔ 차단 사유 (상위 3)</span>
+                  <span className="pwa-card-label">⛔ 매수 차단 사유 (상위 3)</span>
                   <div className="pwa-blocked-list">
                     {(data.today_blocked || []).slice(0,3).map((b,i) => (
                       <div key={i} className="pwa-blocked-row">
                         <span className="pwa-blocked-stock">{b.stock}</span>
-                        <span className="pwa-blocked-signal mono dim bear">{b.signal}</span>
+                        <span className="pwa-blocked-signal mono dim bear">{blockedLabel(b.signal)}</span>
                         <span className="pwa-blocked-reason">{b.reason}</span>
                       </div>
                     ))}
@@ -403,63 +340,76 @@ export default function PWADashboard() {
 
             {analyzeResult && !analyzing && (
               <>
+                {/* [v8.5] 요약 카드 — 액션/확신도/핵심신호를 한눈에. 기존엔 결론을 보려면 6장 카드를 끝까지 스크롤해야 했음 */}
                 <section className="pwa-card">
                   <span className="pwa-card-label">{analyzeResult.name} ({analyzeResult.code})</span>
                   <div className="pwa-analyze-header">
                     <span className="pwa-analyze-action" style={{color: actionColor(analyzeResult.action)}}>
                       {analyzeResult.action === 'BUY' ? '🟢 매수' : analyzeResult.action === 'SELL' ? '🔴 매도' : '⚪ 관망'}
                     </span>
-                    <span className="pwa-analyze-conf mono dim">{analyzeResult.confidence}</span>
+                    <span className="pwa-analyze-conf-badge mono" style={{borderColor: actionColor(analyzeResult.action), color: actionColor(analyzeResult.action)}}>
+                      AI 확신도 {analyzeResult.confidence}
+                    </span>
                   </div>
-                  <div className="pwa-price-grid">
-                    <div className="pwa-price-item">
-                      <span className="dim">현재가</span>
-                      <span className="mono">{analyzeResult.current_price?.toLocaleString()}원</span>
-                    </div>
-                    <div className="pwa-price-item">
-                      <span className="dim">목표가</span>
-                      <span className="mono bull">{analyzeResult.target?.toLocaleString()}원</span>
-                    </div>
-                    <div className="pwa-price-item">
-                      <span className="dim">손절가</span>
-                      <span className="mono bear">{analyzeResult.stop_loss?.toLocaleString()}원</span>
-                    </div>
-                    <div className="pwa-price-item">
-                      <span className="dim">RSI</span>
-                      <span className="mono">{analyzeResult.rsi?.toFixed(1)}</span>
-                    </div>
-                  </div>
+                  {analyzeResult.key_signal && <p className="pwa-analyze-text" style={{marginTop:10}}>{analyzeResult.key_signal}</p>}
                 </section>
-                {analyzeResult.key_signal && (
-                  <section className="pwa-card">
-                    <span className="pwa-card-label">🔑 핵심신호</span>
-                    <p className="pwa-analyze-text">{analyzeResult.key_signal}</p>
-                  </section>
-                )}
-                {analyzeResult.technical_summary && (
-                  <section className="pwa-card">
-                    <span className="pwa-card-label">📈 기술적 분석</span>
-                    <p className="pwa-analyze-text">{analyzeResult.technical_summary}</p>
-                  </section>
-                )}
-                {analyzeResult.macro_alignment && (
-                  <section className="pwa-card">
-                    <span className="pwa-card-label">🌐 매크로</span>
-                    <p className="pwa-analyze-text">{analyzeResult.macro_alignment}</p>
-                  </section>
-                )}
+
                 {analyzeResult.verdict && (
                   <section className="pwa-card pwa-verdict">
                     <span className="pwa-card-label">✅ 결론</span>
                     <p className="pwa-analyze-text">{analyzeResult.verdict}</p>
                   </section>
                 )}
-                {analyzeResult.caution && (
-                  <section className="pwa-card pwa-caution">
-                    <span className="pwa-card-label">⚠️ 주의</span>
-                    <p className="pwa-analyze-text">{analyzeResult.caution}</p>
+
+                <button
+                  className="pwa-report-btn"
+                  style={{ cursor:'pointer', textAlign:'center', width:'100%' }}
+                  onClick={() => setAnalyzeExpanded(v => !v)}
+                >
+                  {analyzeExpanded ? '간단히 보기 ▲' : '상세 분석 더보기 (기술/매크로/가격) ▼'}
+                </button>
+
+                {analyzeExpanded && (<>
+                  <section className="pwa-card">
+                    <span className="pwa-card-label">가격 정보</span>
+                    <div className="pwa-price-grid">
+                      <div className="pwa-price-item">
+                        <span className="dim">현재가</span>
+                        <span className="mono">{analyzeResult.current_price?.toLocaleString()}원</span>
+                      </div>
+                      <div className="pwa-price-item">
+                        <span className="dim">목표가</span>
+                        <span className="mono bull">{analyzeResult.target?.toLocaleString()}원</span>
+                      </div>
+                      <div className="pwa-price-item">
+                        <span className="dim">손절가</span>
+                        <span className="mono bear">{analyzeResult.stop_loss?.toLocaleString()}원</span>
+                      </div>
+                      <div className="pwa-price-item">
+                        <span className="dim">RSI</span>
+                        <span className="mono">{analyzeResult.rsi?.toFixed(1)}</span>
+                      </div>
+                    </div>
                   </section>
-                )}
+                  {analyzeResult.technical_summary && (
+                    <section className="pwa-card">
+                      <span className="pwa-card-label">📈 기술적 분석</span>
+                      <p className="pwa-analyze-text">{analyzeResult.technical_summary}</p>
+                    </section>
+                  )}
+                  {analyzeResult.macro_alignment && (
+                    <section className="pwa-card">
+                      <span className="pwa-card-label">🌐 매크로</span>
+                      <p className="pwa-analyze-text">{analyzeResult.macro_alignment}</p>
+                    </section>
+                  )}
+                  {analyzeResult.caution && (
+                    <section className="pwa-card pwa-caution">
+                      <span className="pwa-card-label">⚠️ 주의</span>
+                      <p className="pwa-analyze-text">{analyzeResult.caution}</p>
+                    </section>
+                  )}
+                </>)}
               </>
             )}
           </main>
@@ -510,13 +460,13 @@ export default function PWADashboard() {
                     </div>}
               </section>
               <section className="pwa-card">
-                <span className="pwa-card-label">AI Reasoning — Blocked</span>
+                <span className="pwa-card-label">🤖 AI 판단 — 매수 차단 종목</span>
                 {(!data.today_blocked || data.today_blocked.length===0)
                   ? <div className="pwa-empty">차단 종목 없음</div>
                   : <div className="pwa-blocked-list">{data.today_blocked.slice(0,5).map((b,i) => (
                       <div key={i} className="pwa-blocked-row">
                         <span className="pwa-blocked-stock">{b.stock}</span>
-                        <span className="pwa-blocked-signal mono dim">{b.signal}</span>
+                        <span className="pwa-blocked-signal mono dim">{blockedLabel(b.signal)}</span>
                         <span className="pwa-blocked-reason">{b.reason}</span>
                       </div>))}
                     </div>}
@@ -529,12 +479,12 @@ export default function PWADashboard() {
         {tab === 'report' && (
           <main className="pwa-main">
             <section className="pwa-card">
-              <span className="pwa-card-label">Daily / Weekly Report</span>
+              <span className="pwa-card-label">일간 / 주간 리포트</span>
               <div className="pwa-report-links">
-                <Link href="/daily" className="pwa-report-btn">📅 Daily Reports</Link>
-                <Link href="/weekly" className="pwa-report-btn">📊 Weekly Reports</Link>
-                <Link href="/history" className="pwa-report-btn">🤖 AI History</Link>
-                <Link href="/heat-history" className="pwa-report-btn">🌡 Heat History</Link>
+                <Link href="/daily" className="pwa-report-btn">📅 일간 리포트</Link>
+                <Link href="/weekly" className="pwa-report-btn">📊 주간 리포트</Link>
+                <Link href="/history" className="pwa-report-btn">🤖 AI 히스토리</Link>
+                <Link href="/heat-history" className="pwa-report-btn">🌡 히트 히스토리</Link>
               </div>
             </section>
             {data && (
@@ -660,9 +610,10 @@ export default function PWADashboard() {
         @keyframes spin { to { transform: rotate(360deg); } }
 
         /* 분석 결과 */
-        .pwa-analyze-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .pwa-analyze-header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
         .pwa-analyze-action { font-family: 'Syne', sans-serif; font-size: 1.2rem; font-weight: 700; }
         .pwa-analyze-conf { font-size: 0.7rem; }
+        .pwa-analyze-conf-badge { font-size: 0.72rem; font-weight: 700; padding: 4px 10px; border: 1px solid; border-radius: 12px; }
         .pwa-price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .pwa-price-item { display: flex; flex-direction: column; gap: 3px; }
         .pwa-price-item span:first-child { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.08em; }
