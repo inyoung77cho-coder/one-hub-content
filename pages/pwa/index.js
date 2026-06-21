@@ -255,9 +255,9 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
         </header>
 
         <nav className="pwa-tabs">
-          {['dashboard','analyze','portfolio','report'].map(t => (
+          {['dashboard','recommend','portfolio','report'].map(t => (
             <button key={t} className={`pwa-tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
-              {t==='dashboard'?'홈':t==='analyze'?'분석':t==='portfolio'?'보유':'기록'}
+              {t==='dashboard'?'홈':t==='recommend'?'추천':t==='portfolio'?'보유':'기록'}
             </button>
           ))}
         </nav>
@@ -469,6 +469,47 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
               </section>
 
             </>)}
+          </main>
+        )}
+
+        {/* ── Recommend Tab ── [v9.0] AI 매수 선별 전 기술 스코어링 상위 후보 — 실거래와 분리된 관심종목 전용 화면 */}
+        {tab === 'recommend' && (
+          <main className="pwa-main">
+            <section className="pwa-card">
+              <span className="pwa-card-label">🔍 추천 관심종목</span>
+              <p className="dim" style={{fontSize:'0.72rem', marginBottom:10, lineHeight:1.5}}>
+                AI 매수 선별 전 기술 스코어링 상위 후보입니다. 실제 매수 신호와는 별개입니다.
+              </p>
+              {!data && !error && (
+                <div className="pwa-loading"><div className="pwa-spinner" /><span>데이터 로딩 중...</span></div>
+              )}
+              {data && (!data.screening_candidates || data.screening_candidates.length === 0) && (
+                <div className="pwa-empty">오늘 스캔된 관심종목이 없습니다.</div>
+              )}
+              {data && data.screening_candidates && data.screening_candidates.length > 0 && (
+                <div className="pwa-search-results">
+                  {[...data.screening_candidates]
+                    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+                    .map((s, i) => (
+                      <button
+                        key={s.code || i}
+                        className="pwa-search-item"
+                        onClick={() => { setTab('analyze'); runAnalyze(s.code, s.name); }}
+                      >
+                        <span className="pwa-si-name">{i < 3 ? `${['🥇','🥈','🥉'][i]} ` : ''}{s.name}</span>
+                        <span className="pwa-si-code mono dim">{s.code}</span>
+                        <span className="pwa-si-theme dim mono">
+                          {s.score != null ? `점수 ${Math.round(s.score)}` : ''}
+                          {s.change_1d != null ? ` · ${s.change_1d >= 0 ? '+' : ''}${s.change_1d}%` : ''}
+                        </span>
+                      </button>
+                  ))}
+                </div>
+              )}
+              <button className="pwa-link-btn" onClick={() => setTab('analyze')}>
+                다른 종목 직접 검색 →
+              </button>
+            </section>
           </main>
         )}
 
