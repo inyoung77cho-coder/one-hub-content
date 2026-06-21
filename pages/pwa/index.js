@@ -177,7 +177,15 @@ export default function PWADashboard() {
   const watchCount = data?.recent_decisions?.filter(e => e.event_type === 'ANALYZE').length ?? 0;
   const heat = data?.market?.heat_score ?? null;
   const regime = data?.market?.regime ?? null;
-  const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null;
+const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null;
+
+  // [v8.7] Hero 추천종목 — today_buys 우선, 없으면 screening_candidates로 대체
+  const topBuy = data?.today_buys?.length
+    ? [...data.today_buys].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0]
+    : null;
+  const topScreen = !topBuy && data?.screening_candidates?.length
+    ? [...data.screening_candidates].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0]
+    : null;
 
   return (
     <>
@@ -262,6 +270,21 @@ export default function PWADashboard() {
                     추천행동 · {heroVerdict(regime, heat)}
                   </span>
                   <p className="hero-action-text">{heroMessage(regime, heat)}</p>
+                  {(topBuy || topScreen) && (
+                    <div className="hero-pick">
+                      <span className="hero-pick-label">{topBuy ? '오늘의 추천 종목' : '오늘의 주목 종목'}</span>
+                      <div className="hero-pick-row">
+                        <span className="hero-pick-name">{topBuy ? topBuy.stock : topScreen.name}</span>
+                        {topBuy && <span className="hero-pick-score mono">AI 확신도 {Math.round(topBuy.score)}%</span>}
+                      </div>
+                      <button
+                        className="hero-pick-btn"
+                        onClick={() => document.getElementById('recommend-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                      >
+                        추천종목 보기 →
+                      </button>
+                    </div>
+                  )}
                 </div>
               </section>
 
@@ -341,7 +364,7 @@ export default function PWADashboard() {
               </section>
 
               {/* 추천종목 — 오늘 매수 실행 */}
-              <section className="pwa-card">
+              <section className="pwa-card" id="recommend-section">
                 <span className="pwa-card-label">✅ 추천종목 · 매수 실행</span>
                 {buyCount === 0
                   ? <div className="pwa-empty">오늘 매수 없음 — {regime === 'BEAR' ? '헤지/방어 스캔 중' : '관망 중'}</div>
@@ -774,6 +797,12 @@ export default function PWADashboard() {
         .hero-action { display: flex; flex-direction: column; gap: 8px; padding-top: 6px; border-top: 1px solid var(--border); }
         .hero-action-badge { align-self: flex-start; font-size: 0.72rem; font-weight: 700; padding: 5px 12px; border: 1px solid; border-radius: var(--radius-pill); }
         .hero-action-text { font-size: 0.8rem; line-height: 1.5; color: var(--text-primary); }
+        .hero-pick { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--border); }
+        .hero-pick-label { font-size: 0.72rem; color: var(--text-secondary); font-weight: 600; }
+        .hero-pick-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+        .hero-pick-name { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); }
+        .hero-pick-score { font-size: 0.72rem; color: var(--accent-buy); }
+        .hero-pick-btn { align-self: flex-start; background: none; border: none; padding: 0; margin-top: 2px; font-size: 0.76rem; font-weight: 600; color: var(--accent-info); cursor: pointer; }
 
         /* Mission 4칸 그리드 */
         .mission-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
