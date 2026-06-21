@@ -522,8 +522,27 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                       {analyzeResult.action === 'BUY' ? '🟢 매수' : analyzeResult.action === 'SELL' ? '🔴 매도' : '⚪ 관망'}
                     </span>
                     <span className="pwa-analyze-conf-badge mono" style={{borderColor: actionColor(analyzeResult.action), color: actionColor(analyzeResult.action)}}>
-                      AI 확신도 {analyzeResult.confidence}
+                      AI 확신도 {analyzeResult.confidence_score}%
                     </span>
+                  </div>
+                  {/* [v8.7] 결론 먼저 — 목표가/손절가/기대수익을 토글 밖 메인 카드로 승격 */}
+                  <div className="pwa-price-grid" style={{marginTop:12}}>
+                    <div className="pwa-price-item">
+                      <span className="dim">목표가</span>
+                      <span className="mono bull">{analyzeResult.target?.toLocaleString()}원</span>
+                    </div>
+                    <div className="pwa-price-item">
+                      <span className="dim">손절가</span>
+                      <span className="mono bear">{analyzeResult.stop_loss?.toLocaleString()}원</span>
+                    </div>
+                    {analyzeResult.current_price > 0 && (
+                      <div className="pwa-price-item">
+                        <span className="dim">기대수익</span>
+                        <span className="mono bull">
+                          {((analyzeResult.target / analyzeResult.current_price - 1) * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                    )}
                   </div>
                   {analyzeResult.key_signal && <p className="pwa-analyze-text" style={{marginTop:10}}>{analyzeResult.key_signal}</p>}
                 </section>
@@ -540,34 +559,16 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                   style={{ cursor:'pointer', textAlign:'center', width:'100%' }}
                   onClick={() => setAnalyzeExpanded(v => !v)}
                 >
-                  {analyzeExpanded ? '간단히 보기 ▲' : '상세 분석 더보기 (기술/매크로/가격) ▼'}
+                  {analyzeExpanded ? '왜? 접기 ▲' : '왜? — AI 판단 근거 보기 (기술/매크로) ▼'}
                 </button>
 
                 {analyzeExpanded && (<>
-                  <section className="pwa-card">
-                    <span className="pwa-card-label">가격 정보</span>
-                    <div className="pwa-price-grid">
-                      <div className="pwa-price-item">
-                        <span className="dim">현재가</span>
-                        <span className="mono">{analyzeResult.current_price?.toLocaleString()}원</span>
-                      </div>
-                      <div className="pwa-price-item">
-                        <span className="dim">목표가</span>
-                        <span className="mono bull">{analyzeResult.target?.toLocaleString()}원</span>
-                      </div>
-                      <div className="pwa-price-item">
-                        <span className="dim">손절가</span>
-                        <span className="mono bear">{analyzeResult.stop_loss?.toLocaleString()}원</span>
-                      </div>
-                      <div className="pwa-price-item">
-                        <span className="dim">RSI</span>
-                        <span className="mono">{analyzeResult.rsi?.toFixed(1)}</span>
-                      </div>
-                    </div>
-                  </section>
                   {analyzeResult.technical_summary && (
                     <section className="pwa-card">
                       <span className="pwa-card-label">📈 기술적 분석</span>
+                      <p className="dim mono" style={{fontSize:'0.72rem', marginBottom:6}}>
+                        현재가 {analyzeResult.current_price?.toLocaleString()}원 · RSI {analyzeResult.rsi?.toFixed(1)}
+                      </p>
                       <p className="pwa-analyze-text">{analyzeResult.technical_summary}</p>
                     </section>
                   )}
