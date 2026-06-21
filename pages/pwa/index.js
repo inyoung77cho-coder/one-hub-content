@@ -27,6 +27,7 @@ export default function PWADashboard() {
   const [pendingLoading, setPendingLoading] = useState(false);
   const [pendingError, setPendingError] = useState(null);
   const [actingCode, setActingCode] = useState(null); // 승인/거절 처리 중인 종목코드
+  const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
 
   useEffect(() => {
     setMounted(true);
@@ -56,6 +57,10 @@ export default function PWADashboard() {
       .then(r => r.json())
       .then(d => { if (d.ok) setData(d); else setError(d.error || 'failed'); })
       .catch(e => setError(String(e)));
+    fetch(`/api/pwa-performance?trader=${trader}&days=30`)
+      .then(r => r.json())
+      .then(d => { if (d.ok) setPerf(d); })
+      .catch(() => {});
   }, [mounted, trader]);
 
   const loadPending = useCallback(async () => {
@@ -714,6 +719,33 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
         {/* ── Report Tab ── */}
         {tab === 'report' && (
           <main className="pwa-main">
+            {perf && perf.total > 0 && (
+              <section className="pwa-card">
+                <span className="pwa-card-label">📊 최근 30일 성과</span>
+                <div className="pwa-balance-grid">
+                  <div className="pwa-bal-item">
+                    <span className="dim">평균 수익률</span>
+                    <span className={`mono ${perf.avg_pnl_pct>=0?'bull':'bear'}`}>
+                      {perf.avg_pnl_pct>=0?'+':''}{perf.avg_pnl_pct}%
+                    </span>
+                  </div>
+                  <div className="pwa-bal-item">
+                    <span className="dim">MDD</span>
+                    <span className="mono bear">-{perf.mdd}%</span>
+                  </div>
+                  <div className="pwa-bal-item">
+                    <span className="dim">승률</span>
+                    <span className="mono">{perf.win_rate}% ({perf.wins}승 {perf.losses}패)</span>
+                  </div>
+                  <div className="pwa-bal-item">
+                    <span className="dim">누적 손익</span>
+                    <span className={`mono ${perf.total_pnl>=0?'bull':'bear'}`}>
+                      {perf.total_pnl>=0?'+':''}{Number(perf.total_pnl).toLocaleString()}원
+                    </span>
+                  </div>
+                </div>
+              </section>
+            )}
             <section className="pwa-card">
               <span className="pwa-card-label">일간 / 주간 리포트</span>
               <div className="report-cards">
