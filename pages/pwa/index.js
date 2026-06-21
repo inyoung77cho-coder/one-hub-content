@@ -1,8 +1,9 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
+import { getLatestDailyReport } from '../../lib/reports';
 
-export default function PWADashboard() {
+export default function PWADashboard({ latestReport }) {
   const [tab, setTab] = useState('dashboard');
   const [data, setData] = useState(null);
   const [trader, setTrader] = useState('A');
@@ -719,6 +720,15 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
         {/* ── Report Tab ── */}
         {tab === 'report' && (
           <main className="pwa-main">
+            {latestReport && latestReport.insight && (
+              <section className="pwa-card">
+                <span className="pwa-card-label">📅 오늘의 리포트 — {latestReport.date}</span>
+                <p className="pwa-analyze-text" style={{marginTop:8}}>{latestReport.insight}</p>
+                <p className="dim mono" style={{fontSize:'0.7rem', marginTop:8}}>
+                  {latestReport.regime} · 매매 {latestReport.trade_count}건 · 차단 {latestReport.block_count}건
+                </p>
+              </section>
+            )}
             {perf && perf.total > 0 && (
               <section className="pwa-card">
                 <span className="pwa-card-label">📊 최근 30일 성과</span>
@@ -1049,4 +1059,8 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
       `}</style>
     </>
   );
+}
+
+export async function getStaticProps() {
+  return { props: { latestReport: getLatestDailyReport() } };
 }
