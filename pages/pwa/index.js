@@ -187,6 +187,15 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
     ? [...data.screening_candidates].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0]
     : null;
 
+  // [v8.7] "오늘 AI가 한 일" 결론 한 줄 — 숫자보다 먼저 보여줄 요약 문장
+  const missionSummary = buyCount > 0
+    ? `오늘 ${buyCount}건 매수 신호가 나왔어요`
+    : blockCount > 0
+      ? `오늘은 매수 없이 ${blockCount}건을 신중하게 걸렀어요`
+      : watchCount > 0
+        ? `오늘은 ${watchCount}건 분석했지만 매수 조건은 안 됐어요`
+        : '오늘은 아직 활동 기록이 없어요';
+
   return (
     <>
       <Head>
@@ -291,6 +300,7 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
               {/* AI 활동 요약 — 4칸 그리드 */}
               <section className="pwa-card">
                 <span className="pwa-card-label">오늘 AI가 한 일</span>
+                <p className="mission-summary">{missionSummary}</p>
                 <div className="mission-grid">
                   <div className="mission-cell buy">
                     <span className="mission-num">{buyCount}</span>
@@ -805,6 +815,7 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
         .hero-pick-btn { align-self: flex-start; background: none; border: none; padding: 0; margin-top: 2px; font-size: 0.76rem; font-weight: 600; color: var(--accent-info); cursor: pointer; }
 
         /* Mission 4칸 그리드 */
+        .mission-summary { font-size: 0.82rem; color: var(--text-primary); font-weight: 600; margin: 2px 0 10px; }
         .mission-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
         .mission-cell { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 4px; border-radius: var(--radius-md); }
         .mission-num { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; line-height: 1; }
