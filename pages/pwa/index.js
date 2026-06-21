@@ -673,6 +673,18 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                               {p.pnl_amount>=0?'+':''}{Number(p.pnl_amount||0).toLocaleString()}원
                             </span>
                           </div>
+                          {p.target > 0 && (
+                            <div className="position-card-cell">
+                              <span className="dim">목표가</span>
+                              <span className="bull">{Number(p.target).toLocaleString()}원</span>
+                            </div>
+                          )}
+                          {p.stop_loss > 0 && (
+                            <div className="position-card-cell">
+                              <span className="dim">손절가</span>
+                              <span className="bear">{Number(p.stop_loss).toLocaleString()}원</span>
+                            </div>
+                          )}
                         </div>
                         {p.entry_hypothesis && (
                           <div className="position-card-ai">
