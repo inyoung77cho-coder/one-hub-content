@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import os, sys, argparse
+import os, sys, argparse, sqlite3
 from datetime import datetime, timedelta, date
 from pathlib import Path
 import anthropic
@@ -19,6 +19,36 @@ def get_week_range(week_str=None):
         monday = today - timedelta(days=today.weekday())
     friday = monday + timedelta(days=4)
     return monday, friday
+
+
+DB_PATH = os.path.expanduser("~/trading.db")
+
+def get_blocked_top3(monday, friday, trader_id="A"):
+    """해당 주 기간 동안 가장 많이 차단된 신호 TOP3 + 사유."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("""
+            SELECT stock, code, errors, COUNT(*) as cnt,
+                   ROUND(AVG(final_score), 1) as avg_score,
+                   ROUND(AVG(target_gap_pct), 1) as avg_gap
+            FROM blocked_signals
+            WHERE date >= ? AND date < ? AND trader_id = ?
+            GROUP BY code, errors
+            ORDER BY cnt DESC
+            LIMIT 3
+        """, (f"{monday} 00:00:00", f"{friday + timedelta(days=1)} 00:00:00", trader_id))
+        rows = c.fetchall()
+        conn.close()
+        return [
+            {"stock": r[0], "code": r[1], "errors": r[2], "count": r[3],
+             "avg_score": r[4], "avg_gap": r[5]}
+            for r in rows
+        ]
+    except Exception as e:
+        print(f"[BLOCKED_TOP3] {e}")
+        return []
+
 
 def load_daily_files(monday, friday):
     days = []
@@ -107,7 +137,16 @@ def generate_market_outlook(stats, week_str):
         print(f"[AI Outlook] {e}")
         return "다음 주 시장 방향은 Heat Score와 Regime 변화를 모니터링하며 판단합니다."
 
-def build_weekly_md(week_str, monday, friday, days, stats, ai_review, market_outlook):
+def build_weekly_md(week_str, monday, friday, days, stats, ai_review, market_outlook, blocked_top3=None):
+    blocked_top3 = blocked_top3 or []
+    if blocked_top3:
+        bt_rows = "| 종목 | 차단 횟수 | 평균 점수 | 평균 목표갭 | 주요 차단 사유 |\n"
+        bt_rows += "|------|----------|----------|-----------|---------------|\n"
+        for b in blocked_top3:
+            bt_rows += f"| {b['stock']} ({b['code']}) | {b['count']}회 | {b['avg_score']} | {b['avg_gap']}% | {b['errors']} |\n"
+        blocked_top3_table = bt_rows
+    else:
+        blocked_top3_table = "*이번 주 반복 차단된 신호가 없습니다.*\n"
     regime_bar = " / ".join([f"{k}:{v}일" for k, v in stats["regimes"].items()])
     pnl_line = " ".join(stats["pnl_emojis"])
 
@@ -200,6 +239,10 @@ def build_weekly_md(week_str, monday, friday, days, stats, ai_review, market_out
         "차단건수가 높을수록 시스템이 더 신중하게 작동했다는 의미입니다.",
         "매매를 안 한 것도 전략입니다.",
         "",
+        "### 차단 신호 Top 3",
+        "",
+        blocked_top3_table,
+        "",
         "---",
         "",
         "## 5. 일별 현황",
@@ -248,7 +291,8 @@ def main():
     print(f"[WEEKLY] 매매:{stats['total_trades']}건 / 차단:{stats['total_blocks']}건 / Heat:{stats['avg_heat']} / {stats['dominant_regime']}")
     ai_review = generate_ai_review(days, stats, week_str)
     market_outlook = generate_market_outlook(stats, week_str)
-    md = build_weekly_md(week_str, monday, friday, days, stats, ai_review, market_outlook)
+    blocked_top3 = get_blocked_top3(monday, friday)
+    md = build_weekly_md(week_str, monday, friday, days, stats, ai_review, market_outlook, blocked_top3)
     out_path = WEEKLY_DIR / f"{week_str}.md"
     out_path.write_text(md, encoding="utf-8")
     print(f"[WEEKLY] 완료: {out_path}")
