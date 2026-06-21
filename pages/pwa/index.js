@@ -196,6 +196,21 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
         ? `오늘은 ${watchCount}건 분석했지만 매수 조건은 안 됐어요`
         : '오늘은 아직 활동 기록이 없어요';
 
+  // [v8.7] TOP PICK 3 — 매수신호 우선, 부족하면 관심종목(screening_candidates)으로 채움
+  const topPicksRaw = (data?.today_buys || []).map(b => ({
+    name: b.stock, score: b.score, isBuy: true, reason: b.reason,
+  }));
+  if (topPicksRaw.length < 3 && data?.screening_candidates?.length) {
+    const usedNames = new Set(topPicksRaw.map(p => p.name));
+    const fillers = [...data.screening_candidates]
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+      .filter(s => !usedNames.has(s.name))
+      .slice(0, 3 - topPicksRaw.length)
+      .map(s => ({ name: s.name, score: s.score, isBuy: false, reason: null }));
+    topPicksRaw.push(...fillers);
+  }
+  const topPicks = topPicksRaw.slice(0, 3);
+
   return (
     <>
       <Head>
@@ -373,16 +388,18 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                 </>)}
               </section>
 
-              {/* 추천종목 — 오늘 매수 실행 */}
+              {/* [v8.7] 추천종목 — 오늘의 TOP PICK (매수신호 없어도 관심종목으로 항상 최대 3개 노출) */}
               <section className="pwa-card" id="recommend-section">
-                <span className="pwa-card-label">✅ 추천종목 · 매수 실행</span>
-                {buyCount === 0
+                <span className="pwa-card-label">✅ 오늘의 TOP PICK</span>
+                {topPicks.length === 0
                   ? <div className="pwa-empty">오늘 매수 없음 — {regime === 'BEAR' ? '헤지/방어 스캔 중' : '관망 중'}</div>
-                  : <div className="pwa-action-list">{data.today_buys.map((b,i) => (
+                  : <div className="pwa-action-list">{topPicks.map((p, i) => (
                       <div key={i} className="pwa-action-row">
-                        <span className="pwa-action-stock">{b.stock}</span>
-                        <span className="pwa-action-score mono dim">score {b.score}</span>
-                        <span className="pwa-action-reason">{b.reason}</span>
+                        <span className="pwa-action-stock">{['🥇','🥈','🥉'][i] || ''} {p.name}</span>
+                        {p.isBuy
+                          ? <span className="pwa-action-score mono dim">AI 확신도 {Math.round(p.score)}%</span>
+                          : <span className="pwa-action-score mono dim">관심도 {Math.round(p.score)}</span>}
+                        {p.reason && <span className="pwa-action-reason">{p.reason}</span>}
                       </div>))}
                     </div>}
               </section>
