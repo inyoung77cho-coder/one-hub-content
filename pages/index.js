@@ -10,12 +10,17 @@ export default function Home({ reports, stats }) {
   const latest = reports[0] || null;
   const [mounted, setMounted] = useState(false);
   const [engineVersion, setEngineVersion] = useState("v8.0");
+  const [liveData, setLiveData] = useState(null); // [v8.7] 홈페이지 ↔ PWA 실시간 연동
 
   useEffect(() => {
     setMounted(true);
     fetch("/api/engine-status")
       .then(r => r.json())
       .then(d => { if (d.version) setEngineVersion(d.version); })
+      .catch(() => {});
+    fetch("/api/pwa-dashboard?trader=A")
+      .then(r => r.json())
+      .then(d => { if (d.ok) setLiveData(d); })
       .catch(() => {});
   }, []);
 
@@ -34,6 +39,12 @@ export default function Home({ reports, stats }) {
     if (regime === 'BEAR') return '시장 흐름-bear';
     return 'REGIME-side';
   };
+
+  let liveHoldCount = 0;
+  if (liveData?.balance?.positions) {
+    try { liveHoldCount = JSON.parse(liveData.balance.positions).length; } catch (e) {}
+  }
+  const liveHeat = liveData?.market?.heat_score ?? null;
 
   return (
     <>
@@ -66,6 +77,21 @@ export default function Home({ reports, stats }) {
                   {regimeIcon(latest.regime)} {regimeLabel(latest.regime)}
                 </span>
               </div>
+            </>
+          )}
+          {liveData && (
+            <>
+              <div className="status-divider">|</div>
+              {liveHeat !== null && (
+                <div className="status-item">
+                  <span className="status-label mono">Heat {liveHeat}</span>
+                </div>
+              )}
+              <div className="status-item">
+                <span className="status-label mono">보유 {liveHoldCount}종목</span>
+              </div>
+              <div className="status-divider">|</div>
+              <Link href="/pwa" className="status-cta">앱 열기 →</Link>
             </>
           )}
         </div>

@@ -216,6 +216,17 @@ img { max-width: 100%; display: block; }
 }
 .status-divider { color: var(--bg-border); font-size: 12px; flex-shrink: 0; }
 
+.status-cta {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--green);
+  text-decoration: none;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.status-cta:hover { color: var(--green-dim); }
+
 .status-dot {
   width: 6px;
   height: 6px;
