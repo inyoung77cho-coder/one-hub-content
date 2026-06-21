@@ -171,6 +171,12 @@ export default function PWADashboard() {
     try { positions = JSON.parse(data.balance.positions); } catch(e) {}
   }
 
+  // [v8.7] 포트폴리오 요약 — 보유종목 평가수익률 + 오늘 변동
+  const portCostBasis = positions.reduce((sum, p) => sum + (Number(p.avg_price||0) * Number(p.qty||0)), 0);
+  const portEvalTotal = positions.reduce((sum, p) => sum + Number(p.eval_amount||0), 0);
+  const portReturnPct = portCostBasis > 0 ? ((portEvalTotal - portCostBasis) / portCostBasis * 100) : null;
+  const todayPnl = data?.market?.daily_pnl ?? null;
+
   // Mission stats 계산
   const buyCount = data?.today_buys?.length ?? 0;
   const blockCount = data?.market?.block_count ?? 0;
@@ -598,6 +604,22 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
               <section className="pwa-card">
                 <span className="pwa-card-label">계좌 현황</span>
                 <div className="pwa-balance-grid">
+                  {portReturnPct !== null && (
+                    <div className="pwa-bal-item">
+                      <span className="dim">평가수익률</span>
+                      <span className={`mono ${portReturnPct>=0?'bull':'bear'}`}>
+                        {portReturnPct>=0?'+':''}{portReturnPct.toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                  {todayPnl !== null && (
+                    <div className="pwa-bal-item">
+                      <span className="dim">오늘 변동</span>
+                      <span className={`mono ${todayPnl>=0?'bull':'bear'}`}>
+                        {todayPnl>=0?'+':''}{Number(todayPnl).toLocaleString()}원
+                      </span>
+                    </div>
+                  )}
                   <div className="pwa-bal-item">
                     <span className="dim">총 자산</span>
                     <span className="mono">{data.balance?.total_asset?.toLocaleString() ?? '-'}원</span>
