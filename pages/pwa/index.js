@@ -3,6 +3,18 @@ import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
 import { getLatestDailyReport } from '../../lib/reports';
 
+// [v9.0] PWA Web Push 구독용 — VAPID 공개키(base64url) -> Uint8Array 변환
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 export default function PWADashboard({ latestReport }) {
   const [tab, setTab] = useState('dashboard');
   const [data, setData] = useState(null);
@@ -30,6 +42,13 @@ export default function PWADashboard({ latestReport }) {
   const [actingCode, setActingCode] = useState(null); // 승인/거절 처리 중인 종목코드
   const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
 
+  // [v9.0] PWA Web Push 구독 상태
+  const [pushSupported, setPushSupported] = useState(false);
+  const [pushSubscribed, setPushSubscribed] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushError, setPushError] = useState(null);
+  const [pushBannerDismissed, setPushBannerDismissed] = useState(false);
+
   useEffect(() => {
     setMounted(true);
     // [v8.5] 최근 검색 종목 불러오기
@@ -42,6 +61,19 @@ export default function PWADashboard({ latestReport }) {
       const savedTheme = window.localStorage.getItem('onehub_theme');
       if (savedTheme === 'light' || savedTheme === 'dark') setTheme(savedTheme);
     } catch (e) { /* 무시 */ }
+    // [v9.0] PWA Web Push 지원여부 + 기존 구독상태 확인
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
+      setPushSupported(true);
+      navigator.serviceWorker.register('/sw.js')
+        .then(reg => reg.pushManager.getSubscription())
+        .then(sub => setPushSubscribed(!!sub))
+        .catch(() => {});
+    }
+    try {
+      if (window.localStorage.getItem('onehub_push_banner_dismissed') === '1') {
+        setPushBannerDismissed(true);
+      }
+    } catch (e) { /* 무시 */ }
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -50,6 +82,56 @@ export default function PWADashboard({ latestReport }) {
       try { window.localStorage.setItem('onehub_theme', next); } catch (e) {}
       return next;
     });
+  }, []);
+
+  // [v9.0] PWA Web Push 구독 등록 — 텔레그램과 동일 내용을 폰 푸시로도 수신
+  const subscribeToPush = useCallback(async () => {
+    setPushBusy(true);
+    setPushError(null);
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        throw new Error('이 브라우저는 푸시 알림을 지원하지 않습니다.');
+      }
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        throw new Error('알림 권한이 거부되었습니다.');
+      }
+      const reg = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+
+      const keyRes = await fetch('/api/push-vapid-key');
+      const keyData = await keyRes.json();
+      if (!keyData.ok || !keyData.key) throw new Error('VAPID 키 조회 실패');
+
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(keyData.key),
+        });
+      }
+
+      const subJson = sub.toJSON();
+      const res = await fetch('/api/push-subscribe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trader, endpoint: subJson.endpoint, keys: subJson.keys }),
+      });
+      const d = await res.json();
+      if (!d.ok) throw new Error(d.error || '구독 등록 실패');
+
+      setPushSubscribed(true);
+      try { window.localStorage.setItem('onehub_push_banner_dismissed', '1'); } catch (e) {}
+    } catch (e) {
+      setPushError(String(e.message || e));
+    } finally {
+      setPushBusy(false);
+    }
+  }, [trader]);
+
+  const dismissPushBanner = useCallback(() => {
+    setPushBannerDismissed(true);
+    try { window.localStorage.setItem('onehub_push_banner_dismissed', '1'); } catch (e) {}
   }, []);
 
   useEffect(() => {
@@ -267,6 +349,43 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
         {/* ── Dashboard Tab — "오늘 뭘 해야 하는가" 우선순위 ── */}
         {tab === 'dashboard' && (
           <main className="pwa-main">
+            {/* [v9.0] PWA Web Push 알림 켜기 배너 */}
+            {pushSupported && !pushSubscribed && !pushBannerDismissed && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                padding: '10px 14px', marginBottom: 10, borderRadius: 'var(--radius-md, 12px)',
+                background: 'var(--inset-bg, rgba(0,0,0,0.04))', border: '1px solid var(--border, rgba(0,0,0,0.08))',
+              }}>
+                <span style={{ fontSize: '0.78rem', lineHeight: 1.4, flex: 1 }}>
+                  🔔 매수신호·리포트·손절익절 알림을 폰으로 바로 받아보세요
+                </span>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button
+                    onClick={subscribeToPush}
+                    disabled={pushBusy}
+                    style={{
+                      padding: '6px 12px', fontSize: '0.74rem', fontWeight: 700,
+                      borderRadius: 999, border: 'none', cursor: pushBusy ? 'default' : 'pointer',
+                      background: 'var(--accent-buy)', color: '#fff', opacity: pushBusy ? 0.6 : 1,
+                    }}
+                  >
+                    {pushBusy ? '처리 중...' : '켜기'}
+                  </button>
+                  <button
+                    onClick={dismissPushBanner}
+                    style={{
+                      padding: '6px 10px', fontSize: '0.74rem', borderRadius: 999, border: 'none',
+                      background: 'transparent', color: 'var(--text-tertiary)', cursor: 'pointer',
+                    }}
+                  >
+                    나중에
+                  </button>
+                </div>
+              </div>
+            )}
+            {pushError && (
+              <div className="pwa-error" style={{ marginBottom: 10 }}>알림 설정 오류: {pushError}</div>
+            )}
             {!data && !error && (
               <div className="pwa-loading">
                 <div className="pwa-spinner" />
