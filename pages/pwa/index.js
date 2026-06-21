@@ -223,6 +223,10 @@ export default function PWADashboard({ latestReport }) {
   const heatTier = (h) => h == null ? null : h >= 70 ? 'hot' : h >= 40 ? 'warm' : 'cold';
   const heatColor = (h) => { const t = heatTier(h); return t === 'hot' ? 'var(--accent-buy)' : t === 'warm' ? 'var(--accent-warn)' : 'var(--accent-sell)'; };
   const heatLabel = (h) => { const t = heatTier(h); return t === 'hot' ? 'HOT' : t === 'warm' ? 'WARM' : 'COLD'; };
+  // [v9.0] 공포탐욕지수 등급 — alternative.me 표준 구간(0-24/25-44/45-55/56-74/75-100)
+  const fgTier = (f) => f == null ? null : f >= 75 ? 'extreme_greed' : f >= 56 ? 'greed' : f >= 45 ? 'neutral' : f >= 25 ? 'fear' : 'extreme_fear';
+  const fgColor = (f) => { const t = fgTier(f); return (t === 'extreme_greed' || t === 'greed') ? 'var(--accent-buy)' : t === 'neutral' ? 'var(--accent-warn)' : 'var(--accent-sell)'; };
+  const fgLabel = (f) => ({ extreme_greed: '극단적 탐욕', greed: '탐욕', neutral: '중립', fear: '공포', extreme_fear: '극단적 공포' }[fgTier(f)] || '-');
   // [v8.5] 차단 신호 한글 라벨 — STRONG_SELL 등 ML 용어를 일반 투자자가 바로 이해하도록 변환
   const blockedLabel = (signal) => {
     const s = (signal || '').toUpperCase();
@@ -270,6 +274,7 @@ export default function PWADashboard({ latestReport }) {
   const blockCount = data?.market?.block_count ?? 0;
   const watchCount = data?.recent_decisions?.filter(e => e.event_type === 'ANALYZE').length ?? 0;
   const heat = data?.market?.heat_score ?? null;
+  const fearGreed = data?.market?.fear_greed ?? null;
   const regime = data?.market?.regime ?? null;
 const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null;
 
@@ -418,6 +423,14 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                         />
                       ))}
                     </div>
+                    {fearGreed !== null && (
+                      <div className="hero-heat-top" style={{ marginTop: 8 }}>
+                        <span className="hero-heat-label">공포탐욕지수</span>
+                        <span className="hero-heat-val" style={{ color: fgColor(fearGreed), fontSize: '1rem' }}>
+                          {fearGreed}<span className="hero-heat-unit">점 · {fgLabel(fearGreed)}</span>
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
                 <div className="hero-action">
@@ -946,7 +959,8 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                 <span className="pwa-card-label">오늘 요약</span>
                 <div className="pwa-report-summary">
                   <div className="pwa-rs-row"><span className="dim">Regime</span><span className={`mono ${regimeClass(data.market?.regime)}`}>{data.market?.regime}</span></div>
-                  <div className="pwa-rs-row"><span className="dim">Heat</span><span className="mono" style={{color: heatColor(heat)}}>{heat ?? '-'}/100</span></div>
+                  <div className="pwa-rs-row"><span className="dim">Heat</span><span className="mono" style={{color: heatColor(heat)}}>{heat ?? '-'}/100{heat != null ? ` (${heatLabel(heat)})` : ''}</span></div>
+                  <div className="pwa-rs-row"><span className="dim">공포탐욕</span><span className="mono" style={{color: fgColor(fearGreed)}}>{fearGreed ?? '-'}{fearGreed != null ? ` (${fgLabel(fearGreed)})` : ''}</span></div>
                   <div className="pwa-rs-row"><span className="dim">매수</span><span className="mono bull">{buyCount}건</span></div>
                   <div className="pwa-rs-row"><span className="dim">차단</span><span className="mono bear">{blockCount}건</span></div>
                   <div className="pwa-rs-row"><span className="dim">실현손익</span><span className={`mono ${(data.balance?.realized_pnl??0)>=0?'bull':'bear'}`}>{data.balance?.realized_pnl?.toLocaleString() ?? 0}원</span></div>
