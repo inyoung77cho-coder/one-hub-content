@@ -966,6 +966,21 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                   <div className="pwa-rs-row"><span className="dim">실현손익</span><span className={`mono ${(data.balance?.realized_pnl??0)>=0?'bull':'bear'}`}>{data.balance?.realized_pnl?.toLocaleString() ?? 0}원</span></div>
                 </div>
               </section>
+
+            {/* AI 정확도 링크 */}
+            <Link href="/pwa/accuracy" style={{textDecoration:'none', color:'inherit'}}>
+              <section className="pwa-card" style={{cursor:'pointer'}}>
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                  <div>
+                    <div style={{fontWeight:700, fontSize:14}}>🎯 AI 차단 정확도</div>
+                    <div style={{fontSize:12, color:'var(--text-muted)', marginTop:4}}>
+                      차단 신호 적중률 · 사유별 분석 · 최근 내역
+                    </div>
+                  </div>
+                  <span style={{fontSize:20, color:'var(--text-muted)'}}>›</span>
+                </div>
+              </section>
+            </Link>
             )}
           </main>
         )}
