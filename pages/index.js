@@ -132,6 +132,7 @@ export default function Home({ reports, stats }) {
               </div>
               <div className="live-widget-divider" />
               <a href="/pwa" className="live-widget-cta">ONE-HUB 열기 →</a>
+              <a href="/pwa-guide" className="live-widget-cta" style={{marginLeft:8, background:'#e0edff', color:'#2563eb'}}>📱 설치 가이드</a>
             </div>
           </section>
         )}
