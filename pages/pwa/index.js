@@ -623,41 +623,46 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
               {data && (!data.screening_candidates || data.screening_candidates.length === 0) && (
                 <div className="pwa-empty">오늘 스캔된 관심종목이 없습니다.</div>
               )}
-              {data && data.screening_candidates && data.screening_candidates.length > 0 && (
-                <div className="pwa-search-results">
-                  {[...data.screening_candidates]
-                    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-                    .map((s, i) => (
-                      <button
-                        key={s.code || i}
-                        className="pwa-search-item"
-                        onClick={() => { setTab('analyze'); runAnalyze(s.code, s.name); }}
-                      >
-                        <span className="pwa-si-name">{i < 3 ? `${['🥇','🥈','🥉'][i]} ` : ''}{s.name}</span>
-                        <span className="pwa-si-code mono dim">{s.code}</span>
-                        <span className="pwa-si-theme dim mono">
-                          {s.score != null && (() => {
-                            const sc = Math.round(s.score);
-                            const pct = Math.min(100, Math.round(sc * 1.8));
-                            const grade = sc >= 70 ? { label: '강력추천', color: '#1565c0', bg: '#e3f2fd' }
-                                        : sc >= 55 ? { label: '추천',     color: '#2e7d32', bg: '#e8f5e9' }
-                                        :            { label: '관찰',     color: '#e65100', bg: '#fff3e0' };
-                            return (
-                              <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
-                                <span style={{ fontSize:'0.68rem', fontWeight:700, color: grade.color,
-                                  background: grade.bg, padding:'1px 5px', borderRadius:4 }}>
-                                  {grade.label}
-                                </span>
-                                <span>AI {pct}%</span>
-                              </span>
-                            );
-                          })()}
-                          {s.change_1d != null ? ` · ${s.change_1d >= 0 ? '+' : ''}${s.change_1d}%` : ''}
-                        </span>
-                      </button>
-                  ))}
-                </div>
-              )}
+              {data && data.screening_candidates && data.screening_candidates.length > 0 && (() => {
+                const sorted = [...data.screening_candidates].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+                const buyList  = sorted.filter(s => (s.score ?? 0) >= 6);
+                const watchList= sorted.filter(s => (s.score ?? 0) >= 4 && (s.score ?? 0) < 6);
+                const obsList  = sorted.filter(s => (s.score ?? 0) < 4);
+                const renderGroup = (label, icon, color, list) => list.length === 0 ? null : (
+                  <div style={{ marginBottom: 12 }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color, marginBottom: 6 }}>
+                      {icon} {label} ({list.length})
+                    </div>
+                    <div className="pwa-search-results">
+                      {list.map((s, i) => (
+                        <button
+                          key={s.code || i}
+                          className="pwa-search-item"
+                          onClick={() => { setTab('analyze'); runAnalyze(s.code, s.name); }}
+                        >
+                          <span className="pwa-si-name">{s.name}</span>
+                          <span className="pwa-si-code mono dim">{s.code}</span>
+                          <span className="pwa-si-theme dim mono">
+                            {(() => {
+                              const sc = Math.round(s.score ?? 0);
+                              const pct = Math.min(100, Math.round(sc * 1.8));
+                              return `AI ${pct}%`;
+                            })()}
+                            {s.change_1d != null ? ` · ${s.change_1d >= 0 ? '+' : ''}${s.change_1d}%` : ''}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+                return (
+                  <>
+                    {renderGroup('매수 후보', '🟢', '#2e7d32', buyList)}
+                    {renderGroup('관심 종목', '🟡', '#f57c00', watchList)}
+                    {renderGroup('관찰 종목', '⚪', '#757575', obsList)}
+                  </>
+                );
+              })()}
               <button className="pwa-link-btn" onClick={() => setTab('analyze')}>
                 다른 종목 직접 검색 →
               </button>
