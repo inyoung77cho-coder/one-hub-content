@@ -636,7 +636,22 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                         <span className="pwa-si-name">{i < 3 ? `${['🥇','🥈','🥉'][i]} ` : ''}{s.name}</span>
                         <span className="pwa-si-code mono dim">{s.code}</span>
                         <span className="pwa-si-theme dim mono">
-                          {s.score != null ? `점수 ${Math.round(s.score)}` : ''}
+                          {s.score != null && (() => {
+                            const sc = Math.round(s.score);
+                            const pct = Math.min(100, Math.round(sc * 1.8));
+                            const grade = sc >= 70 ? { label: '강력추천', color: '#1565c0', bg: '#e3f2fd' }
+                                        : sc >= 55 ? { label: '추천',     color: '#2e7d32', bg: '#e8f5e9' }
+                                        :            { label: '관찰',     color: '#e65100', bg: '#fff3e0' };
+                            return (
+                              <span style={{ display:'inline-flex', alignItems:'center', gap:4 }}>
+                                <span style={{ fontSize:'0.68rem', fontWeight:700, color: grade.color,
+                                  background: grade.bg, padding:'1px 5px', borderRadius:4 }}>
+                                  {grade.label}
+                                </span>
+                                <span>AI {pct}%</span>
+                              </span>
+                            );
+                          })()}
                           {s.change_1d != null ? ` · ${s.change_1d >= 0 ? '+' : ''}${s.change_1d}%` : ''}
                         </span>
                       </button>
