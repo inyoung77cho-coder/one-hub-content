@@ -923,31 +923,51 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                 </p>
               </section>
             )}
-            {perf && perf.total > 0 && (
+            {perf && (
               <section className="pwa-card">
-                <span className="pwa-card-label">📊 최근 30일 성과</span>
-                <div className="pwa-balance-grid">
-                  <div className="pwa-bal-item">
-                    <span className="dim">평균 수익률</span>
-                    <span className={`mono ${perf.avg_pnl_pct>=0?'bull':'bear'}`}>
-                      {perf.avg_pnl_pct>=0?'+':''}{perf.avg_pnl_pct}%
-                    </span>
+                <span className="pwa-card-label">📅 최근 30일 성과</span>
+                {perf.total < 5 ? (
+                  <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-secondary)' }}>
+                    <div style={{ fontSize: '1.5rem', marginBottom: 6 }}>📊</div>
+                    <div style={{ fontSize: '0.85rem' }}>데이터 수집 중</div>
+                    <div style={{ fontSize: '0.75rem', marginTop: 4, color: 'var(--text-muted)' }}>
+                      {perf.total}건 / 최소 5건 이상 거래 후 통계가 표시됩니다
+                    </div>
                   </div>
-                  <div className="pwa-bal-item">
-                    <span className="dim">MDD</span>
-                    <span className="mono bear">-{perf.mdd}%</span>
+                ) : (
+                  <div className="pwa-balance-grid">
+                    <div className="pwa-bal-item">
+                      <span className="dim">평균수익률</span>
+                      <span className={`mono ${perf.avg_pnl_pct>=0?'bull':'bear'}`}>
+                        {perf.avg_pnl_pct>=0?'+':''}{perf.avg_pnl_pct}%
+                      </span>
+                    </div>
+                    <div className="pwa-bal-item">
+                      <span className="dim">MDD</span>
+                      <span className="mono bear">-{perf.mdd}%</span>
+                    </div>
+                    <div className="pwa-bal-item">
+                      <span className="dim">승률</span>
+                      <span className="mono">{perf.win_rate}% ({perf.wins}승 {perf.losses}패)</span>
+                    </div>
+                    <div className="pwa-bal-item">
+                      <span className="dim">누적손익</span>
+                      <span className={`mono ${perf.total_pnl>=0?'bull':'bear'}`}>
+                        {perf.total_pnl>=0?'+':''}{Number(perf.total_pnl).toLocaleString()}원
+                      </span>
+                    </div>
+                    <div className="pwa-bal-item">
+                      <span className="dim">샤프지수</span>
+                      <span className={`mono ${(perf.sharpe||0)>=1?'bull':(perf.sharpe||0)>=0?'':'bear'}`}>
+                        {perf.sharpe ?? '-'}
+                      </span>
+                    </div>
+                    <div className="pwa-bal-item">
+                      <span className="dim">손익비</span>
+                      <span className="mono">{perf.rr_ratio}</span>
+                    </div>
                   </div>
-                  <div className="pwa-bal-item">
-                    <span className="dim">승률</span>
-                    <span className="mono">{perf.win_rate}% ({perf.wins}승 {perf.losses}패)</span>
-                  </div>
-                  <div className="pwa-bal-item">
-                    <span className="dim">누적 손익</span>
-                    <span className={`mono ${perf.total_pnl>=0?'bull':'bear'}`}>
-                      {perf.total_pnl>=0?'+':''}{Number(perf.total_pnl).toLocaleString()}원
-                    </span>
-                  </div>
-                </div>
+                )}
               </section>
             )}
             <section className="pwa-card">
