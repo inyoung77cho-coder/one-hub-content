@@ -98,7 +98,44 @@ export default function Home({ reports, stats }) {
 
         <main className="main">
 
-          {/* ── PLATFORM INTRO ── */}
+          {/* ── LIVE 위젯 ── */}
+        {liveData && mounted && (
+          <section className="live-widget">
+            <div className="live-widget-inner">
+              <div className="live-widget-item">
+                <span className="live-widget-label">🌡 AI 투자온도</span>
+                <span className="live-widget-val" style={{
+                  color: (liveData.market?.heat_score ?? 0) >= 70 ? '#e53935'
+                       : (liveData.market?.heat_score ?? 0) >= 40 ? '#f57c00' : '#2e7d32'
+                }}>
+                  {liveData.market?.heat_score ?? '-'}<span className="live-widget-unit">점</span>
+                </span>
+              </div>
+              <div className="live-widget-divider" />
+              <div className="live-widget-item">
+                <span className="live-widget-label">😨 공포탐욕</span>
+                <span className="live-widget-val" style={{
+                  color: (liveData.market?.fear_greed ?? 50) <= 30 ? '#e53935'
+                       : (liveData.market?.fear_greed ?? 50) >= 70 ? '#2e7d32' : '#f57c00'
+                }}>
+                  {liveData.market?.fear_greed ?? '-'}<span className="live-widget-unit">점</span>
+                </span>
+              </div>
+              <div className="live-widget-divider" />
+              <div className="live-widget-item">
+                <span className="live-widget-label">🎯 TOP PICK</span>
+                <span className="live-widget-val" style={{ fontSize: '0.95rem' }}>
+                  {liveData.screening_candidates?.length
+                    ? [...liveData.screening_candidates].sort((a,b)=>(b.score??0)-(a.score??0))[0]?.name
+                    : '-'}
+                </span>
+              </div>
+              <div className="live-widget-divider" />
+              <a href="/pwa" className="live-widget-cta">ONE-HUB 열기 →</a>
+            </div>
+          </section>
+        )}
+        {/* ── PLATFORM INTRO ── */}
           <section className="platform-intro">
             <div className="pi-copy">
               <h1 className="pi-title">AI가 매일 어떻게 판단하는지, 투명하게 기록합니다.</h1>

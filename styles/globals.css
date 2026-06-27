@@ -1695,3 +1695,63 @@ img { max-width: 100%; display: block; }
   font-family: 'Space Mono', monospace;
 }
 .ta-link:hover { text-decoration: underline; }
+
+/* ── LIVE 위젯 (homepage) ── */
+.live-widget {
+  margin: 0 auto 24px;
+  max-width: 860px;
+  padding: 0 16px;
+}
+.live-widget-inner {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  padding: 14px 20px;
+  overflow-x: auto;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.live-widget-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 80px;
+}
+.live-widget-label {
+  font-size: 0.68rem;
+  color: #888;
+  font-weight: 600;
+}
+.live-widget-val {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: var(--font-mono, monospace);
+}
+.live-widget-unit {
+  font-size: 0.7rem;
+  font-weight: 500;
+  margin-left: 1px;
+}
+.live-widget-divider {
+  width: 1px;
+  height: 36px;
+  background: var(--border, #e5e7eb);
+  margin: 0 12px;
+  flex-shrink: 0;
+}
+.live-widget-cta {
+  margin-left: auto;
+  background: #1a56db;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.live-widget-cta:hover { background: #1344b4; }
