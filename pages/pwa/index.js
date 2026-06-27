@@ -580,7 +580,7 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                 <section className="pwa-card">
                   <span className="pwa-card-label">⛔ 매수 차단 사유 (상위 3)</span>
                   <div className="pwa-blocked-list">
-                    {(data.today_blocked || []).slice(0,3).map((b,i) => (
+                    {[...new Map((data.today_blocked||[]).map(b=>[b.stock,b])).values()].slice(0,3).map((b,i) => (
                       <div key={i} className="pwa-blocked-row">
                         <span className="pwa-blocked-stock">{b.stock}</span>
                         <span className="pwa-blocked-signal mono dim bear">{blockedLabel(b.signal)}</span>
@@ -914,7 +914,7 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                 <span className="pwa-card-label">🤖 AI 판단 — 매수 차단 종목</span>
                 {(!data.today_blocked || data.today_blocked.length===0)
                   ? <div className="pwa-empty">차단 종목 없음</div>
-                  : <div className="pwa-blocked-list">{data.today_blocked.slice(0,5).map((b,i) => (
+                  : <div className="pwa-blocked-list">{[...new Map(data.today_blocked.map(b=>[b.stock,b])).values()].slice(0,5).map((b,i) => (
                       <div key={i} className="pwa-blocked-row">
                         <span className="pwa-blocked-stock">{b.stock}</span>
                         <span className="pwa-blocked-signal mono dim">{blockedLabel(b.signal)}</span>
