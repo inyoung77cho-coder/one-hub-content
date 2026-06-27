@@ -438,18 +438,23 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                     추천행동 · {heroVerdict(regime, heat)}
                   </span>
                   <p className="hero-action-text">{heroMessage(regime, heat)}</p>
-                  {(topBuy || topScreen) && (
+                  {topPicks.length > 0 && (
                     <div className="hero-pick">
-                      <span className="hero-pick-label">{topBuy ? '오늘의 추천 종목' : '오늘의 주목 종목'}</span>
-                      <div className="hero-pick-row">
-                        <span className="hero-pick-name">{topBuy ? topBuy.stock : topScreen.name}</span>
-                        {topBuy && <span className="hero-pick-score mono">AI 확신도 {Math.round(topBuy.score)}%</span>}
-                      </div>
+                      <span className="hero-pick-label">🎯 TOP PICK</span>
+                      {topPicks.map((p, i) => (
+                        <div key={i} className="hero-pick-row" style={{ marginBottom: 2 }}>
+                          <span className="hero-pick-rank">{["🥇","🥈","🥉"][i]}</span>
+                          <span className="hero-pick-name">{p.name}</span>
+                          {p.isBuy
+                            ? <span className="hero-pick-score mono">AI {Math.round(p.score)}%</span>
+                            : <span className="hero-pick-score mono dim">{Math.round(p.score)}점</span>}
+                        </div>
+                      ))}
                       <button
                         className="hero-pick-btn"
-                        onClick={() => document.getElementById('recommend-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                        onClick={() => document.getElementById("recommend-section")?.scrollIntoView({ behavior: "smooth", block: "start" })}
                       >
-                        추천종목 보기 →
+                        전체 보기 →
                       </button>
                     </div>
                   )}
@@ -1093,6 +1098,7 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
         .hero-pick { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; padding-top: 10px; border-top: 1px dashed var(--border); }
         .hero-pick-label { font-size: 0.72rem; color: var(--text-secondary); font-weight: 600; }
         .hero-pick-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+        .hero-pick-rank { font-size: 0.85rem; }
         .hero-pick-name { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); }
         .hero-pick-score { font-size: 0.72rem; color: var(--accent-buy); }
         .hero-pick-btn { align-self: flex-start; background: none; border: none; padding: 0; margin-top: 2px; font-size: 0.76rem; font-weight: 600; color: var(--accent-info); cursor: pointer; }
