@@ -1,4 +1,4 @@
-import Head from 'next/head';
+﻿import Head from 'next/head';
 import Link from 'next/link';
 import { useState, useEffect, useCallback } from 'react';
 import { getLatestDailyReport } from '../../lib/reports';
@@ -1028,20 +1028,20 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                 </div>
               </section>
 
-            {/* AI 정확도 링크 */}
-            <Link href="/pwa/accuracy" style={{textDecoration:'none', color:'inherit'}}>
-              <section className="pwa-card" style={{cursor:'pointer'}}>
-                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                  <div>
-                    <div style={{fontWeight:700, fontSize:14}}>🎯 AI 차단 정확도</div>
-                    <div style={{fontSize:12, color:'var(--text-muted)', marginTop:4}}>
-                      차단 신호 적중률 · 사유별 분석 · 최근 내역
+              {/* AI 정확도 링크 */}
+              <Link href="/pwa/accuracy" style={{textDecoration:'none', color:'inherit'}}>
+                <section className="pwa-card" style={{cursor:'pointer'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                    <div>
+                      <div style={{fontWeight:700, fontSize:14}}>🎯 AI 차단 정확도</div>
+                      <div style={{fontSize:12, color:'var(--text-muted)', marginTop:4}}>
+                        차단 신호 적중률 · 사유별 분석 · 최근 내역
+                      </div>
                     </div>
+                    <span style={{fontSize:20, color:'var(--text-muted)'}}>›</span>
                   </div>
-                  <span style={{fontSize:20, color:'var(--text-muted)'}}>›</span>
-                </div>
-              </section>
-            </Link>
+                </section>
+              </Link>
             )}
           </main>
         )}
