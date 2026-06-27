@@ -1015,7 +1015,7 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                 </Link>
               </div>
             </section>
-            {data && (
+            {data && (<>
               <section className="pwa-card">
                 <span className="pwa-card-label">오늘 요약</span>
                 <div className="pwa-report-summary">
@@ -1042,7 +1042,7 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                   </div>
                 </section>
               </Link>
-            )}
+            </>)}
           </main>
         )}
 
