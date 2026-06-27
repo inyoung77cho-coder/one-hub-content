@@ -870,9 +870,25 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
                             </div>
                           )}
                         </div>
+                        {(() => {
+                          const cur = Number(p.current_price||0);
+                          const avg = Number(p.avg_price||0);
+                          const tgt = Number(p.target||0);
+                          const stp = Number(p.stop_loss||0);
+                          let badge = null;
+                          if (tgt > 0 && cur >= tgt) badge = { label: '익절 고려', color: '#e53935', icon: '🔴' };
+                          else if (stp > 0 && cur <= stp) badge = { label: '손절 고려', color: '#e53935', icon: '🔴' };
+                          else if (avg > 0 && cur < avg * 0.97) badge = { label: '일부매도 고려', color: '#f57c00', icon: '🟡' };
+                          else badge = { label: '보유', color: '#2e7d32', icon: '🟢' };
+                          return (
+                            <div className="position-card-action-badge" style={{ color: badge.color }}>
+                              {badge.icon} AI 행동 지침: {badge.label}
+                            </div>
+                          );
+                        })()}
                         {p.entry_hypothesis && (
                           <div className="position-card-ai">
-                            <span className="position-card-ai-label">🤖 AI 의견</span>
+                            <span className="position-card-ai-label">🤖 AI 가설</span>
                             <p className="position-card-ai-text">{p.entry_hypothesis}</p>
                           </div>
                         )}
@@ -1099,6 +1115,7 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
         .hero-pick-label { font-size: 0.72rem; color: var(--text-secondary); font-weight: 600; }
         .hero-pick-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
         .hero-pick-rank { font-size: 0.85rem; }
+        .position-card-action-badge { font-size: 0.78rem; font-weight: 700; margin-top: 8px; padding: 4px 8px; border-radius: 6px; background: var(--card-bg); border: 1px solid currentColor; display: inline-block; }
         .hero-pick-name { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); }
         .hero-pick-score { font-size: 0.72rem; color: var(--accent-buy); }
         .hero-pick-btn { align-self: flex-start; background: none; border: none; padding: 0; margin-top: 2px; font-size: 0.76rem; font-weight: 600; color: var(--accent-info); cursor: pointer; }
