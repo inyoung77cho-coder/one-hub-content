@@ -1,5 +1,6 @@
 ﻿import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { useState, useEffect, useCallback } from 'react';
 import { getLatestDailyReport } from '../../lib/reports';
 
@@ -48,6 +49,28 @@ export default function PWADashboard({ latestReport }) {
   const [pushBusy, setPushBusy] = useState(false);
   const [pushError, setPushError] = useState(null);
   const [pushBannerDismissed, setPushBannerDismissed] = useState(false);
+
+  const router = useRouter();
+
+  // [N1] 푸시 알림 딥링크 — URL 파라미터로 탭/종목 자동 설정
+  useEffect(() => {
+    if (!router.isReady) return;
+    const { tab: tabParam, code, name } = router.query;
+    if (tabParam) setTab(tabParam);
+    if (code && name) {
+      setSearchQuery(name);
+      // 분석 자동 실행
+      setTimeout(() => {
+        setTab('analyze');
+        setAnalyzeResult(null);
+        setAnalyzing(true);
+        fetch(`/api/pwa/analyze?code=${code}&name=${encodeURIComponent(name)}&trader_id=A`)
+          .then(r => r.json())
+          .then(d => { setAnalyzeResult(d); setAnalyzing(false); })
+          .catch(() => setAnalyzing(false));
+      }, 300);
+    }
+  }, [router.isReady, router.query]);
 
   useEffect(() => {
     setMounted(true);

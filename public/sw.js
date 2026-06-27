@@ -1,4 +1,4 @@
-// public/sw.js — ONE-HUB v9.0 PWA Web Push Service Worker
+﻿// public/sw.js — ONE-HUB v9.0 PWA Web Push Service Worker
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -25,7 +25,7 @@ self.addEventListener('push', (event) => {
     body: payload.body || '',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    data: { url: '/pwa' },
+    data: { url: '/pwa', code: payload.code || null, name: payload.name || null },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -33,13 +33,21 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const targetUrl = (event.notification.data && event.notification.data.url) || '/pwa';
-
+  const data = event.notification.data || {};
+  let targetUrl = '/pwa';
+  if (data.code && data.name) {
+    const params = new URLSearchParams({ tab: 'analyze', code: data.code, name: data.name });
+    targetUrl = '/pwa?' + params.toString();
+  } else if (data.url) {
+    targetUrl = data.url;
+  }
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       for (const client of clientList) {
         if (client.url.includes('/pwa') && 'focus' in client) {
-          return client.focus();
+          client.focus();
+          client.navigate(targetUrl);
+          return;
         }
       }
       if (self.clients.openWindow) {
