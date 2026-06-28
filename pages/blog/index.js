@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Head from 'next/head';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
+import CTABar from '../../components/CTABar';
 
 const TAG_COLORS = {
   ai: '#2563eb', ml: '#7c3aed', stock: '#16a34a', macro: '#d97706',
@@ -198,6 +199,7 @@ export default function Blog({ posts }) {
               );
             })}
           </div>
+          <CTABar />
         </main>
       </div>
     </>

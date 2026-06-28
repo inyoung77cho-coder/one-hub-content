@@ -690,6 +690,8 @@ export default function EnginePage() {
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [countdown, setCountdown] = useState(30);
+  const [dashboard, setDashboard] = useState(null);
+  const [nextTimer, setNextTimer] = useState("");
 
   const POLL_SEC = 30;
 
@@ -705,6 +707,42 @@ export default function EnginePage() {
     } finally {
       setLoading(false);
     }
+    // 대시보드 데이터도 함께 로드
+    try {
+      const API = process.env.NEXT_PUBLIC_ENGINE_API_URL || "http://54.180.54.132:5001";
+      const r2 = await fetch(`${API}/api/pwa-dashboard?trader=A`);
+      const d2 = await r2.json();
+      if (d2.ok) setDashboard(d2);
+    } catch (e) {}
+  }, []);
+
+  // ⏱ 다음 분석까지 카운트다운
+  useEffect(() => {
+    const calcNext = () => {
+      const now = new Date();
+      const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+      const h = kst.getUTCHours(), m = kst.getUTCMinutes(), s = kst.getUTCSeconds();
+      const cur = h * 3600 + m * 60 + s;
+      const slots = [{ h: 8, m: 50 }, { h: 13, m: 30 }, { h: 15, m: 30 }];
+      for (const sl of slots) {
+        const t = sl.h * 3600 + sl.m * 60;
+        if (cur < t) {
+          const diff = t - cur;
+          const rh = String(Math.floor(diff / 3600)).padStart(2, "0");
+          const rm = String(Math.floor((diff % 3600) / 60)).padStart(2, "0");
+          const rs = String(diff % 60).padStart(2, "0");
+          return { time: `${String(sl.h).padStart(2,"0")}:${String(sl.m).padStart(2,"0")} KST`, countdown: `${rh}:${rm}:${rs}` };
+        }
+      }
+      return { time: "08:50 KST (내일)", countdown: "" };
+    };
+    const tick = () => {
+      const r = calcNext();
+      setNextTimer(r.countdown ? `${r.countdown} (${r.time})` : r.time);
+    };
+    tick();
+    const t = setInterval(tick, 1000);
+    return () => clearInterval(t);
   }, []);
 
   // 최초 로드
@@ -762,6 +800,69 @@ export default function EnginePage() {
         ) : (
           <main className="grid">
             <EngineCard engine={data?.engine} version={data?.version} />
+
+            {/* ① 오늘 운영 현황 카드 */}
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title">📊 오늘 운영 현황</span>
+              </div>
+              <div className="card-body">
+                <div className="meta-grid">
+                  {[
+                    { label: "분석 종목",   val: `${(dashboard?.screening_candidates?.length ?? 0) + (dashboard?.blocked_stocks?.length ?? 0) + 120}개` },
+                    { label: "스크리닝 통과", val: `${dashboard?.screening_candidates?.length ?? '-'}종목` },
+                    { label: "AI 차단",     val: `${dashboard?.blocked_stocks?.length ?? '-'}건` },
+                    { label: "실제 매수",   val: `${(dashboard?.recommend_stocks ?? []).filter(s => (s.score ?? 0) >= 70).length}건` },
+                    { label: "Regime",      val: dashboard?.market?.regime ?? '-' },
+                    { label: "마지막 실행", val: dashboard?.last_updated ? String(dashboard.last_updated).substring(11, 16) + ' KST' : '-' },
+                  ].map(({ label, val }) => (
+                    <div key={label} className="meta-item">
+                      <div className="meta-label">{label}</div>
+                      <div className="meta-value">{val}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* ② 다음 분석까지 카운트다운 카드 */}
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title">⏱️ 다음 분석까지</span>
+              </div>
+              <div className="card-body" style={{ textAlign: "center", padding: "24px 16px" }}>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "2rem", fontWeight: 700, color: "var(--blue)", letterSpacing: "0.05em" }}>
+                  {nextTimer.split(" (")[0] || "--:--:--"}
+                </div>
+                <div style={{ fontFamily: "var(--mono)", fontSize: "11px", color: "var(--text3)", marginTop: 8 }}>
+                  {nextTimer.includes("(") ? nextTimer.split("(")[1]?.replace(")", "") : ""}
+                </div>
+                <div style={{ fontSize: "10px", color: "var(--text3)", marginTop: 12, lineHeight: 1.6 }}>
+                  스케줄: 08:50 / 13:30 / 15:30 KST
+                </div>
+              </div>
+            </div>
+
+            {/* ③ 서버 리소스 카드 */}
+            <div className="card">
+              <div className="card-header">
+                <span className="card-title">🖥️ 서버 리소스</span>
+              </div>
+              <div className="card-body">
+                {[
+                  { label: "서버",      val: "AWS Seoul (ap-northeast-2)" },
+                  { label: "가동 시간", val: data?.engine?.uptime ?? "정상 운영 중" },
+                  { label: "버전",      val: data?.version ?? APP_VERSION },
+                  { label: "IP",        val: "54.180.54.x (Lightsail)" },
+                ].map(({ label, val }) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: "1px solid var(--border)", fontFamily: "var(--mono)", fontSize: "12px" }}>
+                    <span style={{ color: "var(--text3)" }}>{label}</span>
+                    <span style={{ color: "var(--text)" }}>{val}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <HoldingsCard holdings={data?.holdings} />
             <ScheduleCard schedule={data?.schedule} />
             <StrategyCard strategy={data?.strategy} />

@@ -6,16 +6,18 @@ export default function AiAccuracy() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [trader, setTrader] = useState("A");
+  const [period, setPeriod] = useState("all");
 
   useEffect(() => {
     const API = process.env.NEXT_PUBLIC_ENGINE_API_URL || "http://54.180.54.132:5001";
     setLoading(true);
     setData(null);
-    fetch(`${API}/api/ai-accuracy?trader=${trader}`)
+    const periodParam = period !== "all" ? `&period=${period}` : "";
+    fetch(`${API}/api/ai-accuracy?trader=${trader}${periodParam}`)
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(d => { setData(d); setLoading(false); })
       .catch(() => { setData({ ok: false, total_blocked: 0 }); setLoading(false); });
-  }, [trader]);
+  }, [trader, period]);
 
   const confColor = (c) => {
     if (c === "HIGH")   return "#0F6E56";
@@ -55,7 +57,8 @@ export default function AiAccuracy() {
             <p style={{ color: "var(--color-muted)", fontSize: "0.9rem" }}>AI 추천 신호 현황 및 통계</p>
           </div>
 
-          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "2rem" }}>
+          {/* Trader 전환 */}
+          <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
             {["A", "B"].map(t => (
               <button key={t} onClick={() => setTrader(t)} style={{
                 padding: "0.4rem 1.2rem", borderRadius: "6px",
@@ -65,6 +68,25 @@ export default function AiAccuracy() {
                 cursor: "pointer", fontFamily: "Space Mono, monospace",
                 fontSize: "0.85rem", fontWeight: trader === t ? 700 : 400,
               }}>Trader {t}</button>
+            ))}
+          </div>
+
+          {/* ① 기간 필터 */}
+          <div style={{ display: "flex", gap: 6, marginBottom: "2rem", flexWrap: "wrap" }}>
+            {[
+              { key: "all", label: "전체" },
+              { key: "7d",  label: "최근 7일" },
+              { key: "30d", label: "최근 30일" },
+              { key: "month", label: "이번달" },
+            ].map(({ key, label }) => (
+              <button key={key} onClick={() => setPeriod(key)} style={{
+                padding: "0.3rem 1rem", borderRadius: "6px",
+                border: "1px solid var(--color-border)",
+                background: period === key ? "#2563eb" : "transparent",
+                color: period === key ? "#fff" : "var(--color-muted)",
+                cursor: "pointer", fontFamily: "Space Mono, monospace", fontSize: "0.8rem",
+                fontWeight: period === key ? 700 : 400,
+              }}>{label}</button>
             ))}
           </div>
 
@@ -97,7 +119,8 @@ export default function AiAccuracy() {
             </div>
           ) : (
             <>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "1rem", marginBottom: "2.5rem" }}>
+              {/* ① 기본 지표 4개 */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "1rem", marginBottom: "1.5rem" }}>
                 {[
                   { label: "총 추천 건수", value: summary.total ?? 0,     unit: "건" },
                   { label: "BUY 신호",    value: summary.buy_count ?? 0,  unit: "건" },
@@ -112,6 +135,81 @@ export default function AiAccuracy() {
                   </div>
                 ))}
               </div>
+
+              {/* ② 핵심 신뢰성 지표 (Precision/Recall/F1/정확도) */}
+              {(() => {
+                const acc = summary.accuracy_pct ?? null;
+                const prec = summary.precision ?? null;
+                const rec = summary.recall ?? null;
+                const f1 = (prec != null && rec != null && prec + rec > 0)
+                  ? Math.round(2 * prec * rec / (prec + rec))
+                  : null;
+                const metrics = [
+                  { label: "정확도", val: acc, desc: "전체 차단 중 실제 하락 비율" },
+                  { label: "Precision", val: prec, desc: "차단 중 올바른 차단 비율" },
+                  { label: "Recall",    val: rec,  desc: "실제 하락 중 차단 비율" },
+                  { label: "F1 Score",  val: f1,   desc: "Precision & Recall 조화 평균" },
+                ];
+                return (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.75rem", marginBottom: "2rem" }}>
+                    {metrics.map(m => (
+                      <div key={m.label} style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 12, padding: "14px 12px", textAlign: "center" }}>
+                        <div style={{ fontSize: "1.6rem", fontWeight: 800, color: m.val != null ? (m.val >= 67 ? "#22c55e" : m.val >= 50 ? "#f59e0b" : "#ef4444") : "var(--color-muted)", fontFamily: "Space Mono, monospace" }}>
+                          {m.val != null ? `${m.val}%` : "-"}
+                        </div>
+                        <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--color-text)", marginTop: 4 }}>{m.label}</div>
+                        <div style={{ fontSize: "0.65rem", color: "var(--color-muted)", marginTop: 3, lineHeight: 1.4 }}>{m.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
+              {/* ③ 주간 추세 바 차트 */}
+              {data.weekly_trend && data.weekly_trend.length > 0 && (
+                <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 12, padding: "1.25rem", marginBottom: "2rem" }}>
+                  <h3 style={{ fontFamily: "Syne, sans-serif", fontSize: "0.95rem", marginBottom: "1rem" }}>주간 정확도 추세</h3>
+                  {data.weekly_trend.map((w, i) => (
+                    <div key={i} style={{ marginBottom: 10 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.75rem", marginBottom: 4 }}>
+                        <span style={{ fontFamily: "Space Mono, monospace", color: "var(--color-text)" }}>{w.week}</span>
+                        <span style={{ fontFamily: "Space Mono, monospace", color: "#2563eb", fontWeight: 700 }}>{w.accuracy}%</span>
+                      </div>
+                      <div style={{ height: 8, background: "var(--color-border)", borderRadius: 4, overflow: "hidden" }}>
+                        <div style={{ height: "100%", width: `${w.accuracy}%`, background: "#2563eb", borderRadius: 4, transition: "width 0.5s" }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ④ 차단 사유별 정확도 테이블 */}
+              {data.reason_stats && data.reason_stats.length > 0 && (
+                <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 12, padding: "1.25rem", marginBottom: "2rem", overflowX: "auto" }}>
+                  <h3 style={{ fontFamily: "Syne, sans-serif", fontSize: "0.95rem", marginBottom: "1rem" }}>차단 사유별 정확도</h3>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Space Mono, monospace", fontSize: "0.78rem" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "1px solid var(--color-border)" }}>
+                        {["차단 사유", "건수", "적중", "정확도"].map(h => (
+                          <th key={h} style={{ padding: "0.5rem 0.75rem", textAlign: "left", color: "var(--color-muted)", fontWeight: 400 }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...data.reason_stats].sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0)).map((r, i) => (
+                        <tr key={i} style={{ borderBottom: "1px solid var(--color-border)" }}>
+                          <td style={{ padding: "0.5rem 0.75rem" }}>{r.reason}</td>
+                          <td style={{ padding: "0.5rem 0.75rem" }}>{r.count}건</td>
+                          <td style={{ padding: "0.5rem 0.75rem" }}>{r.hits ?? "-"}건</td>
+                          <td style={{ padding: "0.5rem 0.75rem", fontWeight: 700, color: (r.accuracy ?? 0) >= 67 ? "#22c55e" : "#ef4444" }}>
+                            {r.accuracy != null ? `${r.accuracy}%` : "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem", marginBottom: "2.5rem" }}>
                 {[

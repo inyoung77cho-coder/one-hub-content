@@ -16,7 +16,26 @@ export default function DailyIndex({ posts, postsB }) {
 
   const [isMobile, setIsMobile] = useState(false);
   const [trader, setTrader] = useState("A");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedRegime, setSelectedRegime] = useState("ALL");
   const activePosts = trader === "A" ? posts : (postsB || []);
+
+  // 검색 + regime 필터
+  const filteredPosts = activePosts.filter(p => {
+    const matchRegime = selectedRegime === "ALL" || p.regime === selectedRegime;
+    const q = searchQuery.toLowerCase();
+    const matchSearch = !q || p.date?.includes(q) || p.insight?.toLowerCase().includes(q) || p.regime?.toLowerCase().includes(q);
+    return matchRegime && matchSearch;
+  });
+
+  // 월별 그룹핑
+  const grouped = filteredPosts.reduce((acc, post) => {
+    const month = post.date?.substring(0, 7) || "기타";
+    if (!acc[month]) acc[month] = [];
+    acc[month].push(post);
+    return acc;
+  }, {});
+  const months = Object.keys(grouped).sort().reverse();
 
   useEffect(() => {
 
@@ -88,15 +107,56 @@ export default function DailyIndex({ posts, postsB }) {
 
         <main style={{ maxWidth: "800px", margin: "0 auto", padding: isMobile ? "24px 16px" : "40px 24px" }}>
 
-          <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#718096", textTransform: "uppercase", marginBottom: "32px" }}>
-
+          <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#718096", textTransform: "uppercase", marginBottom: "24px" }}>
             Daily Operations Log
-
           </h1>
 
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {/* Trader 전환 */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+            {["A", "B"].map(t => (
+              <button key={t} onClick={() => setTrader(t)}
+                style={{ padding: "5px 16px", borderRadius: 6, border: "1px solid #e2e8f0",
+                  background: trader === t ? "#1e293b" : "#fff", color: trader === t ? "#fff" : "#64748b",
+                  cursor: "pointer", fontFamily: "monospace", fontSize: "11px", fontWeight: trader === t ? 700 : 400 }}>
+                Trader {t}
+              </button>
+            ))}
+          </div>
 
-            {activePosts.map((post, i) => {
+          {/* ① 검색 입력 */}
+          <input
+            type="text" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+            placeholder="날짜 또는 키워드 검색 (예: 2026-06, BEAR)"
+            style={{ width: "100%", padding: "10px 14px", borderRadius: 8, border: "1px solid #e2e8f0",
+              fontSize: "13px", fontFamily: "monospace", background: "#fff", color: "#1e293b",
+              boxSizing: "border-box", marginBottom: 12, outline: "none" }}
+          />
+
+          {/* ② Regime 필터 */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 24, flexWrap: "wrap", alignItems: "center" }}>
+            {["ALL", "BULL", "BEAR", "SIDEWAYS"].map(r => (
+              <button key={r} onClick={() => setSelectedRegime(r)}
+                style={{ padding: "4px 12px", borderRadius: 6, border: "1px solid #e2e8f0",
+                  background: selectedRegime === r ? "#1e293b" : "#fff",
+                  color: selectedRegime === r ? "#fff" : "#718096",
+                  cursor: "pointer", fontFamily: "monospace", fontSize: "11px", fontWeight: selectedRegime === r ? 700 : 400 }}>
+                {r === "ALL" ? "전체" : r}
+              </button>
+            ))}
+            <span style={{ marginLeft: "auto", fontFamily: "monospace", fontSize: "11px", color: "#a0aec0" }}>
+              {filteredPosts.length}일
+            </span>
+          </div>
+
+          {/* ③ 월별 그룹 리스트 */}
+          {months.map(month => (
+            <div key={month} style={{ marginBottom: 32 }}>
+              <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#718096", marginBottom: 12, paddingBottom: 8, borderBottom: "1px solid #e2e8f0" }}>
+                {month.replace("-", "년 ")}월 ({grouped[month].length}개)
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+
+          {grouped[month].map((post, i) => {
               const isToday = post.date === new Date().toISOString().split("T")[0];
               return (
               <Link key={post.date} href={`/daily/${post.date}`} style={{ textDecoration: "none" }}>
@@ -187,7 +247,14 @@ export default function DailyIndex({ posts, postsB }) {
               );
             })}
 
-          </div>
+              </div>  {/* grouped[month] list */}
+            </div>  {/* month group */}
+          ))}
+          {filteredPosts.length === 0 && (
+            <div style={{ textAlign: "center", padding: "40px 0", color: "#a0aec0", fontFamily: "monospace", fontSize: "12px" }}>
+              검색 결과가 없습니다.
+            </div>
+          )}
           <CTABar />
         </main>
 
