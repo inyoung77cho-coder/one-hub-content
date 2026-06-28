@@ -298,8 +298,21 @@ export default function PWADashboard({ latestReport }) {
   const watchCount = data?.recent_decisions?.filter(e => e.event_type === 'ANALYZE').length ?? 0;
   const heat = data?.market?.heat_score ?? null;
   const fearGreed = data?.market?.fear_greed ?? null;
+  const vix = data?.market?.vix ?? null;
+  const regimeDays = data?.market?.regime_days ?? null;
   const regime = data?.market?.regime ?? null;
-const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null;
+  const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null;
+
+  // [v8.7] 3단 Hero — 오늘 행동 판단 (신규매수 / 추가매수 / 현금유지)
+  const actionNew   = regime === 'BULL' && (heat ?? 0) >= 40;   // 신규매수 가능
+  const actionAdd   = regime === 'BULL' && (heat ?? 0) >= 60;   // 추가매수 가능
+  const actionCash  = regime === 'BEAR' || (heat ?? 0) < 40;    // 현금유지 권장
+  const heroWhy = [
+    heat    !== null ? `Heat ${heatLabel(heat)} ${heat}점` : null,
+    fearGreed !== null ? `공포탐욕 ${fearGreed}` : null,
+    vix     !== null ? `VIX ${vix}` : null,
+    regimeDays !== null ? `${regime} ${regimeDays}일째` : null,
+  ].filter(Boolean).join(' · ');
 
   // [v8.7] Hero 추천종목 — today_buys 우선, 없으면 screening_candidates로 대체
   const topBuy = data?.today_buys?.length
@@ -422,66 +435,53 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
             )}
             {data && (<>
 
-              {/* [v8.6] Hero — 오늘의 시장. 기존 regime 카드를 대체하는 시그니처 요소 */}
-              <section className="hero-card" style={{ borderColor: heroBorderTint(regime) }}>
-                <div className="hero-eyebrow">{regimeIcon(regime)} 오늘의 시장</div>
-                <div className="hero-regime">
-                  <span className={`hero-regime-text ${regimeClass(regime)}`}>{regimeMarket(regime)}</span>
-                  <span className="hero-regime-ko dim">{regimeKo(regime)}</span>
-                </div>
-                {heat !== null && (
-                  <div className="hero-heat">
-                    <div className="hero-heat-top">
-                      <span className="hero-heat-label">AI 투자온도</span>
-                      <span className="hero-heat-val" style={{ color: heatColor(heat) }}>
-                        {heat}<span className="hero-heat-unit">점 · {heatLabel(heat)}</span>
-                      </span>
-                    </div>
-                    <div className="heat-bar" role="img" aria-label={`투자온도 ${heat}점`}>
-                      {Array.from({ length: 10 }).map((_, i) => (
-                        <span
-                          key={i}
-                          className="heat-bar-seg"
-                          style={i < Math.round(heat / 10) ? { background: heatColor(heat) } : undefined}
-                        />
-                      ))}
-                    </div>
+              {/* [v8.7] Hero 3단 — 지금 시장 / 오늘 행동 / 왜? */}
+              <section className="hero-card hero3" style={{ borderColor: heroBorderTint(regime) }}>
+
+                {/* 1단: 지금 시장 */}
+                <div className="hero3-row hero3-market">
+                  <span className={`hero3-regime-badge ${regimeClass(regime)}`}>
+                    {regimeIcon(regime)} {regimeMarket(regime)}
+                  </span>
+                  <div className="hero3-market-chips">
+                    {vix !== null && (
+                      <span className="hero3-chip">VIX {vix}</span>
+                    )}
                     {fearGreed !== null && (
-                      <div className="hero-heat-top" style={{ marginTop: 8 }}>
-                        <span className="hero-heat-label">공포탐욕지수</span>
-                        <span className="hero-heat-val" style={{ color: fgColor(fearGreed), fontSize: '1rem' }}>
-                          {fearGreed}<span className="hero-heat-unit">점 · {fgLabel(fearGreed)}</span>
-                        </span>
-                      </div>
+                      <span className="hero3-chip" style={{ color: fgColor(fearGreed) }}>
+                        공포탐욕 {fearGreed}
+                      </span>
+                    )}
+                    {heat !== null && (
+                      <span className="hero3-chip" style={{ color: heatColor(heat) }}>
+                        Heat {heat}
+                      </span>
                     )}
                   </div>
-                )}
-                <div className="hero-action">
-                  <span className="hero-action-badge" style={{ color: actionColor(heroAction), borderColor: actionColor(heroAction) }}>
-                    추천행동 · {heroVerdict(regime, heat)}
-                  </span>
-                  <p className="hero-action-text">{heroMessage(regime, heat)}</p>
-                  {topPicks.length > 0 && (
-                    <div className="hero-pick">
-                      <span className="hero-pick-label">🎯 TOP PICK</span>
-                      {topPicks.map((p, i) => (
-                        <div key={i} className="hero-pick-row" style={{ marginBottom: 2 }}>
-                          <span className="hero-pick-rank">{["🥇","🥈","🥉"][i]}</span>
-                          <span className="hero-pick-name">{p.name}</span>
-                          {p.isBuy
-                            ? <span className="hero-pick-score mono">AI {Math.round(p.score)}%</span>
-                            : <span className="hero-pick-score mono dim">{Math.round(p.score)}점</span>}
-                        </div>
-                      ))}
-                      <button
-                        className="hero-pick-btn"
-                        onClick={() => document.getElementById("recommend-section")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                      >
-                        전체 보기 →
-                      </button>
-                    </div>
-                  )}
                 </div>
+
+                {/* 2단: 오늘 행동 */}
+                <div className="hero3-row hero3-action">
+                  <span className="hero3-action-label">오늘 행동</span>
+                  <div className="hero3-action-badges">
+                    <span className={`hero3-act-badge ${actionNew ? 'act-ok' : 'act-no'}`}>
+                      신규매수 {actionNew ? '✅' : '❌'}
+                    </span>
+                    <span className={`hero3-act-badge ${actionAdd ? 'act-ok' : 'act-no'}`}>
+                      추가매수 {actionAdd ? '✅' : '❌'}
+                    </span>
+                    <span className={`hero3-act-badge ${actionCash ? 'act-ok' : 'act-no'}`}>
+                      현금유지 {actionCash ? '✅' : '❌'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 3단: 왜? */}
+                <div className="hero3-row hero3-why">
+                  <span className="hero3-why-label">왜?</span>
+                  <p className="hero3-why-text">{heroWhy || heroMessage(regime, heat)}</p>
+                </div>
+
               </section>
 
               {/* AI 활동 요약 — 4칸 그리드 */}
@@ -1161,6 +1161,27 @@ const heroAction = regime === 'BEAR' ? 'SELL' : regime === 'BULL' ? 'BUY' : null
 
         /* [v8.6] Hero 카드 — "오늘의 시장" */
         .hero-card { background: var(--hero-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 20px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; gap: 14px; }
+
+        /* [v8.7] Hero 3단 */
+        .hero3 { gap: 0; padding: 0; overflow: hidden; }
+        .hero3-row { padding: 14px 18px; display: flex; flex-direction: column; gap: 8px; }
+        .hero3-row + .hero3-row { border-top: 1px solid var(--border); }
+        .hero3-market { background: var(--hero-bg); }
+        .hero3-action { background: var(--card-bg); }
+        .hero3-why { background: var(--inset-bg); }
+        .hero3-regime-badge { font-size: 1rem; font-weight: 800; font-family: var(--font-display); }
+        .hero3-regime-badge.bull { color: var(--accent-buy); }
+        .hero3-regime-badge.bear { color: var(--accent-sell); }
+        .hero3-regime-badge.side { color: var(--accent-warn); }
+        .hero3-market-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .hero3-chip { font-size: 0.72rem; font-family: var(--font-mono); padding: 3px 9px; border-radius: var(--radius-pill); background: var(--card-bg); border: 1px solid var(--border); color: var(--text-secondary); }
+        .hero3-action-label { font-size: 0.68rem; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+        .hero3-action-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+        .hero3-act-badge { font-size: 0.78rem; font-weight: 700; padding: 5px 12px; border-radius: var(--radius-pill); border: 1px solid var(--border); }
+        .hero3-act-badge.act-ok { background: color-mix(in srgb, var(--accent-buy) 12%, var(--card-bg)); color: var(--accent-buy); border-color: color-mix(in srgb, var(--accent-buy) 30%, var(--border)); }
+        .hero3-act-badge.act-no { background: var(--inset-bg); color: var(--text-tertiary); }
+        .hero3-why-label { font-size: 0.68rem; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
+        .hero3-why-text { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5; }
         .hero-eyebrow { font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; }
         .hero-regime { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
         .hero-regime-text { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; }
