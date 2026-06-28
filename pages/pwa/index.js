@@ -4,6 +4,18 @@ import { useRouter } from 'next/router';
 import { useState, useEffect, useCallback } from 'react';
 import { getLatestDailyReport } from '../../lib/reports';
 
+// [v9.0] 안전 숫자 포맷 — INVALID_PRICE/STOP/NaN/undefined → '-'
+function safeLocale(v, suffix = '') {
+  if (v == null || v === '' || String(v).startsWith('INVALID') || isNaN(Number(v))) return '-';
+  const n = Number(v);
+  return n.toLocaleString() + suffix;
+}
+function safeNum(v) {
+  if (v == null || String(v).startsWith('INVALID')) return null;
+  const n = Number(v);
+  return isNaN(n) ? null : n;
+}
+
 // [v9.0] PWA Web Push 구독용 — VAPID 공개키(base64url) -> Uint8Array 변환
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -1020,11 +1032,11 @@ export default function PWADashboard({ latestReport }) {
                   <div className="pwa-price-grid" style={{marginTop:12}}>
                     <div className="pwa-price-item">
                       <span className="dim">목표가</span>
-                      <span className="mono bull">{analyzeResult.target?.toLocaleString()}원</span>
+                      <span className="mono bull">{safeLocale(analyzeResult.target, '원')}</span>
                     </div>
                     <div className="pwa-price-item">
                       <span className="dim">손절가</span>
-                      <span className="mono bear">{analyzeResult.stop_loss?.toLocaleString()}원</span>
+                      <span className="mono bear">{safeLocale(analyzeResult.stop_loss, '원')}</span>
                     </div>
                     {analyzeResult.current_price > 0 && (
                       <div className="pwa-price-item">
@@ -1158,24 +1170,24 @@ export default function PWADashboard({ latestReport }) {
                               {p.pnl_amount>=0?'+':''}{Number(p.pnl_amount||0).toLocaleString()}원
                             </span>
                           </div>
-                          {p.target > 0 && (
+                          {safeNum(p.target) > 0 && (
                             <div className="position-card-cell">
                               <span className="dim">목표가</span>
-                              <span className="bull">{Number(p.target).toLocaleString()}원</span>
+                              <span className="bull">{safeLocale(p.target, '원')}</span>
                             </div>
                           )}
-                          {p.stop_loss > 0 && (
+                          {safeNum(p.stop_loss) > 0 && (
                             <div className="position-card-cell">
                               <span className="dim">손절가</span>
-                              <span className="bear">{Number(p.stop_loss).toLocaleString()}원</span>
+                              <span className="bear">{safeLocale(p.stop_loss, '원')}</span>
                             </div>
                           )}
                         </div>
                         {(() => {
-                          const cur = Number(p.current_price||0);
-                          const avg = Number(p.avg_price||0);
-                          const tgt = Number(p.target||0);
-                          const stp = Number(p.stop_loss||0);
+                          const cur = safeNum(p.current_price) ?? 0;
+                          const avg = safeNum(p.avg_price) ?? 0;
+                          const tgt = safeNum(p.target) ?? 0;
+                          const stp = safeNum(p.stop_loss) ?? 0;
                           const pnlR = p.pnl_rate ?? 0;
                           let badge = null;
                           if (tgt > 0 && cur >= tgt)        badge = { label: '손절', color: '#ef4444', icon: '🔴', bg: '#fef2f2' };
@@ -1244,6 +1256,45 @@ export default function PWADashboard({ latestReport }) {
         {/* ── Report Tab ── */}
         {tab === 'report' && (
           <main className="pwa-main">
+
+            {/* [v9.0] 이번 주 AI 요약 카드 */}
+            <section className="pwa-card">
+              <span className="pwa-card-label">📊 이번 주 AI 요약</span>
+              {!perf ? (
+                <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                  이번 주 데이터 수집 중...
+                </div>
+              ) : (
+                <div style={{ marginTop: 10 }}>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>
+                    AI는 이번 주<br/>
+                    <strong style={{ color: 'var(--accent-sell)' }}>🚫 {perf.losses ?? 0}종목 차단</strong>
+                    {'  '}
+                    <strong style={{ color: 'var(--accent-buy)' }}>✅ {perf.wins ?? 0}종목 매수</strong>
+                    {'  '}
+                    <strong style={{ color: 'var(--text-secondary)' }}>📉 손절 {perf.losses ?? 0}건</strong>
+                  </p>
+                  {/* 승률 바 */}
+                  {perf.win_rate != null && (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 4 }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>승률</span>
+                        <span className="mono" style={{ color: 'var(--accent-buy)', fontWeight: 700 }}>{perf.win_rate}%</span>
+                      </div>
+                      <div style={{ height: 8, background: 'var(--inset-bg)', borderRadius: 4, overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: `${perf.win_rate}%`, background: 'var(--accent-buy)', borderRadius: 4 }} />
+                      </div>
+                    </div>
+                  )}
+                  {perf.avg_pnl_pct != null && (
+                    <div style={{ fontSize: '0.82rem', color: perf.avg_pnl_pct >= 0 ? 'var(--accent-buy)' : 'var(--accent-sell)', fontWeight: 700 }}>
+                      수익률 {perf.avg_pnl_pct >= 0 ? '+' : ''}{perf.avg_pnl_pct}%
+                    </div>
+                  )}
+                </div>
+              )}
+            </section>
+
             {latestReport && latestReport.insight && (
               <section className="pwa-card">
                 <span className="pwa-card-label">📅 오늘의 리포트 — {latestReport.date}</span>
@@ -1494,7 +1545,9 @@ export default function PWADashboard({ latestReport }) {
         )}
 
         <footer className="pwa-footer">
-          <Link href="/" className="mono dim">← Back to ONE-HUB</Link>
+          <Link href="/" style={{ fontSize: 11, color: 'var(--text-tertiary)', textDecoration: 'none', opacity: 0.6 }}>
+            onehub.kr
+          </Link>
         </footer>
       </div>
 

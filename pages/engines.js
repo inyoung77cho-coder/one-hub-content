@@ -537,6 +537,39 @@ function EngineCard({ engine, version }) {
           </div>
           )}
         </div>
+
+        {/* [v9.0] 컴포넌트별 Health Check */}
+        <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 16 }}>
+          <div style={{ fontSize: 9, fontFamily: 'var(--mono)', letterSpacing: '0.15em', color: 'var(--text3)', textTransform: 'uppercase', marginBottom: 12 }}>
+            Component Health
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[
+              { name: 'Trading Engine', key: 'engine',   check: (d) => d?.is_active },
+              { name: 'KIS API',        key: 'kis',      check: (d) => d?.is_active },
+              { name: 'Telegram Bot',   key: 'telegram', check: (d) => d?.is_active },
+              { name: 'AI Analyzer',    key: 'analyzer', check: (d) => d?.is_active },
+              { name: 'Database',       key: 'db',       check: (d) => d?.is_active },
+              { name: 'Scheduler',      key: 'scheduler',check: (d) => d?.is_active },
+            ].map(c => {
+              const status = engine == null ? null : c.key === 'engine' ? isOn : (engine?.components?.[c.key] ?? isOn);
+              const icon = status === null ? '🔵' : status ? '🟢' : '🔴';
+              const label = status === null ? '확인 중' : status ? '정상' : '오프라인';
+              return (
+                <div key={c.key} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                           padding: '8px 12px', background: 'var(--bg3)', borderRadius: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: 14 }}>{icon}</span>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--text)' }}>{c.name}</span>
+                  </div>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: status ? 'var(--green)' : status === null ? 'var(--blue)' : 'var(--red)' }}>
+                    {label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   );

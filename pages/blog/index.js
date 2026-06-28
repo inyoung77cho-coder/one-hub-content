@@ -3,6 +3,7 @@ import path from 'path';
 import matter from 'gray-matter';
 import Link from 'next/link';
 import Head from 'next/head';
+import { useState } from 'react';
 
 const TAG_COLORS = {
   ai: '#2563eb', ml: '#7c3aed', stock: '#16a34a', macro: '#d97706',
@@ -15,7 +16,18 @@ function tagColor(tags) {
   return TAG_COLORS[t] || TAG_COLORS.default;
 }
 
+const FILTER_TAGS = ['전체', 'AI분석', '매크로', 'ETF', '퀀트', '운영일지'];
+
 export default function Blog({ posts }) {
+  const [selectedTag, setSelectedTag] = useState('전체');
+
+  const filteredPosts = selectedTag === '전체'
+    ? posts
+    : posts.filter(p => (p.tags || []).some(t =>
+        t.toLowerCase() === selectedTag.toLowerCase() ||
+        t === selectedTag
+      ));
+
   return (
     <>
       <Head>
@@ -34,14 +46,33 @@ export default function Blog({ posts }) {
           <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.4rem', fontFamily: 'Pretendard, sans-serif' }}>
             AI 투자 인사이트
           </h1>
-          <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '2rem' }}>
+          <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '1.2rem' }}>
             AI 자동매매 운영 경험과 투자 방법론을 공유합니다.
           </p>
 
-          {posts.length === 0 && (
+          {/* 카테고리 필터 버튼 */}
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: '1.8rem' }}>
+            {FILTER_TAGS.map(tag => (
+              <button
+                key={tag}
+                onClick={() => setSelectedTag(tag)}
+                style={{
+                  padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                  border: 'none', cursor: 'pointer', fontFamily: 'Pretendard, sans-serif',
+                  background: selectedTag === tag ? '#2563eb' : '#f1f5f9',
+                  color:      selectedTag === tag ? '#fff'    : '#64748b',
+                  transition: 'background 0.15s, color 0.15s',
+                }}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+
+          {filteredPosts.length === 0 && (
             <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8', fontSize: '14px',
                           background: '#fff', borderRadius: 16, border: '1px solid #e2e8f0' }}>
-              아직 게시된 글이 없습니다.
+              {selectedTag === '전체' ? '아직 게시된 글이 없습니다.' : `'${selectedTag}' 카테고리에 글이 없습니다.`}
             </div>
           )}
 
@@ -51,7 +82,7 @@ export default function Blog({ posts }) {
             gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
             gap: 20,
           }}>
-            {posts.map(post => {
+            {filteredPosts.map(post => {
               const color = tagColor(post.tags);
               return (
                 <Link

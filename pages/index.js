@@ -11,6 +11,9 @@ export default function Home({ reports, stats }) {
   const [mounted, setMounted] = useState(false);
   const [engineVersion, setEngineVersion] = useState("v8.0");
   const [liveData, setLiveData] = useState(null); // [v8.7] 홈페이지 ↔ PWA 실시간 연동
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // [v9.0] 햄버거 메뉴
+  const [accuracyPct, setAccuracyPct] = useState(null);       // [v9.0] AI 정확도
+  const [winRate, setWinRate] = useState(null);               // [v9.0] 누적 승률
 
   useEffect(() => {
     setMounted(true);
@@ -21,6 +24,14 @@ export default function Home({ reports, stats }) {
     fetch("/api/pwa-dashboard?trader=A")
       .then(r => r.json())
       .then(d => { if (d.ok) setLiveData(d); })
+      .catch(() => {});
+    fetch("/api/pwa/accuracy?trader_id=A")
+      .then(r => r.json())
+      .then(d => { if (d.ok && d.summary?.accuracy_pct != null) setAccuracyPct(d.summary.accuracy_pct); })
+      .catch(() => {});
+    fetch("/api/pwa-performance?trader=A")
+      .then(r => r.json())
+      .then(d => { if (d.win_rate != null) setWinRate(d.win_rate); })
       .catch(() => {});
   }, []);
 
@@ -58,6 +69,78 @@ export default function Home({ reports, stats }) {
       </Head>
 
       <div className="page-wrapper">
+
+        {/* ── [v9.0] GLOBAL HEADER: Logo좌 / 메뉴중앙 / CTA우 ── */}
+        <header style={{
+          height: 64, background: '#fff', borderBottom: '1px solid #e2e8f0',
+          position: 'sticky', top: 0, zIndex: 200, display: 'flex', alignItems: 'center',
+          padding: '0 24px',
+        }}>
+          {/* Logo 좌측 */}
+          <Link href="/" style={{ fontFamily: 'Pretendard, monospace', fontWeight: 800, fontSize: 16, color: '#1e293b', letterSpacing: '0.08em', textDecoration: 'none', flexShrink: 0 }}>
+            ONE-HUB
+          </Link>
+          {/* 메뉴 중앙 */}
+          <nav style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 4,
+                        '@media(maxWidth:768px)': { display: 'none' } }}
+               className="site-nav-links">
+            {[
+              { href: '/daily', label: 'Daily' },
+              { href: '/strategies', label: '전략' },
+              { href: '/decision-log', label: '차단 로그' },
+              { href: '/engines', label: '엔진' },
+              { href: '/blog', label: 'Blog' },
+            ].map(n => (
+              <Link key={n.href} href={n.href} style={{
+                fontSize: 13, fontWeight: 600, padding: '5px 12px', borderRadius: 8,
+                color: '#64748b', textDecoration: 'none',
+              }}>
+                {n.label}
+              </Link>
+            ))}
+          </nav>
+          {/* CTA 우측 */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }} className="site-nav-cta">
+            <Link href="/pwa" style={{
+              background: '#2563eb', color: '#fff', padding: '8px 18px', borderRadius: 8,
+              fontSize: 13, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap',
+            }}>
+              앱 열기
+            </Link>
+          </div>
+          {/* 햄버거 — 모바일 */}
+          <button
+            className="site-nav-hamburger"
+            onClick={() => setMobileMenuOpen(o => !o)}
+            style={{ display: 'none', marginLeft: 'auto', background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#374151' }}
+            aria-label="메뉴"
+          >
+            {mobileMenuOpen ? '✕' : '☰'}
+          </button>
+          {/* 모바일 드롭다운 */}
+          {mobileMenuOpen && (
+            <div style={{
+              position: 'absolute', top: 64, left: 0, right: 0, background: '#fff',
+              borderBottom: '1px solid #e2e8f0', padding: '12px 24px', zIndex: 300,
+              display: 'flex', flexDirection: 'column', gap: 4,
+            }}>
+              {[
+                { href: '/daily', label: 'Daily 리포트' },
+                { href: '/strategies', label: '전략 라이브러리' },
+                { href: '/decision-log', label: 'AI 차단 로그' },
+                { href: '/engines', label: '엔진 현황' },
+                { href: '/blog', label: 'Blog' },
+                { href: '/pwa', label: '📱 ONE-HUB 앱 열기' },
+              ].map(n => (
+                <Link key={n.href} href={n.href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  style={{ fontSize: 14, fontWeight: 600, padding: '10px 8px', color: '#374151', textDecoration: 'none', borderRadius: 8 }}>
+                  {n.label}
+                </Link>
+              ))}
+            </div>
+          )}
+        </header>
 
         {/* ── HERO STATUS BAR ── */}
         <div className="status-bar">
@@ -130,12 +213,88 @@ export default function Home({ reports, stats }) {
                     : '-'}
                 </span>
               </div>
+              {accuracyPct != null && (
+                <>
+                  <div className="live-widget-divider" />
+                  <div className="live-widget-item">
+                    <span className="live-widget-label">🎯 AI 정확도</span>
+                    <span className="live-widget-val" style={{
+                      color: accuracyPct >= 70 ? '#2e7d32' : accuracyPct >= 50 ? '#f57c00' : '#e53935'
+                    }}>
+                      {accuracyPct}<span className="live-widget-unit">%</span>
+                    </span>
+                  </div>
+                </>
+              )}
+              {winRate != null && (
+                <>
+                  <div className="live-widget-divider" />
+                  <div className="live-widget-item">
+                    <span className="live-widget-label">📈 누적 승률</span>
+                    <span className="live-widget-val" style={{
+                      color: winRate >= 60 ? '#2e7d32' : winRate >= 45 ? '#f57c00' : '#e53935'
+                    }}>
+                      {winRate}<span className="live-widget-unit">%</span>
+                    </span>
+                  </div>
+                </>
+              )}
               <div className="live-widget-divider" />
               <a href="/pwa" className="live-widget-cta">ONE-HUB 열기 →</a>
               <a href="/pwa-guide" className="live-widget-cta" style={{marginLeft:8, background:'#e0edff', color:'#2563eb'}}>📱 설치 가이드</a>
             </div>
           </section>
         )}
+        {/* ── [v9.0] HERO 섹션 — 포지셔닝 + 실시간 현황 ── */}
+          <section style={{ padding: '40px 24px 32px', maxWidth: 1200, margin: '0 auto' }}>
+            {/* 포지셔닝 문구 */}
+            <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1e293b', lineHeight: 1.3, marginBottom: 20,
+                         fontFamily: 'Pretendard, sans-serif' }}>
+              AI가 분석하고<br/>
+              사람이 승인하는<br/>
+              반자동 투자 플랫폼
+            </h1>
+            {/* 오늘 현황 뱃지 */}
+            {mounted && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
+                {latest?.regime && (
+                  <span style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700,
+                    background: latest.regime === 'BEAR' ? '#fef2f2' : latest.regime === 'BULL' ? '#f0fdf4' : '#fffbeb',
+                    color:      latest.regime === 'BEAR' ? '#ef4444' : latest.regime === 'BULL' ? '#22c55e' : '#f59e0b',
+                  }}>
+                    {latest.regime === 'BEAR' ? '📉 BEAR' : latest.regime === 'BULL' ? '📈 BULL' : '➖ SIDEWAYS'}
+                  </span>
+                )}
+                {liveData?.market?.heat_score != null && (
+                  <span style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: '#fff7ed', color: '#f59e0b' }}>
+                    🌡 Heat {liveData.market.heat_score}
+                  </span>
+                )}
+                {latest?.trade_count != null && (
+                  <span style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: '#f0fdf4', color: '#22c55e' }}>
+                    ✅ 매수 {latest.trade_count}건
+                  </span>
+                )}
+                {latest?.block_count != null && (
+                  <span style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: '#f1f5f9', color: '#64748b' }}>
+                    🚫 차단 {latest.block_count}건
+                  </span>
+                )}
+              </div>
+            )}
+            {/* CTA 버튼 2개 */}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <Link href="/pwa" style={{
+                background: '#2563eb', color: '#fff', padding: '12px 24px', borderRadius: 10,
+                fontSize: 14, fontWeight: 700, textDecoration: 'none',
+              }}>🚀 ONE-HUB 시작하기</Link>
+              <Link href="/pwa-guide" style={{
+                background: '#f1f5f9', color: '#1e293b', padding: '12px 24px', borderRadius: 10,
+                fontSize: 14, fontWeight: 700, textDecoration: 'none',
+              }}>📱 앱 설치</Link>
+            </div>
+          </section>
+
         {/* ── PLATFORM INTRO ── */}
           <section className="platform-intro">
             <div className="pi-copy">

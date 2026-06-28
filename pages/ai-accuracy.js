@@ -70,7 +70,19 @@ export default function AiAccuracy() {
           {loading ? (
             <div style={{ color: "var(--color-muted)", fontFamily: "Space Mono, monospace", padding: "3rem 0" }}>Loading...</div>
           ) : !data?.ok ? (
-            <div style={{ color: "#A32D2D", fontFamily: "Space Mono, monospace" }}>데이터를 불러올 수 없습니다.</div>
+            <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
+              <div style={{ fontSize: 40, marginBottom: 16 }}>🔄</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 8 }}>데이터 수집 중</div>
+              <div style={{ fontSize: 13, color: "var(--color-muted)", lineHeight: 1.7, marginBottom: 16 }}>
+                AI 차단 정확도 분석은<br/>
+                <strong>5건 이상</strong>의 검증 완료 후 자동으로 표시됩니다.
+              </div>
+              {data?.total_blocked != null && (
+                <div style={{ display: "inline-block", padding: "8px 20px", borderRadius: 20, background: "#eff6ff", color: "#2563eb", fontSize: 13, fontWeight: 700 }}>
+                  현재 수집된 차단 건수: {data.total_blocked}건
+                </div>
+              )}
+            </div>
           ) : (
             <>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "1rem", marginBottom: "2.5rem" }}>
@@ -97,7 +109,10 @@ export default function AiAccuracy() {
                   <div key={si} style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "10px", padding: "1.5rem" }}>
                     <h3 style={{ fontFamily: "Syne, sans-serif", fontSize: "1rem", marginBottom: "1rem" }}>{section.title}</h3>
                     {section.items.length === 0 ? (
-                      <div style={{ color: "var(--color-muted)", fontSize: "0.85rem" }}>데이터 없음</div>
+                      <div style={{ textAlign: "center", padding: "20px 0" }}>
+                        <div style={{ fontSize: 24, marginBottom: 8 }}>🔄</div>
+                        <div style={{ fontSize: 13, color: "var(--color-muted)" }}>5건 이상 수집 후 표시됩니다</div>
+                      </div>
                     ) : section.items.map((item, i) => {
                       const total = section.items.reduce((s, x) => s + section.countF(x), 0);
                       const pct = total > 0 ? Math.round(section.countF(item) / total * 100) : 0;
@@ -120,7 +135,10 @@ export default function AiAccuracy() {
               <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "10px", padding: "1.5rem", marginBottom: "2.5rem" }}>
                 <h3 style={{ fontFamily: "Syne, sans-serif", fontSize: "1rem", marginBottom: "1rem" }}>일별 추천 트렌드 (최근 30일)</h3>
                 {dailyTrend.length === 0 ? (
-                  <div style={{ color: "var(--color-muted)", fontSize: "0.85rem" }}>데이터 없음</div>
+                  <div style={{ textAlign: "center", padding: "20px 0" }}>
+                    <div style={{ fontSize: 24, marginBottom: 8 }}>🔄</div>
+                    <div style={{ fontSize: 13, color: "var(--color-muted)" }}>5건 이상 수집 후 표시됩니다</div>
+                  </div>
                 ) : (
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Space Mono, monospace", fontSize: "0.8rem" }}>
@@ -148,7 +166,10 @@ export default function AiAccuracy() {
               <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "10px", padding: "1.5rem" }}>
                 <h3 style={{ fontFamily: "Syne, sans-serif", fontSize: "1rem", marginBottom: "1rem" }}>최근 AI 추천 (최대 50건)</h3>
                 {logs.length === 0 ? (
-                  <div style={{ color: "var(--color-muted)", fontSize: "0.85rem" }}>데이터 없음</div>
+                  <div style={{ textAlign: "center", padding: "20px 0" }}>
+                    <div style={{ fontSize: 24, marginBottom: 8 }}>🔄</div>
+                    <div style={{ fontSize: 13, color: "var(--color-muted)" }}>5건 이상 수집 후 표시됩니다</div>
+                  </div>
                 ) : (
                   <div style={{ overflowX: "auto" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "Space Mono, monospace", fontSize: "0.78rem" }}>
