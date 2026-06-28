@@ -43,6 +43,14 @@ export default function PWADashboard({ latestReport }) {
   const [actingCode, setActingCode] = useState(null); // 승인/거절 처리 중인 종목코드
   const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
 
+  // [v9.0] 투자성향 프로필
+  const [profile, setProfile] = useState({
+    style: 'balanced',      // aggressive | balanced | conservative
+    maxLoss: 10,            // 최대 허용 손실 %
+    investPeriod: 'mid',    // short(단기) | mid(중기) | long(장기)
+    riskTolerance: 5,       // 1~10
+  });
+
   // [v9.0] Splash Screen
   const [splash, setSplash] = useState(true);
 
@@ -79,6 +87,11 @@ export default function PWADashboard({ latestReport }) {
     setMounted(true);
     // [v9.0] Splash: 2초 후 해제
     const splashTimer = setTimeout(() => setSplash(false), 2000);
+    // [v9.0] 투자성향 프로필 로드
+    try {
+      const saved = window.localStorage.getItem('onehub_profile');
+      if (saved) setProfile(p => ({ ...p, ...JSON.parse(saved) }));
+    } catch (e) { /* 무시 */ }
     // [v8.5] 최근 검색 종목 불러오기
     try {
       const saved = window.localStorage.getItem('onehub_recent_searches');
@@ -103,6 +116,14 @@ export default function PWADashboard({ latestReport }) {
       }
     } catch (e) { /* 무시 */ }
     return () => clearTimeout(splashTimer);
+  }, []);
+
+  const saveProfile = useCallback((updates) => {
+    setProfile(prev => {
+      const next = { ...prev, ...updates };
+      try { window.localStorage.setItem('onehub_profile', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -397,9 +418,9 @@ export default function PWADashboard({ latestReport }) {
         </header>
 
         <nav className="pwa-tabs">
-          {['dashboard','recommend','portfolio','report'].map(t => (
+          {['dashboard','recommend','portfolio','report','profile'].map(t => (
             <button key={t} className={`pwa-tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
-              {t==='dashboard'?'홈':t==='recommend'?'추천':t==='portfolio'?'보유':'기록'}
+              {t==='dashboard'?'홈':t==='recommend'?'추천':t==='portfolio'?'보유':t==='report'?'기록':'내 설정'}
             </button>
           ))}
         </nav>
@@ -491,20 +512,26 @@ export default function PWADashboard({ latestReport }) {
                 </div>
               </section>
 
-              {/* [v9.0] Action Card — 오늘 해야 할 일 */}
+              {/* [v9.0] Action Card — 오늘 해야 할 일 (투자성향 반영) */}
               <section className="pwa-card action-card">
-                <span className="pwa-card-label">오늘 해야 할 일</span>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+                  <span className="pwa-card-label" style={{ marginBottom:0 }}>오늘 해야 할 일</span>
+                  <span className="dim mono" style={{ fontSize:'0.68rem' }}>
+                    {profile.style === 'conservative' ? '🛡️ 방어형' : profile.style === 'aggressive' ? '🚀 공격형' : '⚖️ 중립형'}
+                  </span>
+                </div>
                 <div className="action-grid">
-                  {[
-                    { label: '신규매수', ok: actionNew,
-                      warn: actionNewWarn && !actionNew },
-                    { label: '추가매수', ok: actionAdd,
-                      warn: false },
-                    { label: '물타기',   ok: false,
-                      warn: false },
-                    { label: '현금유지', ok: actionCash,
-                      warn: false },
-                  ].map(({ label, ok, warn }) => (
+                  {(() => {
+                    // 성향별 오버라이드 — conservative는 BULL에서도 신규매수 ⚠️
+                    const styleOk   = (base) => profile.style === 'aggressive' ? base || (regime === 'SIDEWAYS') : base;
+                    const styleWarn = (base, warn) => profile.style === 'conservative' && regime === 'BULL' ? true : warn;
+                    return [
+                      { label: '신규매수', ok: styleOk(actionNew),  warn: styleWarn(false, actionNewWarn && !actionNew) },
+                      { label: '추가매수', ok: styleOk(actionAdd),  warn: profile.style === 'conservative' && regime === 'BULL' },
+                      { label: '물타기',   ok: false,               warn: profile.style === 'aggressive' && regime !== 'BEAR' },
+                      { label: '현금유지', ok: actionCash || profile.style === 'conservative', warn: false },
+                    ];
+                  })().map(({ label, ok, warn }) => (
                     <div key={label} className={`action-item ${ok ? 'act-yes' : warn ? 'act-warn' : 'act-no'}`}>
                       <span className="action-icon">{ok ? '✅' : warn ? '⚠️' : '❌'}</span>
                       <span className="action-label">{label}</span>
@@ -1200,6 +1227,143 @@ export default function PWADashboard({ latestReport }) {
           </main>
         )}
 
+        {/* ── Profile Tab — 투자성향 설정 ── */}
+        {tab === 'profile' && (
+          <main className="pwa-main">
+
+            {/* 성향 선택 카드 */}
+            <section className="pwa-card">
+              <span className="pwa-card-label">투자 성향</span>
+              <p className="dim" style={{ fontSize:'0.74rem', marginBottom:12, lineHeight:1.5 }}>
+                성향에 맞게 Hero 행동 지침과 AI 판단 기준이 조정됩니다.
+              </p>
+              <div className="profile-style-grid">
+                {[
+                  { key:'conservative', label:'방어형', icon:'🛡️', desc:'안전 우선. 헤지·배당주 중심, 손실 최소화.' },
+                  { key:'balanced',     label:'중립형', icon:'⚖️', desc:'수익과 안전 균형. 다양한 섹터 분산.' },
+                  { key:'aggressive',   label:'공격형', icon:'🚀', desc:'고수익 추구. 성장주·모멘텀 집중.' },
+                ].map(s => (
+                  <button
+                    key={s.key}
+                    className={`profile-style-card ${profile.style === s.key ? 'selected' : ''}`}
+                    onClick={() => saveProfile({ style: s.key })}
+                  >
+                    <span className="profile-style-icon">{s.icon}</span>
+                    <span className="profile-style-label">{s.label}</span>
+                    <span className="profile-style-desc">{s.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            {/* 세부 설정 */}
+            <section className="pwa-card">
+              <span className="pwa-card-label">세부 설정</span>
+
+              {/* 최대 허용 손실 */}
+              <div className="profile-row">
+                <div className="profile-row-top">
+                  <span className="profile-row-label">최대 허용 손실</span>
+                  <span className="profile-row-val mono" style={{ color:'var(--accent-sell)' }}>-{profile.maxLoss}%</span>
+                </div>
+                <input
+                  type="range" min={3} max={30} step={1}
+                  value={profile.maxLoss}
+                  onChange={e => saveProfile({ maxLoss: Number(e.target.value) })}
+                  className="profile-slider"
+                />
+                <div className="profile-slider-hint">
+                  <span>안전 (-3%)</span><span>표준 (-10%)</span><span>공격 (-30%)</span>
+                </div>
+              </div>
+
+              {/* 투자 기간 */}
+              <div className="profile-row" style={{ marginTop:16 }}>
+                <span className="profile-row-label">투자 기간</span>
+                <div className="profile-period-btns">
+                  {[
+                    { key:'short', label:'단기 (1개월 미만)' },
+                    { key:'mid',   label:'중기 (1~6개월)' },
+                    { key:'long',  label:'장기 (6개월 이상)' },
+                  ].map(p => (
+                    <button
+                      key={p.key}
+                      className={`profile-period-btn ${profile.investPeriod === p.key ? 'selected' : ''}`}
+                      onClick={() => saveProfile({ investPeriod: p.key })}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 리스크 감내도 */}
+              <div className="profile-row" style={{ marginTop:16 }}>
+                <div className="profile-row-top">
+                  <span className="profile-row-label">리스크 감내도</span>
+                  <span className="profile-row-val mono">{profile.riskTolerance}/10</span>
+                </div>
+                <input
+                  type="range" min={1} max={10} step={1}
+                  value={profile.riskTolerance}
+                  onChange={e => saveProfile({ riskTolerance: Number(e.target.value) })}
+                  className="profile-slider"
+                />
+                <div className="profile-slider-hint">
+                  <span>낮음</span><span>중간</span><span>높음</span>
+                </div>
+              </div>
+            </section>
+
+            {/* 현재 설정 요약 */}
+            <section className="pwa-card" style={{ background:'var(--inset-bg)' }}>
+              <span className="pwa-card-label">현재 프로필 요약</span>
+              <div className="profile-summary">
+                <div className="profile-sum-row">
+                  <span className="dim">투자 성향</span>
+                  <span className="mono" style={{ fontWeight:700 }}>
+                    {profile.style === 'conservative' ? '🛡️ 방어형' : profile.style === 'aggressive' ? '🚀 공격형' : '⚖️ 중립형'}
+                  </span>
+                </div>
+                <div className="profile-sum-row">
+                  <span className="dim">최대 손실 허용</span>
+                  <span className="mono bear">-{profile.maxLoss}%</span>
+                </div>
+                <div className="profile-sum-row">
+                  <span className="dim">투자 기간</span>
+                  <span className="mono">{profile.investPeriod === 'short' ? '단기' : profile.investPeriod === 'long' ? '장기' : '중기'}</span>
+                </div>
+                <div className="profile-sum-row">
+                  <span className="dim">리스크 감내도</span>
+                  <span className="mono">{profile.riskTolerance}/10</span>
+                </div>
+              </div>
+              <p className="dim" style={{ fontSize:'0.7rem', marginTop:10, lineHeight:1.5 }}>
+                * 설정은 이 기기에 저장됩니다. AI 매수 기준은 서버 설정을 따릅니다.
+              </p>
+            </section>
+
+            {/* Trader 전환 + 테마 */}
+            <section className="pwa-card">
+              <span className="pwa-card-label">앱 설정</span>
+              <div className="profile-app-row">
+                <span>Trader 계정</span>
+                <div className="pwa-trader-toggle" style={{ margin:0 }}>
+                  <button className={trader==='A'?'active':''} onClick={()=>setTrader('A')}>A</button>
+                  <button className={trader==='B'?'active':''} onClick={()=>setTrader('B')}>B</button>
+                </div>
+              </div>
+              <div className="profile-app-row" style={{ marginTop:10 }}>
+                <span>테마</span>
+                <button className="pwa-theme-toggle" onClick={toggleTheme} style={{ fontSize:'1.2rem', background:'none', border:'none', cursor:'pointer' }}>
+                  {theme === 'light' ? '🌙 다크' : '☀️ 라이트'}
+                </button>
+              </div>
+            </section>
+
+          </main>
+        )}
+
         <footer className="pwa-footer">
           <Link href="/" className="mono dim">← Back to ONE-HUB</Link>
         </footer>
@@ -1346,6 +1510,26 @@ export default function PWADashboard({ latestReport }) {
         .ai-reason-row { display: flex; align-items: flex-start; gap: 8px; }
         .ai-reason-num { font-size: 0.8rem; color: #2563eb; font-weight: 700; flex-shrink: 0; }
         .ai-reason-text { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; }
+
+        /* [v9.0] Profile Tab */
+        .profile-style-grid { display: flex; flex-direction: column; gap: 8px; }
+        .profile-style-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-md); border: 2px solid var(--border); background: var(--inset-bg); cursor: pointer; text-align: left; transition: border-color 0.15s, background 0.15s; }
+        .profile-style-card.selected { border-color: #2563eb; background: color-mix(in srgb, #2563eb 8%, var(--card-bg)); }
+        .profile-style-icon { font-size: 1.4rem; flex-shrink: 0; }
+        .profile-style-label { font-size: 0.9rem; font-weight: 700; color: var(--text-primary); flex-shrink: 0; width: 44px; }
+        .profile-style-desc { font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4; }
+        .profile-row { display: flex; flex-direction: column; gap: 6px; }
+        .profile-row-top { display: flex; justify-content: space-between; align-items: center; }
+        .profile-row-label { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
+        .profile-row-val { font-size: 0.88rem; }
+        .profile-slider { width: 100%; accent-color: #2563eb; cursor: pointer; }
+        .profile-slider-hint { display: flex; justify-content: space-between; font-size: 0.64rem; color: var(--text-tertiary); margin-top: 2px; }
+        .profile-period-btns { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+        .profile-period-btn { padding: 9px 14px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: var(--inset-bg); color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; text-align: left; font-family: var(--font-body); }
+        .profile-period-btn.selected { border-color: #2563eb; color: #2563eb; background: color-mix(in srgb, #2563eb 8%, var(--card-bg)); font-weight: 700; }
+        .profile-summary { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+        .profile-sum-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; }
+        .profile-app-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.84rem; color: var(--text-primary); }
         .hero-eyebrow { font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; }
         .hero-regime { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
         .hero-regime-text { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; }
