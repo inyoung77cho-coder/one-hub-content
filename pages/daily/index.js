@@ -247,8 +247,8 @@ export default function DailyIndex({ posts, postsB }) {
               );
             })}
 
-              </div>  {/* grouped[month] list */}
-            </div>  {/* month group */}
+              </div>
+            </div>
           ))}
           {filteredPosts.length === 0 && (
             <div style={{ textAlign: "center", padding: "40px 0", color: "#a0aec0", fontFamily: "monospace", fontSize: "12px" }}>
