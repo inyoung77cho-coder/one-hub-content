@@ -5,11 +5,12 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import MarketScore from '../components/MarketScore';
+import { APP_VERSION } from '../lib/version';
 
 export default function Home({ reports, stats }) {
   const latest = reports[0] || null;
   const [mounted, setMounted] = useState(false);
-  const [engineVersion, setEngineVersion] = useState("v8.0");
+  const [engineVersion, setEngineVersion] = useState(APP_VERSION);
   const [liveData, setLiveData] = useState(null); // [v8.7] 홈페이지 ↔ PWA 실시간 연동
   const [accuracyPct, setAccuracyPct] = useState(null);       // [v9.0] AI 정확도
   const [winRate, setWinRate] = useState(null);               // [v9.0] 누적 승률
@@ -179,15 +180,14 @@ export default function Home({ reports, stats }) {
           </section>
         )}
         {/* ── [v9.0] HERO 섹션 ── */}
-          <section style={{ padding: '40px 24px 32px', maxWidth: 1200, margin: '0 auto' }}>
+          <section className="home-hero-section">
             {/* LIVE 배지 */}
             <div style={{ fontSize: 12, fontWeight: 600, color: '#22c55e', marginBottom: 12, fontFamily: 'monospace' }}>
               <span className="live-dot" />
               LIVE · auto_trade {engineVersion} RUNNING
             </div>
             {/* 포지셔닝 문구 */}
-            <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1e293b', lineHeight: 1.3, marginBottom: 20,
-                         fontFamily: 'Pretendard, sans-serif' }}>
+            <h1 className="home-hero-h1">
               AI가 시장을 읽고<br/>
               사람이 최종 결정합니다.
             </h1>
@@ -220,22 +220,10 @@ export default function Home({ reports, stats }) {
               </div>
             )}
             {/* CTA 버튼 3개 */}
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-              <Link href="/pwa" style={{
-                height: 44, display: 'inline-flex', alignItems: 'center',
-                background: '#2563eb', color: '#fff', padding: '0 24px', borderRadius: 10,
-                fontSize: 14, fontWeight: 700, textDecoration: 'none',
-              }}>🚀 ONE-HUB 시작하기</Link>
-              <Link href="/daily" style={{
-                height: 44, display: 'inline-flex', alignItems: 'center',
-                background: '#f0f6ff', color: '#2563eb', padding: '0 20px', borderRadius: 10,
-                fontSize: 14, fontWeight: 700, textDecoration: 'none',
-              }}>📋 오늘 리포트</Link>
-              <Link href="/decision-log" style={{
-                height: 44, display: 'inline-flex', alignItems: 'center',
-                background: '#f0f6ff', color: '#2563eb', padding: '0 20px', borderRadius: 10,
-                fontSize: 14, fontWeight: 700, textDecoration: 'none',
-              }}>🧠 AI 판단근거</Link>
+            <div className="home-cta-row">
+              <Link href="/pwa" className="home-cta-btn home-cta-primary">🚀 ONE-HUB 시작하기</Link>
+              <Link href="/daily" className="home-cta-btn home-cta-secondary">📋 오늘 리포트</Link>
+              <Link href="/decision-log" className="home-cta-btn home-cta-secondary">🧠 AI 판단근거</Link>
             </div>
           </section>
 
@@ -309,13 +297,8 @@ export default function Home({ reports, stats }) {
 
           {/* ── [B4] KPI 카드 4개 그리드 ── */}
           {(liveData || latest) && mounted && (
-            <section style={{ padding: '0 24px 24px', maxWidth: 1200, margin: '0 auto' }}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(4,1fr)',
-                gap: 12,
-              }}
-                className="kpi-grid">
+            <section className="home-kpi-section">
+              <div className="kpi-grid">
                 {[
                   { label: '🌡 AI 투자온도', val: liveData?.market?.heat_score ?? '-', unit: '점',
                     color: (liveData?.market?.heat_score ?? 0) >= 70 ? '#ef4444'

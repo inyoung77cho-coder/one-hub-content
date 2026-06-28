@@ -1783,5 +1783,71 @@ img { max-width: 100%; display: block; }
 }
 .live-widget-cta:hover { background: #1344b4; }
 
-/* [B4] KPI Grid mobile */
-@media (max-width: 640px) { .kpi-grid { grid-template-columns: repeat(2,1fr) !important; } }
+/* ── HOME HERO (index.js) ── */
+.home-hero-section {
+  padding: 40px 24px 28px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.home-hero-h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: #1e293b;
+  line-height: 1.3;
+  margin-bottom: 20px;
+  font-family: 'Pretendard', 'Noto Sans KR', sans-serif;
+}
+.home-cta-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.home-cta-btn {
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 20px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.home-cta-primary  { background: #2563eb; color: #fff; }
+.home-cta-secondary { background: #f0f6ff; color: #2563eb; }
+
+/* ── HOME KPI Section ── */
+.home-kpi-section {
+  padding: 0 24px 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* [B4] KPI Grid */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+/* ── Status bar mobile touch scroll ── */
+.status-bar {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── MOBILE ≤ 640px ── */
+@media (max-width: 640px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  .home-hero-section { padding: 24px 16px 20px; }
+  .home-hero-h1 { font-size: 22px; margin-bottom: 16px; }
+
+  .home-cta-row { flex-direction: column; gap: 8px; }
+  .home-cta-btn { width: 100%; padding: 0 16px; }
+
+  .home-kpi-section { padding: 0 16px 20px; }
+
+  /* status bar 가로스크롤 강제 */
+  .status-bar { gap: 8px; padding: 0 12px; }
+}
