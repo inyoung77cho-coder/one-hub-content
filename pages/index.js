@@ -57,6 +57,20 @@ export default function Home({ reports, stats }) {
   }
   const liveHeat = liveData?.market?.heat_score ?? null;
 
+  // 다음 분석 시간 계산 (KST: 08:50, 13:30, 15:30)
+  const getNextAnalysisTime = () => {
+    const now = new Date();
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const h = kst.getUTCHours(), m = kst.getUTCMinutes();
+    const cur = h * 60 + m;
+    const slots = [{ h: 8, m: 50 }, { h: 13, m: 30 }, { h: 15, m: 30 }];
+    for (const s of slots) {
+      const t = s.h * 60 + s.m;
+      if (cur < t) return `${String(s.h).padStart(2,'0')}:${String(s.m).padStart(2,'0')} KST`;
+    }
+    return '08:50 KST (내일)';
+  };
+
   return (
     <>
       <Head>
@@ -219,6 +233,12 @@ export default function Home({ reports, stats }) {
                 )}
               </div>
             )}
+            {/* 다음 분석 시간 */}
+            {mounted && (
+              <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 20, fontFamily: 'monospace' }}>
+                ⏰ 다음 분석: <strong style={{ color: '#2563eb' }}>{getNextAnalysisTime()}</strong>
+              </div>
+            )}
             {/* CTA 버튼 3개 */}
             <div className="home-cta-row">
               <Link href="/pwa" className="home-cta-btn home-cta-primary">🚀 ONE-HUB 시작하기</Link>
@@ -300,20 +320,20 @@ export default function Home({ reports, stats }) {
             <section className="home-kpi-section">
               <div className="kpi-grid">
                 {[
-                  { label: '🌡 AI 투자온도', val: liveData?.market?.heat_score ?? '-', unit: '점',
+                  { label: 'Regime', val: liveData?.market?.regime ?? (latest?.regime ?? '-'), unit: '',
+                    color: (liveData?.market?.regime ?? latest?.regime) === 'BULL' ? '#22c55e'
+                          :(liveData?.market?.regime ?? latest?.regime) === 'BEAR' ? '#ef4444' : '#f59e0b' },
+                  { label: '🌡 Heat', val: liveData?.market?.heat_score ?? '-', unit: '/100',
                     color: (liveData?.market?.heat_score ?? 0) >= 70 ? '#ef4444'
                           :(liveData?.market?.heat_score ?? 0) >= 40 ? '#f59e0b' : '#22c55e' },
-                  { label: '😨 공포탐욕', val: liveData?.market?.fear_greed ?? '-', unit: '점',
-                    color: (liveData?.market?.fear_greed ?? 50) <= 30 ? '#ef4444'
-                          :(liveData?.market?.fear_greed ?? 50) >= 70 ? '#22c55e' : '#f59e0b' },
-                  { label: '✅ AI 추천', val: latest?.trade_count ?? '-', unit: '건', color: '#22c55e' },
-                  { label: '🚫 AI 차단', val: latest?.block_count ?? '-', unit: '건', color: '#64748b' },
+                  { label: '🚫 차단', val: latest?.block_count ?? '-', unit: '건', color: '#ef4444' },
+                  { label: '✅ 매수', val: latest?.trade_count ?? '-', unit: '건', color: '#22c55e' },
                 ].map(k => (
                   <div key={k.label} style={{ background: '#fff', border: '1px solid #e2e8f0',
-                    borderRadius: 20, padding: 16, boxShadow: '0 2px 16px rgba(0,0,0,0.07)', textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6 }}>{k.label}</div>
-                    <div style={{ fontSize: 24, fontWeight: 800, color: k.color, fontFamily: 'monospace' }}>
-                      {k.val}<span style={{ fontSize: 13, fontWeight: 400 }}>{k.unit}</span>
+                    borderRadius: 20, padding: '16px 12px', boxShadow: '0 2px 16px rgba(0,0,0,0.07)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6, fontWeight: 600 }}>{k.label}</div>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: k.color, fontFamily: 'monospace' }}>
+                      {k.val}<span style={{ fontSize: 12, fontWeight: 400, color: '#94a3b8' }}>{k.unit}</span>
                     </div>
                   </div>
                 ))}
@@ -560,6 +580,13 @@ export default function Home({ reports, stats }) {
           </section>
 
         </main>
+
+        {/* ── Trust Center 링크 ── */}
+        <div style={{ textAlign: 'center', padding: '8px 0 24px', fontSize: 13 }}>
+          <Link href="/trust" style={{ color: '#94a3b8', textDecoration: 'none', fontFamily: 'monospace' }}>
+            🛡️ 시스템 상태 보기 →
+          </Link>
+        </div>
 
         {/* ── FOOTER ── */}
         <footer className="footer">

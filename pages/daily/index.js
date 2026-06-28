@@ -1,5 +1,5 @@
 import Head from "next/head";
-
+import CTABar from "../../components/CTABar";
 import Link from "next/link";
 
 import fs from "fs";
@@ -188,7 +188,7 @@ export default function DailyIndex({ posts, postsB }) {
             })}
 
           </div>
-
+          <CTABar />
         </main>
 
       </div>

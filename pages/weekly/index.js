@@ -3,6 +3,7 @@ import path from 'path'
 import matter from 'gray-matter'
 import Link from 'next/link'
 import Head from 'next/head'
+import CTABar from '../../components/CTABar'
 
 export default function WeeklyIndex({ reports }) {
   return (
@@ -58,6 +59,7 @@ export default function WeeklyIndex({ reports }) {
               </Link>
             ))}
           </div>
+          <CTABar />
         </main>
       </div>
     </>

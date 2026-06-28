@@ -7,6 +7,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Head from "next/head";
 import { APP_VERSION } from '../lib/version';
+import CTABar from '../components/CTABar';
 
 // ────────────────────────────────────────────────────────────
 // 스타일 상수
@@ -788,6 +789,7 @@ export default function EnginePage() {
             Decision Log →
           </a>
         </div>
+        <div style={{ padding: '0 24px 24px' }}><CTABar /></div>
       </div>
     </>
   );

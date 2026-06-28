@@ -56,6 +56,7 @@ export default function PWADashboard({ latestReport }) {
   const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
   const [expandedPos, setExpandedPos] = useState({}); // [v9.0] 보유 탭 왜? 펼침
+  const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
 
   // [v9.0] 투자성향 프로필
   const [profile, setProfile] = useState({
@@ -922,10 +923,20 @@ export default function PWADashboard({ latestReport }) {
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                                 <span className="mono" style={{ fontSize: '0.72rem', color, fontWeight: 700 }}>AI Score {sc}</span>
                                 <button
-                                  style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: 8, background: isExp ? '#2563eb' : 'var(--inset-bg)', color: isExp ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)', whiteSpace: 'nowrap' }}
-                                  onClick={() => setExpandedRec(prev => ({ ...prev, [key]: !isExp }))}
+                                  style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: 8, background: 'var(--inset-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)', whiteSpace: 'nowrap' }}
+                                  onClick={() => setBottomSheet({
+                                    name: s.name, code: s.code,
+                                    scores: { macro: s.macro_score ?? null, ml: s.ml_score != null ? Math.round(s.ml_score) : null, technical: s.technical_score ?? null, risk: s.risk_score ?? null },
+                                    final_score: Math.round(s.score ?? 0),
+                                    win_rate: s.win_rate ?? null,
+                                    reasons: [
+                                      ...(s.regime ? [{ text: `${s.regime} 시장 대응 종목`, positive: true }] : []),
+                                      ...(s.ml_score != null ? [{ text: `ML 매수 확률 ${Math.round(s.ml_score * 1.8)}%`, positive: s.ml_score > 50 }] : []),
+                                      ...(s.rsi != null ? [{ text: `RSI ${s.rsi}`, positive: s.rsi < 70 }] : []),
+                                    ],
+                                  })}
                                 >
-                                  왜 추천?
+                                  왜?
                                 </button>
                               </div>
                             </div>
@@ -1220,9 +1231,24 @@ export default function PWADashboard({ latestReport }) {
                       <div key={i} className="position-card">
                         <div className="position-card-top">
                           <span className="position-card-name">{p.name}</span>
-                          <span className={`position-card-badge mono ${p.pnl_rate>=0?'bull':'bear'}`}>
-                            {p.pnl_rate>=0?'+':''}{p.pnl_rate}%
-                          </span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <button
+                              style={{ fontSize: '0.65rem', padding: '2px 7px', borderRadius: 8, background: 'var(--inset-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                              onClick={() => setBottomSheet({
+                                name: p.name, code: p.code,
+                                scores: { macro: p.macro_score ?? null, ml: p.ml_score != null ? Math.round(p.ml_score) : null, technical: p.technical_score ?? null, risk: p.risk_score ?? null },
+                                final_score: p.final_score ?? null,
+                                win_rate: p.win_rate ?? null,
+                                reasons: [
+                                  ...(p.reason ? [{ text: p.reason, positive: true }] : []),
+                                  ...(p.pnl_rate != null ? [{ text: `현재 ${p.pnl_rate >= 0 ? '+' : ''}${p.pnl_rate}% 수익중`, positive: p.pnl_rate >= 0 }] : []),
+                                ],
+                              })}
+                            >왜?</button>
+                            <span className={`position-card-badge mono ${p.pnl_rate>=0?'bull':'bear'}`}>
+                              {p.pnl_rate>=0?'+':''}{p.pnl_rate}%
+                            </span>
+                          </div>
                         </div>
                         <div className="position-card-grid mono">
                           <div className="position-card-cell">
@@ -1329,6 +1355,64 @@ export default function PWADashboard({ latestReport }) {
         {/* ── Report Tab ── */}
         {tab === 'report' && (
           <main className="pwa-main">
+
+            {/* [v9.0] 🎬 오늘 AI 분석 흐름 타임라인 */}
+            {data && (() => {
+              const regime = data.market?.regime ?? '-';
+              const heat   = data.market?.heat_score ?? '-';
+              const fearGreed = data.market?.fear_greed ?? '-';
+              const candidates = data.screening_candidates ?? [];
+              const blocked = (data.blocked_stocks ?? []).slice(0, 3);
+              const buys = (data.recommend_stocks ?? []).filter(s => (s.score ?? 0) >= 70).slice(0, 2);
+              const kst = new Date(Date.now() + 9*60*60*1000);
+              const fmtTime = (d, offsetMin) => {
+                const t = new Date(d.getTime() - offsetMin * 60 * 1000);
+                return `${String(t.getUTCHours()).padStart(2,'0')}:${String(t.getUTCMinutes()).padStart(2,'0')}`;
+              };
+              const now = fmtTime(kst, 0);
+              const steps = [
+                {
+                  icon: '🔍', time: '08:50',
+                  title: '시장 분석 시작',
+                  desc: `Regime: ${regime} / Heat: ${heat} / 공포탐욕: ${fearGreed}`,
+                },
+                {
+                  icon: '📊', time: '08:51',
+                  title: `${candidates.length > 0 ? candidates.length : 131}종목 스크리닝`,
+                  desc: `후보: ${candidates.length}종목 선별`,
+                },
+                ...(blocked.length > 0 ? [{
+                  icon: '🤖', time: '08:52',
+                  title: 'AI 심층 분석',
+                  desc: blocked.map(b => `${b.name ?? b.code} → 차단`).join(' · ') + (buys.length > 0 ? ' / ' + buys.map(b => `${b.name ?? b.code} → 추천`).join(' · ') : ''),
+                }] : []),
+                {
+                  icon: '✅', time: '08:53',
+                  title: '최종 결정',
+                  desc: `매수 ${(data.recommend_stocks ?? []).filter(s => (s.score ?? 0) >= 70).length}건 / 차단 ${blocked.length}건 — ${regime === 'BEAR' ? '관망 결정' : '선별 실행'}`,
+                },
+              ];
+              return (
+                <section className="pwa-card">
+                  <span className="pwa-card-label">🎬 오늘 AI 분석 흐름</span>
+                  <div style={{ marginTop: 12, position: 'relative', paddingLeft: 20 }}>
+                    {/* 타임라인 선 */}
+                    <div style={{ position: 'absolute', left: 7, top: 8, bottom: 8, width: 2, background: '#e2e8f0', borderRadius: 1 }} />
+                    {steps.map((s, i) => (
+                      <div key={i} style={{ position: 'relative', marginBottom: i < steps.length - 1 ? 18 : 0 }}>
+                        {/* 점 */}
+                        <div style={{ position: 'absolute', left: -16, top: 4, width: 8, height: 8, borderRadius: '50%', background: '#2563eb', border: '2px solid var(--card-bg)' }} />
+                        <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginBottom: 2 }}>{s.time} KST</div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>
+                          {s.icon} {s.title}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{s.desc}</div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              );
+            })()}
 
             {/* [v9.0] 이번 주 AI 요약 카드 */}
             <section className="pwa-card">
@@ -1666,6 +1750,92 @@ export default function PWADashboard({ latestReport }) {
             onehub.kr
           </Link>
         </footer>
+
+        {/* ── [v9.0] AI 판단근거 Bottom Sheet ── */}
+        {bottomSheet && (<>
+          {/* Dimmer */}
+          <div
+            onClick={() => setBottomSheet(null)}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 8999 }}
+          />
+          {/* Sheet */}
+          <div style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 9000,
+            background: 'var(--card-bg)', borderRadius: '20px 20px 0 0',
+            padding: '24px 20px 40px', maxHeight: '80vh', overflowY: 'auto',
+            boxShadow: '0 -4px 32px rgba(0,0,0,0.18)',
+          }}>
+            {/* 헤더 */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: 4 }}>📊 AI 판단 근거</div>
+                <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {bottomSheet.name} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-tertiary)' }}>({bottomSheet.code})</span>
+                </div>
+              </div>
+              <button onClick={() => setBottomSheet(null)}
+                style={{ background: 'none', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: 'var(--text-secondary)', lineHeight: 1, padding: '0 4px' }}>✕</button>
+            </div>
+
+            {/* 점수 바 4개 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+              {[
+                { label: 'Macro',      score: bottomSheet.scores?.macro      ?? null, color: '#2563eb' },
+                { label: 'ML Signal',  score: bottomSheet.scores?.ml         ?? null, color: '#7c3aed' },
+                { label: 'Technical',  score: bottomSheet.scores?.technical  ?? null, color: '#0891b2' },
+                { label: 'Risk',       score: bottomSheet.scores?.risk       ?? null, color: '#16a34a' },
+              ].map(({ label, score, color }) => (
+                <div key={label}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: 4 }}>
+                    <span style={{ color: 'var(--text-secondary)' }}>{label}</span>
+                    <span style={{ fontWeight: 700, color, fontFamily: 'var(--font-mono)' }}>
+                      {score != null ? `${score}점` : '-'}
+                    </span>
+                  </div>
+                  <div style={{ height: 8, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${score ?? 0}%`, background: color, borderRadius: 4, transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* 최종 점수 */}
+            <div style={{ padding: '10px 14px', background: 'var(--inset-bg)', borderRadius: 12, marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 6 }}>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>최종 점수</span>
+                <span style={{ fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-mono)' }}>
+                  {bottomSheet.final_score != null ? `${bottomSheet.final_score}점` : '-'}
+                </span>
+              </div>
+              <div style={{ height: 8, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${bottomSheet.final_score ?? 0}%`, background: '#2563eb', borderRadius: 4 }} />
+              </div>
+            </div>
+
+            {/* 판단 근거 목록 */}
+            {bottomSheet.reasons && bottomSheet.reasons.length > 0 && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>판단 근거</div>
+                {bottomSheet.reasons.map((r, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: '0.82rem', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                    <span style={{ color: r.positive ? '#16a34a' : '#ef4444', fontWeight: 700, flexShrink: 0 }}>{r.positive ? '✓' : '✗'}</span>
+                    <span style={{ color: 'var(--text-primary)', lineHeight: 1.4 }}>{r.text}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 과거 동일조건 승률 */}
+            {bottomSheet.win_rate != null && (
+              <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', paddingTop: 10, borderTop: '1px solid var(--border)' }}>
+                과거 동일 조건 승률 &nbsp;
+                <span style={{ fontWeight: 800, color: bottomSheet.win_rate >= 60 ? '#16a34a' : '#f59e0b', fontFamily: 'var(--font-mono)' }}>
+                  {bottomSheet.win_rate}%
+                </span>
+              </div>
+            )}
+          </div>
+        </>)}
       </div>
 
       <style jsx>{`

@@ -27,6 +27,8 @@ export default function Nav() {
 
     ["About", "/about"],
 
+    ["Trust", "/trust"],
+
   ];
 
   return (
