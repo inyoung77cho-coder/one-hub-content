@@ -2,11 +2,12 @@
   "name": "ONE-HUB",
   "short_name": "ONE-HUB",
   "description": "ONE-HUB — AI 투자 의사결정 대시보드",
+  "id": "/pwa",
   "start_url": "/pwa",
   "scope": "/pwa",
   "display": "standalone",
-  "background_color": "#F4F9FF",
-  "theme_color": "#16213D",
+  "background_color": "#f0f6ff",
+  "theme_color": "#2563eb",
   "orientation": "portrait",
   "icons": [
     {

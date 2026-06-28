@@ -1,7 +1,7 @@
 // public/sw.js — ONE-HUB v9.0 PWA Service Worker
 
-const CACHE_VERSION = 'v2';
-const CACHE_NAME = `onehub-${CACHE_VERSION}`;
+const CACHE_VERSION = 'onehub-v2';
+const CACHE_NAME = CACHE_VERSION;
 const STATIC_ASSETS = ['/pwa', '/icons/icon-192.png', '/icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
@@ -17,17 +17,31 @@ self.addEventListener('activate', (event) => {
       Promise.all(
         keys
           .filter((key) => key.startsWith('onehub-') && key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
+          .map((key) => {
+            console.log('[SW] 이전 캐시 삭제:', key);
+            return caches.delete(key);
+          })
       )
     ).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', (event) => {
-  // API 요청은 캐시 제외 — 항상 네트워크
+  // API 요청은 항상 네트워크
   if (event.request.url.includes('/api/')) return;
+
+  // cache-first 전략: 캐시 히트 → 반환, 미스 → 네트워크 후 캐시 저장
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    caches.match(event.request).then((cached) => {
+      if (cached) return cached;
+      return fetch(event.request).then((response) => {
+        if (response && response.status === 200 && response.type === 'basic') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => cached);
+    })
   );
 });
 

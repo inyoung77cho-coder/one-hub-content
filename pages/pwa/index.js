@@ -46,10 +46,11 @@ export default function PWADashboard({ latestReport }) {
   // [v9.0] 투자성향 프로필
   const [profile, setProfile] = useState({
     style: 'balanced',      // aggressive | balanced | conservative
-    maxLoss: 10,            // 최대 허용 손실 %
-    investPeriod: 'mid',    // short(단기) | mid(중기) | long(장기)
-    riskTolerance: 5,       // 1~10
+    maxLoss: 10,
+    investPeriod: 'mid',
+    riskTolerance: 5,
   });
+  const [onboarding, setOnboarding] = useState(false); // 최초 실행 온보딩
 
   // [v9.0] Splash Screen
   const [splash, setSplash] = useState(true);
@@ -87,10 +88,15 @@ export default function PWADashboard({ latestReport }) {
     setMounted(true);
     // [v9.0] Splash: 2초 후 해제
     const splashTimer = setTimeout(() => setSplash(false), 2000);
-    // [v9.0] 투자성향 프로필 로드
+    // [v9.0] 투자성향 프로필 로드 — 없으면 온보딩 표시
     try {
       const saved = window.localStorage.getItem('onehub_profile');
-      if (saved) setProfile(p => ({ ...p, ...JSON.parse(saved) }));
+      if (saved) {
+        setProfile(p => ({ ...p, ...JSON.parse(saved) }));
+      } else {
+        // Splash 2초 후 온보딩 표시
+        setTimeout(() => setOnboarding(true), 2100);
+      }
     } catch (e) { /* 무시 */ }
     // [v8.5] 최근 검색 종목 불러오기
     try {
@@ -118,12 +124,13 @@ export default function PWADashboard({ latestReport }) {
     return () => clearTimeout(splashTimer);
   }, []);
 
-  const saveProfile = useCallback((updates) => {
+  const saveProfile = useCallback((updates, closeOnboarding = false) => {
     setProfile(prev => {
       const next = { ...prev, ...updates };
       try { window.localStorage.setItem('onehub_profile', JSON.stringify(next)); } catch (e) {}
       return next;
     });
+    if (closeOnboarding) setOnboarding(false);
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -395,6 +402,43 @@ export default function PWADashboard({ latestReport }) {
         </div>
       )}
 
+      {/* [v9.0] 투자성향 온보딩 — 최초 실행 시 */}
+      {onboarding && !splash && (
+        <div className="onboarding-overlay">
+          <div className="onboarding-card">
+            <div className="onboarding-logo">ONE-HUB</div>
+            <h2 className="onboarding-title">투자 성향을 선택하세요</h2>
+            <p className="onboarding-desc">AI 판단 기준과 행동 지침이 성향에 맞게 조정됩니다.</p>
+            <div className="onboarding-options">
+              {[
+                { key: 'conservative', icon: '🛡️', label: '보수형', desc: '안전 우선 · 손실 최소화 · 헤지/배당주 중심', sub: 'Risk 가중치 높음' },
+                { key: 'balanced',     icon: '⚖️', label: '균형형', desc: '수익과 안전 균형 · 다양한 섹터 분산', sub: '기본값' },
+                { key: 'aggressive',   icon: '🚀', label: '공격형', desc: '고수익 추구 · 성장주/모멘텀 집중', sub: 'ML 가중치 높음 · 적극 매매' },
+              ].map(o => (
+                <button
+                  key={o.key}
+                  className={`onboarding-opt ${profile.style === o.key ? 'selected' : ''}`}
+                  onClick={() => saveProfile({ style: o.key })}
+                >
+                  <span className="onboarding-opt-icon">{o.icon}</span>
+                  <div className="onboarding-opt-text">
+                    <span className="onboarding-opt-label">{o.label}</span>
+                    <span className="onboarding-opt-desc">{o.desc}</span>
+                    <span className="onboarding-opt-sub">{o.sub}</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button
+              className="onboarding-confirm"
+              onClick={() => saveProfile({}, true)}
+            >
+              시작하기 →
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className={`pwa-wrapper theme-${theme}`} style={{ display: splash ? 'none' : undefined }}>
         <header className="pwa-header">
           <div className="pwa-brand">
@@ -475,63 +519,86 @@ export default function PWADashboard({ latestReport }) {
             )}
             {data && (<>
 
-              {/* [v9.0] Hero 카드 — Regime 크게 + AI Confidence + 버튼 2개 */}
-              <section className="hero-v9" style={{ borderColor: heroBorderTint(regime) }}>
-                <div className="hero-v9-eyebrow">{regimeIcon(regime)} 오늘의 시장</div>
-                <div className={`hero-v9-regime ${regimeClass(regime)}`}>{regimeMarket(regime)}</div>
-                <div className="hero-v9-sub">{regimeKo(regime)}{regimeDays !== null ? ` · ${regimeDays}일째` : ''}</div>
+              {/* [v9.0] Hero 카드 */}
+              {(() => {
+                const rColor = regime === 'BEAR' ? '#ef4444' : regime === 'BULL' ? '#22c55e' : '#f59e0b';
+                const aiConf = data?.ai_confidence ?? heat;
+                const verdictText = regime === 'BEAR' ? '🚫 관망' : regime === 'BULL' ? '📈 매수' : '🔍 선별매수';
+                return (
+                  <section className="hero-v9" style={{ borderColor: rColor }}>
+                    {/* Regime 크게 */}
+                    <div className="hero-v9-regime-row">
+                      <span className="hero-v9-regime" style={{ color: rColor }}>
+                        {regimeIcon(regime)} {regimeMarket(regime)}
+                      </span>
+                      {regimeDays !== null && (
+                        <span className="hero-v9-days dim mono">{regimeDays}일째</span>
+                      )}
+                    </div>
 
-                {/* 오늘 행동 뱃지 */}
-                <div className="hero-v9-verdict">
-                  <span className="hero-v9-verdict-badge" style={{
-                    background: regime === 'BEAR' ? 'color-mix(in srgb,var(--accent-sell) 12%,var(--card-bg))'
-                               : regime === 'BULL' ? 'color-mix(in srgb,var(--accent-buy) 12%,var(--card-bg))'
-                               : 'color-mix(in srgb,var(--accent-warn) 12%,var(--card-bg))',
-                    color: regime === 'BEAR' ? 'var(--accent-sell)' : regime === 'BULL' ? 'var(--accent-buy)' : 'var(--accent-warn)',
-                    border: `1px solid ${regime === 'BEAR' ? 'var(--accent-sell)' : regime === 'BULL' ? 'var(--accent-buy)' : 'var(--accent-warn)'}`,
-                  }}>
-                    {heroVerdict(regime, heat)}
-                  </span>
-                  {heat !== null && (
-                    <span className="hero-v9-conf mono" style={{ color: heatColor(heat) }}>
-                      AI {heat}점
-                    </span>
-                  )}
-                </div>
+                    {/* AI Confidence */}
+                    <div className="hero-v9-conf-row">
+                      <span className="hero-v9-conf-label">AI Confidence</span>
+                      <span className="hero-v9-conf-val" style={{ color: rColor }}>
+                        {aiConf !== null ? `${aiConf}%` : '-'}
+                      </span>
+                    </div>
 
-                <p className="hero-v9-msg">{heroMessage(regime, heat)}</p>
+                    {/* 오늘 행동 */}
+                    <div className="hero-v9-verdict-row">
+                      <span className="hero-v9-verdict-label">오늘 행동</span>
+                      <span className="hero-v9-verdict-badge" style={{
+                        background: `${rColor}1a`,
+                        color: rColor,
+                        border: `1px solid ${rColor}55`,
+                      }}>
+                        {verdictText}
+                      </span>
+                    </div>
 
-                {/* 버튼 2개 */}
-                <div className="hero-v9-btns">
-                  <button className="hero-v9-btn primary" onClick={() => setTab('report')}>
-                    오늘 리포트
-                  </button>
-                  <button className="hero-v9-btn secondary" onClick={() => setTab('recommend')}>
-                    추천 보기
-                  </button>
-                </div>
-              </section>
+                    {/* 버튼 2개 */}
+                    <div className="hero-v9-btns">
+                      <button className="hero-v9-btn primary" onClick={() => setTab('report')}>
+                        📋 오늘 리포트
+                      </button>
+                      <button className="hero-v9-btn secondary" onClick={() => setTab('recommend')}>
+                        ⭐ 추천 보기
+                      </button>
+                    </div>
+                  </section>
+                );
+              })()}
 
-              {/* [v9.0] Action Card — 오늘 해야 할 일 (투자성향 반영) */}
+              {/* [v9.0][5] Action Card — 📋 오늘 해야 할 일 */}
               <section className="pwa-card action-card">
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
-                  <span className="pwa-card-label" style={{ marginBottom:0 }}>오늘 해야 할 일</span>
-                  <span className="dim mono" style={{ fontSize:'0.68rem' }}>
-                    {profile.style === 'conservative' ? '🛡️ 방어형' : profile.style === 'aggressive' ? '🚀 공격형' : '⚖️ 중립형'}
-                  </span>
-                </div>
+                <span className="pwa-card-label">📋 오늘 해야 할 일</span>
                 <div className="action-grid">
-                  {(() => {
-                    // 성향별 오버라이드 — conservative는 BULL에서도 신규매수 ⚠️
-                    const styleOk   = (base) => profile.style === 'aggressive' ? base || (regime === 'SIDEWAYS') : base;
-                    const styleWarn = (base, warn) => profile.style === 'conservative' && regime === 'BULL' ? true : warn;
-                    return [
-                      { label: '신규매수', ok: styleOk(actionNew),  warn: styleWarn(false, actionNewWarn && !actionNew) },
-                      { label: '추가매수', ok: styleOk(actionAdd),  warn: profile.style === 'conservative' && regime === 'BULL' },
-                      { label: '물타기',   ok: false,               warn: profile.style === 'aggressive' && regime !== 'BEAR' },
-                      { label: '현금유지', ok: actionCash || profile.style === 'conservative', warn: false },
-                    ];
-                  })().map(({ label, ok, warn }) => (
+                  {[
+                    {
+                      label: '신규매수',
+                      ok:   regime === 'BULL',
+                      warn: regime === 'SIDEWAYS',
+                      no:   regime === 'BEAR',
+                    },
+                    {
+                      label: '추가매수',
+                      ok:   regime === 'BULL',
+                      warn: false,
+                      no:   regime !== 'BULL',
+                    },
+                    {
+                      label: '물타기',
+                      ok:   false,
+                      warn: false,
+                      no:   true,
+                    },
+                    {
+                      label: '현금유지',
+                      ok:   regime === 'BEAR' || regime === 'SIDEWAYS',
+                      warn: false,
+                      no:   regime === 'BULL',
+                    },
+                  ].map(({ label, ok, warn, no }) => (
                     <div key={label} className={`action-item ${ok ? 'act-yes' : warn ? 'act-warn' : 'act-no'}`}>
                       <span className="action-icon">{ok ? '✅' : warn ? '⚠️' : '❌'}</span>
                       <span className="action-label">{label}</span>
@@ -540,44 +607,66 @@ export default function PWADashboard({ latestReport }) {
                 </div>
               </section>
 
-              {/* [v9.0] AI 판단 근거 카드 */}
+              {/* [v9.0][6] AI 판단 근거 카드 */}
               {regime && (() => {
-                const h = heat ?? 50;
+                const h  = heat      ?? 50;
                 const fg = fearGreed ?? 50;
+                const v  = vix       ?? 18;
+
+                // BUY/SELL/WAIT 확률
                 let buyP, sellP, waitP;
                 if (regime === 'BULL') {
                   buyP  = Math.round(40 + (h / 100) * 35);
                   sellP = Math.round(5  + ((100 - fg) / 100) * 10);
-                  waitP = 100 - buyP - sellP;
                 } else if (regime === 'BEAR') {
                   sellP = Math.round(40 + ((100 - h) / 100) * 35);
                   buyP  = Math.round(5  + (fg / 100) * 10);
-                  waitP = 100 - buyP - sellP;
                 } else {
                   waitP = Math.round(45 + ((50 - Math.abs(h - 50)) / 50) * 20);
                   buyP  = Math.round((100 - waitP) * (h / 100));
                   sellP = 100 - buyP - waitP;
                 }
-                buyP  = Math.max(0, Math.min(buyP,  100));
-                sellP = Math.max(0, Math.min(sellP, 100));
+                buyP  = Math.max(0, Math.min(buyP  ?? 0, 100));
+                sellP = Math.max(0, Math.min(sellP ?? 0, 100));
                 waitP = Math.max(0, 100 - buyP - sellP);
 
-                // "AI가 관망한 이유" — 상위 3개 근거
+                // 조건 기반 판단 이유 자동 생성
+                const actionLabel = regime === 'BULL' ? '매수한' : '관망한';
                 const reasons = [];
-                if (heat !== null) reasons.push(`Heat ${heatLabel(heat)} (${heat}점)`);
-                if (vix  !== null) reasons.push(`VIX ${vix}${vix >= 25 ? ' — 변동성 경고' : ''}`);
-                if (fearGreed !== null) reasons.push(`공포탐욕 ${fearGreed} (${fgLabel(fearGreed)})`);
+                if (regime === 'BEAR')              reasons.push('BEAR 레짐 — 전체 시장 하락 국면');
+                if (fg < 20)                        reasons.push(`공포탐욕 ${fg} — 극단적 공포 구간`);
+                if (heat !== null && heat < 30)     reasons.push(`Heat ${heat}점 — 시장 투자온도 낮음`);
+                if (vix  !== null && vix >= 25)     reasons.push(`VIX ${vix} — 변동성 급등 경고`);
+                if (fearGreed !== null && fg >= 80) reasons.push(`공포탐욕 ${fg} — 극단적 탐욕, 과열 주의`);
+                if (reasons.length === 0 && regime === 'SIDEWAYS') reasons.push('뚜렷한 방향 없음 — 선별적 접근 권장');
+                if (reasons.length === 0)           reasons.push('종합 지표 정상 범위 — AI 매매 기준 충족');
 
                 return (
                   <section className="pwa-card ai-basis-card">
-                    <span className="pwa-card-label">🤖 AI 판단 근거</span>
+                    <span className="pwa-card-label">🧠 AI 판단 근거</span>
+
+                    {/* 지표 3개 + 방향 화살표 */}
+                    <div className="ai-basis-metrics" style={{ marginBottom: 14 }}>
+                      {[
+                        { label: 'VIX',    val: vix,      dir: v >= 20 ? '↑' : '↓', color: v >= 25 ? 'var(--accent-sell)' : v >= 20 ? 'var(--accent-warn)' : 'var(--accent-buy)' },
+                        { label: 'Fear&Greed', val: fearGreed, dir: fg >= 50 ? '↑' : '↓', color: fgColor(fearGreed) },
+                        { label: 'Heat',   val: heat,     dir: h >= 50 ? '↑' : '↓', color: heatColor(heat) },
+                      ].map(m => m.val !== null && (
+                        <div key={m.label} className="ai-basis-metric">
+                          <span className="ai-basis-metric-label">{m.label}</span>
+                          <span className="ai-basis-metric-val mono" style={{ color: m.color }}>
+                            {m.val} <span className="ai-arrow">{m.dir}</span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
 
                     {/* BUY / WAIT / SELL 확률 바 */}
                     <div className="ai-basis-bars">
                       {[
-                        { label: 'BUY',  pct: buyP,  color: 'var(--accent-buy)' },
-                        { label: 'WAIT', pct: waitP, color: 'var(--accent-warn)' },
-                        { label: 'SELL', pct: sellP, color: 'var(--accent-sell)' },
+                        { label: 'BUY',  pct: buyP,  color: '#22c55e' },
+                        { label: 'WAIT', pct: waitP, color: '#f59e0b' },
+                        { label: 'SELL', pct: sellP, color: '#ef4444' },
                       ].map(b => (
                         <div key={b.label} className="ai-basis-bar-row">
                           <span className="ai-basis-bar-label mono">{b.label}</span>
@@ -589,58 +678,28 @@ export default function PWADashboard({ latestReport }) {
                       ))}
                     </div>
 
-                    {/* 지표 4개 그리드 */}
-                    <div className="ai-basis-metrics">
-                      {heat !== null && (
-                        <div className="ai-basis-metric">
-                          <span className="ai-basis-metric-label">Heat</span>
-                          <span className="ai-basis-metric-val mono" style={{ color: heatColor(heat) }}>
-                            {heat}<span className="dim">/100</span>
-                            <span className="ai-arrow">{heat >= 50 ? ' ↑' : ' ↓'}</span>
-                          </span>
+                    {/* 판단 요약 ①②③ */}
+                    <div className="ai-reasons">
+                      <span className="ai-reasons-title">AI가 오늘 {actionLabel} 이유</span>
+                      {reasons.slice(0, 3).map((r, i) => (
+                        <div key={i} className="ai-reason-row">
+                          <span className="ai-reason-num">{'①②③'[i]}</span>
+                          <span className="ai-reason-text">{r}</span>
                         </div>
-                      )}
-                      {fearGreed !== null && (
-                        <div className="ai-basis-metric">
-                          <span className="ai-basis-metric-label">공포탐욕</span>
-                          <span className="ai-basis-metric-val mono" style={{ color: fgColor(fearGreed) }}>
-                            {fearGreed}
-                            <span className="ai-arrow">{fearGreed >= 50 ? ' ↑' : ' ↓'}</span>
-                          </span>
-                        </div>
-                      )}
-                      {vix !== null && (
-                        <div className="ai-basis-metric">
-                          <span className="ai-basis-metric-label">VIX</span>
-                          <span className="ai-basis-metric-val mono" style={{ color: vix >= 25 ? 'var(--accent-sell)' : vix >= 20 ? 'var(--accent-warn)' : 'var(--accent-buy)' }}>
-                            {vix}
-                            <span className="ai-arrow">{vix >= 20 ? ' ↑' : ' ↓'}</span>
-                          </span>
-                        </div>
-                      )}
-                      {regimeDays !== null && (
-                        <div className="ai-basis-metric">
-                          <span className="ai-basis-metric-label">레짐 지속</span>
-                          <span className="ai-basis-metric-val mono">{regimeDays}일</span>
-                        </div>
-                      )}
+                      ))}
                     </div>
-
-                    {/* AI 관망 이유 리스트 */}
-                    {reasons.length > 0 && (
-                      <div className="ai-reasons">
-                        <span className="ai-reasons-title">AI가 오늘 {regime === 'BEAR' ? '관망한' : regime === 'BULL' ? '매수한' : '관망한'} 이유</span>
-                        {reasons.map((r, i) => (
-                          <div key={i} className="ai-reason-row">
-                            <span className="ai-reason-num">{'①②③'[i]}</span>
-                            <span className="ai-reason-text">{r}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </section>
                 );
               })()}
+
+              {/* [v9.0] 투자성향 배지 */}
+              <div className="profile-badge-row">
+                <span className="profile-badge-label">
+                  현재 투자성향:&nbsp;
+                  <strong>{profile.style === 'conservative' ? '🛡️ 보수형' : profile.style === 'aggressive' ? '🚀 공격형' : '⚖️ 균형형'}</strong>
+                </span>
+                <button className="profile-badge-change" onClick={() => setTab('profile')}>변경 →</button>
+              </div>
 
               {/* AI 활동 요약 — 4칸 그리드 */}
               <section className="pwa-card">
@@ -1467,18 +1526,33 @@ export default function PWADashboard({ latestReport }) {
         .splash-dots span:nth-child(3) { animation-delay: 0.4s; }
         @keyframes splash-bounce { 0%,80%,100%{transform:scale(0.8);opacity:0.5} 40%{transform:scale(1.2);opacity:1} }
 
-        /* [v9.0] Hero 카드 v9 */
-        .hero-v9 { background: var(--hero-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 22px 20px 18px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; gap: 10px; }
-        .hero-v9-eyebrow { font-size: 0.75rem; color: var(--text-tertiary); font-weight: 600; }
-        .hero-v9-regime { font-family: var(--font-display); font-size: 1.9rem; font-weight: 800; line-height: 1.1; }
-        .hero-v9-regime.bull { color: var(--accent-buy); }
-        .hero-v9-regime.bear { color: var(--accent-sell); }
-        .hero-v9-regime.side { color: var(--accent-warn); }
-        .hero-v9-sub { font-size: 0.78rem; color: var(--text-secondary); }
-        .hero-v9-verdict { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+        /* [v9.0] Onboarding Gate */
+        .onboarding-overlay { position: fixed; inset: 0; z-index: 9000; background: rgba(15,23,42,0.72); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .onboarding-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 28px 22px 24px; max-width: 400px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .onboarding-logo { font-family: var(--font-display); font-size: 1.1rem; font-weight: 800; color: #2563eb; letter-spacing: 0.15em; margin-bottom: 12px; }
+        .onboarding-title { font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin: 0 0 6px; }
+        .onboarding-desc { font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 18px; line-height: 1.5; }
+        .onboarding-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+        .onboarding-opt { display: flex; align-items: flex-start; gap: 12px; padding: 13px 14px; border-radius: var(--radius-md); border: 1.5px solid var(--border); background: var(--inset-bg); cursor: pointer; text-align: left; font-family: var(--font-body); transition: border-color 0.15s, background 0.15s; }
+        .onboarding-opt.selected { border-color: #2563eb; background: color-mix(in srgb, #2563eb 10%, var(--card-bg)); }
+        .onboarding-opt-icon { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
+        .onboarding-opt-text { display: flex; flex-direction: column; gap: 2px; }
+        .onboarding-opt-label { font-size: 0.88rem; font-weight: 700; color: var(--text-primary); }
+        .onboarding-opt-desc { font-size: 0.76rem; color: var(--text-secondary); line-height: 1.4; }
+        .onboarding-opt-sub { font-size: 0.7rem; color: var(--text-tertiary); font-style: italic; }
+        .onboarding-confirm { width: 100%; padding: 12px; background: #2563eb; color: #fff; border: none; border-radius: var(--radius-md); font-size: 0.9rem; font-weight: 700; cursor: pointer; font-family: var(--font-body); }
+
+        /* [v9.0] Hero 카드 v9 — Regime 크게 + AI Confidence + 오늘행동 + 버튼2 */
+        .hero-v9 { background: var(--hero-bg); border: 2px solid var(--border); border-radius: var(--radius-card); padding: 22px 20px 18px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; gap: 12px; }
+        .hero-v9-regime-row { display: flex; align-items: baseline; justify-content: space-between; }
+        .hero-v9-regime { font-family: var(--font-display); font-size: 2rem; font-weight: 800; line-height: 1.1; }
+        .hero-v9-days { font-size: 0.75rem; color: var(--text-tertiary); }
+        .hero-v9-conf-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+        .hero-v9-conf-label { font-size: 0.75rem; color: var(--text-tertiary); font-weight: 600; letter-spacing: 0.04em; }
+        .hero-v9-conf-val { font-family: var(--font-mono); font-size: 1.3rem; font-weight: 800; }
+        .hero-v9-verdict-row { display: flex; align-items: center; justify-content: space-between; }
+        .hero-v9-verdict-label { font-size: 0.75rem; color: var(--text-tertiary); font-weight: 600; }
         .hero-v9-verdict-badge { font-size: 0.8rem; font-weight: 700; padding: 5px 14px; border-radius: var(--radius-pill); }
-        .hero-v9-conf { font-size: 0.8rem; font-weight: 700; }
-        .hero-v9-msg { font-size: 0.83rem; color: var(--text-secondary); line-height: 1.55; }
         .hero-v9-btns { display: flex; gap: 8px; margin-top: 4px; }
         .hero-v9-btn { flex: 1; padding: 10px 0; border-radius: var(--radius-md); font-size: 0.82rem; font-weight: 700; cursor: pointer; border: none; font-family: var(--font-body); }
         .hero-v9-btn.primary { background: #2563eb; color: #fff; }
@@ -1512,6 +1586,12 @@ export default function PWADashboard({ latestReport }) {
         .ai-reason-text { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; }
 
         /* [v9.0] Profile Tab */
+        /* 투자성향 배지 */
+        .profile-badge-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: color-mix(in srgb, #2563eb 8%, var(--card-bg)); border: 1px solid color-mix(in srgb, #2563eb 20%, var(--border)); border-radius: var(--radius-md); }
+        .profile-badge-label { font-size: 0.78rem; color: var(--text-secondary); }
+        .profile-badge-label strong { color: var(--text-primary); }
+        .profile-badge-change { background: none; border: none; font-size: 0.75rem; color: #2563eb; cursor: pointer; font-weight: 700; font-family: var(--font-body); padding: 0; }
+
         .profile-style-grid { display: flex; flex-direction: column; gap: 8px; }
         .profile-style-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-md); border: 2px solid var(--border); background: var(--inset-bg); cursor: pointer; text-align: left; transition: border-color 0.15s, background 0.15s; }
         .profile-style-card.selected { border-color: #2563eb; background: color-mix(in srgb, #2563eb 8%, var(--card-bg)); }
