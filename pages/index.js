@@ -11,7 +11,6 @@ export default function Home({ reports, stats }) {
   const [mounted, setMounted] = useState(false);
   const [engineVersion, setEngineVersion] = useState("v8.0");
   const [liveData, setLiveData] = useState(null); // [v8.7] 홈페이지 ↔ PWA 실시간 연동
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false); // [v9.0] 햄버거 메뉴
   const [accuracyPct, setAccuracyPct] = useState(null);       // [v9.0] AI 정확도
   const [winRate, setWinRate] = useState(null);               // [v9.0] 누적 승률
 
@@ -69,78 +68,6 @@ export default function Home({ reports, stats }) {
       </Head>
 
       <div className="page-wrapper">
-
-        {/* ── [v9.0] GLOBAL HEADER: Logo좌 / 메뉴중앙 / CTA우 ── */}
-        <header style={{
-          height: 64, background: '#fff', borderBottom: '1px solid #e2e8f0',
-          position: 'sticky', top: 0, zIndex: 200, display: 'flex', alignItems: 'center',
-          padding: '0 24px',
-        }}>
-          {/* Logo 좌측 */}
-          <Link href="/" style={{ fontFamily: 'Pretendard, monospace', fontWeight: 800, fontSize: 16, color: '#1e293b', letterSpacing: '0.08em', textDecoration: 'none', flexShrink: 0 }}>
-            ONE-HUB
-          </Link>
-          {/* 메뉴 중앙 */}
-          <nav style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 4,
-                        '@media(maxWidth:768px)': { display: 'none' } }}
-               className="site-nav-links">
-            {[
-              { href: '/daily', label: 'Daily' },
-              { href: '/strategies', label: '전략' },
-              { href: '/decision-log', label: '차단 로그' },
-              { href: '/engines', label: '엔진' },
-              { href: '/blog', label: 'Blog' },
-            ].map(n => (
-              <Link key={n.href} href={n.href} style={{
-                fontSize: 13, fontWeight: 600, padding: '5px 12px', borderRadius: 8,
-                color: '#64748b', textDecoration: 'none',
-              }}>
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-          {/* CTA 우측 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }} className="site-nav-cta">
-            <Link href="/pwa" style={{
-              background: '#2563eb', color: '#fff', padding: '8px 18px', borderRadius: 8,
-              fontSize: 13, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap',
-            }}>
-              앱 열기
-            </Link>
-          </div>
-          {/* 햄버거 — 모바일 */}
-          <button
-            className="site-nav-hamburger"
-            onClick={() => setMobileMenuOpen(o => !o)}
-            style={{ display: 'none', marginLeft: 'auto', background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#374151' }}
-            aria-label="메뉴"
-          >
-            {mobileMenuOpen ? '✕' : '☰'}
-          </button>
-          {/* 모바일 드롭다운 */}
-          {mobileMenuOpen && (
-            <div style={{
-              position: 'absolute', top: 64, left: 0, right: 0, background: '#fff',
-              borderBottom: '1px solid #e2e8f0', padding: '12px 24px', zIndex: 300,
-              display: 'flex', flexDirection: 'column', gap: 4,
-            }}>
-              {[
-                { href: '/daily', label: 'Daily 리포트' },
-                { href: '/strategies', label: '전략 라이브러리' },
-                { href: '/decision-log', label: 'AI 차단 로그' },
-                { href: '/engines', label: '엔진 현황' },
-                { href: '/blog', label: 'Blog' },
-                { href: '/pwa', label: '📱 ONE-HUB 앱 열기' },
-              ].map(n => (
-                <Link key={n.href} href={n.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  style={{ fontSize: 14, fontWeight: 600, padding: '10px 8px', color: '#374151', textDecoration: 'none', borderRadius: 8 }}>
-                  {n.label}
-                </Link>
-              ))}
-            </div>
-          )}
-        </header>
 
         {/* ── HERO STATUS BAR ── */}
         <div className="status-bar">

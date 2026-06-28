@@ -1,10 +1,8 @@
 import "../styles/globals.css";
 import Nav from "../components/Nav";
 import Head from "next/head";
-import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/router";
-import { APP_VERSION, LAST_UPDATED } from '../lib/version';
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
@@ -30,14 +28,6 @@ export default function App({ Component, pageProps }) {
       </Head>
       {!isPWARoute && <Nav />}
       <Component {...pageProps} />
-      {/* [B9] 공통 Footer — 버전 정보 */}
-      {!isPWARoute && (
-        <footer style={{ textAlign: 'center', padding: '16px 24px', borderTop: '1px solid #e2e8f0',
-                         fontSize: 11, color: '#94a3b8', fontFamily: 'monospace' }}>
-          <Link href="/" style={{ color: '#94a3b8', textDecoration: 'none' }}>ONE-HUB</Link>
-          <span style={{ marginLeft: 12 }}>{APP_VERSION} · {LAST_UPDATED}</span>
-        </footer>
-      )}
     </>
   );
 }
