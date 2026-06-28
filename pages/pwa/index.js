@@ -42,6 +42,8 @@ export default function PWADashboard({ latestReport }) {
   const [pendingError, setPendingError] = useState(null);
   const [actingCode, setActingCode] = useState(null); // 승인/거절 처리 중인 종목코드
   const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
+  const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
+  const [expandedPos, setExpandedPos] = useState({}); // [v9.0] 보유 탭 왜? 펼침
 
   // [v9.0] 투자성향 프로필
   const [profile, setProfile] = useState({
@@ -536,9 +538,12 @@ export default function PWADashboard({ latestReport }) {
                       )}
                     </div>
 
-                    {/* AI Confidence */}
+                    {/* AI 신뢰도 */}
                     <div className="hero-v9-conf-row">
-                      <span className="hero-v9-conf-label">AI Confidence</span>
+                      <div>
+                        <span className="hero-v9-conf-label">AI 매수 확률</span>
+                        <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: 1 }}>(오늘 예측 신뢰도)</div>
+                      </div>
                       <span className="hero-v9-conf-val" style={{ color: rColor }}>
                         {aiConf !== null ? `${aiConf}%` : '-'}
                       </span>
@@ -873,25 +878,61 @@ export default function PWADashboard({ latestReport }) {
                     <div style={{ fontSize: '0.72rem', fontWeight: 700, color, marginBottom: 6 }}>
                       {icon} {label} ({list.length})
                     </div>
-                    <div className="pwa-search-results">
-                      {list.map((s, i) => (
-                        <button
-                          key={s.code || i}
-                          className="pwa-search-item"
-                          onClick={() => { setTab('analyze'); runAnalyze(s.code, s.name); }}
-                        >
-                          <span className="pwa-si-name">{s.name}</span>
-                          <span className="pwa-si-code mono dim">{s.code}</span>
-                          <span className="pwa-si-theme dim mono">
-                            {(() => {
-                              const sc = Math.round(s.score ?? 0);
-                              const pct = Math.min(100, Math.round(sc * 1.8));
-                              return `AI ${pct}%`;
-                            })()}
-                            {s.change_1d != null ? ` · ${s.change_1d >= 0 ? '+' : ''}${s.change_1d}%` : ''}
-                          </span>
-                        </button>
-                      ))}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {list.map((s, i) => {
+                        const sc = Math.round(s.score ?? 0);
+                        const aiPct = Math.min(100, Math.round(sc * 1.8));
+                        const key = s.code || i;
+                        const isExp = !!expandedRec[key];
+                        return (
+                          <div key={key} className="pwa-card" style={{ padding: '10px 14px', margin: 0 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                              <button
+                                className="pwa-search-item"
+                                style={{ flex: 1, textAlign: 'left', padding: 0, background: 'none', border: 'none' }}
+                                onClick={() => { setTab('analyze'); runAnalyze(s.code, s.name); }}
+                              >
+                                <span className="pwa-si-name">{s.name}</span>
+                                <span className="pwa-si-code mono dim" style={{ marginLeft: 6 }}>{s.code}</span>
+                              </button>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                                <span className="mono" style={{ fontSize: '0.72rem', color, fontWeight: 700 }}>AI Score {sc}</span>
+                                <button
+                                  style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: 8, background: isExp ? '#2563eb' : 'var(--inset-bg)', color: isExp ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)', whiteSpace: 'nowrap' }}
+                                  onClick={() => setExpandedRec(prev => ({ ...prev, [key]: !isExp }))}
+                                >
+                                  왜 추천?
+                                </button>
+                              </div>
+                            </div>
+                            {/* 매수 확률 + 등락 */}
+                            <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                              <span className="mono">매수확률 {aiPct}%</span>
+                              {s.change_1d != null && (
+                                <span className="mono" style={{ color: s.change_1d >= 0 ? 'var(--accent-buy)' : 'var(--accent-sell)' }}>
+                                  {s.change_1d >= 0 ? '+' : ''}{s.change_1d}%
+                                </span>
+                              )}
+                            </div>
+                            {/* 펼침 상세 */}
+                            {isExp && (
+                              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                                {[
+                                  { label: 'ML 점수', value: s.ml_score != null ? `${s.ml_score}점` : '-' },
+                                  { label: 'RSI',     value: s.rsi     != null ? s.rsi      : '-' },
+                                  { label: 'ATR',     value: s.atr     != null ? s.atr      : '-' },
+                                  { label: '최종점수', value: `${sc}점` },
+                                ].map(m => (
+                                  <div key={m.label} style={{ background: 'var(--inset-bg)', borderRadius: 8, padding: '6px 10px' }}>
+                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{m.label}</div>
+                                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{m.value}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
@@ -1135,14 +1176,43 @@ export default function PWADashboard({ latestReport }) {
                           const avg = Number(p.avg_price||0);
                           const tgt = Number(p.target||0);
                           const stp = Number(p.stop_loss||0);
+                          const pnlR = p.pnl_rate ?? 0;
                           let badge = null;
-                          if (tgt > 0 && cur >= tgt) badge = { label: '익절 고려', color: '#e53935', icon: '🔴' };
-                          else if (stp > 0 && cur <= stp) badge = { label: '손절 고려', color: '#e53935', icon: '🔴' };
-                          else if (avg > 0 && cur < avg * 0.97) badge = { label: '일부매도 고려', color: '#f57c00', icon: '🟡' };
-                          else badge = { label: '보유', color: '#2e7d32', icon: '🟢' };
+                          if (tgt > 0 && cur >= tgt)        badge = { label: '손절', color: '#ef4444', icon: '🔴', bg: '#fef2f2' };
+                          else if (stp > 0 && cur <= stp)   badge = { label: '손절', color: '#ef4444', icon: '🔴', bg: '#fef2f2' };
+                          else if (pnlR >= 5)                badge = { label: '추가매수', color: '#2563eb', icon: '🔵', bg: '#eff6ff' };
+                          else if (avg > 0 && cur < avg * 0.97) badge = { label: '관망', color: '#f59e0b', icon: '🟡', bg: '#fffbeb' };
+                          else                               badge = { label: '보유', color: '#22c55e', icon: '🟢', bg: '#f0fdf4' };
+                          const posKey = p.code || i;
+                          const isPosExp = !!expandedPos[posKey];
                           return (
-                            <div className="position-card-action-badge" style={{ color: badge.color }}>
-                              {badge.icon} AI 행동 지침: {badge.label}
+                            <div>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 700, padding: '3px 10px', borderRadius: 8, background: badge.bg, color: badge.color }}>
+                                  {badge.icon} {badge.label}
+                                </span>
+                                <button
+                                  style={{ fontSize: '0.68rem', padding: '3px 10px', borderRadius: 8, background: isPosExp ? '#2563eb' : 'var(--inset-bg)', color: isPosExp ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}
+                                  onClick={() => setExpandedPos(prev => ({ ...prev, [posKey]: !isPosExp }))}
+                                >
+                                  왜?
+                                </button>
+                              </div>
+                              {isPosExp && (
+                                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                                  {[
+                                    { label: 'RSI',    value: p.rsi   != null ? p.rsi   : '-' },
+                                    { label: 'MACD',   value: p.macd  != null ? p.macd  : '-' },
+                                    { label: 'ATR',    value: p.atr   != null ? p.atr   : '-' },
+                                    { label: 'ML점수', value: p.ml_score != null ? `${p.ml_score}점` : '-' },
+                                  ].map(m => (
+                                    <div key={m.label} style={{ background: 'var(--inset-bg)', borderRadius: 8, padding: '6px 10px' }}>
+                                      <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{m.label}</div>
+                                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{m.value}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           );
                         })()}

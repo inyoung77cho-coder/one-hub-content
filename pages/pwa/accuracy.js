@@ -191,8 +191,22 @@ export default function AccuracyPage() {
         })()}
 
         {!loading && (!data || !data.ok) && (
-          <div style={{ textAlign:'center', padding:60, color:'var(--text-muted)', fontSize:14 }}>
-            데이터를 불러올 수 없습니다.
+          <div style={{ background:'var(--card)', borderRadius:16, padding:'40px 24px',
+                        textAlign:'center', boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
+            <div style={{ fontSize:40, marginBottom:16 }}>🔄</div>
+            <div style={{ fontSize:17, fontWeight:700, color:'var(--text)', marginBottom:8 }}>
+              데이터 수집 중
+            </div>
+            <div style={{ fontSize:13, color:'var(--text-muted)', lineHeight:1.7, marginBottom:16 }}>
+              첫 통계는 <strong>5건 이상</strong> 거래 완료 후 표시됩니다.<br/>
+              AI가 매일 종목을 차단하고 3거래일 후 검증합니다.
+            </div>
+            {data?.total_blocked != null && (
+              <div style={{ display:'inline-block', padding:'8px 20px', borderRadius:20,
+                            background:'#eff6ff', color:'#2563eb', fontSize:13, fontWeight:700 }}>
+                현재 수집된 차단 기록: {data.total_blocked}건
+              </div>
+            )}
           </div>
         )}
       </div>

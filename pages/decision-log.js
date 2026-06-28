@@ -114,13 +114,18 @@ export default function DecisionLog() {
           ) : logs.length === 0 ? (
             <div style={{
               background: "var(--color-surface)", border: "1px solid var(--color-border)",
-              borderRadius: "12px", padding: "2rem", textAlign: "center"
+              borderRadius: "16px", padding: "40px 24px", textAlign: "center",
+              boxShadow: "0 2px 12px rgba(0,0,0,0.06)"
             }}>
-              <div style={{ fontSize: "0.875rem", color: "var(--color-muted)" }}>
-                {selectedDate} 차단 기록이 없습니다.
+              <div style={{ fontSize: "2.5rem", marginBottom: "12px" }}>✅</div>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--color-text)", marginBottom: "8px" }}>
+                오늘 차단 종목 없음
               </div>
-              <div style={{ fontSize: "0.8rem", color: "var(--color-muted)", marginTop: "0.5rem" }}>
-                장 운영일(평일 09:05~15:30)에 데이터가 쌓입니다.
+              <div style={{ fontSize: "0.875rem", color: "var(--color-muted)", marginBottom: 8 }}>
+                AI는 현재 시장을 안정적으로 판단했습니다.
+              </div>
+              <div style={{ fontSize: "0.8rem", color: "var(--color-muted)" }}>
+                {selectedDate} · 장 운영일(평일 09:05~15:30)에 데이터가 쌓입니다.
               </div>
             </div>
           ) : (

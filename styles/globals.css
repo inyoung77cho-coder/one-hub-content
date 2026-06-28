@@ -58,7 +58,7 @@
   --font-body:    'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
 
   /* Spacing */
-  --nav-height: 56px;
+  --nav-height: 64px;
   --status-height: 36px;
   --max-width: 1080px;
   --section-gap: 4rem;
@@ -134,10 +134,15 @@ img { max-width: 100%; display: block; }
   margin: 0 auto;
   height: 100%;
   padding: 0 1.5rem;
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 2rem;
+  gap: 1rem;
 }
+/* 메뉴: 중앙 */
+.nav-links { justify-content: center; }
+/* CTA: 우측 고정 */
+.nav-cta-wrap { display: flex; justify-content: flex-end; align-items: center; gap: 8px; }
 
 .nav-logo {
   font-family: var(--font-display);
@@ -776,7 +781,9 @@ img { max-width: 100%; display: block; }
    RESPONSIVE — Tablet
 ───────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
+  .nav-inner { grid-template-columns: 1fr auto; }
   .nav-links { display: none; }
+  .nav-cta-wrap { display: none; }
   .nav-menu-btn { display: flex; }
 
   .hero-grid {
