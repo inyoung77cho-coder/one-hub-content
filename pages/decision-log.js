@@ -114,18 +114,24 @@ export default function DecisionLog() {
           ) : logs.length === 0 ? (
             <div style={{
               background: "var(--color-surface)", border: "1px solid var(--color-border)",
-              borderRadius: "16px", padding: "40px 24px", textAlign: "center",
-              boxShadow: "0 2px 12px rgba(0,0,0,0.06)"
+              borderRadius: "20px", padding: "44px 28px", textAlign: "center",
+              boxShadow: "0 2px 16px rgba(0,0,0,0.07)"
             }}>
-              <div style={{ fontSize: "2.5rem", marginBottom: "12px" }}>✅</div>
-              <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--color-text)", marginBottom: "8px" }}>
+              <div style={{ fontSize: "2.5rem", marginBottom: "14px" }}>✅</div>
+              <div style={{ fontSize: "16px", fontWeight: 700, color: "var(--color-text)", marginBottom: "10px" }}>
                 오늘 차단 종목 없음
               </div>
-              <div style={{ fontSize: "0.875rem", color: "var(--color-muted)", marginBottom: 8 }}>
-                AI는 현재 시장을 안정적으로 판단했습니다.
+              <div style={{ fontSize: "14px", color: "var(--color-muted)", lineHeight: 1.8, marginBottom: 16 }}>
+                AI가 오늘 시장을 안정적으로<br/>
+                판단했습니다.
               </div>
-              <div style={{ fontSize: "0.8rem", color: "var(--color-muted)" }}>
-                {selectedDate} · 장 운영일(평일 09:05~15:30)에 데이터가 쌓입니다.
+              <div style={{ fontSize: "13px", color: "var(--color-muted)", padding: "12px 16px",
+                            background: "#f8fafc", borderRadius: 12, display: "inline-block" }}>
+                장중 차단 종목 발생 시<br/>
+                이곳에 자동 기록됩니다.
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--color-muted)", marginTop: 14 }}>
+                {selectedDate} · 평일 09:05~15:30
               </div>
             </div>
           ) : (

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 const channels = [
   { icon: "✈️", name: "텔레그램 알림 봇", handle: "@onehub_jiy_bot", desc: "매매 신호, 일일 리포트, 서버 상태 알림을 실시간으로 수신", status: "LIVE", action: "채널 참여", link: "https://t.me/onehub_jiy_bot" },
   { icon: "📧", name: "뉴스레터", handle: "Weekly Digest", desc: "매주 핵심 투자 결정 블로그 요약 + AI 인사이트 받아보기", status: "LIVE", action: "구독하기", link: null, newsletter: true },
-  { icon: "💬", name: "카카오톡 알림", handle: "KakaoTalk", desc: "중요 매매 신호 및 리스크 경고를 카카오톡으로 수신", status: "BUILDING", action: "준비 중", link: null },
+  { icon: "💬", name: "카카오톡 알림", handle: "KakaoTalk", desc: "중요 매매 신호 및 리스크 경고를 카카오톡으로 수신", status: "Coming Soon", action: "준비 중", link: null },
 ];
 
 const principles = [
@@ -86,7 +86,7 @@ export default function CommunityPage() {
 
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr 1fr", gap: "14px", marginBottom: "40px" }}>
             {channels.map(ch => (
-              <div key={ch.name} style={{ background: "#FFFFFF", border: "1px solid #E0DDD4", borderRadius: "12px", padding: "22px 20px", opacity: ch.status === "BUILDING" ? 0.6 : 1, display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div key={ch.name} style={{ background: "#FFFFFF", border: "1px solid #E0DDD4", borderRadius: "12px", padding: "22px 20px", opacity: ch.status === "Coming Soon" ? 0.6 : 1, display: "flex", flexDirection: "column", gap: "12px" }}>
                 <div style={{ fontSize: "28px" }}>{ch.icon}</div>
                 <div>
                   <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#1A1A1A", marginBottom: "3px" }}>{ch.name}</div>
@@ -94,7 +94,10 @@ export default function CommunityPage() {
                 </div>
                 <p style={{ fontSize: "12px", color: "#6A6660", lineHeight: 1.6, margin: 0, flex: 1 }}>{ch.desc}</p>
                 <div>
-                  <span style={{ display: "inline-block", fontFamily: "monospace", fontSize: "10px", fontWeight: 700, padding: "3px 8px", borderRadius: "4px", background: ch.status === "LIVE" ? "#E8F8EF" : "#FFF8E6", color: ch.status === "LIVE" ? "#00AA55" : "#CC8800", marginBottom: "10px" }}>
+                  <span style={{ display: "inline-block", fontFamily: "monospace", fontSize: "10px", fontWeight: 700, padding: "3px 8px", borderRadius: "4px",
+                    background: ch.status === "LIVE" ? "#E8F8EF" : ch.status === "Coming Soon" ? "#f1f5f9" : "#FFF8E6",
+                    color: ch.status === "LIVE" ? "#00AA55" : ch.status === "Coming Soon" ? "#64748b" : "#CC8800",
+                    marginBottom: "10px" }}>
                     {ch.status}
                   </span>
                   {ch.newsletter ? <NewsletterForm /> : ch.link ? (

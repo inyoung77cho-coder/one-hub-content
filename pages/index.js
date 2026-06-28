@@ -251,14 +251,18 @@ export default function Home({ reports, stats }) {
             </div>
           </section>
         )}
-        {/* ── [v9.0] HERO 섹션 — 포지셔닝 + 실시간 현황 ── */}
+        {/* ── [v9.0] HERO 섹션 ── */}
           <section style={{ padding: '40px 24px 32px', maxWidth: 1200, margin: '0 auto' }}>
+            {/* LIVE 배지 */}
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#22c55e', marginBottom: 12, fontFamily: 'monospace' }}>
+              <span className="live-dot" />
+              LIVE · auto_trade {engineVersion} RUNNING
+            </div>
             {/* 포지셔닝 문구 */}
             <h1 style={{ fontSize: 28, fontWeight: 800, color: '#1e293b', lineHeight: 1.3, marginBottom: 20,
                          fontFamily: 'Pretendard, sans-serif' }}>
-              AI가 분석하고<br/>
-              사람이 승인하는<br/>
-              반자동 투자 플랫폼
+              AI가 시장을 읽고<br/>
+              사람이 최종 결정합니다.
             </h1>
             {/* 오늘 현황 뱃지 */}
             {mounted && (
@@ -288,16 +292,23 @@ export default function Home({ reports, stats }) {
                 )}
               </div>
             )}
-            {/* CTA 버튼 2개 */}
+            {/* CTA 버튼 3개 */}
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <Link href="/pwa" style={{
-                background: '#2563eb', color: '#fff', padding: '12px 24px', borderRadius: 10,
+                height: 44, display: 'inline-flex', alignItems: 'center',
+                background: '#2563eb', color: '#fff', padding: '0 24px', borderRadius: 10,
                 fontSize: 14, fontWeight: 700, textDecoration: 'none',
               }}>🚀 ONE-HUB 시작하기</Link>
-              <Link href="/pwa-guide" style={{
-                background: '#f1f5f9', color: '#1e293b', padding: '12px 24px', borderRadius: 10,
+              <Link href="/daily" style={{
+                height: 44, display: 'inline-flex', alignItems: 'center',
+                background: '#f0f6ff', color: '#2563eb', padding: '0 20px', borderRadius: 10,
                 fontSize: 14, fontWeight: 700, textDecoration: 'none',
-              }}>📱 앱 설치</Link>
+              }}>📋 오늘 리포트</Link>
+              <Link href="/decision-log" style={{
+                height: 44, display: 'inline-flex', alignItems: 'center',
+                background: '#f0f6ff', color: '#2563eb', padding: '0 20px', borderRadius: 10,
+                fontSize: 14, fontWeight: 700, textDecoration: 'none',
+              }}>🧠 AI 판단근거</Link>
             </div>
           </section>
 
@@ -365,6 +376,37 @@ export default function Home({ reports, stats }) {
                   </span>
                 </div>
                 <Link href={`/daily/${latest.date}`} className="ta-link">이유 보기 →</Link>
+              </div>
+            </section>
+          )}
+
+          {/* ── [B4] KPI 카드 4개 그리드 ── */}
+          {(liveData || latest) && mounted && (
+            <section style={{ padding: '0 24px 24px', maxWidth: 1200, margin: '0 auto' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4,1fr)',
+                gap: 12,
+              }}
+                className="kpi-grid">
+                {[
+                  { label: '🌡 AI 투자온도', val: liveData?.market?.heat_score ?? '-', unit: '점',
+                    color: (liveData?.market?.heat_score ?? 0) >= 70 ? '#ef4444'
+                          :(liveData?.market?.heat_score ?? 0) >= 40 ? '#f59e0b' : '#22c55e' },
+                  { label: '😨 공포탐욕', val: liveData?.market?.fear_greed ?? '-', unit: '점',
+                    color: (liveData?.market?.fear_greed ?? 50) <= 30 ? '#ef4444'
+                          :(liveData?.market?.fear_greed ?? 50) >= 70 ? '#22c55e' : '#f59e0b' },
+                  { label: '✅ AI 추천', val: latest?.trade_count ?? '-', unit: '건', color: '#22c55e' },
+                  { label: '🚫 AI 차단', val: latest?.block_count ?? '-', unit: '건', color: '#64748b' },
+                ].map(k => (
+                  <div key={k.label} style={{ background: '#fff', border: '1px solid #e2e8f0',
+                    borderRadius: 20, padding: 16, boxShadow: '0 2px 16px rgba(0,0,0,0.07)', textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6 }}>{k.label}</div>
+                    <div style={{ fontSize: 24, fontWeight: 800, color: k.color, fontFamily: 'monospace' }}>
+                      {k.val}<span style={{ fontSize: 13, fontWeight: 400 }}>{k.unit}</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
           )}

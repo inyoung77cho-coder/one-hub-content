@@ -239,11 +239,24 @@ img { max-width: 100%; display: block; }
   background: var(--green);
 }
 .status-dot.pulse {
-  animation: pulse 2s infinite;
+  animation: pulse 2s ease-in-out infinite;
 }
 @keyframes pulse {
   0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(0, 210, 106, 0.5); }
   50%       { opacity: 0.8; box-shadow: 0 0 0 4px rgba(0, 210, 106, 0); }
+}
+
+/* [B2] LIVE Pulse dot */
+.live-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #22c55e;
+  display: inline-block; margin-right: 6px; vertical-align: middle;
+  animation: pulse-live 2s ease-in-out infinite;
+}
+@keyframes pulse-live {
+  0%   { transform: scale(1);   opacity: 1; }
+  50%  { transform: scale(1.4); opacity: 0.5; }
+  100% { transform: scale(1);   opacity: 1; }
 }
 
 .regime-badge {
@@ -1769,3 +1782,6 @@ img { max-width: 100%; display: block; }
   flex-shrink: 0;
 }
 .live-widget-cta:hover { background: #1344b4; }
+
+/* [B4] KPI Grid mobile */
+@media (max-width: 640px) { .kpi-grid { grid-template-columns: repeat(2,1fr) !important; } }

@@ -1,5 +1,6 @@
-import Head from "next/head";
+﻿import Head from "next/head";
 import Link from "next/link";
+import { APP_VERSION, LAST_UPDATED } from '../lib/version';
 
 const values = [
   { icon: "🔍", title: "투명성", desc: "수익뿐 아니라 실패와 손절 이유를 그대로 공개합니다. 방향성(▲▼➖)만 공유하되, 판단 근거는 모두 오픈합니다." },
@@ -9,6 +10,7 @@ const values = [
 ];
 
 const timeline = [
+  { date: "2026-06", label: `ONE-HUB ${APP_VERSION} PWA 출시`, desc: "PWA 전면 리뉴얼 (Splash/Onboarding/Hero), AI 판단 근거 시각화, AI Accuracy Dashboard, Decision Log 추가, Trader A/B 분리 운영, STOCK_POOL 131종목 확대" },
   { date: "2026-05-31", label: "ONE-HUB v8.0", desc: "AWS 마이그레이션 완료, Engine Hub 공개, 전체 홈페이지 구축, systemd 단독 관리" },
   { date: "2026-05-23", label: "콘텐츠 플랫폼 전환", desc: "단순 매매봇 → Daily/Weekly 리포트 자동 발행 파이프라인 구축, Vercel 배포" },
   { date: "2026-05-21", label: "AWS 마이그레이션 시작", desc: "Lightsail 서버 구축, KIS API 연동, systemd 서비스 등록" },
@@ -95,7 +97,7 @@ export default function AboutPage() {
           <div style={{ background: "#FFFFFF", border: "1px solid #E0DDD4", borderRadius: "12px", padding: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
               <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "8px" }}>현재 운용 상태</div>
-              <div style={{ fontFamily: "monospace", fontSize: "16px", fontWeight: 700, color: "#00AA55" }}>LIVE · auto_trade v8.0</div>
+              <div style={{ fontFamily: "monospace", fontSize: "16px", fontWeight: 700, color: "#00AA55" }}>LIVE · auto_trade {APP_VERSION}</div>
               <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#6A6660", marginTop: "4px" }}>AWS Lightsail · 매일 15:30 KST 자동 리포트</div>
             </div>
             <Link href="/engines" style={{ fontFamily: "monospace", fontSize: "11px", color: "#00AA55", textDecoration: "none", padding: "10px 16px", border: "1px solid #E8F8EF", borderRadius: "8px" }}>

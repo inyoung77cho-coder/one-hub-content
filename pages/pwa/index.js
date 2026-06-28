@@ -581,6 +581,12 @@ export default function PWADashboard({ latestReport }) {
                       <button className="hero-v9-btn secondary" onClick={() => setTab('recommend')}>
                         ⭐ 추천 보기
                       </button>
+                      <button className="hero-v9-btn secondary" onClick={() => {
+                        setTab('dashboard');
+                        setTimeout(() => document.querySelector('.ai-basis-card')?.scrollIntoView({ behavior:'smooth', block:'start' }), 150);
+                      }}>
+                        🧠 AI 판단근거
+                      </button>
                     </div>
                   </section>
                 );
@@ -1636,7 +1642,10 @@ export default function PWADashboard({ latestReport }) {
               </div>
               <div className="profile-app-row" style={{ marginTop:10 }}>
                 <span>테마</span>
-                <button className="pwa-theme-toggle" onClick={toggleTheme} style={{ fontSize:'1.2rem', background:'none', border:'none', cursor:'pointer' }}>
+                <button className="pwa-theme-toggle" onClick={toggleTheme}
+                  style={{ fontSize:'0.85rem', background:'none', border:'1px solid var(--border)',
+                           padding:'4px 10px', borderRadius:8, cursor:'pointer', whiteSpace:'nowrap',
+                           minWidth:88, color:'var(--text-primary)' }}>
                   {theme === 'light' ? '🌙 다크' : '☀️ 라이트'}
                 </button>
               </div>

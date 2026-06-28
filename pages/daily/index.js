@@ -96,13 +96,14 @@ export default function DailyIndex({ posts, postsB }) {
 
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
 
-            {activePosts.map((post, i) => (
-
+            {activePosts.map((post, i) => {
+              const isToday = post.date === new Date().toISOString().split("T")[0];
+              return (
               <Link key={post.date} href={`/daily/${post.date}`} style={{ textDecoration: "none" }}>
 
                 {isMobile ? (
 
-                  <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "14px 16px", cursor: "pointer" }}
+                  <div style={{ background: isToday ? "#f0f6ff" : "#ffffff", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "16px 18px", cursor: "pointer" }}
 
                     onMouseEnter={e => e.currentTarget.style.borderColor = "#cbd5e0"}
 
@@ -110,7 +111,10 @@ export default function DailyIndex({ posts, postsB }) {
 
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
 
-                      <span style={{ fontFamily: "monospace", fontSize: "12px", color: "#718096" }}>{post.date}</span>
+                      <span style={{ fontFamily: "monospace", fontSize: "13px", fontWeight: 700, color: "#1e293b" }}>
+                        {post.date}
+                        {isToday && <span style={{ background:'#2563eb', color:'#fff', fontSize:10, padding:'2px 8px', borderRadius:10, marginLeft:8 }}>NEW</span>}
+                      </span>
 
                       <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#a0aec0" }}>{post.trade_count}건</span>
 
@@ -138,7 +142,7 @@ export default function DailyIndex({ posts, postsB }) {
 
                 ) : (
 
-                  <div style={{ background: "#ffffff", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "18px 20px", display: "grid", gridTemplateColumns: "40px 120px 1fr auto", alignItems: "center", gap: "16px", cursor: "pointer" }}
+                  <div style={{ background: isToday ? "#f0f6ff" : "#ffffff", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "20px 24px", display: "grid", gridTemplateColumns: "40px 160px 1fr auto", alignItems: "center", gap: "16px", cursor: "pointer" }}
 
                     onMouseEnter={e => e.currentTarget.style.borderColor = "#cbd5e0"}
 
@@ -146,7 +150,10 @@ export default function DailyIndex({ posts, postsB }) {
 
                     <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#a0aec0" }}>{String(i + 1).padStart(2, "0")}</span>
 
-                    <span style={{ fontFamily: "monospace", fontSize: "12px", color: "#718096" }}>{post.date}</span>
+                    <span style={{ fontFamily: "monospace", fontSize: "13px", fontWeight: 700, color: "#1e293b" }}>
+                      {post.date}
+                      {isToday && <span style={{ background:'#2563eb', color:'#fff', fontSize:10, padding:'2px 8px', borderRadius:10, marginLeft:8 }}>NEW</span>}
+                    </span>
 
                     <div>
 
@@ -177,8 +184,8 @@ export default function DailyIndex({ posts, postsB }) {
                 )}
 
               </Link>
-
-            ))}
+              );
+            })}
 
           </div>
 

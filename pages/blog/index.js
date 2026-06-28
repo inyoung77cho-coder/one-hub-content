@@ -22,6 +22,7 @@ const FILTER_TAGS = ['전체', 'AI분석', '매크로', 'ETF', '퀀트', '운영
 export default function Blog({ posts }) {
   const router = useRouter();
   const [selectedTag, setSelectedTag] = useState('전체');
+  const [brief, setBrief] = useState(null);
 
   // [v9.0] URL ?tag= 파라미터로 자동 필터
   useEffect(() => {
@@ -29,6 +30,15 @@ export default function Blog({ posts }) {
     const { tag } = router.query;
     if (tag) setSelectedTag(tag);
   }, [router.isReady, router.query]);
+
+  // [v9.0] 오늘 시장 브리핑
+  useEffect(() => {
+    const API = process.env.NEXT_PUBLIC_ENGINE_API_URL || 'http://54.180.54.132:5001';
+    fetch(`${API}/api/pwa-dashboard?trader=A`)
+      .then(r => r.json())
+      .then(d => setBrief(d))
+      .catch(() => {});
+  }, []);
 
   const filteredPosts = selectedTag === '전체'
     ? posts
@@ -58,6 +68,36 @@ export default function Blog({ posts }) {
           <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '1.2rem' }}>
             AI 자동매매 운영 경험과 투자 방법론을 공유합니다.
           </p>
+
+          {/* [v9.0] 오늘 시장 브리핑 카드 */}
+          {brief && (
+            <div style={{
+              background: brief.regime === 'BEAR' ? '#fef2f2' : brief.regime === 'BULL' ? '#f0fdf4' : '#fffbeb',
+              border: '1px solid #e2e8f0', borderRadius: 20, padding: '16px 20px', marginBottom: '1.2rem',
+              boxShadow: '0 2px 16px rgba(0,0,0,0.07)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>📡 오늘 시장 브리핑</span>
+                <Link href="/pwa" style={{ fontSize: 11, color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}>자세히 →</Link>
+              </div>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 12,
+                  background: brief.regime === 'BEAR' ? '#fee2e2' : brief.regime === 'BULL' ? '#dcfce7' : '#fef9c3',
+                  color:      brief.regime === 'BEAR' ? '#ef4444' : brief.regime === 'BULL' ? '#22c55e' : '#f59e0b' }}>
+                  {brief.regime === 'BEAR' ? '🔴 BEAR' : brief.regime === 'BULL' ? '🟢 BULL' : '🟡 SIDEWAYS'}
+                </span>
+                {brief.market?.heat_score != null && (
+                  <span style={{ fontSize: 12, color: '#64748b' }}>Heat {brief.market.heat_score}</span>
+                )}
+                {brief.market?.fear_greed != null && (
+                  <span style={{ fontSize: 12, color: '#64748b' }}>Fear {brief.market.fear_greed}</span>
+                )}
+              </div>
+              <div style={{ fontSize: 12, color: '#374151', marginTop: 8 }}>
+                AI 결론: {brief.regime === 'BEAR' ? '신규매수 금지' : brief.regime === 'BULL' ? '매수 우호 — 적극 검토' : '선택적 매수'}
+              </div>
+            </div>
+          )}
 
           {/* 카테고리 필터 버튼 */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: '1.8rem' }}>

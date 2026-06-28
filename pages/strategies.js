@@ -1,5 +1,6 @@
-import Head from "next/head";
+﻿import Head from "next/head";
 import { useState } from "react";
+import { APP_VERSION, LAST_UPDATED } from '../lib/version';
 
 const strategies = [
   {
@@ -48,7 +49,7 @@ export default function StrategiesPage() {
           <p style={{ fontSize: "13px", color: "#64748b", marginBottom: 28 }}>ONE-HUB 자동매매 전략 구성 및 가중치</p>
 
           {/* 가중치 바 */}
-          <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, padding: "20px 24px", marginBottom: 24, boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+          <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 20, padding: "20px 24px", marginBottom: 24, boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
             <div style={{ fontSize: "11px", color: "#94a3b8", letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>전략 가중치 분포</div>
             <div style={{ display: "flex", height: 8, borderRadius: 4, overflow: "hidden", gap: 2 }}>
               {strategies.map(s => (
@@ -70,7 +71,7 @@ export default function StrategiesPage() {
             {strategies.map(s => {
               const isOpen = !!open[s.id];
               return (
-                <div key={s.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 16, overflow: "hidden", boxShadow: "0 2px 12px rgba(0,0,0,0.06)" }}>
+                <div key={s.id} style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 20, overflow: "hidden", boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
                   {/* 헤더 클릭 → 펼침 */}
                   <button
                     onClick={() => toggle(s.id)}
@@ -90,6 +91,7 @@ export default function StrategiesPage() {
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       {/* 수치 뱃지 */}
                       <span style={{ fontSize: 12, fontWeight: 700, padding: "3px 10px", borderRadius: 8, background: `${colorMap[s.id]}15`, color: colorMap[s.id] }}>{s.weight}%</span>
+                      <span style={{ fontSize: 11, color: "#64748b" }}>ACTIVE · {LAST_UPDATED}</span>
                       <span style={{ color: "#94a3b8", fontSize: 14, transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</span>
                     </div>
                   </button>

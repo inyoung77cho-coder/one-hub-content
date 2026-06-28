@@ -70,18 +70,29 @@ export default function AiAccuracy() {
           {loading ? (
             <div style={{ color: "var(--color-muted)", fontFamily: "Space Mono, monospace", padding: "3rem 0" }}>Loading...</div>
           ) : !data?.ok ? (
-            <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 16, padding: "40px 24px", textAlign: "center" }}>
-              <div style={{ fontSize: 40, marginBottom: 16 }}>🔄</div>
-              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 8 }}>데이터 수집 중</div>
-              <div style={{ fontSize: 13, color: "var(--color-muted)", lineHeight: 1.7, marginBottom: 16 }}>
-                AI 차단 정확도 분석은<br/>
-                <strong>5건 이상</strong>의 검증 완료 후 자동으로 표시됩니다.
+            <div style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: 20, padding: "40px 28px", textAlign: "center", boxShadow: "0 2px 16px rgba(0,0,0,0.07)" }}>
+              <div style={{ fontSize: 40, marginBottom: 16 }}>📊</div>
+              <div style={{ fontSize: 15, fontWeight: 700, color: "var(--color-text)", marginBottom: 10 }}>데이터가 아직 충분하지 않습니다</div>
+              <div style={{ fontSize: 13, color: "var(--color-muted)", lineHeight: 1.8, marginBottom: 20 }}>
+                최소 <strong>20건</strong> 이상의 차단 검증 후<br/>
+                AI 정확도 통계가 자동 생성됩니다.
               </div>
-              {data?.total_blocked != null && (
-                <div style={{ display: "inline-block", padding: "8px 20px", borderRadius: 20, background: "#eff6ff", color: "#2563eb", fontSize: 13, fontWeight: 700 }}>
-                  현재 수집된 차단 건수: {data.total_blocked}건
-                </div>
-              )}
+              {(() => {
+                const n = data?.total_blocked ?? 0;
+                const pct = Math.min(100, Math.round(n / 20 * 100));
+                return (
+                  <div style={{ maxWidth: 260, margin: "0 auto" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, color: "var(--color-muted)", marginBottom: 6 }}>
+                      <span>현재 수집: <strong style={{ color: "#2563eb" }}>{n}건</strong></span>
+                      <span>목표: 20건</span>
+                    </div>
+                    <div style={{ height: 8, background: "#e2e8f0", borderRadius: 4, overflow: "hidden", marginBottom: 8 }}>
+                      <div style={{ height: "100%", width: `${pct}%`, background: "#2563eb", borderRadius: 4, transition: "width 0.4s" }} />
+                    </div>
+                    <div style={{ fontSize: 12, color: "#2563eb", fontWeight: 700 }}>{pct}%</div>
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <>
