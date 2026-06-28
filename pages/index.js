@@ -187,22 +187,28 @@ export default function Home({ reports, stats }) {
             <div className="live-widget-inner">
               <div className="live-widget-item">
                 <span className="live-widget-label">🌡 AI 투자온도</span>
-                <span className="live-widget-val" style={{
-                  color: (liveData.market?.heat_score ?? 0) >= 70 ? '#e53935'
-                       : (liveData.market?.heat_score ?? 0) >= 40 ? '#f57c00' : '#2e7d32'
-                }}>
-                  {liveData.market?.heat_score ?? '-'}<span className="live-widget-unit">점</span>
-                </span>
+                <a href="/blog?tag=AI분석" title="관련 블로그 보기"
+                   style={{ textDecoration: 'none', borderBottom: '1px dashed #94a3b8', cursor: 'pointer' }}>
+                  <span className="live-widget-val" style={{
+                    color: (liveData.market?.heat_score ?? 0) >= 70 ? '#e53935'
+                         : (liveData.market?.heat_score ?? 0) >= 40 ? '#f57c00' : '#2e7d32'
+                  }}>
+                    {liveData.market?.heat_score ?? '-'}<span className="live-widget-unit">점</span>
+                  </span>
+                </a>
               </div>
               <div className="live-widget-divider" />
               <div className="live-widget-item">
                 <span className="live-widget-label">😨 공포탐욕</span>
-                <span className="live-widget-val" style={{
-                  color: (liveData.market?.fear_greed ?? 50) <= 30 ? '#e53935'
-                       : (liveData.market?.fear_greed ?? 50) >= 70 ? '#2e7d32' : '#f57c00'
-                }}>
-                  {liveData.market?.fear_greed ?? '-'}<span className="live-widget-unit">점</span>
-                </span>
+                <a href="/blog?tag=매크로" title="관련 블로그 보기"
+                   style={{ textDecoration: 'none', borderBottom: '1px dashed #94a3b8', cursor: 'pointer' }}>
+                  <span className="live-widget-val" style={{
+                    color: (liveData.market?.fear_greed ?? 50) <= 30 ? '#e53935'
+                         : (liveData.market?.fear_greed ?? 50) >= 70 ? '#2e7d32' : '#f57c00'
+                  }}>
+                    {liveData.market?.fear_greed ?? '-'}<span className="live-widget-unit">점</span>
+                  </span>
+                </a>
               </div>
               <div className="live-widget-divider" />
               <div className="live-widget-item">

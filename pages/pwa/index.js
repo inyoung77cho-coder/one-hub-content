@@ -665,12 +665,18 @@ export default function PWADashboard({ latestReport }) {
                     {/* 지표 3개 + 방향 화살표 */}
                     <div className="ai-basis-metrics" style={{ marginBottom: 14 }}>
                       {[
-                        { label: 'VIX',    val: vix,      dir: v >= 20 ? '↑' : '↓', color: v >= 25 ? 'var(--accent-sell)' : v >= 20 ? 'var(--accent-warn)' : 'var(--accent-buy)' },
-                        { label: 'Fear&Greed', val: fearGreed, dir: fg >= 50 ? '↑' : '↓', color: fgColor(fearGreed) },
-                        { label: 'Heat',   val: heat,     dir: h >= 50 ? '↑' : '↓', color: heatColor(heat) },
+                        { label: 'VIX',    val: vix,      dir: v >= 20 ? '↑' : '↓', color: v >= 25 ? 'var(--accent-sell)' : v >= 20 ? 'var(--accent-warn)' : 'var(--accent-buy)', blogTag: '매크로' },
+                        { label: 'Fear&Greed', val: fearGreed, dir: fg >= 50 ? '↑' : '↓', color: fgColor(fearGreed), blogTag: '매크로' },
+                        { label: 'Heat',   val: heat,     dir: h >= 50 ? '↑' : '↓', color: heatColor(heat), blogTag: 'AI분석' },
                       ].map(m => m.val !== null && (
                         <div key={m.label} className="ai-basis-metric">
-                          <span className="ai-basis-metric-label">{m.label}</span>
+                          <span className="ai-basis-metric-label">
+                            {m.label}
+                            {/* [v9.0] 블로그 연결 📖 */}
+                            <a href={`/blog?tag=${m.blogTag}`} target="_blank" rel="noopener"
+                               style={{ fontSize: 10, color: '#94a3b8', textDecoration: 'none', marginLeft: 4 }}
+                               title="관련 블로그 보기">📖</a>
+                          </span>
                           <span className="ai-basis-metric-val mono" style={{ color: m.color }}>
                             {m.val} <span className="ai-arrow">{m.dir}</span>
                           </span>
@@ -1049,6 +1055,67 @@ export default function PWADashboard({ latestReport }) {
                   </div>
                   {analyzeResult.key_signal && <p className="pwa-analyze-text" style={{marginTop:10}}>{analyzeResult.key_signal}</p>}
                 </section>
+
+                {/* [v9.0] AI 액션 플랜 카드 */}
+                {(() => {
+                  const cur = safeNum(analyzeResult.current_price ?? analyzeResult.price) ?? 0;
+                  const tgt = safeNum(analyzeResult.target);
+                  const stp = safeNum(analyzeResult.stop_loss);
+                  const b1  = cur > 0 ? Math.round(cur * 0.99) : null;
+                  const b2  = cur > 0 ? Math.round(cur * 0.98) : null;
+                  const aiConf = analyzeResult.confidence_score ?? analyzeResult.ai_score ?? null;
+                  const risk = analyzeResult.risk_level ?? (aiConf >= 70 ? '낮음' : aiConf >= 50 ? '중간' : '높음');
+                  const riskColor = risk === '낮음' || risk === 'low' ? '#22c55e' : risk === '중간' || risk === 'medium' ? '#f59e0b' : '#ef4444';
+                  const riskPct   = risk === '낮음' || risk === 'low' ? 30 : risk === '중간' || risk === 'medium' ? 60 : 90;
+                  const pctStr = (base, val) => base > 0 && val > 0 ? `현재가 ${val >= base ? '+' : ''}${((val/base-1)*100).toFixed(1)}%` : '';
+
+                  const rows = [
+                    { label: '1차 매수', price: b1,  sub: pctStr(cur, b1),  color: '#2563eb' },
+                    { label: '2차 매수', price: b2,  sub: pctStr(cur, b2),  color: '#2563eb' },
+                    { label: '손절',     price: stp, sub: pctStr(cur, stp), color: '#ef4444' },
+                    { label: '목표가',   price: tgt, sub: pctStr(cur, tgt), color: '#22c55e' },
+                  ];
+
+                  return (
+                    <section className="pwa-card" style={{ marginTop: 0 }}>
+                      <span className="pwa-card-label">📋 AI 액션 플랜</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
+                        {rows.map(r => (
+                          <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', minWidth: 60 }}>{r.label}</span>
+                            <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: r.color, fontWeight: 700 }}>
+                              {r.price != null ? r.price.toLocaleString() + '원' : '-'}
+                            </span>
+                            <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 90, textAlign: 'right' }}>{r.sub}</span>
+                          </div>
+                        ))}
+                      </div>
+                      {/* 리스크 바 */}
+                      <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                            <span style={{ color: 'var(--text-secondary)' }}>리스크</span>
+                            <span style={{ color: riskColor, fontWeight: 700 }}>{risk}</span>
+                          </div>
+                          <div style={{ height: 6, background: 'var(--inset-bg)', borderRadius: 3, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${riskPct}%`, background: riskColor, borderRadius: 3 }} />
+                          </div>
+                        </div>
+                        {aiConf != null && (
+                          <div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                              <span style={{ color: 'var(--text-secondary)' }}>AI 확신도</span>
+                              <span style={{ color: '#2563eb', fontWeight: 700 }}>{aiConf}%</span>
+                            </div>
+                            <div style={{ height: 6, background: 'var(--inset-bg)', borderRadius: 3, overflow: 'hidden' }}>
+                              <div style={{ height: '100%', width: `${aiConf}%`, background: '#2563eb', borderRadius: 3 }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </section>
+                  );
+                })()}
 
                 {analyzeResult.verdict && (
                   <section className="pwa-card pwa-verdict">
@@ -1494,6 +1561,40 @@ export default function PWADashboard({ latestReport }) {
                 </div>
               </div>
             </section>
+
+            {/* [v9.0] 투자 성향 예상 결과 */}
+            {(() => {
+              const PROFILE_STATS = {
+                conservative: { label: '보수형', icon: '🛡️', trades: '2~4회', stop: '-3%', hold: '14~21일', risk: '낮음', riskColor: '#22c55e' },
+                balanced:     { label: '균형형', icon: '⚖️', trades: '4~8회', stop: '-5%', hold: '7~14일',  risk: '중간', riskColor: '#f59e0b' },
+                aggressive:   { label: '공격형', icon: '🚀', trades: '8~15회',stop: '-7%', hold: '3~7일',   risk: '높음', riskColor: '#ef4444' },
+              };
+              const ps = PROFILE_STATS[profile.style] || PROFILE_STATS.balanced;
+              return (
+                <section className="pwa-card">
+                  <span className="pwa-card-label">📊 내 투자 성향 예상 결과</span>
+                  <div style={{ marginTop: 10, padding: '12px 14px', background: 'var(--inset-bg)', borderRadius: 12 }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: ps.riskColor, marginBottom: 10 }}>
+                      {ps.icon} {ps.label} 선택 시
+                    </div>
+                    {[
+                      { label: '예상 월 거래횟수', value: ps.trades },
+                      { label: '평균 손절 기준',   value: ps.stop },
+                      { label: '평균 보유 기간',   value: ps.hold },
+                      { label: '리스크 수준',      value: `${ps.risk} ${ps.risk === '낮음' ? '🟢' : ps.risk === '중간' ? '🟡' : '🔴'}` },
+                    ].map(row => (
+                      <div key={row.label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
+                        <span style={{ color: 'var(--text-secondary)' }}>{row.label}</span>
+                        <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{row.value}</span>
+                      </div>
+                    ))}
+                    <p style={{ fontSize: '0.7rem', color: 'var(--text-tertiary)', marginTop: 10, lineHeight: 1.5 }}>
+                      * 실제 결과는 시장 상황에 따라 달라질 수 있습니다.
+                    </p>
+                  </div>
+                </section>
+              );
+            })()}
 
             {/* 현재 설정 요약 */}
             <section className="pwa-card" style={{ background:'var(--inset-bg)' }}>

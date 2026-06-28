@@ -3,7 +3,8 @@ import path from 'path';
 import matter from 'gray-matter';
 import Link from 'next/link';
 import Head from 'next/head';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
 
 const TAG_COLORS = {
   ai: '#2563eb', ml: '#7c3aed', stock: '#16a34a', macro: '#d97706',
@@ -19,7 +20,15 @@ function tagColor(tags) {
 const FILTER_TAGS = ['전체', 'AI분석', '매크로', 'ETF', '퀀트', '운영일지'];
 
 export default function Blog({ posts }) {
+  const router = useRouter();
   const [selectedTag, setSelectedTag] = useState('전체');
+
+  // [v9.0] URL ?tag= 파라미터로 자동 필터
+  useEffect(() => {
+    if (!router.isReady) return;
+    const { tag } = router.query;
+    if (tag) setSelectedTag(tag);
+  }, [router.isReady, router.query]);
 
   const filteredPosts = selectedTag === '전체'
     ? posts
