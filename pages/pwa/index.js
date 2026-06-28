@@ -484,6 +484,83 @@ export default function PWADashboard({ latestReport }) {
 
               </section>
 
+              {/* [v8.7] AI 판단 근거 카드 — BUY/SELL/WAIT 확률 + 지표 연결 */}
+              {regime && (
+                <section className="pwa-card ai-basis-card">
+                  <span className="pwa-card-label">🤖 AI 판단 근거</span>
+                  {(() => {
+                    const h = heat ?? 50;
+                    const fg = fearGreed ?? 50;
+                    // BUY/SELL/WAIT 확률 — regime + heat 기반 근사치
+                    let buyP, sellP, waitP;
+                    if (regime === 'BULL') {
+                      buyP  = Math.round(40 + (h / 100) * 35);
+                      sellP = Math.round(5  + ((100 - fg) / 100) * 10);
+                      waitP = 100 - buyP - sellP;
+                    } else if (regime === 'BEAR') {
+                      sellP = Math.round(40 + ((100 - h) / 100) * 35);
+                      buyP  = Math.round(5  + (fg / 100) * 10);
+                      waitP = 100 - buyP - sellP;
+                    } else {
+                      waitP = Math.round(45 + ((50 - Math.abs(h - 50)) / 50) * 20);
+                      buyP  = Math.round((100 - waitP) * (h / 100));
+                      sellP = 100 - buyP - waitP;
+                    }
+                    buyP  = Math.max(0, Math.min(buyP, 100));
+                    sellP = Math.max(0, Math.min(sellP, 100));
+                    waitP = Math.max(0, 100 - buyP - sellP);
+                    const bars = [
+                      { label: 'BUY',  pct: buyP,  color: 'var(--accent-buy)' },
+                      { label: 'WAIT', pct: waitP, color: 'var(--accent-warn)' },
+                      { label: 'SELL', pct: sellP, color: 'var(--accent-sell)' },
+                    ];
+                    return (
+                      <>
+                        {/* 확률 바 */}
+                        <div className="ai-basis-bars">
+                          {bars.map(b => (
+                            <div key={b.label} className="ai-basis-bar-row">
+                              <span className="ai-basis-bar-label mono">{b.label}</span>
+                              <div className="ai-basis-bar-track">
+                                <div className="ai-basis-bar-fill" style={{ width: `${b.pct}%`, background: b.color }} />
+                              </div>
+                              <span className="ai-basis-bar-pct mono" style={{ color: b.color }}>{b.pct}%</span>
+                            </div>
+                          ))}
+                        </div>
+                        {/* 지표 연결 */}
+                        <div className="ai-basis-metrics">
+                          {heat !== null && (
+                            <div className="ai-basis-metric">
+                              <span className="ai-basis-metric-label">Heat</span>
+                              <span className="ai-basis-metric-val mono" style={{ color: heatColor(heat) }}>{heat}<span className="dim">/100</span></span>
+                            </div>
+                          )}
+                          {fearGreed !== null && (
+                            <div className="ai-basis-metric">
+                              <span className="ai-basis-metric-label">공포탐욕</span>
+                              <span className="ai-basis-metric-val mono" style={{ color: fgColor(fearGreed) }}>{fearGreed}</span>
+                            </div>
+                          )}
+                          {vix !== null && (
+                            <div className="ai-basis-metric">
+                              <span className="ai-basis-metric-label">VIX</span>
+                              <span className="ai-basis-metric-val mono" style={{ color: vix >= 25 ? 'var(--accent-sell)' : vix >= 20 ? 'var(--accent-warn)' : 'var(--accent-buy)' }}>{vix}</span>
+                            </div>
+                          )}
+                          {regimeDays !== null && (
+                            <div className="ai-basis-metric">
+                              <span className="ai-basis-metric-label">레짐 지속</span>
+                              <span className="ai-basis-metric-val mono">{regimeDays}일</span>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </section>
+              )}
+
               {/* AI 활동 요약 — 4칸 그리드 */}
               <section className="pwa-card">
                 <span className="pwa-card-label">오늘 AI가 한 일</span>
@@ -1182,6 +1259,18 @@ export default function PWADashboard({ latestReport }) {
         .hero3-act-badge.act-no { background: var(--inset-bg); color: var(--text-tertiary); }
         .hero3-why-label { font-size: 0.68rem; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.06em; }
         .hero3-why-text { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5; }
+
+        /* [v8.7] AI 판단 근거 카드 */
+        .ai-basis-bars { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 14px; }
+        .ai-basis-bar-row { display: flex; align-items: center; gap: 8px; }
+        .ai-basis-bar-label { font-size: 0.7rem; font-weight: 700; width: 32px; color: var(--text-secondary); }
+        .ai-basis-bar-track { flex: 1; height: 7px; background: var(--inset-bg); border-radius: 4px; overflow: hidden; }
+        .ai-basis-bar-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+        .ai-basis-bar-pct { font-size: 0.72rem; width: 36px; text-align: right; }
+        .ai-basis-metrics { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding-top: 12px; border-top: 1px solid var(--border); }
+        .ai-basis-metric { display: flex; flex-direction: column; gap: 2px; }
+        .ai-basis-metric-label { font-size: 0.66rem; color: var(--text-tertiary); }
+        .ai-basis-metric-val { font-size: 0.9rem; font-weight: 700; color: var(--text-primary); }
         .hero-eyebrow { font-size: 0.78rem; color: var(--text-secondary); font-weight: 600; }
         .hero-regime { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
         .hero-regime-text { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; }
