@@ -1725,22 +1725,24 @@ img { max-width: 100%; display: block; }
 
 /* ── LIVE 위젯 (homepage) ── */
 .live-widget {
-  margin: 0 auto 24px;
+  margin: 0 auto 16px;
   max-width: 860px;
   padding: 0 16px;
 }
 .live-widget-inner {
   display: flex;
   align-items: center;
-  gap: 0;
   background: var(--card-bg, #fff);
   border: 1px solid var(--border, #e5e7eb);
   border-radius: 14px;
-  padding: 14px 20px;
+  padding: 12px 16px;
   overflow-x: auto;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 8px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
 }
+.live-widget-inner::-webkit-scrollbar { display: none; }
 .live-widget-item {
   display: flex;
   flex-direction: column;
@@ -1840,14 +1842,18 @@ img { max-width: 100%; display: block; }
 @media (max-width: 640px) {
   .kpi-grid { grid-template-columns: repeat(2, 1fr) !important; }
 
-  .home-hero-section { padding: 24px 16px 20px; }
-  .home-hero-h1 { font-size: 22px; margin-bottom: 16px; }
+  .home-hero-section { padding: 20px 16px 16px; }
+  .home-hero-h1 { font-size: 22px; margin-bottom: 14px; }
 
   .home-cta-row { flex-direction: column; gap: 8px; }
   .home-cta-btn { width: 100%; padding: 0 16px; }
 
-  .home-kpi-section { padding: 0 16px 20px; }
+  .home-kpi-section { padding: 0 16px 16px; }
 
-  /* status bar 가로스크롤 강제 */
+  /* status bar 가로스크롤 */
   .status-bar { gap: 8px; padding: 0 12px; }
+
+  /* live-widget 모바일 */
+  .live-widget { padding: 0 12px; margin-bottom: 12px; }
+  .live-widget-inner { padding: 10px 14px; border-radius: 12px; }
 }

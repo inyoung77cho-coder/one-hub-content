@@ -1452,13 +1452,20 @@ export default function PWADashboard({ latestReport }) {
             {data && (<>
               <section className="pwa-card">
                 <span className="pwa-card-label">오늘 요약</span>
-                <div className="pwa-report-summary">
-                  <div className="pwa-rs-row"><span className="dim">Regime</span><span className={`mono ${regimeClass(data.market?.regime)}`}>{data.market?.regime}</span></div>
-                  <div className="pwa-rs-row"><span className="dim">Heat</span><span className="mono" style={{color: heatColor(heat)}}>{heat ?? '-'}/100{heat != null ? ` (${heatLabel(heat)})` : ''}</span></div>
-                  <div className="pwa-rs-row"><span className="dim">공포탐욕</span><span className="mono" style={{color: fgColor(fearGreed)}}>{fearGreed ?? '-'}{fearGreed != null ? ` (${fgLabel(fearGreed)})` : ''}</span></div>
-                  <div className="pwa-rs-row"><span className="dim">매수</span><span className="mono bull">{buyCount}건</span></div>
-                  <div className="pwa-rs-row"><span className="dim">차단</span><span className="mono bear">{blockCount}건</span></div>
-                  <div className="pwa-rs-row"><span className="dim">실현손익</span><span className={`mono ${(data.balance?.realized_pnl??0)>=0?'bull':'bear'}`}>{data.balance?.realized_pnl?.toLocaleString() ?? 0}원</span></div>
+                <div className="report-kpi-grid">
+                  {[
+                    { label: 'Regime',   val: data.market?.regime ?? '-',    style: { color: regimeClass(data.market?.regime) === 'bull' ? 'var(--accent-buy)' : regimeClass(data.market?.regime) === 'bear' ? 'var(--accent-sell)' : 'var(--accent-warn)' } },
+                    { label: 'Heat',     val: `${heat ?? '-'}`,              style: { color: heatColor(heat) } },
+                    { label: '공포탐욕', val: `${fearGreed ?? '-'}`,         style: { color: fgColor(fearGreed) } },
+                    { label: '매수',     val: `${buyCount}건`,               style: { color: 'var(--accent-buy)' } },
+                    { label: '차단',     val: `${blockCount}건`,             style: { color: 'var(--accent-sell)' } },
+                    { label: '실현손익', val: `${(data.balance?.realized_pnl ?? 0).toLocaleString()}원`, style: { color: (data.balance?.realized_pnl ?? 0) >= 0 ? 'var(--accent-buy)' : 'var(--accent-sell)' } },
+                  ].map(({ label, val, style }) => (
+                    <div key={label} className="report-kpi-item">
+                      <span className="report-kpi-label">{label}</span>
+                      <span className="report-kpi-val" style={style}>{val}</span>
+                    </div>
+                  ))}
                 </div>
               </section>
 
@@ -1787,8 +1794,8 @@ export default function PWADashboard({ latestReport }) {
         .hero-v9-verdict-row { display: flex; align-items: center; justify-content: space-between; }
         .hero-v9-verdict-label { font-size: 0.75rem; color: var(--text-tertiary); font-weight: 600; }
         .hero-v9-verdict-badge { font-size: 0.8rem; font-weight: 700; padding: 5px 14px; border-radius: var(--radius-pill); }
-        .hero-v9-btns { display: flex; gap: 8px; margin-top: 4px; }
-        .hero-v9-btn { flex: 1; padding: 10px 0; border-radius: var(--radius-md); font-size: 0.82rem; font-weight: 700; cursor: pointer; border: none; font-family: var(--font-body); }
+        .hero-v9-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 4px; }
+        .hero-v9-btn { width: 100%; padding: 10px 4px; border-radius: var(--radius-md); font-size: 0.78rem; font-weight: 700; cursor: pointer; border: none; font-family: var(--font-body); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .hero-v9-btn.primary { background: #2563eb; color: #fff; }
         .hero-v9-btn.secondary { background: var(--inset-bg); color: var(--text-secondary); border: 1px solid var(--border); }
 
@@ -2007,6 +2014,11 @@ export default function PWADashboard({ latestReport }) {
         .pwa-rs-row:last-child { border-bottom: none; }
         .pwa-rs-row span:first-child { font-size: 0.75rem; color: var(--text-secondary); }
         .pwa-rs-row span:last-child { font-size: 0.85rem; color: var(--text-primary); }
+        /* Report KPI Grid */
+        .report-kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 10px; }
+        .report-kpi-item { background: var(--inset-bg); border-radius: var(--radius-md); padding: 10px 8px; text-align: center; }
+        .report-kpi-label { display: block; font-size: 0.68rem; color: var(--text-tertiary); margin-bottom: 4px; font-weight: 600; letter-spacing: 0.04em; }
+        .report-kpi-val { display: block; font-size: 0.9rem; font-weight: 800; font-family: var(--font-mono); color: var(--text-primary); }
 
         /* 공통 */
         .pwa-empty { font-size: 0.78rem; color: var(--text-tertiary); padding: 10px 0; }

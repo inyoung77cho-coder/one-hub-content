@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Head from "next/head";
+import { APP_VERSION } from '../lib/version';
 
 // ────────────────────────────────────────────────────────────
 // 스타일 상수
@@ -505,7 +506,7 @@ function EngineCard({ engine, version }) {
 
             </h2>
 
-            <p style={{ marginBottom: "4px" }}>onehub.service · {version}</p>
+            <p style={{ marginBottom: "4px" }}>onehub.service · {version || APP_VERSION}</p>
 
             {engine?.status === "stopped" && !isOn && (
 

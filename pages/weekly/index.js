@@ -68,17 +68,22 @@ export async function getStaticProps() {
   const dir = path.join(process.cwd(), 'content', 'weekly')
   if (!fs.existsSync(dir)) return { props: { reports: [] } }
   const files = fs.readdirSync(dir).filter(f => f.endsWith('.md')).sort().reverse()
-  const reports = files.map(f => {
+  const seen = new Set()
+  const reports = files.reduce((acc, f) => {
     const raw = fs.readFileSync(path.join(dir, f), 'utf8')
     const { data } = matter(raw)
-    return {
-      week: data.week || f.replace('.md', ''),
-      monday: data.monday || '',
-      friday: data.friday || '',
+    const week = data.week || data.slug || f.replace('.md', '')
+    if (seen.has(week)) return acc   // 중복 주차 제거
+    seen.add(week)
+    acc.push({
+      week,
+      monday: data.monday || data.mon || '',
+      friday: data.friday || data.fri || '',
       dominant_regime: data.dominant_regime || 'SIDEWAYS',
       avg_heat: data.avg_heat || 50,
-      total_trades: data.total_trades || 0,
-    }
-  })
+      total_trades: data.total_trades || data.trade_count || 0,
+    })
+    return acc
+  }, [])
   return { props: { reports } }
 }
