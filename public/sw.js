@@ -1,6 +1,6 @@
 // public/sw.js — ONE-HUB v9.0 PWA Service Worker
 
-const CACHE_VERSION = 'onehub-v2';
+const CACHE_VERSION = 'onehub-v9';
 const CACHE_NAME = CACHE_VERSION;
 const STATIC_ASSETS = ['/pwa', '/icons/icon-192.png', '/icons/icon-512.png'];
 
@@ -27,10 +27,26 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // API 요청은 항상 네트워크
-  if (event.request.url.includes('/api/')) return;
+  const url = event.request.url;
 
-  // cache-first 전략: 캐시 히트 → 반환, 미스 → 네트워크 후 캐시 저장
+  // API 요청 → 항상 네트워크
+  if (url.includes('/api/')) return;
+
+  // HTML 페이지(navigation) → network-first: 항상 최신 HTML 서빙, 실패 시만 캐시
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).then((response) => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // _next/static(JS/CSS/이미지) → cache-first (해시 변경 시 자동 갱신)
   event.respondWith(
     caches.match(event.request).then((cached) => {
       if (cached) return cached;
