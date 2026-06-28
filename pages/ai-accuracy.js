@@ -10,10 +10,11 @@ export default function AiAccuracy() {
   useEffect(() => {
     const API = process.env.NEXT_PUBLIC_ENGINE_API_URL || "http://54.180.54.132:5001";
     setLoading(true);
+    setData(null);
     fetch(`${API}/api/ai-accuracy?trader=${trader}`)
-      .then(r => r.json())
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(d => { setData(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .catch(() => { setData({ ok: false, total_blocked: 0 }); setLoading(false); });
   }, [trader]);
 
   const confColor = (c) => {

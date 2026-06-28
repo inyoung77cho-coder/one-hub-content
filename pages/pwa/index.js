@@ -1723,7 +1723,8 @@ export default function PWADashboard({ latestReport }) {
         /* Header */
         .pwa-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px 12px; }
         .pwa-brand { display: flex; align-items: center; gap: 8px; }
-        .pwa-brand-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-buy); flex-shrink: 0; }
+        .pwa-brand-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-buy); flex-shrink: 0; animation: pulse-live 2s ease-in-out infinite; }
+        @keyframes pulse-live { 0%{transform:scale(1);opacity:1;} 50%{transform:scale(1.45);opacity:0.5;} 100%{transform:scale(1);opacity:1;} }
         .pwa-title { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; letter-spacing: 0.04em; color: var(--text-primary); }
         .pwa-header-actions { display: flex; align-items: center; gap: 8px; }
         .pwa-trader-toggle { display: flex; gap: 3px; background: var(--inset-bg); padding: 3px; border-radius: var(--radius-pill); }
