@@ -3,8 +3,6 @@ import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import CTABar from '../components/CTABar';
 
-const API = process.env.NEXT_PUBLIC_ENGINE_API_URL || 'http://54.180.54.132:5001';
-
 const MONITORED_ETFS = [
   { name: 'KODEX미국달러', code: '261240' },
   { name: 'KODEX인버스',   code: '114800' },
@@ -35,7 +33,7 @@ export default function MarketCenter() {
   const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
-    fetch(`${API}/api/pwa-dashboard?trader=A`)
+    fetch(`/api/pwa-dashboard?trader=A`)
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(d => { setData(d); setLastUpdated(new Date()); setLoading(false); })
       .catch(() => setLoading(false));
@@ -45,11 +43,19 @@ export default function MarketCenter() {
   const candidates = data?.screening_candidates ?? [];
   const blocked = data?.blocked_stocks ?? [];
 
+  // 필드 정규화 (Flask API는 heat_score, fear_greed 키 사용)
+  const heat   = market.heat_score ?? market.heat ?? null;
+  const fear   = market.fear_greed ?? market.fear ?? null;
+  const vix    = market.vix ?? null;
+  const regime = market.regime ?? 'SIDEWAYS';
+  const heatLabel = heat == null ? '-' : heat >= 65 ? 'HOT 구간' : heat >= 50 ? 'WARM 구간' : heat >= 35 ? '냉각 구간' : '극냉 구간';
+  const fearLabel = fear == null ? '-' : fear >= 60 ? '탐욕' : fear >= 40 ? '중립' : fear >= 25 ? '공포' : '극도 공포';
+
   const regimeBases = [
-    { label: 'VIX 22 (기준 20 초과)', met: true },
-    { label: `Fear ${market.fear ?? 15} (극도 공포 구간)`, met: (market.fear ?? 15) < 25 },
-    { label: `Nasdaq ${market.nasdaq_chg ?? '-1.2%'} (약세)`, met: true },
-    { label: `Heat ${market.heat ?? 12} (냉각 구간)`, met: (market.heat ?? 12) < 30 },
+    { label: `VIX ${vix ?? '-'} (기준 20 ${vix != null && vix > 20 ? '초과' : '이하'})`, met: vix != null && vix > 20 },
+    { label: `Fear ${fear ?? '-'} (${fearLabel})`, met: fear != null && fear < 25 },
+    { label: `Heat ${heat ?? '-'} (${heatLabel})`, met: heat != null && heat < 35 },
+    { label: `Regime: ${regime}`, met: regime === 'BEAR' },
   ];
 
   const sectorScores = (() => {
@@ -75,12 +81,12 @@ export default function MarketCenter() {
   });
 
   const KPIs = [
-    { icon: '🌡️', label: 'Heat',   val: market.heat != null ? `${market.heat}/100` : '-', sub: market.heat_label ?? '냉각 구간' },
-    { icon: '😱', label: 'Fear',   val: market.fear != null ? `${market.fear}/100` : '-', sub: market.fear_label ?? '극도 공포' },
-    { icon: '📊', label: 'VIX',    val: market.vix ?? '-',   sub: market.vix_chg ? `↑ ${market.vix_chg}%` : '' },
-    { icon: '💵', label: 'DXY',    val: market.dxy ?? '-',   sub: market.dxy_chg ? `↑ ${market.dxy_chg}%` : '' },
-    { icon: '🇺🇸', label: 'Nasdaq', val: market.nasdaq_chg ?? '-', sub: market.nasdaq_chg && String(market.nasdaq_chg).startsWith('-') ? '하락' : '상승' },
-    { icon: '🇰🇷', label: 'KOSPI',  val: market.kospi_chg ?? '-', sub: market.kospi_chg && String(market.kospi_chg).startsWith('-') ? '하락' : '상승' },
+    { icon: '🌡️', label: 'Heat',   val: heat != null ? `${heat}/100` : '-', sub: heatLabel },
+    { icon: '😱', label: 'Fear',   val: fear != null ? `${fear}/100` : '-', sub: fearLabel },
+    { icon: '📊', label: 'VIX',    val: vix ?? '-',   sub: vix != null ? (vix > 20 ? '변동성 높음' : '변동성 낮음') : '' },
+    { icon: '📅', label: 'Regime', val: regime,        sub: market.regime_days != null ? `${market.regime_days}일째` : '' },
+    { icon: '💰', label: '평가액',  val: market.final_value != null ? `${(market.final_value/10000).toFixed(0)}만` : '-', sub: '' },
+    { icon: '📈', label: '오늘손익', val: market.daily_pnl != null ? `${market.daily_pnl >= 0 ? '+' : ''}${Math.round(market.daily_pnl).toLocaleString()}` : '-', sub: '' },
   ];
 
   return (
@@ -133,11 +139,11 @@ export default function MarketCenter() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, padding: '12px 16px', background: '#fef2f2', borderRadius: 10 }}>
                   <div>
                     <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 3 }}>현재 Regime</div>
-                    <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#dc2626' }}>{market.regime ?? 'BEAR'}</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: regime === 'BULL' ? '#22c55e' : regime === 'BEAR' ? '#dc2626' : '#f59e0b' }}>{regime}</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 3 }}>AI 신뢰도</div>
-                    <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#2563eb' }}>{market.confidence ?? 73}%</div>
+                    <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 3 }}>지속일</div>
+                    <div style={{ fontFamily: 'monospace', fontSize: 18, fontWeight: 800, color: '#2563eb' }}>{market.regime_days ?? '-'}일</div>
                   </div>
                 </div>
                 <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>판단 근거</div>
