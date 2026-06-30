@@ -3,8 +3,6 @@ import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import CTABar from '../components/CTABar';
 
-const API = process.env.NEXT_PUBLIC_ENGINE_API_URL || 'http://54.180.54.132:5001';
-
 function todayKST() {
   const now = new Date();
   const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -36,48 +34,46 @@ export default function AiReplay() {
     setData(null);
     setCurrentStep(0);
     setIsPlaying(false);
-    fetch(`${API}/api/pwa-history?date=${replayDate}`)
+    fetch(`/api/pwa-history?date=${replayDate}&limit=100`)
       .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
       .then(d => { setData(d); setLoading(false); })
       .catch(() => { setData(null); setLoading(false); });
   }, [replayDate]);
 
-  const steps = data ? [
+  // [v8.8] 실 event_log 기반 타임라인 (data.items)
+  const items = data?.items ?? [];
+  const buyItems  = items.filter(i => i.action === 'BUY');
+  const blockItems = items.filter(i => i.action === 'BLOCK' || i.action === 'BLOCKED');
+
+  const steps = items.length > 0 ? [
     {
-      time: '08:50',
+      time: items[items.length - 1]?.date?.slice(11, 16) ?? '-',
       icon: '🌐',
-      title: '시장 분석 시작',
+      title: '분석 시작',
       detail: [
-        `Regime: ${data.summary?.regime ?? '-'}`,
-        `Heat: ${data.summary?.heat ?? '-'} / Fear: ${data.summary?.fear ?? '-'}`,
-        `VIX: ${data.summary?.vix ?? '-'} / Nasdaq: ${data.summary?.nasdaq_chg ?? '-'}`,
+        `Regime: ${items[0]?.global_risk ?? '-'}`,
+        `총 ${items.length}건 판단 기록`,
       ],
     },
-    {
-      time: '08:51',
-      icon: '🔍',
-      title: `${data.summary?.total_screened ?? 131}종목 스크리닝`,
-      detail: [
-        `기술점수 ≥ 60: ${data.summary?.passed_screening ?? (data.stocks?.length ?? 8)}종목`,
-        `제외: ${(data.summary?.total_screened ?? 131) - (data.summary?.passed_screening ?? (data.stocks?.length ?? 8))}종목`,
-      ],
-    },
-    {
-      time: '08:52',
-      icon: '🤖',
-      title: `AI 개별 분석 (${data.stocks?.length ?? 0}종목)`,
-      stocks: data.stocks ?? [],
-    },
-    {
-      time: '08:53',
+    ...buyItems.map(item => ({
+      time: item.date?.slice(11, 16) ?? '-',
       icon: '✅',
-      title: '최종 결정',
+      title: `매수: ${item.stock}`,
       detail: [
-        `매수 ${data.summary?.buy_count ?? 0}건 / 차단 ${data.summary?.block_count ?? 0}건`,
-        `→ ${(data.summary?.buy_count ?? 0) > 0 ? '매수 진행' : '관망 결정'}`,
+        `Score: ${item.ai_score} | ${item.confidence ?? ''}`,
+        item.reason?.slice(0, 60) ?? '',
       ],
-    },
-  ] : [];
+    })),
+    ...blockItems.map(item => ({
+      time: item.date?.slice(11, 16) ?? '-',
+      icon: '🔴',
+      title: `차단: ${item.stock}`,
+      detail: [
+        `Score: ${item.ai_score} | ${item.confidence ?? ''}`,
+        item.reason?.slice(0, 60) ?? '',
+      ],
+    })),
+  ].sort((a, b) => a.time.localeCompare(b.time)) : [];
 
   const visibleSteps = steps.slice(0, currentStep + 1);
 
@@ -99,7 +95,7 @@ export default function AiReplay() {
     return () => clearInterval(intervalRef.current);
   }, [isPlaying, steps.length]);
 
-  const reasons = data?.block_reasons ?? [];
+  const reasons = blockItems;  // [v8.8] 실 BLOCK 이벤트 사용
 
   return (
     <>
@@ -159,10 +155,10 @@ export default function AiReplay() {
                 <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#94a3b8', marginBottom: 14 }}>📊 {replayDate} 요약</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
                   {[
-                    { label: 'Regime',  val: data.summary?.regime ?? '-' },
-                    { label: 'Heat',    val: `${data.summary?.heat ?? '-'}/100` },
-                    { label: '차단',    val: `${data.summary?.block_count ?? 0}건` },
-                    { label: '매수',    val: `${data.summary?.buy_count ?? 0}건` },
+                    { label: 'Regime',  val: items[0]?.global_risk ?? '-' },
+                    { label: '총이벤트', val: `${items.length}건` },
+                    { label: '차단',    val: `${blockItems.length}건` },
+                    { label: '매수',    val: `${buyItems.length}건` },
                   ].map(({ label, val }) => (
                     <div key={label} style={{ textAlign: 'center' }}>
                       <div style={{ fontFamily: 'monospace', fontSize: 15, fontWeight: 800, color: '#0f172a' }}>{val}</div>
@@ -247,12 +243,6 @@ export default function AiReplay() {
                       </div>
                     </div>
                   ))}
-                  {data.summary?.block_avg_return != null && (
-                    <div style={{ marginTop: 14, padding: '12px', background: '#f0fdf4', borderRadius: 8 }}>
-                      <div style={{ fontSize: 12, color: '#15803d', fontWeight: 600 }}>만약 매수했다면? 차단 종목 평균 수익률 {data.summary.block_avg_return}%</div>
-                      <div style={{ fontSize: 11, color: '#16a34a', marginTop: 3 }}>→ AI 차단이 올바른 판단</div>
-                    </div>
-                  )}
                 </div>
               )}
             </>

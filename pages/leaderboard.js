@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CTABar from '../components/CTABar';
 
 const PERIODS = ['이번달', '3개월', '전체'];
@@ -51,8 +51,28 @@ const sectorColor = (r) => r >= 80 ? '#22c55e' : r >= 70 ? '#2563eb' : '#94a3b8'
 
 export default function Leaderboard() {
   const [period, setPeriod] = useState('이번달');
-  const strategies = STRATEGIES[period];
+  const [liveData, setLiveData] = useState(null);
 
+  useEffect(() => {
+    const daysMap = { '이번달': 30, '3개월': 90, '전체': 365 };
+    const days = daysMap[period] || 30;
+    fetch(`/api/pwa-leaderboard?trader=A&days=${days}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.ok) setLiveData(d); })
+      .catch(() => {});
+  }, [period]);
+
+  // 실데이터가 있으면 교체
+  const strategies = liveData?.strategies?.length
+    ? liveData.strategies.map((s, i) => ({
+        rank: i + 1, name: s.name,
+        winRate: s.win_rate, returns: `${s.avg_pct >= 0 ? '+' : ''}${s.avg_pct}%`,
+        count: s.count,
+      }))
+    : (STRATEGIES[period] || []);
+  const sectors = liveData?.sectors?.length
+    ? liveData.sectors.map(s => ({ name: s.name, winRate: s.win_rate }))
+    : SECTORS;
   return (
     <>
       <Head>
@@ -129,7 +149,7 @@ export default function Leaderboard() {
 
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '20px', marginBottom: 20, boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 14 }}>🗺️ 섹터별 AI 승률</div>
-            {SECTORS.map(s => (
+            {sectors.map(s => (
               <div key={s.name} style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 13 }}>
                   <span style={{ color: '#1e293b', fontWeight: 500 }}>{s.name}</span>

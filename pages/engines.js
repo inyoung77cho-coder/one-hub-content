@@ -695,6 +695,8 @@ export default function EnginePage() {
 
   const POLL_SEC = 30;
 
+  const [engineStatus, setEngineStatus] = useState(null);  // [v8.8]
+
   const fetchData = useCallback(async () => {
     try {
       const res = await fetch("/api/engine-status");
@@ -707,10 +709,15 @@ export default function EnginePage() {
     } finally {
       setLoading(false);
     }
+    // [v8.8] is_analyzing 상태 폴링
+    try {
+      const es = await fetch("/api/pwa-engine-status?trader=A");
+      const esj = await es.json();
+      if (esj.ok) setEngineStatus(esj);
+    } catch (e) {}
     // 대시보드 데이터도 함께 로드
     try {
-      const API = process.env.NEXT_PUBLIC_ENGINE_API_URL || "http://54.180.54.132:5001";
-      const r2 = await fetch(`${API}/api/pwa-dashboard?trader=A`);
+      const r2 = await fetch("/api/pwa-dashboard?trader=A");
       const d2 = await r2.json();
       if (d2.ok) setDashboard(d2);
     } catch (e) {}
@@ -867,6 +874,33 @@ export default function EnginePage() {
             <ScheduleCard schedule={data?.schedule} />
             <StrategyCard strategy={data?.strategy} />
           </main>
+        )}
+
+        {/* [v8.8] is_analyzing 배지 */}
+        {engineStatus && (
+          <div style={{ textAlign: "center", marginBottom: "0.5rem" }}>
+            <span style={{
+              display: "inline-flex", alignItems: "center", gap: 6,
+              padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+              background: engineStatus.is_analyzing ? "#fef9c3" : "#f0fdf4",
+              color: engineStatus.is_analyzing ? "#92400e" : "#166534",
+              border: `1px solid ${engineStatus.is_analyzing ? "#fbbf24" : "#86efac"}`,
+            }}>
+              <span style={{
+                width: 8, height: 8, borderRadius: "50%",
+                background: engineStatus.is_analyzing ? "#f59e0b" : "#22c55e",
+                animation: engineStatus.is_analyzing ? "pulse 1s infinite" : "none",
+                display: "inline-block",
+              }} />
+              {engineStatus.is_analyzing ? "분석 중..." : "대기 중"}
+              {engineStatus.last_analysis_at && !engineStatus.is_analyzing && (
+                <span style={{ color: "#6b7280", fontWeight: 400, marginLeft: 4 }}>
+                  · 마지막: {engineStatus.last_analysis_at.slice(11, 16)} KST
+                  {engineStatus.last_scan_count ? ` (${engineStatus.last_scan_count}종목)` : ""}
+                </span>
+              )}
+            </span>
+          </div>
         )}
 
         {/* 타임스탬프 */}

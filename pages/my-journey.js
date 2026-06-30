@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CTABar from '../components/CTABar';
 import { APP_VERSION } from '../lib/version';
 
@@ -67,6 +67,25 @@ const ROADMAP = [
 
 export default function MyJourney() {
   const [expandedMonth, setExpandedMonth] = useState(null);
+  const [liveMonths, setLiveMonths] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/pwa-my-journey?trader=A')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.ok && d.months?.length) setLiveMonths(d.months); })
+      .catch(() => {});
+  }, []);
+
+  // 실데이터가 있으면 교체, 없으면 정적 데이터 유지
+  const MONTHLY_DISPLAY = liveMonths ? liveMonths.map(m => ({
+    month: m.month,
+    label: m.month.replace('-', '년 ') + '월',
+    trades: m.trades,
+    blocks: m.blocks,
+    pnl: `${m.avg_pct >= 0 ? '+' : ''}${m.avg_pct}%`,
+    highlight: `매수 ${m.trades}건 / 차단 ${m.blocks}건 / 승률 ${m.win_rate}%`,
+    note: `총 손익 ${m.pnl >= 0 ? '+' : ''}${m.pnl.toLocaleString()}원`,
+  })) : MONTHLY;
 
   const startDate = new Date('2026-04-01');
   const today = new Date();
@@ -122,7 +141,7 @@ export default function MyJourney() {
 
           <h2 style={{ fontSize: 14, fontWeight: 700, color: '#0f172a', marginBottom: 14, fontFamily: 'monospace', letterSpacing: '0.05em', textTransform: 'uppercase' }}>월별 성과 타임라인</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 32 }}>
-            {MONTHLY.map((m) => (
+            {MONTHLY_DISPLAY.map((m) => (
               <div key={m.month} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, overflow: 'hidden', boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
                 <button
                   onClick={() => setExpandedMonth(expandedMonth === m.month ? null : m.month)}
