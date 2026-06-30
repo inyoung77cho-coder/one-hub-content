@@ -2,6 +2,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import CTABar from '../components/CTABar';
+import LastUpdated from '../components/LastUpdated';
 
 const MONITORED_ETFS = [
   { name: 'KODEX미국달러', code: '261240' },
@@ -111,11 +112,7 @@ export default function MarketCenter() {
             <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px' }}>🌐 Market Center</h1>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <p style={{ fontSize: '0.9rem', color: '#64748b', margin: 0 }}>오늘 시장 핵심 지표 종합</p>
-              {lastUpdated && (
-                <span style={{ fontFamily: 'monospace', fontSize: 11, color: '#94a3b8' }}>
-                  {lastUpdated.getHours().toString().padStart(2,'0')}:{lastUpdated.getMinutes().toString().padStart(2,'0')} KST
-                </span>
-              )}
+              <LastUpdated timestamp={lastUpdated} />
             </div>
           </div>
 

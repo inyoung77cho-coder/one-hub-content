@@ -1,11 +1,13 @@
 ﻿import Head from "next/head";
 import Link from "next/link";
 import { useState, useEffect } from "react";
+import LastUpdated from "../components/LastUpdated";
 
 export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [trader, setTrader] = useState("A");
+  const [dashTs, setDashTs] = useState(null);  // [v8.8]
 
   const [watchlist, setWatchlist] = useState([]);
   const [wlSymbol, setWlSymbol] = useState("");
@@ -17,7 +19,7 @@ export default function Dashboard() {
     setLoading(true);
     fetch(`/api/pwa-dashboard?trader=${trader}`)
       .then(r => r.json())
-      .then(d => { setData(d); setLoading(false); })
+      .then(d => { setData(d); setLoading(false); setDashTs(new Date()); })
       .catch(() => setLoading(false));
   }, [trader]);
 
@@ -140,6 +142,7 @@ export default function Dashboard() {
               ONE-HUB Dashboard
             </h1>
             <p style={muted}>실시간, 포지션과 AI 결정 현황</p>
+            <LastUpdated timestamp={dashTs} />
           </div>
 
           <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>

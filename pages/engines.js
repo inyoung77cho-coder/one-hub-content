@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback } from "react";
 import Head from "next/head";
 import { APP_VERSION } from '../lib/version';
 import CTABar from '../components/CTABar';
+import LastUpdated from '../components/LastUpdated';
 
 // ────────────────────────────────────────────────────────────
 // 스타일 상수
@@ -906,12 +907,7 @@ export default function EnginePage() {
         {/* 타임스탬프 */}
         {lastUpdated && (
           <div className="footer-ts">
-            LAST UPDATED ·{" "}
-            {lastUpdated.toLocaleString("ko-KR", {
-              timeZone: "Asia/Seoul",
-              hour: "2-digit", minute: "2-digit", second: "2-digit",
-            })}{" "}
-            KST
+            <LastUpdated timestamp={lastUpdated} />
           </div>
         )}
 

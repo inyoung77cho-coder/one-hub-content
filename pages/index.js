@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
 import MarketScore from '../components/MarketScore';
+import LastUpdated from '../components/LastUpdated';
 import { APP_VERSION } from '../lib/version';
 
 export default function Home({ reports, stats }) {
@@ -12,6 +13,7 @@ export default function Home({ reports, stats }) {
   const [mounted, setMounted] = useState(false);
   const [engineVersion, setEngineVersion] = useState(APP_VERSION);
   const [liveData, setLiveData] = useState(null); // [v8.7] 홈페이지 ↔ PWA 실시간 연동
+  const [dashboardTs, setDashboardTs] = useState(null);  // [v8.8] LastUpdated
   const [accuracyPct, setAccuracyPct] = useState(null);       // [v9.0] AI 정확도
   const [winRate, setWinRate] = useState(null);               // [v9.0] 누적 승률
 
@@ -23,7 +25,7 @@ export default function Home({ reports, stats }) {
       .catch(() => {});
     fetch("/api/pwa-dashboard?trader=A")
       .then(r => r.json())
-      .then(d => { if (d.ok) setLiveData(d); })
+      .then(d => { if (d.ok) { setLiveData(d); setDashboardTs(new Date()); } })
       .catch(() => {});
     fetch("/api/pwa/accuracy?trader_id=A")
       .then(r => r.json())
@@ -126,6 +128,7 @@ export default function Home({ reports, stats }) {
           {/* ── LIVE 위젯 ── */}
         {liveData && mounted && (
           <section className="live-widget">
+            {dashboardTs && <div style={{ textAlign: 'right', padding: '2px 12px 0' }}><LastUpdated timestamp={dashboardTs} /></div>}
             <div className="live-widget-inner">
               <div className="live-widget-item">
                 <span className="live-widget-label">🌡 AI 투자온도</span>

@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useState, useEffect, useCallback } from 'react';
 import { getLatestDailyReport } from '../../lib/reports';
+import LastUpdated from '../../components/LastUpdated';
 
 // [v9.0] 안전 숫자 포맷 — INVALID_PRICE/STOP/NaN/undefined → '-'
 function safeLocale(v, suffix = '') {
@@ -883,7 +884,10 @@ export default function PWADashboard({ latestReport }) {
         {tab === 'recommend' && (
           <main className="pwa-main">
             <section className="pwa-card">
-              <span className="pwa-card-label">🔍 추천 관심종목</span>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6}}>
+                <span className="pwa-card-label">🔍 추천 관심종목</span>
+                <LastUpdated timestamp={data?.ok ? new Date() : null} staleAfterSeconds={180} />
+              </div>
               <p className="dim" style={{fontSize:'0.72rem', marginBottom:10, lineHeight:1.5}}>
                 AI 매수 선별 전 기술 스코어링 상위 후보입니다. 실제 매수 신호와는 별개입니다.
               </p>
