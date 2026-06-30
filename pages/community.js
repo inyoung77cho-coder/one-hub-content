@@ -52,9 +52,9 @@ function NewsletterForm() {
       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
         <input type="email" value={email} onChange={e => setEmail(e.target.value)}
           placeholder="이메일 입력" disabled={status === "loading" || status === "success"}
-          style={{ flex: 1, minWidth: "140px", background: "#F0EDE8", border: "1px solid #D0CCC4", borderRadius: "6px", padding: "8px 12px", fontFamily: "monospace", fontSize: "11px", color: "#1A1A1A", outline: "none" }} />
+          style={{ flex: 1, minWidth: "140px", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "8px 12px", fontFamily: "monospace", fontSize: "11px", color: "#0f172a", outline: "none" }} />
         <button type="submit" disabled={status === "loading" || status === "success"}
-          style={{ background: status === "success" ? "#E8F8EF" : "#00AA55", color: status === "success" ? "#00AA55" : "#F8F7F2", border: "none", borderRadius: "6px", padding: "8px 16px", fontFamily: "monospace", fontSize: "11px", fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
+          style={{ background: status === "success" ? "#E8F8EF" : "#00AA55", color: status === "success" ? "#00AA55" : "#f8fafc", border: "none", borderRadius: "6px", padding: "8px 16px", fontFamily: "monospace", fontSize: "11px", fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
           {status === "loading" ? "..." : status === "success" ? "✓ 완료" : "구독"}
         </button>
       </div>
@@ -85,7 +85,7 @@ export default function CommunityPage() {
         <meta property="og:site_name" content="ONE-HUB" />
         <meta name="twitter:card" content="summary" />
       </Head>
-      <div style={{ minHeight: "100vh", background: "#F8F7F2", color: "#1A1A1A", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
+      <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "860px", margin: "0 auto", padding: isMobile ? "24px 16px" : "40px 24px" }}>
 
           <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#9A9690", textTransform: "uppercase", marginBottom: "8px" }}>Community</h1>
@@ -94,10 +94,10 @@ export default function CommunityPage() {
           {/* ① 채널 카드 6개 */}
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "14px", marginBottom: "40px" }}>
             {channels.map(ch => (
-              <div key={ch.name} style={{ background: "#FFFFFF", border: "1px solid #E0DDD4", borderRadius: "12px", padding: "22px 20px", opacity: ch.status === "Coming Soon" ? 0.6 : 1, display: "flex", flexDirection: "column", gap: "12px" }}>
+              <div key={ch.name} style={{ background: "#FFFFFF", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "22px 20px", opacity: ch.status === "Coming Soon" ? 0.6 : 1, display: "flex", flexDirection: "column", gap: "12px" }}>
                 <div style={{ fontSize: "28px" }}>{ch.icon}</div>
                 <div>
-                  <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#1A1A1A", marginBottom: "3px" }}>{ch.name}</div>
+                  <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#0f172a", marginBottom: "3px" }}>{ch.name}</div>
                   <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690" }}>{ch.handle}</div>
                 </div>
                 <p style={{ fontSize: "12px", color: "#6A6660", lineHeight: 1.6, margin: 0, flex: 1 }}>{ch.desc}</p>
@@ -120,14 +120,14 @@ export default function CommunityPage() {
           </div>
 
           {/* ② ONE-HUB 운영 현황 통계 카드 */}
-          <div style={{ background: "#FFFFFF", border: "1px solid #E0DDD4", borderRadius: "12px", padding: "24px 20px", marginBottom: "24px" }}>
+          <div style={{ background: "#FFFFFF", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "24px 20px", marginBottom: "24px" }}>
             <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "18px" }}>
               📊 ONE-HUB 운영 현황
             </div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(5, 1fr)", gap: 12 }}>
               {STATS.map(({ label, val, unit }) => (
-                <div key={label} style={{ textAlign: "center", padding: "12px 8px", background: "#F8F7F2", borderRadius: 10 }}>
-                  <div style={{ fontFamily: "monospace", fontSize: "1.1rem", fontWeight: 800, color: "#1A1A1A" }}>{val}<span style={{ fontSize: "0.7rem", color: "#9A9690", marginLeft: 2 }}>{unit}</span></div>
+                <div key={label} style={{ textAlign: "center", padding: "12px 8px", background: "#f8fafc", borderRadius: 10 }}>
+                  <div style={{ fontFamily: "monospace", fontSize: "1.1rem", fontWeight: 800, color: "#0f172a" }}>{val}<span style={{ fontSize: "0.7rem", color: "#9A9690", marginLeft: 2 }}>{unit}</span></div>
                   <div style={{ fontSize: "10px", color: "#6A6660", marginTop: 4 }}>{label}</div>
                 </div>
               ))}
@@ -135,14 +135,14 @@ export default function CommunityPage() {
           </div>
 
           {/* ③ 커뮤니티 원칙 — 카드형 */}
-          <div style={{ background: "#FFFFFF", border: "1px solid #E0DDD4", borderRadius: "12px", padding: "28px 24px", marginBottom: "32px" }}>
+          <div style={{ background: "#FFFFFF", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "28px 24px", marginBottom: "32px" }}>
             <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "20px" }}>커뮤니티 원칙</div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "12px" }}>
               {principles.map(p => (
                 <div key={p.title} style={{ background: "#f8fafc", borderRadius: 12, padding: 16, display: "flex", gap: 14, alignItems: "flex-start" }}>
                   <span style={{ fontSize: "20px", flexShrink: 0 }}>{p.icon}</span>
                   <div>
-                    <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#1A1A1A", marginBottom: "4px" }}>{p.title}</div>
+                    <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>{p.title}</div>
                     <div style={{ fontSize: "12px", color: "#6A6660", lineHeight: 1.5 }}>{p.desc}</div>
                   </div>
                 </div>

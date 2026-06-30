@@ -46,11 +46,11 @@ export default function AboutPage() {
         <meta name="twitter:description" content="ONE-HUB 소개. AI가 분석하고 사람이 판단하는 한국 주식 자동매매 시스템의 철학과 운영 원칙." />
 
       </Head>
-      <div style={{ minHeight: "100vh", background: "#F8F7F2", color: "#1A1A1A", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
+      <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "780px", margin: "0 auto", padding: "40px 24px" }}>
           <div style={{ marginBottom: "48px" }}>
-            <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#9A9690", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "16px" }}>About ONE-HUB</div>
-            <h1 style={{ fontSize: "28px", fontWeight: 700, lineHeight: 1.4, color: "#1A1A1A", marginBottom: "16px" }}>
+            <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#94a3b8", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "16px" }}>About ONE-HUB</div>
+            <h1 style={{ fontSize: "28px", fontWeight: 700, lineHeight: 1.4, color: "#0f172a", marginBottom: "16px" }}>
               AI가 시장을 읽고,<br /><span style={{ color: "#00AA55" }}>사람이 판단하는</span> 자동매매
             </h1>
             <p style={{ fontSize: "14px", color: "#6A6660", lineHeight: 1.8, maxWidth: "580px" }}>
@@ -58,45 +58,45 @@ export default function AboutPage() {
             </p>
           </div>
           <div style={{ marginBottom: "48px" }}>
-            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "24px" }}>운영 철학</div>
+            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#94a3b8", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "24px" }}>운영 철학</div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
               {values.map(v => (
-                <div key={v.title} style={{ background: "#FFFFFF", border: "1px solid #E0DDD4", borderRadius: "12px", padding: "22px 20px" }}>
+                <div key={v.title} style={{ background: "#FFFFFF", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "22px 20px" }}>
                   <div style={{ fontSize: "24px", marginBottom: "12px" }}>{v.icon}</div>
-                  <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#1A1A1A", marginBottom: "8px" }}>{v.title}</div>
+                  <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#0f172a", marginBottom: "8px" }}>{v.title}</div>
                   <p style={{ fontSize: "12px", color: "#6A6660", lineHeight: 1.6, margin: 0 }}>{v.desc}</p>
                 </div>
               ))}
             </div>
           </div>
-          <div style={{ background: "#FFFFFF", border: "1px solid #D0CCC4", borderRadius: "12px", padding: "24px", marginBottom: "48px" }}>
-            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "16px" }}>콘텐츠 원칙</div>
+          <div style={{ background: "#FFFFFF", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "24px", marginBottom: "48px" }}>
+            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#94a3b8", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "16px" }}>콘텐츠 원칙</div>
             {[["🚫","수익률(%) 숫자 공개 금지","방향성(▲▼➖)만 공개합니다. 과도한 기대를 조성하지 않습니다."],["📢","실패 공개 필수","손절 이유와 판단 오류를 있는 그대로 기록합니다."],["🔗","AI + 사람 결합 과정 콘텐츠화","AI 판단 근거와 사람의 최종 결정 과정을 매일 공유합니다."]].map(([icon, title, desc]) => (
-              <div key={title} style={{ display: "flex", gap: "16px", alignItems: "flex-start", padding: "12px 0", borderBottom: "1px solid #E0DDD4" }}>
+              <div key={title} style={{ display: "flex", gap: "16px", alignItems: "flex-start", padding: "12px 0", borderBottom: "1px solid #e2e8f0" }}>
                 <span style={{ fontSize: "18px", flexShrink: 0 }}>{icon}</span>
                 <div>
-                  <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#1A1A1A", marginBottom: "3px" }}>{title}</div>
+                  <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#0f172a", marginBottom: "3px" }}>{title}</div>
                   <div style={{ fontSize: "12px", color: "#6A6660" }}>{desc}</div>
                 </div>
               </div>
             ))}
           </div>
           <div style={{ marginBottom: "48px" }}>
-            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "24px" }}>프로젝트 히스토리</div>
-            <div style={{ position: "relative", paddingLeft: "24px", borderLeft: "1px solid #E0DDD4" }}>
+            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#94a3b8", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "24px" }}>프로젝트 히스토리</div>
+            <div style={{ position: "relative", paddingLeft: "24px", borderLeft: "1px solid #e2e8f0" }}>
               {timeline.map((t, i) => (
                 <div key={i} style={{ position: "relative", paddingBottom: "24px" }}>
-                  <div style={{ position: "absolute", left: "-29px", top: "4px", width: "10px", height: "10px", borderRadius: "50%", background: i === 0 ? "#00AA55" : "#D0CCC4", border: "2px solid #E0DDD4" }} />
-                  <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", marginBottom: "4px" }}>{t.date}</div>
-                  <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#1A1A1A", marginBottom: "4px" }}>{t.label}</div>
+                  <div style={{ position: "absolute", left: "-29px", top: "4px", width: "10px", height: "10px", borderRadius: "50%", background: i === 0 ? "#00AA55" : "#e2e8f0", border: "2px solid #e2e8f0" }} />
+                  <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#94a3b8", marginBottom: "4px" }}>{t.date}</div>
+                  <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>{t.label}</div>
                   <div style={{ fontSize: "12px", color: "#6A6660", lineHeight: 1.5 }}>{t.desc}</div>
                 </div>
               ))}
             </div>
           </div>
-          <div style={{ background: "#FFFFFF", border: "1px solid #E0DDD4", borderRadius: "12px", padding: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{ background: "#FFFFFF", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
-              <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "8px" }}>현재 운용 상태</div>
+              <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#94a3b8", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "8px" }}>현재 운용 상태</div>
               <div style={{ fontFamily: "monospace", fontSize: "16px", fontWeight: 700, color: "#00AA55" }}>LIVE · auto_trade {APP_VERSION}</div>
               <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#6A6660", marginTop: "4px" }}>AWS Lightsail · 매일 15:30 KST 자동 리포트</div>
             </div>
