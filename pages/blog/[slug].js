@@ -301,7 +301,7 @@ export async function getStaticProps({ params }) {
   return {
     props: {
       meta: { title: data.title||params.slug, date: data.date||'', description: data.description||'',
-              tags: data.tags||[], image: data.image||null, rawContent: content },
+              tags: data.tags||[], image: data.heroImage || data.image || null, rawContent: content },
       body: marked(content),
       prevPost,
       nextPost,

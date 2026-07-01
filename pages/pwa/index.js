@@ -58,6 +58,8 @@ export default function PWADashboard({ latestReport }) {
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
   const [expandedPos, setExpandedPos] = useState({}); // [v9.0] 보유 탭 왜? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
+  const [sellConfirm, setSellConfirm] = useState({}); // [v8.7] 매도 1단계 확인 상태: { [code]: true }
+  const [sellLoading, setSellLoading] = useState({}); // [v8.7] 매도 처리 중 상태
 
   // [v9.0] 투자성향 프로필
   const [profile, setProfile] = useState({
@@ -300,6 +302,15 @@ export default function PWADashboard({ latestReport }) {
   const fgTier = (f) => f == null ? null : f >= 75 ? 'extreme_greed' : f >= 56 ? 'greed' : f >= 45 ? 'neutral' : f >= 25 ? 'fear' : 'extreme_fear';
   const fgColor = (f) => { const t = fgTier(f); return (t === 'extreme_greed' || t === 'greed') ? 'var(--accent-buy)' : t === 'neutral' ? 'var(--accent-warn)' : 'var(--accent-sell)'; };
   const fgLabel = (f) => ({ extreme_greed: '극단적 탐욕', greed: '탐욕', neutral: '중립', fear: '공포', extreme_fear: '극단적 공포' }[fgTier(f)] || '-');
+  const fgReason = (f) => {
+    const t = fgTier(f);
+    if (t === 'extreme_fear') return 'VIX 급등 + 나스닥 하락 + 기관 매도세';
+    if (t === 'fear') return '기술주 조정 + 경기침체 우려';
+    if (t === 'neutral') return '방향성 탐색 중';
+    if (t === 'greed') return 'AI 모멘텀 + 실적 기대';
+    if (t === 'extreme_greed') return '과열 주의 — 단기 조정 가능성';
+    return '';
+  };
   // [v8.5] 차단 신호 한글 라벨 — STRONG_SELL 등 ML 용어를 일반 투자자가 바로 이해하도록 변환
   const blockedLabel = (signal) => {
     const s = (signal || '').toUpperCase();
@@ -346,6 +357,8 @@ export default function PWADashboard({ latestReport }) {
   const buyCount = data?.today_buys?.length ?? 0;
   const blockCount = data?.market?.block_count ?? 0;
   const watchCount = data?.recent_decisions?.filter(e => e.event_type === 'ANALYZE').length ?? 0;
+  const sellCount = data?.today_sells?.length ?? 0;
+  const passCount = blockCount; // PASS = AI가 차단한 종목 수
   const heat = data?.market?.heat_score ?? null;
   const fearGreed = data?.market?.fear_greed ?? null;
   const vix = data?.market?.vix ?? null;
@@ -478,9 +491,18 @@ export default function PWADashboard({ latestReport }) {
         </header>
 
         <nav className="pwa-tabs">
-          {['dashboard','recommend','portfolio','report','profile'].map(t => (
+          {['dashboard','recommend'].map(t => (
             <button key={t} className={`pwa-tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
-              {t==='dashboard'?'홈':t==='recommend'?'추천':t==='portfolio'?'보유':t==='report'?'기록':'내 설정'}
+              {t==='dashboard'?'홈':'추천'}
+            </button>
+          ))}
+          {/* [v8.7] 중앙 FAB — AI 검색 */}
+          <button className={`pwa-tab-fab ${tab==='analyze'?'active':''}`} onClick={() => setTab('analyze')} aria-label="AI 종목 검색">
+            🔍
+          </button>
+          {['portfolio','report','profile'].map(t => (
+            <button key={t} className={`pwa-tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
+              {t==='portfolio'?'보유':t==='report'?'기록':'설정'}
             </button>
           ))}
         </nav>
@@ -534,6 +556,39 @@ export default function PWADashboard({ latestReport }) {
               </div>
             )}
             {data && (<>
+
+              {/* [v8.7] Action Summary Hero — 오늘 결론 한줄 + BUY/SELL/WATCH/PASS 4분할 */}
+              <section className="action-summary-hero">
+                <div className="action-summary-headline">
+                  {buyCount > 0
+                    ? `🟢 오늘 ${buyCount}종목 매수 추천`
+                    : regime === 'BEAR'
+                      ? '🔴 오늘 관망'
+                      : '⚪ 오늘 매수 없음'}
+                </div>
+                <div className="action-summary-grid">
+                  {[
+                    { label: 'BUY',   count: buyCount,   color: '#1E8449' },
+                    { label: 'SELL',  count: sellCount,  color: '#C0392B' },
+                    { label: 'WATCH', count: watchCount, color: '#2980B9' },
+                    { label: 'PASS',  count: passCount,  color: '#95A5A6' },
+                  ].map(({ label, count, color }) => (
+                    <div key={label} className="action-summary-pill" style={{ borderColor: color }}>
+                      <span className="action-summary-pill-count mono" style={{ color }}>{count}</span>
+                      <span className="action-summary-pill-label" style={{ color }}>{label}</span>
+                    </div>
+                  ))}
+                </div>
+                {/* [v8.7] P2-7 AI 차단손실 KPI */}
+                {data?.blocked_loss_pct != null && data.blocked_loss_pct !== 0 && (
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>AI가 막은 손실 (30일 평균)</span>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1E8449', fontFamily: 'var(--font-mono)' }}>
+                      +{Math.abs(data.blocked_loss_pct).toFixed(1)}%
+                    </span>
+                  </div>
+                )}
+              </section>
 
               {/* [v9.0] Hero 카드 */}
               {(() => {
@@ -670,11 +725,26 @@ export default function PWADashboard({ latestReport }) {
                   <section className="pwa-card ai-basis-card">
                     <span className="pwa-card-label">🧠 AI 판단 근거</span>
 
+                    {/* [v8.7] Market 4지표 한줄 요약 */}
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
+                      {[
+                        { label: 'Regime', val: regime, color: regime === 'BULL' ? '#22c55e' : regime === 'BEAR' ? '#ef4444' : '#f59e0b' },
+                        { label: 'Heat',   val: heat != null ? `${heat}` : null, color: heatColor(heat) },
+                        { label: 'Fear',   val: fearGreed != null ? `${fearGreed}` : null, color: fgColor(fearGreed) },
+                        { label: 'AI%',    val: data?.ai_confidence != null ? `${data.ai_confidence}%` : null, color: '#2563eb' },
+                      ].filter(m => m.val != null).map(m => (
+                        <div key={m.label} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '3px 10px', background: 'var(--inset-bg)', borderRadius: 999 }}>
+                          <span style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)' }}>{m.label}</span>
+                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: m.color, fontFamily: 'var(--font-mono)' }}>{m.val}</span>
+                        </div>
+                      ))}
+                    </div>
+
                     {/* 지표 3개 + 방향 화살표 */}
                     <div className="ai-basis-metrics" style={{ marginBottom: 14 }}>
                       {[
                         { label: 'VIX',    val: vix,      dir: v >= 20 ? '↑' : '↓', color: v >= 25 ? 'var(--accent-sell)' : v >= 20 ? 'var(--accent-warn)' : 'var(--accent-buy)', blogTag: '매크로' },
-                        { label: 'Fear&Greed', val: fearGreed, dir: fg >= 50 ? '↑' : '↓', color: fgColor(fearGreed), blogTag: '매크로' },
+                        { label: 'Fear&Greed', val: fearGreed, dir: fg >= 50 ? '↑' : '↓', color: fgColor(fearGreed), blogTag: '매크로', grade: fgLabel(fearGreed), reason: fgReason(fearGreed) },
                         { label: 'Heat',   val: heat,     dir: h >= 50 ? '↑' : '↓', color: heatColor(heat), blogTag: 'AI분석' },
                       ].map(m => m.val !== null && (
                         <div key={m.label} className="ai-basis-metric">
@@ -687,7 +757,9 @@ export default function PWADashboard({ latestReport }) {
                           </span>
                           <span className="ai-basis-metric-val mono" style={{ color: m.color }}>
                             {m.val} <span className="ai-arrow">{m.dir}</span>
+                            {m.grade && <span style={{ fontSize: '0.62rem', fontWeight: 600, marginLeft: 4 }}>({m.grade})</span>}
                           </span>
+                          {m.reason && <span style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', marginTop: 1 }}>{m.reason}</span>}
                         </div>
                       ))}
                     </div>
@@ -899,87 +971,68 @@ export default function PWADashboard({ latestReport }) {
               )}
               {data && data.screening_candidates && data.screening_candidates.length > 0 && (() => {
                 const sorted = [...data.screening_candidates].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-                const buyList  = sorted.filter(s => (s.score ?? 0) >= 6);
-                const watchList= sorted.filter(s => (s.score ?? 0) >= 4 && (s.score ?? 0) < 6);
-                const obsList  = sorted.filter(s => (s.score ?? 0) < 4);
-                const renderGroup = (label, icon, color, list) => list.length === 0 ? null : (
-                  <div style={{ marginBottom: 12 }}>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color, marginBottom: 6 }}>
-                      {icon} {label} ({list.length})
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {list.map((s, i) => {
+                const top3 = sorted.slice(0, 3);
+                const rest = sorted.slice(3);
+                const MEDALS = ['🥇', '🥈', '🥉'];
+                const openSheet = (s) => setBottomSheet({
+                  name: s.name, code: s.code,
+                  scores: { macro: s.macro_score ?? null, ml: s.ml_score != null ? Math.round(s.ml_score) : null, technical: s.technical_score ?? null, risk: s.risk_score ?? null },
+                  final_score: Math.round(s.score ?? 0),
+                  win_rate: s.win_rate ?? null,
+                  reasons: [
+                    ...(s.regime ? [{ text: `${s.regime} 시장 대응 종목`, positive: true }] : []),
+                    ...(s.ml_score != null ? [{ text: `ML 매수 확률 ${Math.round(s.ml_score * 1.8)}%`, positive: s.ml_score > 50 }] : []),
+                    ...(s.rsi != null ? [{ text: `RSI ${s.rsi}`, positive: s.rsi < 70 }] : []),
+                  ],
+                });
+                return (
+                  <>
+                    {/* Top3 Hero 카드 */}
+                    <div className="top3-hero-row">
+                      {top3.map((s, i) => {
                         const sc = Math.round(s.score ?? 0);
-                        const aiPct = Math.min(100, Math.round(sc * 1.8));
-                        const key = s.code || i;
-                        const isExp = !!expandedRec[key];
+                        const stars = Math.max(1, Math.min(5, Math.round(sc / 2)));
+                        const aiPct = Math.min(99, Math.round(sc * 1.8));
                         return (
-                          <div key={key} className="pwa-card" style={{ padding: '10px 14px', margin: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <button
-                                className="pwa-search-item"
-                                style={{ flex: 1, textAlign: 'left', padding: 0, background: 'none', border: 'none' }}
-                                onClick={() => { setTab('analyze'); runAnalyze(s.code, s.name); }}
-                              >
-                                <span className="pwa-si-name">{s.name}</span>
-                                <span className="pwa-si-code mono dim" style={{ marginLeft: 6 }}>{s.code}</span>
-                              </button>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                                <span className="mono" style={{ fontSize: '0.72rem', color, fontWeight: 700 }}>AI Score {sc}</span>
-                                <button
-                                  style={{ fontSize: '0.68rem', padding: '2px 8px', borderRadius: 8, background: 'var(--inset-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)', whiteSpace: 'nowrap' }}
-                                  onClick={() => setBottomSheet({
-                                    name: s.name, code: s.code,
-                                    scores: { macro: s.macro_score ?? null, ml: s.ml_score != null ? Math.round(s.ml_score) : null, technical: s.technical_score ?? null, risk: s.risk_score ?? null },
-                                    final_score: Math.round(s.score ?? 0),
-                                    win_rate: s.win_rate ?? null,
-                                    reasons: [
-                                      ...(s.regime ? [{ text: `${s.regime} 시장 대응 종목`, positive: true }] : []),
-                                      ...(s.ml_score != null ? [{ text: `ML 매수 확률 ${Math.round(s.ml_score * 1.8)}%`, positive: s.ml_score > 50 }] : []),
-                                      ...(s.rsi != null ? [{ text: `RSI ${s.rsi}`, positive: s.rsi < 70 }] : []),
-                                    ],
-                                  })}
-                                >
-                                  왜?
-                                </button>
-                              </div>
-                            </div>
-                            {/* 매수 확률 + 등락 */}
-                            <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
-                              <span className="mono">매수확률 {aiPct}%</span>
-                              {s.change_1d != null && (
-                                <span className="mono" style={{ color: s.change_1d >= 0 ? 'var(--accent-buy)' : 'var(--accent-sell)' }}>
-                                  {s.change_1d >= 0 ? '+' : ''}{s.change_1d}%
-                                </span>
-                              )}
-                            </div>
-                            {/* 펼침 상세 */}
-                            {isExp && (
-                              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                                {[
-                                  { label: 'ML 점수', value: s.ml_score != null ? `${s.ml_score}점` : '-' },
-                                  { label: 'RSI',     value: s.rsi     != null ? s.rsi      : '-' },
-                                  { label: 'ATR',     value: s.atr     != null ? s.atr      : '-' },
-                                  { label: '최종점수', value: `${sc}점` },
-                                ].map(m => (
-                                  <div key={m.label} style={{ background: 'var(--inset-bg)', borderRadius: 8, padding: '6px 10px' }}>
-                                    <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{m.label}</div>
-                                    <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{m.value}</div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                          <div key={s.code || i} className="top3-hero-card" onClick={() => openSheet(s)}>
+                            <div className="top3-medal">{MEDALS[i]}</div>
+                            <button
+                              className="top3-name"
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-body)', textAlign: 'center' }}
+                              onClick={(e) => { e.stopPropagation(); setTab('analyze'); runAnalyze(s.code, s.name); }}
+                            >{s.name}</button>
+                            <div className="top3-stars">{'⭐'.repeat(stars)}{'☆'.repeat(5 - stars)}</div>
+                            <div className="top3-ai-pct mono">AI {aiPct}%</div>
+                            <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>AI 분석 보기</button>
                           </div>
                         );
                       })}
                     </div>
-                  </div>
-                );
-                return (
-                  <>
-                    {renderGroup('매수 후보', '🟢', '#2e7d32', buyList)}
-                    {renderGroup('관심 종목', '🟡', '#f57c00', watchList)}
-                    {renderGroup('관찰 종목', '⚪', '#757575', obsList)}
+
+                    {/* 나머지 컴팩트 리스트 */}
+                    {rest.length > 0 && (
+                      <div style={{ marginTop: 12 }}>
+                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>그 외 관심종목</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {rest.map((s, i) => {
+                            const sc = Math.round(s.score ?? 0);
+                            return (
+                              <div key={s.code || i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: 'var(--inset-bg)', borderRadius: 8 }}>
+                                <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 600, padding: 0 }}
+                                  onClick={() => { setTab('analyze'); runAnalyze(s.code, s.name); }}>
+                                  {s.name} <span className="mono dim" style={{ fontSize: '0.68rem' }}>{s.code}</span>
+                                </button>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>AI {sc}</span>
+                                  <button style={{ fontSize: '0.64rem', padding: '2px 7px', borderRadius: 6, background: 'var(--card-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}
+                                    onClick={() => openSheet(s)}>AI 분석 보기</button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </>
                 );
               })()}
@@ -1090,25 +1143,39 @@ export default function PWADashboard({ latestReport }) {
                   const riskPct   = risk === '낮음' || risk === 'low' ? 30 : risk === '중간' || risk === 'medium' ? 60 : 90;
                   const pctStr = (base, val) => base > 0 && val > 0 ? `현재가 ${val >= base ? '+' : ''}${((val/base-1)*100).toFixed(1)}%` : '';
 
-                  const rows = [
-                    { label: '1차 매수', price: b1,  sub: pctStr(cur, b1),  color: '#2563eb' },
-                    { label: '2차 매수', price: b2,  sub: pctStr(cur, b2),  color: '#2563eb' },
-                    { label: '손절',     price: stp, sub: pctStr(cur, stp), color: '#ef4444' },
-                    { label: '목표가',   price: tgt, sub: pctStr(cur, tgt), color: '#22c55e' },
+                  const levels = [
+                    { label: '현재가',  price: cur,  color: '#1A1A1A' },
+                    { label: '1차 매수', price: b1,  color: '#2980B9' },
+                    { label: '2차 매수', price: b2,  color: '#5DADE2' },
+                    { label: '손절',    price: stp,  color: '#C0392B' },
+                    { label: '목표가',  price: tgt,  color: '#1E8449' },
                   ];
 
                   return (
                     <section className="pwa-card" style={{ marginTop: 0 }}>
                       <span className="pwa-card-label">📋 AI 액션 플랜</span>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 12 }}>
-                        {rows.map(r => (
-                          <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', minWidth: 60 }}>{r.label}</span>
-                            <span style={{ fontSize: 13, fontFamily: 'var(--font-mono)', color: r.color, fontWeight: 700 }}>
-                              {r.price != null ? r.price.toLocaleString() + '원' : '-'}
-                            </span>
-                            <span style={{ fontSize: 11, color: '#94a3b8', minWidth: 90, textAlign: 'right' }}>{r.sub}</span>
-                          </div>
+                      {/* 가격레벨 타임라인 */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, marginTop: 12 }}>
+                        {levels.map((lv, li) => (
+                          lv.price > 0 ? (
+                            <div key={lv.label}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}>
+                                <span style={{ width: 10, height: 10, borderRadius: '50%', background: lv.color, flexShrink: 0, display: 'inline-block', boxShadow: `0 0 0 2px ${lv.color}30` }} />
+                                <span style={{ fontSize: '0.78rem', fontWeight: 700, color: lv.color, minWidth: 60 }}>{lv.label}</span>
+                                <span style={{ fontSize: '0.82rem', fontFamily: 'var(--font-mono)', color: lv.color, fontWeight: 800, flex: 1 }}>
+                                  {lv.price.toLocaleString()}원
+                                </span>
+                                {li > 0 && cur > 0 && lv.price > 0 && (
+                                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', flexShrink: 0 }}>
+                                    {lv.price >= cur ? '+' : ''}{((lv.price / cur - 1) * 100).toFixed(1)}%
+                                  </span>
+                                )}
+                              </div>
+                              {li < levels.length - 1 && (
+                                <div style={{ width: 1, height: 10, background: 'var(--border)', marginLeft: 4.5, marginBottom: 0 }} />
+                              )}
+                            </div>
+                          ) : null
                         ))}
                       </div>
                       {/* 리스크 바 */}
@@ -1150,7 +1217,7 @@ export default function PWADashboard({ latestReport }) {
                   style={{ cursor:'pointer', textAlign:'center', width:'100%' }}
                   onClick={() => setAnalyzeExpanded(v => !v)}
                 >
-                  {analyzeExpanded ? '왜? 접기 ▲' : '왜? — AI 판단 근거 보기 (기술/매크로) ▼'}
+                  {analyzeExpanded ? 'AI 분석 보기 접기 ▲' : 'AI 분석 보기 (기술/매크로) ▼'}
                 </button>
 
                 {analyzeExpanded && (<>
@@ -1248,7 +1315,7 @@ export default function PWADashboard({ latestReport }) {
                                   ...(p.pnl_rate != null ? [{ text: `현재 ${p.pnl_rate >= 0 ? '+' : ''}${p.pnl_rate}% 수익중`, positive: p.pnl_rate >= 0 }] : []),
                                 ],
                               })}
-                            >왜?</button>
+                            >AI 분석 보기</button>
                             <span className={`position-card-badge mono ${p.pnl_rate>=0?'bull':'bear'}`}>
                               {p.pnl_rate>=0?'+':''}{p.pnl_rate}%
                             </span>
@@ -1286,6 +1353,15 @@ export default function PWADashboard({ latestReport }) {
                             </div>
                           )}
                         </div>
+                        {/* [v8.7] 지표 한줄 요약 */}
+                        {(p.rsi != null || p.macd != null || p.atr != null || p.ml_score != null) && (
+                          <div className="position-indicator-row">
+                            {p.rsi != null && <span>RSI {p.rsi}</span>}
+                            {p.macd != null && <span>MACD {p.macd > 0 ? '+' : ''}{p.macd}</span>}
+                            {p.atr != null && <span>ATR {p.atr}</span>}
+                            {p.ml_score != null && <span style={{ fontWeight: 700, color: '#2980B9' }}>AI {p.ml_score}</span>}
+                          </div>
+                        )}
                         {(() => {
                           const cur = safeNum(p.current_price) ?? 0;
                           const avg = safeNum(p.avg_price) ?? 0;
@@ -1302,16 +1378,40 @@ export default function PWADashboard({ latestReport }) {
                           const isPosExp = !!expandedPos[posKey];
                           return (
                             <div>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 700, padding: '3px 10px', borderRadius: 8, background: badge.bg, color: badge.color }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, gap: 6 }}>
+                                <span style={{ fontSize: '0.78rem', fontWeight: 700, padding: '3px 10px', borderRadius: 8, background: badge.bg, color: badge.color, flexShrink: 0 }}>
                                   {badge.icon} {badge.label}
                                 </span>
-                                <button
-                                  style={{ fontSize: '0.68rem', padding: '3px 10px', borderRadius: 8, background: isPosExp ? '#2563eb' : 'var(--inset-bg)', color: isPosExp ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}
-                                  onClick={() => setExpandedPos(prev => ({ ...prev, [posKey]: !isPosExp }))}
-                                >
-                                  왜?
-                                </button>
+                                <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
+                                  <button
+                                    style={{ fontSize: '0.68rem', padding: '3px 9px', borderRadius: 8, background: isPosExp ? '#2563eb' : 'var(--inset-bg)', color: isPosExp ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}
+                                    onClick={() => setExpandedPos(prev => ({ ...prev, [posKey]: !isPosExp }))}
+                                  >
+                                    {isPosExp ? '접기 ▲' : 'AI 분석 보기'}
+                                  </button>
+                                  <button
+                                    className={`sell-btn${sellConfirm[posKey] ? ' confirm' : ''}`}
+                                    disabled={sellLoading[posKey]}
+                                    style={{ fontSize: '0.68rem', padding: '3px 9px', borderRadius: 8, border: 'none', cursor: sellLoading[posKey] ? 'default' : 'pointer', fontFamily: 'var(--font-body)', fontWeight: 700, background: sellConfirm[posKey] ? '#C0392B' : '#fef2f2', color: sellConfirm[posKey] ? '#fff' : '#C0392B', opacity: sellLoading[posKey] ? 0.6 : 1 }}
+                                    onClick={async () => {
+                                      if (!sellConfirm[posKey]) {
+                                        setSellConfirm(prev => ({ ...prev, [posKey]: true }));
+                                        setTimeout(() => setSellConfirm(prev => { const n = { ...prev }; delete n[posKey]; return n; }), 4000);
+                                        return;
+                                      }
+                                      setSellLoading(prev => ({ ...prev, [posKey]: true }));
+                                      setSellConfirm(prev => { const n = { ...prev }; delete n[posKey]; return n; });
+                                      try {
+                                        const res = await fetch('/api/pwa/sell', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: p.code, trader: trader }) });
+                                        const d = await res.json();
+                                        alert(d.ok ? `${p.name} 매도 주문 완료` : `매도 실패: ${d.error}`);
+                                      } catch(e) { alert('매도 요청 중 오류: ' + e.message); }
+                                      setSellLoading(prev => { const n = { ...prev }; delete n[posKey]; return n; });
+                                    }}
+                                  >
+                                    {sellLoading[posKey] ? '처리 중...' : sellConfirm[posKey] ? '정말 매도?' : '매도'}
+                                  </button>
+                                </div>
                               </div>
                               {isPosExp && (
                                 <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -1476,7 +1576,7 @@ export default function PWADashboard({ latestReport }) {
                       {perf.total}건 / 최소 5건 이상 거래 후 통계가 표시됩니다
                     </div>
                   </div>
-                ) : (
+                ) : (<>
                   <div className="pwa-balance-grid">
                     <div className="pwa-bal-item">
                       <span className="dim">평균수익률</span>
@@ -1509,7 +1609,74 @@ export default function PWADashboard({ latestReport }) {
                       <span className="mono">{perf.rr_ratio}</span>
                     </div>
                   </div>
-                )}
+
+                  {/* [v8.7] 성과 시각화 — 누적수익률 라인 + 승률 파이 + MDD 바 */}
+                  <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr auto auto', gap: 12, alignItems: 'center' }}>
+                    {/* 누적수익률 스파크라인 (SVG inline) */}
+                    {(() => {
+                      const series = perf.daily_series;
+                      if (!series || series.length < 2) return (
+                        <div style={{ height: 60, background: 'var(--inset-bg)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>그래프 준비 중</div>
+                      );
+                      const vals = series.map(s => s.cumReturn ?? 0);
+                      const min = Math.min(...vals), max = Math.max(...vals);
+                      const range = max - min || 1;
+                      const W = 160, H = 56;
+                      const pts = vals.map((v, i) => {
+                        const x = (i / (vals.length - 1)) * W;
+                        const y = H - ((v - min) / range) * (H - 8) - 4;
+                        return `${x},${y}`;
+                      }).join(' ');
+                      const lastVal = vals[vals.length - 1];
+                      const color = lastVal >= 0 ? '#1E8449' : '#C0392B';
+                      return (
+                        <div>
+                          <div style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', marginBottom: 2 }}>누적수익률</div>
+                          <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+                            <polyline fill="none" stroke={color} strokeWidth="2" points={pts} strokeLinejoin="round" strokeLinecap="round" />
+                            <line x1="0" y1={H - 4 - ((0 - min) / range) * (H - 8)} x2={W} y2={H - 4 - ((0 - min) / range) * (H - 8)} stroke="#94a3b8" strokeWidth="0.5" strokeDasharray="3,2" />
+                          </svg>
+                          <div style={{ fontSize: '0.7rem', fontWeight: 700, color, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
+                            {lastVal >= 0 ? '+' : ''}{lastVal.toFixed(1)}%
+                          </div>
+                        </div>
+                      );
+                    })()}
+                    {/* 승률 도넛 (SVG inline) */}
+                    {(() => {
+                      const wr = perf.win_rate ?? 50;
+                      const r = 22, cx = 28, cy = 28, stroke = 6;
+                      const circ = 2 * Math.PI * r;
+                      const filled = (wr / 100) * circ;
+                      return (
+                        <div style={{ textAlign: 'center', flexShrink: 0 }}>
+                          <div style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', marginBottom: 2 }}>승률</div>
+                          <svg width="56" height="56" viewBox="0 0 56 56">
+                            <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--inset-bg)" strokeWidth={stroke} />
+                            <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1E8449" strokeWidth={stroke}
+                              strokeDasharray={`${filled} ${circ}`} strokeLinecap="round"
+                              transform={`rotate(-90 ${cx} ${cy})`} />
+                            <text x={cx} y={cy + 4} textAnchor="middle" fontSize="10" fontWeight="800" fill="#1E8449" fontFamily="monospace">{wr}%</text>
+                          </svg>
+                        </div>
+                      );
+                    })()}
+                    {/* MDD 바 */}
+                    {(() => {
+                      const mdd = Math.abs(perf.mdd ?? 0);
+                      const dangerPct = Math.min(100, mdd * 5);
+                      return (
+                        <div style={{ flexShrink: 0, textAlign: 'center' }}>
+                          <div style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', marginBottom: 2 }}>MDD</div>
+                          <div style={{ width: 12, height: 52, background: 'var(--inset-bg)', borderRadius: 6, overflow: 'hidden', position: 'relative', margin: '0 auto' }}>
+                            <div style={{ position: 'absolute', bottom: 0, width: '100%', height: `${dangerPct}%`, background: '#C0392B', borderRadius: 6 }} />
+                          </div>
+                          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#C0392B', marginTop: 2, fontFamily: 'var(--font-mono)' }}>-{mdd}%</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                </>)}
               </section>
             )}
             <section className="pwa-card">
@@ -1544,7 +1711,7 @@ export default function PWADashboard({ latestReport }) {
                   {[
                     { label: 'Regime',   val: data.market?.regime ?? '-',    style: { color: regimeClass(data.market?.regime) === 'bull' ? 'var(--accent-buy)' : regimeClass(data.market?.regime) === 'bear' ? 'var(--accent-sell)' : 'var(--accent-warn)' } },
                     { label: 'Heat',     val: `${heat ?? '-'}`,              style: { color: heatColor(heat) } },
-                    { label: '공포탐욕', val: `${fearGreed ?? '-'}`,         style: { color: fgColor(fearGreed) } },
+                    { label: '공포탐욕', val: fearGreed != null ? `${fearGreed} (${fgLabel(fearGreed)})` : '-', style: { color: fgColor(fearGreed) } },
                     { label: '매수',     val: `${buyCount}건`,               style: { color: 'var(--accent-buy)' } },
                     { label: '차단',     val: `${blockCount}건`,             style: { color: 'var(--accent-sell)' } },
                     { label: '실현손익', val: `${(data.balance?.realized_pnl ?? 0).toLocaleString()}원`, style: { color: (data.balance?.realized_pnl ?? 0) >= 0 ? 'var(--accent-buy)' : 'var(--accent-sell)' } },
@@ -1803,18 +1970,32 @@ export default function PWADashboard({ latestReport }) {
               ))}
             </div>
 
-            {/* 최종 점수 */}
-            <div style={{ padding: '10px 14px', background: 'var(--inset-bg)', borderRadius: 12, marginBottom: 14 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 6 }}>
-                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>최종 점수</span>
-                <span style={{ fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-mono)' }}>
-                  {bottomSheet.final_score != null ? `${bottomSheet.final_score}점` : '-'}
-                </span>
-              </div>
-              <div style={{ height: 8, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${bottomSheet.final_score ?? 0}%`, background: '#2563eb', borderRadius: 4 }} />
-              </div>
-            </div>
+            {/* 최종 점수 + 등급 */}
+            {(() => {
+              const fs = bottomSheet.final_score ?? 0;
+              const grade = fs >= 85 ? { label: 'Strong Buy', color: '#16a34a' }
+                : fs >= 70 ? { label: 'Buy', color: '#22c55e' }
+                : fs >= 50 ? { label: 'Hold', color: '#f59e0b' }
+                : { label: 'Sell', color: '#ef4444' };
+              return (
+                <div style={{ padding: '10px 14px', background: 'var(--inset-bg)', borderRadius: 12, marginBottom: 14 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 6 }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>최종 점수</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-mono)' }}>
+                        {bottomSheet.final_score != null ? `${bottomSheet.final_score}점` : '-'}
+                      </span>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: grade.color, padding: '2px 8px', borderRadius: 6, background: `${grade.color}18`, border: `1px solid ${grade.color}44` }}>
+                        {grade.label}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ height: 8, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${fs}%`, background: grade.color, borderRadius: 4, transition: 'width 0.5s ease' }} />
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* 판단 근거 목록 */}
             {bottomSheet.reasons && bottomSheet.reasons.length > 0 && (
@@ -1915,8 +2096,10 @@ export default function PWADashboard({ latestReport }) {
         .pwa-theme-toggle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--card-bg); cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
         /* Tabs */
-        .pwa-tabs { display: flex; }
+        .pwa-tabs { display: flex; align-items: center; }
         .pwa-tab { flex: 1; padding: 10px 4px; background: none; border: none; cursor: pointer; color: var(--text-tertiary); font-family: var(--font-display); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; }
+        .pwa-tab-fab { position: relative; top: -10px; width: 46px; height: 46px; border-radius: 50%; border: none; cursor: pointer; background: linear-gradient(135deg, #2980B9, #1A3A5C); color: #fff; font-size: 1.1rem; flex-shrink: 0; box-shadow: 0 4px 14px rgba(41,128,185,0.45); display: flex; align-items: center; justify-content: center; }
+        .pwa-tab-fab.active { background: linear-gradient(135deg, #1A5276, #0D2B45); }
         .theme-light .pwa-tabs { background: var(--inset-bg); padding: 4px; border-radius: var(--radius-md); margin: 4px 16px 8px; gap: 2px; }
         .theme-light .pwa-tab.active { background: var(--card-bg); color: var(--text-primary); border-radius: 10px; box-shadow: var(--card-shadow); }
         .theme-dark .pwa-tabs { border-bottom: 1px solid var(--border); }
@@ -1972,6 +2155,27 @@ export default function PWADashboard({ latestReport }) {
         .hero-v9-btn { width: 100%; padding: 10px 4px; border-radius: var(--radius-md); font-size: 0.78rem; font-weight: 700; cursor: pointer; border: none; font-family: var(--font-body); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .hero-v9-btn.primary { background: #2563eb; color: #fff; }
         .hero-v9-btn.secondary { background: var(--inset-bg); color: var(--text-secondary); border: 1px solid var(--border); }
+
+        /* [v8.7] Top3 Hero Cards */
+        .top3-hero-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
+        .top3-hero-card { display: flex; flex-direction: column; align-items: center; padding: 12px 6px; background: var(--card-bg); border-radius: var(--radius-md); border: 1.5px solid var(--border); gap: 4px; cursor: pointer; text-align: center; transition: border-color 0.15s; }
+        .top3-hero-card:hover { border-color: #2563eb; }
+        .top3-hero-card:nth-child(1) { border-color: #f59e0b; }
+        .top3-hero-card:nth-child(2) { border-color: #94a3b8; }
+        .top3-hero-card:nth-child(3) { border-color: #b45309; }
+        .top3-medal { font-size: 1.4rem; line-height: 1; }
+        .top3-name { font-size: 0.8rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .top3-stars { font-size: 0.7rem; letter-spacing: -1px; color: #f59e0b; }
+        .top3-ai-pct { font-size: 0.78rem; font-weight: 800; color: #2563eb; }
+        .top3-why-btn { font-size: 0.62rem; padding: 3px 8px; border-radius: 6px; background: var(--inset-bg); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; }
+
+        /* [v8.7] Action Summary Hero */
+        .action-summary-hero { background: var(--card-bg); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
+        .action-summary-headline { font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-bottom: 12px; }
+        .action-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .action-summary-pill { display: flex; flex-direction: column; align-items: center; padding: 8px 4px; border-radius: var(--radius-md); border: 1.5px solid; gap: 2px; background: var(--inset-bg); }
+        .action-summary-pill-count { font-size: 1.3rem; font-weight: 800; line-height: 1; }
+        .action-summary-pill-label { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.06em; }
 
         /* [v9.0] Action Card */
         .action-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 10px; }
@@ -2136,16 +2340,17 @@ export default function PWADashboard({ latestReport }) {
         .pwa-bal-item span:first-child { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-tertiary); }
         .pwa-bal-item span:last-child { font-size: 0.85rem; color: var(--text-primary); }
         /* [v8.5] 보유종목 카드 */
-        .position-cards { display: flex; flex-direction: column; gap: 10px; }
-        .position-card { background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; }
-        .position-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .position-card-name { font-size: 0.88rem; color: var(--text-primary); font-weight: 600; }
-        .position-card-badge { font-size: 0.8rem; font-weight: 700; padding: 4px 10px; border-radius: var(--radius-pill); }
+        .position-cards { display: flex; flex-direction: column; gap: 7px; }
+        .position-card { background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 11px 13px; }
+        .position-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+        .position-card-name { font-size: 0.86rem; color: var(--text-primary); font-weight: 600; }
+        .position-card-badge { font-size: 0.76rem; font-weight: 700; padding: 3px 9px; border-radius: var(--radius-pill); }
         .position-card-badge.bull { background: color-mix(in srgb, var(--accent-buy) 16%, var(--card-bg)); }
         .position-card-badge.bear { background: color-mix(in srgb, var(--accent-sell) 16%, var(--card-bg)); }
-        .position-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
-        .position-card-cell { display: flex; flex-direction: column; gap: 2px; font-size: 0.8rem; }
-        .position-card-cell .dim { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .position-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+        .position-card-cell { display: flex; flex-direction: column; gap: 2px; font-size: 0.78rem; }
+        .position-card-cell .dim { font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .position-indicator-row { display: flex; gap: 10px; font-size: 0.68rem; color: var(--text-tertiary); margin-top: 5px; flex-wrap: wrap; }
         .position-card-ai { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
         .position-card-ai-label { display: block; font-size: 0.62rem; letter-spacing: 0.04em; color: var(--accent-info); margin-bottom: 4px; font-weight: 700; }
         .position-card-ai-text { font-size: 0.76rem; line-height: 1.55; color: var(--text-secondary); }

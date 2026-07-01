@@ -35,6 +35,18 @@ export default function TrustCenter() {
       background: ok ? '#22c55e' : '#ef4444', marginRight: 8, flexShrink: 0 }} />
   );
 
+  // [v8.7] 엔진 상태를 사용자 친화적 문구로 변환
+  const getEngineStatusDisplay = (isActive) => {
+    if (!isActive && !data) return { dot: '⚠', label: '점검 중', sub: '일시적 오류 발생, 자동 복구 중입니다', color: '#C0392B' };
+    const now = new Date();
+    const isWeekend = [0, 6].includes(now.getDay());
+    const kstHour = new Date(now.getTime() + 9 * 3600000).getUTCHours();
+    const isMarketHours = !isWeekend && kstHour >= 9 && kstHour < 16;
+    if (isActive && isMarketHours) return { dot: '●', label: '분석 중', sub: 'AI가 시장을 모니터링하고 있습니다', color: '#1E8449' };
+    if (isWeekend) return { dot: '○', label: '주말 휴식 중', sub: '월요일 오전 7:00 KST에 재개됩니다', color: '#6C7A89' };
+    return { dot: '○', label: '대기 중', sub: '다음 분석은 오전 8:50 KST입니다', color: '#6C7A89' };
+  };
+
   const engine   = data?.engine;
   const market   = data?.market;
   const balance  = data?.balance;
@@ -73,19 +85,34 @@ export default function TrustCenter() {
           {/* ENGINE STATUS */}
           <section style={cardStyle}>
             <h2 style={sectionTitle}>ENGINE STATUS</h2>
+            {/* Trading Engine — 친화적 상태 표시 */}
+            {(() => {
+              const st = getEngineStatusDisplay(engine?.is_active ?? false);
+              return (
+                <div style={{ ...rowStyle, flexDirection: 'column', alignItems: 'flex-start', gap: 4, padding: '10px 0', borderBottom: '1px solid var(--color-border)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: '1rem', color: st.color }}>{st.dot}</span>
+                      <span style={{ fontSize: '0.88rem', fontWeight: 700, color: st.color }}>{st.label}</span>
+                    </div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--color-muted)' }}>Trading Engine</span>
+                  </div>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--color-muted)', paddingLeft: 26 }}>{st.sub}</span>
+                </div>
+              );
+            })()}
             {[
-              { label: 'Trading Engine (Trader A)', ok: engine?.is_active ?? false },
-              { label: 'KIS API 연결',              ok: (balance?.total_asset ?? 0) > 0 },
-              { label: 'Database',                  ok: !!data },
-              { label: 'Flask API 서버',             ok: !!data },
+              { label: 'KIS API 연결',  ok: (balance?.total_asset ?? 0) > 0 },
+              { label: 'Database',      ok: !!data },
+              { label: 'Flask API 서버', ok: !!data },
             ].map(({ label, ok }) => (
               <div key={label} style={rowStyle}>
                 <div style={{ display: 'flex', alignItems: 'center' }}>
                   {statusDot(ok)}
                   <span style={{ fontSize: '0.88rem', color: 'var(--color-text)' }}>{label}</span>
                 </div>
-                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: ok ? '#22c55e' : '#ef4444' }}>
-                  {ok ? '정상' : '오프라인'}
+                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: ok ? '#22c55e' : '#6C7A89' }}>
+                  {ok ? '정상' : '대기 중'}
                 </span>
               </div>
             ))}

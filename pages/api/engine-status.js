@@ -19,7 +19,7 @@ export default async function handler(req, res) {
       holdings: [],
       schedule: [],
       strategy: [],
-      version: "v8.0",
+      version: "v8.7",
     });
   }
 }
