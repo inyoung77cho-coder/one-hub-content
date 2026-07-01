@@ -900,6 +900,12 @@ export default function EnginePage() {
                   {engineStatus.last_scan_count ? ` (${engineStatus.last_scan_count}종목)` : ""}
                 </span>
               )}
+              {engineStatus.regime_current && (
+                <span style={{ color: "#9ca3af", fontSize: "12px", marginLeft: 8 }}>
+                  [{engineStatus.regime_current}{engineStatus.regime_days ? ` ${engineStatus.regime_days}일째` : ""}]
+                  {engineStatus.aimode ? " 🤖자율" : ""}
+                </span>
+              )}
             </span>
           </div>
         )}
