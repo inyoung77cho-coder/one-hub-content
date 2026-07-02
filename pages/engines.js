@@ -17,10 +17,11 @@ const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+KR:wght@300;400;500;700&display=swap');
 
   :root {
-    --bg:        #F8F7F2;
+    /* [v9.0][20] 사이트 표준 배경/텍스트 팔레트로 통일 (community.js/about.js와 동일: #f8fafc/#0f172a) */
+    --bg:        #F8FAFC;
     --bg2:       #FFFFFF;
-    --bg3:       #F0EDE8;
-    --border:    #E0DDD4;
+    --bg3:       #EEF2F6;
+    --border:    #E2E8F0;
     --border2:  #2a3344;
     --green:     #00AA55;
     --green-dim: #E8F8EF;
@@ -30,9 +31,9 @@ const STYLES = `
     --yellow-dim:#3d3200;
     --blue:     #4fa3e0;
     --blue-dim: #0d2540;
-    --text:      #1A1A1A;
-    --text2:     #6A6660;
-    --text3:     #9A9690;
+    --text:      #0F172A;
+    --text2:     #64748B;
+    --text3:     #94A3B8;
     --mono:     'Space Mono', monospace;
     --sans:     'Noto Sans KR', sans-serif;
   }

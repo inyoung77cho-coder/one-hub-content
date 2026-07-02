@@ -1021,14 +1021,17 @@ export default function PWADashboard({ latestReport }) {
                 const MEDALS = ['🥇', '🥈', '🥉'];
                 const openSheet = (s) => setBottomSheet({
                   name: s.name, code: s.code,
-                  scores: { macro: s.macro_score ?? null, ml: s.ml_score != null ? Math.round(s.ml_score) : null, technical: s.technical_score ?? null, risk: s.risk_score ?? null },
+                  scores: { macro: s.macro_score ?? null, ml: s.ml_score != null ? Math.round(s.ml_score) : null, technical: s.tech_score ?? null, risk: s.risk_score ?? null },
                   final_score: Math.round(s.score ?? 0),
                   win_rate: s.win_rate ?? null,
+                  // [v9.0][13] Why Now? -- 근거를 최대 5개까지 노출
                   reasons: [
                     ...(s.regime ? [{ text: `${s.regime} 시장 대응 종목`, positive: true }] : []),
                     ...(s.ml_score != null ? [{ text: `ML 매수 확률 ${Math.round(s.ml_score * 1.8)}%`, positive: s.ml_score > 50 }] : []),
                     ...(s.rsi != null ? [{ text: `RSI ${s.rsi}`, positive: s.rsi < 70 }] : []),
-                  ],
+                    ...(s.vol_ratio != null ? [{ text: `거래량 평소 대비 ${s.vol_ratio.toFixed(1)}배`, positive: s.vol_ratio >= 1 }] : []),
+                    ...(s.change_5d != null ? [{ text: `5일 수익률 ${s.change_5d >= 0 ? '+' : ''}${s.change_5d}%`, positive: s.change_5d >= 0 }] : []),
+                  ].slice(0, 5),
                 });
                 return (
                   <>
@@ -1368,7 +1371,7 @@ export default function PWADashboard({ latestReport }) {
                               style={{ fontSize: '0.65rem', padding: '2px 7px', borderRadius: 8, background: 'var(--inset-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', whiteSpace: 'nowrap' }}
                               onClick={() => setBottomSheet({
                                 name: p.name, code: p.code,
-                                scores: { macro: p.macro_score ?? null, ml: p.ml_score != null ? Math.round(p.ml_score) : null, technical: p.technical_score ?? null, risk: p.risk_score ?? null },
+                                scores: { macro: p.macro_score ?? null, ml: p.ml_score != null ? Math.round(p.ml_score) : null, technical: p.tech_score ?? null, risk: p.risk_score ?? null },
                                 final_score: p.final_score ?? null,
                                 win_rate: p.win_rate ?? null,
                                 reasons: [
@@ -1404,7 +1407,15 @@ export default function PWADashboard({ latestReport }) {
                           {safeNum(p.target) > 0 && (
                             <div className="position-card-cell">
                               <span className="dim">목표가</span>
-                              <span className="bull">{safeLocale(p.target, '원')}</span>
+                              <span className="bull">
+                                {safeLocale(p.target, '원')}
+                                {/* [v9.0][15] 목표가 대비 남은 상승여력 */}
+                                {safeNum(p.current_price) > 0 && (
+                                  <span style={{ fontSize: '0.7rem', marginLeft: 4 }}>
+                                    (+{((p.target / p.current_price - 1) * 100).toFixed(1)}% 남음)
+                                  </span>
+                                )}
+                              </span>
                             </div>
                           )}
                           {safeNum(p.stop_loss) > 0 && (
