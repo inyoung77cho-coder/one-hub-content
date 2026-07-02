@@ -17,6 +17,14 @@ function safeNum(v) {
   return isNaN(n) ? null : n;
 }
 
+// [v9.0][11] AI Confidence 별점 — 실제 AI 확신도(%)에서만 사용.
+// 별점은 항상 같은 % 구간표에서 도출해 "18%인데 별 5개" 같은 불일치가 나지 않도록 함.
+function confidenceStars(pct) {
+  const p = Math.max(0, Math.min(100, Number(pct) || 0));
+  const stars = p >= 85 ? 5 : p >= 70 ? 4 : p >= 55 ? 3 : p >= 40 ? 2 : 1;
+  return '★'.repeat(stars) + '☆'.repeat(5 - stars);
+}
+
 // [v9.0] PWA Web Push 구독용 — VAPID 공개키(base64url) -> Uint8Array 변환
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -649,6 +657,29 @@ export default function PWADashboard({ latestReport }) {
                 );
               })()}
 
+              {/* [v9.0][10] Today Mission — 승인대기/손절경고 등 지금 당장 필요한 개별 액션 */}
+              {(() => {
+                const stopWarnings = positions.filter(p => p.stop_loss > 0 && p.current_price > 0 && p.current_price <= p.stop_loss * 1.02);
+                const missionItems = [
+                  ...pendingList.slice(0, 3).map(p => ({ type: 'buy', icon: '✅', text: `${p.name} 매수 승인 대기` })),
+                  ...stopWarnings.map(p => ({ type: 'stop', icon: '🔴', text: `${p.name} 손절 검토 (${p.pnl_rate >= 0 ? '+' : ''}${p.pnl_rate}%)` })),
+                ];
+                if (missionItems.length === 0) return null;
+                return (
+                  <section className="pwa-card today-mission-card">
+                    <span className="pwa-card-label">⭐ TODAY MISSION</span>
+                    <div className="today-mission-list">
+                      {missionItems.map((m, i) => (
+                        <div key={i} className={`today-mission-row tm-${m.type}`}>
+                          <span className="tm-icon">{m.icon}</span>
+                          <span className="tm-text">{m.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </section>
+                );
+              })()}
+
               {/* [v9.0][5] Action Card — 📋 오늘 해야 할 일 */}
               <section className="pwa-card action-card">
                 <span className="pwa-card-label">📋 오늘 해야 할 일</span>
@@ -860,6 +891,20 @@ export default function PWADashboard({ latestReport }) {
                             <div><span className="dim">목표가</span> <span className="bull">{Number(p.target||0).toLocaleString()}원</span></div>
                             <div><span className="dim">손절가</span> <span className="bear">{Number(p.stop_loss||0).toLocaleString()}원</span></div>
                           </div>
+                          {/* [v9.0][12] Risk/Reward -- 승인 전 얼마를 벌고 얼마를 감수하는지 한눈에 */}
+                          {p.price > 0 && p.target > 0 && p.stop_loss > 0 && (() => {
+                            const rewardPct = (p.target / p.price - 1) * 100;
+                            const riskPct = (1 - p.stop_loss / p.price) * 100;
+                            const rr = riskPct > 0 ? rewardPct / riskPct : null;
+                            const rrColor = rr == null ? 'var(--text-secondary)' : rr >= 2 ? '#1E8449' : rr >= 1.5 ? '#F39C12' : '#C0392B';
+                            return (
+                              <div className="pending-price-grid rr-3col mono" style={{ marginTop: 2 }}>
+                                <div><span className="dim">예상수익</span> <span className="bull">+{rewardPct.toFixed(1)}%</span></div>
+                                <div><span className="dim">손절률</span> <span className="bear">-{riskPct.toFixed(1)}%</span></div>
+                                <div><span className="dim">RR</span> <span style={{ color: rrColor, fontWeight: 700 }}>{rr != null ? rr.toFixed(1) : '-'}</span></div>
+                              </div>
+                            );
+                          })()}
                           {p.reason && <div className="pending-reason">{p.reason}</div>}
                           <div className="pending-actions">
                             <button
@@ -889,7 +934,7 @@ export default function PWADashboard({ latestReport }) {
                       <div key={i} className="pwa-action-row">
                         <span className="pwa-action-stock">{['🥇','🥈','🥉'][i] || ''} {p.name}</span>
                         {p.isBuy
-                          ? <span className="pwa-action-score mono dim">AI 확신도 {Math.round(p.score)}%</span>
+                          ? <span className="pwa-action-score mono dim">{confidenceStars(p.score)} AI 확신도 {Math.round(p.score)}%</span>
                           : <span className="pwa-action-score mono dim">관심도 {Math.round(p.score)}</span>}
                         {p.reason && <span className="pwa-action-reason">{p.reason}</span>}
                       </div>))}
@@ -990,9 +1035,10 @@ export default function PWADashboard({ latestReport }) {
                     {/* Top3 Hero 카드 */}
                     <div className="top3-hero-row">
                       {top3.map((s, i) => {
+                        // [v9.0][11] 이 화면은 AI 매수 선별 "이전" 기술 스코어링 후보라서
+                        // (위 안내문 참고) score를 AI 확신도처럼 %+별점으로 보여주면
+                        // 실제보다 확신도가 높은 것처럼 오해를 줌 — 관심도(원점수)로 정직하게 표기.
                         const sc = Math.round(s.score ?? 0);
-                        const stars = Math.max(1, Math.min(5, Math.round(sc / 2)));
-                        const aiPct = Math.min(99, Math.round(sc * 1.8));
                         return (
                           <div key={s.code || i} className="top3-hero-card" onClick={() => openSheet(s)}>
                             <div className="top3-medal">{MEDALS[i]}</div>
@@ -1001,8 +1047,7 @@ export default function PWADashboard({ latestReport }) {
                               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-body)', textAlign: 'center' }}
                               onClick={(e) => { e.stopPropagation(); setTab('analyze'); runAnalyze(s.code, s.name); }}
                             >{s.name}</button>
-                            <div className="top3-stars">{'⭐'.repeat(stars)}{'☆'.repeat(5 - stars)}</div>
-                            <div className="top3-ai-pct mono">AI {aiPct}%</div>
+                            <div className="top3-ai-pct mono">관심도 {sc}</div>
                             <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>AI 분석 보기</button>
                           </div>
                         );
@@ -1023,7 +1068,7 @@ export default function PWADashboard({ latestReport }) {
                                   {s.name} <span className="mono dim" style={{ fontSize: '0.68rem' }}>{s.code}</span>
                                 </button>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>AI {sc}</span>
+                                  <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>관심도 {sc}</span>
                                   <button style={{ fontSize: '0.64rem', padding: '2px 7px', borderRadius: 6, background: 'var(--card-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}
                                     onClick={() => openSheet(s)}>AI 분석 보기</button>
                                 </div>
@@ -1105,7 +1150,7 @@ export default function PWADashboard({ latestReport }) {
                       {analyzeResult.action === 'BUY' ? '🟢 매수' : analyzeResult.action === 'SELL' ? '🔴 매도' : '⚪ 관망'}
                     </span>
                     <span className="pwa-analyze-conf-badge mono" style={{borderColor: actionColor(analyzeResult.action), color: actionColor(analyzeResult.action)}}>
-                      AI 확신도 {analyzeResult.confidence_score}%
+                      {confidenceStars(analyzeResult.confidence_score)} AI 확신도 {analyzeResult.confidence_score}%
                     </span>
                   </div>
                   {/* [v8.7] 결론 먼저 — 목표가/손절가/기대수익을 토글 밖 메인 카드로 승격 */}
@@ -1118,15 +1163,31 @@ export default function PWADashboard({ latestReport }) {
                       <span className="dim">손절가</span>
                       <span className="mono bear">{safeLocale(analyzeResult.stop_loss, '원')}</span>
                     </div>
-                    {analyzeResult.current_price > 0 && (
-                      <div className="pwa-price-item">
-                        <span className="dim">기대수익</span>
-                        <span className="mono bull">
-                          {((analyzeResult.target / analyzeResult.current_price - 1) * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                    )}
                   </div>
+                  {/* [v9.0][12] Risk/Reward -- 예상수익/손절률/RR비율을 한번에 */}
+                  {analyzeResult.current_price > 0 && analyzeResult.target > 0 && analyzeResult.stop_loss > 0 && (() => {
+                    const cp = analyzeResult.current_price;
+                    const rewardPct = (analyzeResult.target / cp - 1) * 100;
+                    const riskPct = (1 - analyzeResult.stop_loss / cp) * 100;
+                    const rr = riskPct > 0 ? rewardPct / riskPct : null;
+                    const rrColor = rr == null ? 'var(--text-secondary)' : rr >= 2 ? '#1E8449' : rr >= 1.5 ? '#F39C12' : '#C0392B';
+                    return (
+                      <div className="rr-summary">
+                        <div className="rr-summary-row">
+                          <span className="dim">예상수익</span>
+                          <span className="mono bull">+{rewardPct.toFixed(1)}%</span>
+                        </div>
+                        <div className="rr-summary-row">
+                          <span className="dim">손절률</span>
+                          <span className="mono bear">-{riskPct.toFixed(1)}%</span>
+                        </div>
+                        <div className="rr-summary-row rr-summary-main">
+                          <span className="dim">Risk/Reward</span>
+                          <span className="mono" style={{ color: rrColor, fontWeight: 800 }}>{rr != null ? rr.toFixed(1) : '-'}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {analyzeResult.key_signal && <p className="pwa-analyze-text" style={{marginTop:10}}>{analyzeResult.key_signal}</p>}
                 </section>
 
@@ -1192,7 +1253,7 @@ export default function PWADashboard({ latestReport }) {
                         {aiConf != null && (
                           <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
-                              <span style={{ color: 'var(--text-secondary)' }}>AI 확신도</span>
+                              <span style={{ color: 'var(--text-secondary)' }}>AI 확신도 {confidenceStars(aiConf)}</span>
                               <span style={{ color: '#2563eb', fontWeight: 700 }}>{aiConf}%</span>
                             </div>
                             <div style={{ height: 6, background: 'var(--inset-bg)', borderRadius: 3, overflow: 'hidden' }}>
@@ -2186,6 +2247,15 @@ export default function PWADashboard({ latestReport }) {
         .action-icon { font-size: 1rem; line-height: 1; }
         .action-label { font-size: 0.78rem; font-weight: 600; color: var(--text-primary); }
 
+        /* [v9.0][10] Today Mission */
+        .today-mission-card { border-color: color-mix(in srgb, #f59e0b 30%, var(--border)); }
+        .today-mission-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+        .today-mission-row { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: var(--radius-md); background: var(--inset-bg); }
+        .today-mission-row.tm-stop { background: color-mix(in srgb, var(--accent-sell) 10%, var(--card-bg)); }
+        .today-mission-row.tm-buy { background: color-mix(in srgb, var(--accent-buy) 10%, var(--card-bg)); }
+        .tm-icon { font-size: 0.9rem; line-height: 1; flex-shrink: 0; }
+        .tm-text { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
+
         /* [v9.0] AI 판단 근거 카드 */
         .ai-basis-bars { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 14px; }
         .ai-basis-bar-row { display: flex; align-items: center; gap: 8px; }
@@ -2276,6 +2346,7 @@ export default function PWADashboard({ latestReport }) {
         .pending-mid { font-size: 0.75rem; }
         .pending-price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 0.78rem; }
         .pending-price-grid > div { display: flex; flex-direction: column; gap: 2px; }
+        .pending-price-grid.rr-3col { grid-template-columns: 1fr 1fr 1fr; }
         .pending-reason { font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5; }
         .pending-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
         .pending-btn { padding: 11px 0; border-radius: var(--radius-sm); font-family: var(--font-display); font-size: 0.8rem; font-weight: 700; cursor: pointer; border: 1px solid; transition: opacity 0.15s, transform 0.1s; }
@@ -2331,6 +2402,11 @@ export default function PWADashboard({ latestReport }) {
         .pwa-price-item span:first-child { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-tertiary); }
         .pwa-price-item span:last-child { font-size: 0.88rem; color: var(--text-primary); }
         .pwa-analyze-text { font-size: 0.8rem; line-height: 1.65; color: var(--text-secondary); }
+
+        /* [v9.0][12] Risk/Reward 요약 */
+        .rr-summary { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; padding: 10px 12px; background: var(--inset-bg); border-radius: var(--radius-md); }
+        .rr-summary-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; }
+        .rr-summary-main { padding-top: 6px; border-top: 1px dashed var(--border); font-size: 0.85rem; }
         .pwa-verdict { border-color: color-mix(in srgb, var(--accent-buy) 30%, var(--border)); }
         .pwa-caution { border-color: color-mix(in srgb, var(--accent-warn) 30%, var(--border)); }
 
