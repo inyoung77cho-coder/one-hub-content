@@ -3,7 +3,7 @@ title: "주식시장 투자 가능성을 점수로 계산한다면? ONE-HUB Mark
 date: "2026-06-07"
 slug: "market-heat-score"
 description: "ONE-HUB AI 엔진이 매일 계산하는 Market Heat Score의 구조와 판단 로직을 공개합니다. 5개 지표를 조합해 한국 주식시장 투자 가능성을 0~100점으로 수치화합니다."
-tags: ["MarketHeatScore", "AI매매", "시장지표", "투자지수", "ONE-HUB"]
+tags: ["MarketHeatScore", "AI매매", "시장지표", "투자지수", "ONE-HUB", "AI분석"]
 ---
 
 ## 1. 한 줄 요약 (TL;DR)

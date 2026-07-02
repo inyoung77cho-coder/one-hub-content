@@ -3,7 +3,7 @@ title: "SOX란? 반도체 지수 해석법과 AI 투자 전략"
 date: "2026-06-07"
 slug: "sox-semiconductor-index"
 description: "PHLX 반도체 지수 SOX가 무엇인지, 그리고 ONE-HUB AI 엔진이 이 지수를 어떻게 해석하고 매매 판단에 활용하는지 설명합니다."
-tags: ["SOX", "반도체지수", "PHLX", "AI투자", "AI매매", "지표설명"]
+tags: ["SOX", "반도체지수", "PHLX", "AI투자", "AI매매", "지표설명", "매크로"]
 ---
 
 ## 1. 한 줄 요약 (TL;DR)

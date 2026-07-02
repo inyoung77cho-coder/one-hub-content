@@ -9,7 +9,7 @@ slug: "ai-korean-stock-analysis"
 
 description: "ONE-HUB의 AI 엔진이 매일 한국 주식 시장을 분석하는 방법을 공개합니다."
 
-tags: ["AI투자", "한국주식", "자동매매", "퀀트"]
+tags: ["AI투자", "한국주식", "자동매매", "퀀트", "AI분석"]
 
 ---
 

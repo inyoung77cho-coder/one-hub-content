@@ -3,7 +3,7 @@ title: "직장인이 AI로 투자하는 법: 시장을 볼 시간이 없는 사�
 date: "2026-06-07"
 slug: "salaryman-ai-investing"
 category: "trading-logic"
-tags: ["직장인투자", "AI투자", "자동매매", "ONE-HUB", "투자철학"]
+tags: ["직장인투자", "AI투자", "자동매매", "ONE-HUB", "투자철학", "운영일지"]
 description: "직장 중에 시장을 볼 수 없는 직장인을 위해 AI가 24시간 시장을 모니터링하는 방법. ONE-HUB의 실제 운영 방식."
 published: true
 ---

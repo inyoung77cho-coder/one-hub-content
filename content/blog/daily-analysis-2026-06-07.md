@@ -3,7 +3,7 @@ title: "AI는 오늘 무엇을 했는가? 84개 종목 분석 후 0개 매수"
 date: "2026-06-07"
 slug: "daily-analysis-2026-06-07"
 category: "daily-analysis"
-tags: ["일별분석", "HeatScore", "AI투자", "ONE-HUB", "시장분석"]
+tags: ["일별분석", "HeatScore", "AI투자", "ONE-HUB", "시장분석", "AI분석"]
 description: "2026년 6월 7일 ONE-HUB의 실제 판단 공개. Heat Score 계산 근거부터 84개 종목 분석, 0건 매수 결정까지."
 published: true
 ---

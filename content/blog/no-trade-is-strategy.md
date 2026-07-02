@@ -3,7 +3,7 @@ title: "매매를 안 한 것이 전략이다: AI는 왜 기다리는가?"
 date: "2026-06-07"
 slug: "no-trade-is-strategy"
 category: "trading-logic"
-tags: ["매매전략", "리스크관리", "AI투자", "ONE-HUB", "직장인투자"]
+tags: ["매매전략", "리스크관리", "AI투자", "ONE-HUB", "직장인투자", "운영일지"]
 description: "AI가 매매를 안 한 날, 그것은 실패가 아니라 판단이다. ONE-HUB이 침묵을 선택하는 이유."
 published: true
 ---

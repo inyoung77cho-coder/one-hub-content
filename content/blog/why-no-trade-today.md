@@ -3,7 +3,7 @@ title: "왜 오늘 매수하지 않았는가? ONE-HUB AI가 종목을 거르는 
 date: "2026-06-07"
 slug: "why-no-trade-today"
 description: "ONE-HUB AI가 매수를 하지 않는 이유를 공개합니다. 3중 차단 구조와 실제 차단 사례까지 — 관망도 전략입니다."
-tags: ["AI매매", "매매차단", "관망전략", "Trading Logic", "ONE-HUB"]
+tags: ["AI매매", "매매차단", "관망전략", "Trading Logic", "ONE-HUB", "운영일지"]
 ---
 
 ## 1. 한 줄 요약 (TL;DR)

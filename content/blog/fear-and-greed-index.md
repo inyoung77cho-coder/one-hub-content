@@ -3,7 +3,7 @@ title: "Fear & Greed Index란? AI 매매 시스템이 이 지수를 보는 이�
 date: "2026-06-06"
 slug: "fear-and-greed-index"
 description: "CNN Fear & Greed Index가 무엇인지, 그리고 ONE-HUB AI 엔진이 이 지수를 어떻게 활용하는지 설명합니다."
-tags: ["Fear&Greed", "시장심리", "AI매매", "지표설명"]
+tags: ["Fear&Greed", "시장심리", "AI매매", "지표설명", "매크로"]
 ---
 
 ## Fear & Greed Index란?

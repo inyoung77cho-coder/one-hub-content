@@ -12,6 +12,22 @@ const TAG_COLORS = {
   quant: '#0891b2', risk: '#dc2626', etf: '#059669', default: '#64748b',
 };
 
+// [v9.0][26] 카테고리별 대표 색상/아이콘 -- 기존엔 tags[0]을 영문 키('ai'/'stock'...)로
+// 찾았지만 실제 포스트 태그는 전부 한글이라 항상 default(회색+💡)로만 표시되던 문제 수정.
+const CATEGORY_STYLE = {
+  'AI분석':  { color: '#2563eb', icon: '🤖' },
+  '매크로':  { color: '#d97706', icon: '🌐' },
+  'ETF':    { color: '#059669', icon: '📈' },
+  '퀀트':    { color: '#0891b2', icon: '📊' },
+  '운영일지': { color: '#7c3aed', icon: '📝' },
+};
+const DEFAULT_STYLE = { color: '#64748b', icon: '💡' };
+
+function postStyle(tags) {
+  const cat = (tags || []).find(t => CATEGORY_STYLE[t]);
+  return cat ? CATEGORY_STYLE[cat] : DEFAULT_STYLE;
+}
+
 function tagColor(tags) {
   if (!tags || tags.length === 0) return TAG_COLORS.default;
   const t = (tags[0] || '').toLowerCase();
@@ -133,7 +149,7 @@ export default function Blog({ posts }) {
             gap: 20,
           }}>
             {filteredPosts.map(post => {
-              const color = tagColor(post.tags);
+              const { color, icon } = postStyle(post.tags);
               return (
                 <Link
                   key={post.slug}
@@ -157,10 +173,7 @@ export default function Blog({ posts }) {
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: '2rem',
                     }}>
-                      {post.tags?.[0] === 'ai' ? '🤖' :
-                       post.tags?.[0] === 'stock' ? '📈' :
-                       post.tags?.[0] === 'quant' ? '📊' :
-                       post.tags?.[0] === 'macro' ? '🌐' : '💡'}
+                      {icon}
                     </div>
                   )}
 
