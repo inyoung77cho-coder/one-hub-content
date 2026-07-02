@@ -730,6 +730,23 @@ export default function PWADashboard({ latestReport }) {
                 </div>
               </section>
 
+              {/* [v9.0][27] Home 정보 우선순위 재정렬: Mission -> Top3 -> Market -> 보유 -> 뉴스 순서로 이동
+                  [v8.7] 추천종목 — 오늘의 TOP PICK (매수신호 없어도 관심종목으로 항상 최대 3개 노출) */}
+              <section className="pwa-card" id="recommend-section">
+                <span className="pwa-card-label">✅ 오늘의 TOP PICK</span>
+                {topPicks.length === 0
+                  ? <div className="pwa-empty">오늘 매수 없음 — {regime === 'BEAR' ? '헤지/방어 스캔 중' : '관망 중'}</div>
+                  : <div className="pwa-action-list">{topPicks.map((p, i) => (
+                      <div key={i} className="pwa-action-row">
+                        <span className="pwa-action-stock">{['🥇','🥈','🥉'][i] || ''} {p.name}</span>
+                        {p.isBuy
+                          ? <span className="pwa-action-score mono dim">{confidenceStars(p.score)} AI 확신도 {Math.round(p.score)}%</span>
+                          : <span className="pwa-action-score mono dim">관심도 {Math.round(p.score)}</span>}
+                        {p.reason && <span className="pwa-action-reason">{p.reason}</span>}
+                      </div>))}
+                    </div>}
+              </section>
+
               {/* [v9.0][6] AI 판단 근거 카드 */}
               {regime && (() => {
                 const h  = heat      ?? 50;
@@ -935,22 +952,6 @@ export default function PWADashboard({ latestReport }) {
                     </div>
                   )}
                 </>)}
-              </section>
-
-              {/* [v8.7] 추천종목 — 오늘의 TOP PICK (매수신호 없어도 관심종목으로 항상 최대 3개 노출) */}
-              <section className="pwa-card" id="recommend-section">
-                <span className="pwa-card-label">✅ 오늘의 TOP PICK</span>
-                {topPicks.length === 0
-                  ? <div className="pwa-empty">오늘 매수 없음 — {regime === 'BEAR' ? '헤지/방어 스캔 중' : '관망 중'}</div>
-                  : <div className="pwa-action-list">{topPicks.map((p, i) => (
-                      <div key={i} className="pwa-action-row">
-                        <span className="pwa-action-stock">{['🥇','🥈','🥉'][i] || ''} {p.name}</span>
-                        {p.isBuy
-                          ? <span className="pwa-action-score mono dim">{confidenceStars(p.score)} AI 확신도 {Math.round(p.score)}%</span>
-                          : <span className="pwa-action-score mono dim">관심도 {Math.round(p.score)}</span>}
-                        {p.reason && <span className="pwa-action-reason">{p.reason}</span>}
-                      </div>))}
-                    </div>}
               </section>
 
               {/* [v8.6] 보유종목 미리보기 — Hero 다음 우선순위로 신설 (전체 화면은 보유 탭) */}
