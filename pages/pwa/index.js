@@ -1141,6 +1141,45 @@ export default function PWADashboard({ latestReport }) {
                   </div>
                 </div>
               )}
+
+              {/* [v9.0][28] 검색화면 고도화 -- AI추천/오늘 급등주/ETF 빠른 접근 */}
+              {searchQuery.length === 0 && (() => {
+                const aiRecs = (data?.today_buys?.length ? data.today_buys.map(b => ({ code: b.code, name: b.stock }))
+                  : (data?.screening_candidates || []).slice().sort((a,b)=>(b.score??0)-(a.score??0))
+                    .map(s => ({ code: s.code, name: s.name }))).slice(0, 5);
+                const gainers = (data?.screening_candidates || []).slice()
+                  .sort((a,b)=>(b.change_1d??-999)-(a.change_1d??-999))
+                  .filter(s => (s.change_1d ?? 0) > 0)
+                  .map(s => ({ code: s.code, name: s.name, change_1d: s.change_1d })).slice(0, 5);
+                const etfQuick = [
+                  { code: '069500', name: 'KODEX 200' },
+                  { code: '379800', name: 'KODEX 미국S&P500' },
+                  { code: '133690', name: 'TIGER 미국나스닥100' },
+                  { code: '261240', name: 'KODEX 미국달러' },
+                ];
+                const sections = [
+                  { label: '🤖 최근 AI 추천', items: aiRecs },
+                  { label: '📈 오늘 급등주', items: gainers },
+                  { label: '📊 ETF 빠른 검색', items: etfQuick },
+                ].filter(s => s.items.length > 0);
+                if (sections.length === 0) return null;
+                return (
+                  <div className="quick-search-sections">
+                    {sections.map(sec => (
+                      <div key={sec.label} className="recent-search-wrap">
+                        <span className="recent-search-label">{sec.label}</span>
+                        <div className="recent-search-chips">
+                          {sec.items.map((s,i) => (
+                            <button key={i} className="recent-search-chip" onClick={() => runAnalyze(s.code, s.name)}>
+                              {s.name}{s.change_1d != null ? ` +${s.change_1d}%` : ''}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </section>
 
             {analyzing && (
