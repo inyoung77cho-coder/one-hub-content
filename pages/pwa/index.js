@@ -376,10 +376,13 @@ export default function PWADashboard({ latestReport }) {
 
   // [v8.7] 3단 Hero — 오늘 행동 판단 (신규매수 / 추가매수 / 현금유지)
   // 오늘 행동 판단 — BEAR/BULL/SIDEWAYS 분기
-  const actionNew   = regime === 'BULL' && (heat ?? 0) >= 40;
+  // [v9.0][29] 개인 맞춤 대시보드 -- 투자성향별로 신규/추가매수 Heat 기준 조정
+  // (보수형: 더 확실할 때만 매수 신호 / 공격형: 더 낮은 Heat에서도 기회로 인식)
+  const heatBias = profile.style === 'conservative' ? 15 : profile.style === 'aggressive' ? -15 : 0;
+  const actionNew   = regime === 'BULL' && (heat ?? 0) >= 40 + heatBias;
   const actionNewWarn = regime === 'SIDEWAYS';                   // SIDEWAYS: 신규매수 ⚠️
-  const actionAdd   = regime === 'BULL' && (heat ?? 0) >= 60;
-  const actionCash  = regime === 'BEAR' || (regime === 'SIDEWAYS') || (heat ?? 0) < 40;
+  const actionAdd   = regime === 'BULL' && (heat ?? 0) >= 60 + heatBias;
+  const actionCash  = regime === 'BEAR' || (regime === 'SIDEWAYS') || (heat ?? 0) < 40 + heatBias;
   const heroWhy = [
     heat    !== null ? `Heat ${heatLabel(heat)} ${heat}점` : null,
     fearGreed !== null ? `공포탐욕 ${fearGreed}` : null,
@@ -1028,7 +1031,15 @@ export default function PWADashboard({ latestReport }) {
                 <div className="pwa-empty">오늘 스캔된 관심종목이 없습니다.</div>
               )}
               {data && data.screening_candidates && data.screening_candidates.length > 0 && (() => {
-                const sorted = [...data.screening_candidates].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+                // [v9.0][29] 개인 맞춤 대시보드 -- 투자성향별 추천 정렬 기준
+                // 공격형: 점수 + 모멘텀(5일 수익률) 가점 / 보수형: 점수 + 변동성 낮은(vol_ratio 1에 근접) 종목 가점
+                const personalScore = (s) => {
+                  const base = s.score ?? 0;
+                  if (profile.style === 'aggressive') return base + (s.change_5d ?? 0) * 0.5;
+                  if (profile.style === 'conservative') return base - Math.abs((s.vol_ratio ?? 1) - 1) * 3;
+                  return base;
+                };
+                const sorted = [...data.screening_candidates].sort((a, b) => personalScore(b) - personalScore(a));
                 const top3 = sorted.slice(0, 3);
                 const rest = sorted.slice(3);
                 const MEDALS = ['🥇', '🥈', '🥉'];
