@@ -603,6 +603,15 @@ export default function PWADashboard({ latestReport }) {
                 const rColor = regime === 'BEAR' ? '#ef4444' : regime === 'BULL' ? '#22c55e' : '#f59e0b';
                 const aiConf = data?.ai_confidence ?? heat;
                 const verdictText = regime === 'BEAR' ? '🚫 관망' : regime === 'BULL' ? '📈 매수' : '🔍 선별매수';
+                // [v9.0][14] 오늘 시장 AI 한줄 브리핑 -- 숫자 대신 사람이 읽을 문장으로 상황 요약
+                const marketBrief = (() => {
+                  if (regime === 'BEAR' && fearGreed !== null && fearGreed < 20) return '극단적 공포 국면 — 관망이 최선의 전략입니다';
+                  if (regime === 'BEAR') return '시장 전반 하락 국면 — 신규 매수보다 현금 비중 유지 권장';
+                  if (regime === 'BULL' && (heat ?? 0) >= 60) return '강한 매수세 지속 — 적극적 진입 구간';
+                  if (regime === 'BULL') return '상승 흐름 유지 중 — 선별적 진입 가능';
+                  if (regime === 'SIDEWAYS') return '방향성 불분명 — 선별적 접근 권장';
+                  return null;
+                })();
                 return (
                   <section className="hero-v9" style={{ borderColor: rColor }}>
                     {/* Regime 크게 */}
@@ -614,6 +623,9 @@ export default function PWADashboard({ latestReport }) {
                         <span className="hero-v9-days dim mono">{regimeDays}일째</span>
                       )}
                     </div>
+                    {marketBrief && (
+                      <p className="hero-v9-brief">{marketBrief}</p>
+                    )}
 
                     {/* AI 신뢰도 */}
                     <div className="hero-v9-conf-row">
@@ -2217,6 +2229,7 @@ export default function PWADashboard({ latestReport }) {
         .hero-v9-regime-row { display: flex; align-items: baseline; justify-content: space-between; }
         .hero-v9-regime { font-family: var(--font-display); font-size: 2rem; font-weight: 800; line-height: 1.1; }
         .hero-v9-days { font-size: 0.75rem; color: var(--text-tertiary); }
+        .hero-v9-brief { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4; margin: -4px 0 0; }
         .hero-v9-conf-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
         .hero-v9-conf-label { font-size: 0.75rem; color: var(--text-tertiary); font-weight: 600; letter-spacing: 0.04em; }
         .hero-v9-conf-val { font-family: var(--font-mono); font-size: 1.3rem; font-weight: 800; }
