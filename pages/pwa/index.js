@@ -490,6 +490,15 @@ export default function PWADashboard({ latestReport }) {
               <button className={trader==='A'?'active':''} onClick={()=>setTrader('A')}>A</button>
               <button className={trader==='B'?'active':''} onClick={()=>setTrader('B')}>B</button>
             </div>
+            {/* [v9.1 PWA-01] 검색: 중앙 FAB → 우측 상단 아이콘으로 이동 */}
+            <button
+              className={`pwa-search-toggle ${tab==='analyze'?'active':''}`}
+              onClick={() => setTab('analyze')}
+              aria-label="AI 종목 검색"
+              title="AI 종목 검색"
+            >
+              🔍
+            </button>
             <button
               className="pwa-theme-toggle"
               onClick={toggleTheme}
@@ -501,19 +510,17 @@ export default function PWADashboard({ latestReport }) {
           </div>
         </header>
 
+        {/* [v9.1 PWA-01] 홈/추천/보유/기록/설정 5개 균등 배치 (검색은 상단으로 이동) */}
         <nav className="pwa-tabs">
-          {['dashboard','recommend'].map(t => (
+          {[
+            ['dashboard','홈'],
+            ['recommend','추천'],
+            ['portfolio','보유'],
+            ['report','기록'],
+            ['profile','설정'],
+          ].map(([t,label]) => (
             <button key={t} className={`pwa-tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
-              {t==='dashboard'?'홈':'추천'}
-            </button>
-          ))}
-          {/* [v8.7] 중앙 FAB — AI 검색 */}
-          <button className={`pwa-tab-fab ${tab==='analyze'?'active':''}`} onClick={() => setTab('analyze')} aria-label="AI 종목 검색">
-            🔍
-          </button>
-          {['portfolio','report','profile'].map(t => (
-            <button key={t} className={`pwa-tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
-              {t==='portfolio'?'보유':t==='report'?'기록':'설정'}
+              {label}
             </button>
           ))}
         </nav>
@@ -2233,8 +2240,9 @@ export default function PWADashboard({ latestReport }) {
         /* Tabs */
         .pwa-tabs { display: flex; align-items: center; }
         .pwa-tab { flex: 1; padding: 10px 4px; background: none; border: none; cursor: pointer; color: var(--text-tertiary); font-family: var(--font-display); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; }
-        .pwa-tab-fab { position: relative; top: -10px; width: 46px; height: 46px; border-radius: 50%; border: none; cursor: pointer; background: linear-gradient(135deg, #2980B9, #1A3A5C); color: #fff; font-size: 1.1rem; flex-shrink: 0; box-shadow: 0 4px 14px rgba(41,128,185,0.45); display: flex; align-items: center; justify-content: center; }
-        .pwa-tab-fab.active { background: linear-gradient(135deg, #1A5276, #0D2B45); }
+        /* [v9.1 PWA-01] 검색 아이콘: 상단 우측 (theme-toggle과 동일 규격, 강조 최소화) */
+        .pwa-search-toggle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--card-bg); cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .pwa-search-toggle.active { border-color: var(--accent-buy, #2980B9); color: var(--accent-buy, #2980B9); }
         .theme-light .pwa-tabs { background: var(--inset-bg); padding: 4px; border-radius: var(--radius-md); margin: 4px 16px 8px; gap: 2px; }
         .theme-light .pwa-tab.active { background: var(--card-bg); color: var(--text-primary); border-radius: 10px; box-shadow: var(--card-shadow); }
         .theme-dark .pwa-tabs { border-bottom: 1px solid var(--border); }
