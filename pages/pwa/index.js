@@ -622,6 +622,33 @@ export default function PWADashboard({ latestReport }) {
                   if (regime === 'SIDEWAYS') return '방향성 불분명 — 선별적 접근 권장';
                   return null;
                 })();
+                // [v9.3 PWA-09] BEAR 상태: 한 줄 요약 + 리포트/AI판단근거 2버튼으로 축소 (추천보기 숨김)
+                if (regime === 'BEAR') {
+                  return (
+                    <section className="hero-v9 hero-v9-compact" style={{ borderColor: rColor }}>
+                      <div className="hero-v9-regime-row">
+                        <span className="hero-v9-regime-compact" style={{ color: rColor }}>
+                          🔴 BEAR{heat !== null ? ` · Heat ${heat}` : ''} · 매수금지
+                        </span>
+                        {regimeDays !== null && (
+                          <span className="hero-v9-days dim mono">{regimeDays}일째</span>
+                        )}
+                      </div>
+                      {marketBrief && <p className="hero-v9-brief">{marketBrief}</p>}
+                      <div className="hero-v9-btns">
+                        <button className="hero-v9-btn primary" onClick={() => setTab('report')}>
+                          📋 오늘 리포트
+                        </button>
+                        <button className="hero-v9-btn secondary" onClick={() => {
+                          setTab('dashboard');
+                          setTimeout(() => document.querySelector('.ai-basis-card')?.scrollIntoView({ behavior:'smooth', block:'start' }), 150);
+                        }}>
+                          🧠 AI 판단근거
+                        </button>
+                      </div>
+                    </section>
+                  );
+                }
                 return (
                   <section className="hero-v9" style={{ borderColor: rColor }}>
                     {/* Regime 크게 */}
@@ -2296,6 +2323,10 @@ export default function PWADashboard({ latestReport }) {
         .hero-v9-verdict-label { font-size: 0.75rem; color: var(--text-tertiary); font-weight: 600; }
         .hero-v9-verdict-badge { font-size: 0.8rem; font-weight: 700; padding: 5px 14px; border-radius: var(--radius-pill); }
         .hero-v9-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 4px; }
+        /* [v9.3 PWA-09] BEAR 축소 카드 */
+        .hero-v9-compact { padding: 12px 16px; gap: 8px; }
+        .hero-v9-regime-compact { font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; line-height: 1.2; }
+        .hero-v9-compact .hero-v9-btns { grid-template-columns: repeat(2, 1fr); }
         .hero-v9-btn { width: 100%; padding: 10px 4px; border-radius: var(--radius-md); font-size: 0.78rem; font-weight: 700; cursor: pointer; border: none; font-family: var(--font-body); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .hero-v9-btn.primary { background: #2563eb; color: #fff; }
         .hero-v9-btn.secondary { background: var(--inset-bg); color: var(--text-secondary); border: 1px solid var(--border); }
