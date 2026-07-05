@@ -11,9 +11,11 @@ export default async function handler(req, res) {
   if (!fn) return res.status(404).json({ error: "unknown endpoint" });
   const trader = req.query.trader || "A";
   try {
-    const resp = await fetch(`${ETF_API}/api/etf/${fn}?trader=${trader}`);
+    const resp = await fetch(`${ETF_API}/api/etf/${fn}?trader=${trader}`, {
+      headers: { "X-API-Key": process.env.ETF_API_KEY || "" },
+    });
     const data = await resp.json();
-    res.status(200).json(data);
+    res.status(resp.status).json(data);
   } catch (e) {
     res.status(500).json({ error: e.message, hint: "ETF 서비스(5003) 도달 실패 — SG/터널 확인" });
   }
