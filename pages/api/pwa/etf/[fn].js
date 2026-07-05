@@ -4,7 +4,7 @@
 //    로컬 개발은 SSH 터널(localhost:5003) + ETF_API_URL=http://localhost:5003 로 테스트.
 const ETF_API = process.env.ETF_API_URL || "http://3.36.171.171:5003";
 
-const ENDPOINTS = { report: "report", tax: "tax", overlap: "overlap", positions: "positions" };
+const ENDPOINTS = { report: "report", tax: "tax", overlap: "overlap", positions: "positions", rebalance: "rebalance" };
 
 export default async function handler(req, res) {
   const fn = ENDPOINTS[req.query.fn];

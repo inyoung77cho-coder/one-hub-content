@@ -18,14 +18,15 @@ export default function EtfDashboard() {
   const [report, setReport] = useState(null);
   const [tax, setTax] = useState(null);
   const [overlap, setOverlap] = useState(null);
+  const [rebal, setRebal] = useState(null);
   const [err, setErr] = useState(null);
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/etf/${fn}?trader=A`).then((r) => r.json());
-    Promise.all([g("report"), g("tax"), g("overlap")])
-      .then(([r, t, o]) => {
+    Promise.all([g("report"), g("tax"), g("overlap"), g("rebalance")])
+      .then(([r, t, o, rb]) => {
         if (r.error || t.error) setErr(r.error || t.error);
-        setReport(r); setTax(t); setOverlap(o);
+        setReport(r); setTax(t); setOverlap(o); setRebal(rb);
       })
       .catch((e) => setErr(e.message));
   }, []);
@@ -41,6 +42,12 @@ export default function EtfDashboard() {
         <span className="live">LIVE</span>
       </header>
 
+      {report?.as_of && (
+        <div className="asof">
+          기준 {report.as_of.price_date || "-"} · 환율 {report.as_of.fx?.toLocaleString()}원
+          {" "}<span className="asof-tag">수동/자동 스냅샷</span>
+        </div>
+      )}
       {err && <div className="err">데이터 로드 오류: {err}</div>}
       {!report && !err && <div className="loading">불러오는 중…</div>}
 
@@ -99,6 +106,38 @@ export default function EtfDashboard() {
           </div>
           {overlap.warnings?.length > 0 && (
             <div className="warn">⚠ {overlap.warnings.join(" · ")}</div>
+          )}
+        </section>
+      )}
+
+      {/* 3.5) 자산 배분 / 리밸런싱 (P4) */}
+      {rebal && (
+        <section className="card">
+          <div className="label">자산 배분 · 리밸런싱
+            <span className="sub">{rebal.actions ? "목표 대비" : "현재 비중"}</span>
+          </div>
+          {rebal.actions ? (
+            <>
+              {rebal.actions.filter((a) => a.action !== "HOLD").map((a) => (
+                <div className="rb" key={a.ticker}>
+                  <span className="rt">{a.ticker}</span>
+                  <span className="rw">{(a.current_weight * 100).toFixed(1)}% → {(a.target_weight * 100).toFixed(0)}%</span>
+                  <b className={a.action === "SELL" ? "neg" : "pos"}>{a.action} {a.qty}주</b>
+                </div>
+              ))}
+              <div className="rb-tax">리밸런싱 매도 예상 양도세 <b className="neg">{won(rebal.est_tax_krw)}원</b> · 밴드 내는 보유 권장</div>
+            </>
+          ) : (
+            <>
+              {Object.entries(rebal.current || {}).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([t, w]) => (
+                <div className="hrow" key={t}>
+                  <span className="ht">{t}</span>
+                  <div className="hbar"><div style={{ width: `${Math.min(100, w * 100 * 3)}%` }} /></div>
+                  <span className="hw">{(w * 100).toFixed(1)}%</span>
+                </div>
+              ))}
+              <div className="rb-tax sub">상위 종목 집중도 확인용. 목표비중 설정 시 실행 가능한 리밸런싱(세금 포함) 제안이 표시됩니다.</div>
+            </>
           )}
         </section>
       )}
@@ -175,6 +214,12 @@ export default function EtfDashboard() {
         .prow .pt { width: 56px; font-weight: 700; font-family: ui-monospace, monospace; }
         .prow .pd { flex: 1; color: #64748b; font-size: 0.74rem; }
         .prow b { font-size: 0.86rem; }
+        .asof { font-size: 0.7rem; color: #64748b; margin: -4px 2px 10px; }
+        .asof-tag { background: #f1f5f9; color: #94a3b8; padding: 1px 6px; border-radius: 6px; font-size: 0.62rem; margin-left: 4px; }
+        .rb { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.84rem; }
+        .rb .rt { width: 56px; font-weight: 700; font-family: ui-monospace, monospace; }
+        .rb .rw { flex: 1; color: #64748b; font-size: 0.74rem; }
+        .rb-tax { font-size: 0.72rem; color: #475569; margin-top: 10px; background: #f8fafc; padding: 7px 9px; border-radius: 8px; }
         .foot { font-size: 0.68rem; color: #94a3b8; text-align: center; margin-top: 16px; line-height: 1.5; }
       `}</style>
       <style jsx global>{`body { background: #f8fafc; margin: 0; }`}</style>
