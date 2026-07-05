@@ -517,9 +517,11 @@ export default function PWADashboard({ latestReport }) {
             ['recommend','추천'],
             ['portfolio','보유'],
             ['report','기록'],
+            ['etf','ETF'],
             ['profile','설정'],
           ].map(([t,label]) => (
-            <button key={t} className={`pwa-tab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
+            <button key={t} className={`pwa-tab ${tab===t?'active':''}`}
+              onClick={()=> t==='etf' ? (window.location.href='/pwa/etf') : setTab(t)}>
               {label}
             </button>
           ))}
