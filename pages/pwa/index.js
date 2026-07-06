@@ -518,13 +518,16 @@ export default function PWADashboard({ latestReport }) {
             ['portfolio','보유'],
             ['report','기록'],
             ['etf','ETF'],
+            ['realestate','부동산'],
             ['profile','설정'],
-          ].map(([t,label]) => (
+          ].map(([t,label]) => {
+            const routes = { etf: '/pwa/etf', realestate: '/pwa/realestate' };
+            return (
             <button key={t} className={`pwa-tab ${tab===t?'active':''}`}
-              onClick={()=> t==='etf' ? (window.location.href='/pwa/etf') : setTab(t)}>
+              onClick={()=> routes[t] ? (window.location.href=routes[t]) : setTab(t)}>
               {label}
             </button>
-          ))}
+          );})}
         </nav>
 
         {error && <div className="pwa-error">Error: {error}</div>}
