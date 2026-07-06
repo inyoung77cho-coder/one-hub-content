@@ -12,6 +12,7 @@ const ENDPOINTS = {
   macro: "/api/macro",
   ranking: "/api/v2/ranking",
   stats: "/api/db/stats",
+  holdings: "/api/v2/holdings",
 };
 
 export default async function handler(req, res) {

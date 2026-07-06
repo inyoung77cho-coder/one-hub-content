@@ -39,6 +39,7 @@ function Donut({ segments, total }) {
 export default function Portfolio() {
   const [stock, setStock] = useState(null);
   const [etf, setEtf] = useState(null);
+  const [reUk, setReUk] = useState(null);   // 부동산 보유 평가액(억)
   const [err, setErr] = useState(null);
 
   useEffect(() => {
@@ -47,13 +48,17 @@ export default function Portfolio() {
     fetch("/api/pwa/etf/report?trader=A").then((r) => r.json())
       .then((d) => { if (d.error) setErr(d.error); setEtf(d?.summary?.value_krw ?? null); })
       .catch((e) => setErr(e.message));
+    fetch("/api/pwa/re/holdings?trader=A").then((r) => r.json())
+      .then((d) => setReUk(d?.total_uk ?? null)).catch(() => {});
   }, []);
 
-  const s = stock || 0, e = etf || 0;
-  const total = s + e;
+  const s = stock || 0, e = etf || 0, re = (reUk || 0) * 1e8;
+  const total = s + e + re;
+  const hasRe = re > 0;
   const segments = [
     { label: "주식", value: s, color: "#0ea5e9" },
     { label: "ETF", value: e, color: "#6366f1" },
+    ...(hasRe ? [{ label: "부동산", value: re, color: "#10b981" }] : []),
   ];
   const pct = (v) => (total > 0 ? (v / total * 100).toFixed(1) : "0");
 
@@ -89,11 +94,13 @@ export default function Portfolio() {
                 <span className="lg-p">{pct(seg.value)}%</span>
               </div>
             ))}
-            <div className="lg re">
-              <span className="dot" style={{ background: "#e2e8f0" }} />
-              <span className="lg-l">부동산</span>
-              <span className="lg-p">분석 연동</span>
-            </div>
+            {!hasRe && (
+              <div className="lg re">
+                <span className="dot" style={{ background: "#e2e8f0" }} />
+                <span className="lg-l">부동산</span>
+                <span className="lg-p">보유 미입력</span>
+              </div>
+            )}
           </div>
         </div>
       </section>
@@ -103,7 +110,7 @@ export default function Portfolio() {
         <div className="label">자산별 상세</div>
         <Link href="/pwa" className="row"><span>📈 주식</span><b>{won(s)}원</b><span className="arr">→</span></Link>
         <Link href="/pwa/etf" className="row"><span>💵 ETF</span><b>{won(e)}원</b><span className="arr">→</span></Link>
-        <Link href="/pwa/realestate" className="row"><span>🏠 부동산</span><span className="muted">ONE Score·저평가</span><span className="arr">→</span></Link>
+        <Link href="/pwa/realestate" className="row"><span>🏠 부동산</span>{hasRe ? <b>{won(re)}원</b> : <span className="muted">ONE Score·저평가</span>}<span className="arr">→</span></Link>
       </section>
 
       {/* AI 제안 */}
