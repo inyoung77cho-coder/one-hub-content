@@ -561,6 +561,7 @@ export default function Home({ reports, stats }) {
             </div>
             <div className="hub-grid">
               {[
+                { href: '/pwa/portfolio', label: '통합 자산', desc: '주식+ETF+부동산 총자산', status: 'live', week: null },
                 { href: '/pwa/etf', label: 'ETF 자산', desc: '수익·환차·세금·중복도', status: 'live', week: null },
                 { href: '/pwa/realestate', label: '부동산 자산', desc: 'ONE Score·저평가·시장', status: 'live', week: null },
                 { href: '/daily', label: 'Daily Report', desc: '매일 AI 운영일지', status: 'live', week: null },
