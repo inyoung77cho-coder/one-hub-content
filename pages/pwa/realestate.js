@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AssetBottomNav from "../../components/AssetBottomNav";
+import AssetSummaryBar from "../../components/AssetSummaryBar";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -34,6 +35,8 @@ export default function RealEstateDashboard() {
         <h1>부동산 자산</h1>
         <span className="live">LIVE</span>
       </header>
+
+      <AssetSummaryBar />
 
       {err && <div className="err">데이터 로드 오류: {err}</div>}
       {!brief && !err && <div className="loading">불러오는 중…</div>}

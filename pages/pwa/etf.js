@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import AssetBottomNav from "../../components/AssetBottomNav";
+import AssetSummaryBar from "../../components/AssetSummaryBar";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -42,6 +43,8 @@ export default function EtfDashboard() {
         <h1>ETF 자산</h1>
         <span className="live">LIVE</span>
       </header>
+
+      <AssetSummaryBar />
 
       {report?.as_of && (
         <div className="asof">

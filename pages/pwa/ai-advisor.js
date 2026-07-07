@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import AssetBottomNav from "../../components/AssetBottomNav";
+import AssetSummaryBar from "../../components/AssetSummaryBar";
 
 const api = (fn) => `/api/realestate/v2/${fn}?trader_id=A`;
 const Stars = ({ n }) => <span className="st">{"★".repeat(n)}{"☆".repeat(5 - n)}</span>;
@@ -32,6 +33,8 @@ export default function AIAdvisor() {
         <Link href="/pwa" className="bk">←</Link>
         <h1>🤖 AI 자산운영</h1>
       </header>
+
+      <AssetSummaryBar />
 
       {err && <div className="card err">AI 엔진 연결에 실패했습니다. 잠시 후 다시 시도하세요.</div>}
 
