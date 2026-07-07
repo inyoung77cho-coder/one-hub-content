@@ -536,43 +536,50 @@ export default function PWADashboard({ latestReport }) {
             </button>
             <button
               className="pwa-theme-toggle"
-              onClick={toggleTheme}
-              aria-label="테마 전환"
-              title={theme === 'light' ? '다크 모드로 전환' : '라이트 모드로 전환'}
-            >
-              {theme === 'light' ? '🌙' : '☀️'}
-            </button>
-            <button
-              className="pwa-theme-toggle"
               onClick={() => router.push('/pwa/settings')}
               aria-label="설정"
-              title="설정 · 시스템 상태"
+              title="설정 · 테마 · 시스템 상태"
             >
               ⚙️
             </button>
           </div>
         </header>
 
-        {/* [v9.1 PWA-01] 홈/추천/보유/기록/설정 5개 균등 배치 (검색은 상단으로 이동) */}
+        {/* [v11 IA] 자산 카테고리 네비 — 홈 · AI자산 · 주식 · ETF · 부동산 · 설정 */}
         <nav className="pwa-tabs">
           {[
             ['dashboard','홈'],
-            ['ai','AI'],
-            ['recommend','추천'],
-            ['portfolio','보유'],
-            ['report','기록'],
+            ['ai','AI자산'],
+            ['stock','주식'],
             ['etf','ETF'],
             ['realestate','부동산'],
-            ['profile','설정'],
+            ['settings','설정'],
           ].map(([t,label]) => {
-            const routes = { etf: '/pwa/etf', realestate: '/pwa/realestate', ai: '/pwa/ai-advisor' };
+            const routes = { etf: '/pwa/etf', realestate: '/pwa/realestate', ai: '/pwa/ai-advisor', settings: '/pwa/settings' };
+            const stockTabs = ['recommend','portfolio','report','analyze'];
+            const isActive = t === 'stock' ? stockTabs.includes(tab) : tab === t;
+            const go = () => {
+              if (routes[t]) { window.location.href = routes[t]; return; }
+              if (t === 'stock') { setTab('recommend'); return; }
+              setTab(t);
+            };
             return (
-            <button key={t} className={`pwa-tab ${tab===t?'active':''}`}
-              onClick={()=> routes[t] ? (window.location.href=routes[t]) : setTab(t)}>
-              {label}
-            </button>
-          );})}
+              <button key={t} className={`pwa-tab ${isActive?'active':''}`} onClick={go}>
+                {label}
+              </button>
+            );
+          })}
         </nav>
+        {/* [v11 IA] 주식 카테고리 서브탭 — 추천 · 보유 · 기록 */}
+        {['recommend','portfolio','report'].includes(tab) && (
+          <nav className="pwa-subtabs">
+            {[['recommend','추천'],['portfolio','보유'],['report','기록']].map(([t,label]) => (
+              <button key={t} className={`pwa-subtab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
+                {label}
+              </button>
+            ))}
+          </nav>
+        )}
 
         {error && <div className="pwa-error">Error: {error}</div>}
 
@@ -2355,6 +2362,11 @@ export default function PWADashboard({ latestReport }) {
         .theme-dark .pwa-tabs { border-bottom: 1px solid var(--border); }
         .theme-dark .pwa-tab { text-transform: uppercase; font-family: var(--font-mono); font-size: 0.65rem; border-bottom: 2px solid transparent; }
         .theme-dark .pwa-tab.active { color: var(--accent-buy); border-bottom-color: var(--accent-buy); }
+        /* [v11 IA] 주식 서브탭 (2차 내비) */
+        .pwa-subtabs { display: flex; align-items: center; gap: 6px; margin: 0 16px 8px; }
+        .pwa-subtab { padding: 5px 14px; background: none; border: 1px solid var(--border); border-radius: var(--radius-pill, 999px); cursor: pointer; color: var(--text-secondary); font-family: var(--font-display); font-size: 0.72rem; font-weight: 700; }
+        .pwa-subtab.active { background: var(--accent-buy, #2980B9); color: #fff; border-color: var(--accent-buy, #2980B9); }
+        .theme-dark .pwa-subtab.active { background: var(--accent-buy); color: var(--bg); }
 
         /* Layout */
         .pwa-main { padding: 8px 16px 12px; display: flex; flex-direction: column; gap: 12px; }
