@@ -3,6 +3,7 @@
 // ★백엔드 무변경: 기존 프록시(/api/pwa-dashboard, /api/pwa/etf/report)를 프론트에서 합산.
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import AssetBottomNav from "../../components/AssetBottomNav";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -124,7 +125,7 @@ export default function Portfolio() {
       <div className="foot">주식·ETF는 실평가액 합산(확정). 부동산은 분석 엔진 — 보유자산 입력 시 총자산에 합산 예정.</div>
 
       <style jsx>{`
-        .pf { max-width: 480px; margin: 0 auto; padding: 0 14px 40px; font-family: -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+        .pf { max-width: 480px; margin: 0 auto; padding: 0 14px 84px; font-family: -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
         .pf-hdr { display: flex; align-items: center; gap: 10px; padding: 16px 2px 10px; }
         .pf-hdr h1 { font-size: 1.15rem; font-weight: 800; margin: 0; flex: 1; }
         .back { color: #0284c7; text-decoration: none; font-size: 0.82rem; font-weight: 600; }
@@ -148,6 +149,7 @@ export default function Portfolio() {
         .sug { font-size: 0.8rem; color: #0369a1; background: #f0f9ff; padding: 8px 10px; border-radius: 8px; margin-top: 4px; }
         .foot { font-size: 0.68rem; color: #94a3b8; text-align: center; margin-top: 16px; line-height: 1.5; }
       `}</style>
+      <AssetBottomNav active="ai" />
       <style jsx global>{`body { background: #f8fafc; margin: 0; }`}</style>
     </div>
   );

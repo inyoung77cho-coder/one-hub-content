@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
+import AssetBottomNav from "../../components/AssetBottomNav";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -164,8 +165,10 @@ export default function Settings() {
         <div className="row"><span className="l">APP_VERSION</span><span className="ver">{health?.app_version || "…"}</span></div>
       </div>
 
+      <AssetBottomNav active="settings" />
+
       <style jsx>{`
-        .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #f7f9fc; padding: 0 14px 40px; font-family: -apple-system, sans-serif; color: #111827; }
+        .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #f7f9fc; padding: 0 14px 84px; font-family: -apple-system, sans-serif; color: #111827; }
         .m.dk { background: #0b0e14; color: #e5e7eb; }
         .hd { display: flex; align-items: center; gap: 10px; padding: 14px 2px; } .bk { text-decoration: none; color: #2563eb; font-size: 1.2rem; font-weight: 700; } .hd h1 { font-size: 1.05rem; font-weight: 800; margin: 0; }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }

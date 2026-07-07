@@ -2,6 +2,7 @@
 // ETF 대시보드와 동일 패턴. ONE Score 랭킹/시장 브리핑/저평가/거시. 확정 데이터는 진한색.
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import AssetBottomNav from "../../components/AssetBottomNav";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -100,7 +101,7 @@ export default function RealEstateDashboard() {
       <div className="foot">실거래 기반 확정 지표 + 회귀 예측(근사). 예측치는 참고용이며 투자판단은 본인 책임.</div>
 
       <style jsx>{`
-        .re { max-width: 480px; margin: 0 auto; padding: 0 14px 40px; font-family: -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+        .re { max-width: 480px; margin: 0 auto; padding: 0 14px 84px; font-family: -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
         .re-hdr { display: flex; align-items: center; gap: 10px; padding: 16px 2px 10px; position: sticky; top: 0; background: #f8fafc; z-index: 5; }
         .re-hdr h1 { font-size: 1.15rem; font-weight: 800; margin: 0; flex: 1; }
         .back { color: #0284c7; text-decoration: none; font-size: 0.82rem; font-weight: 600; }
@@ -134,6 +135,7 @@ export default function RealEstateDashboard() {
         .chip { font-size: 0.76rem; font-weight: 600; background: #e0f2fe; color: #0369a1; padding: 4px 11px; border-radius: 20px; }
         .foot { font-size: 0.68rem; color: #94a3b8; text-align: center; margin-top: 16px; line-height: 1.5; }
       `}</style>
+      <AssetBottomNav active="realestate" />
       <style jsx global>{`body { background: #f8fafc; margin: 0; }`}</style>
     </div>
   );

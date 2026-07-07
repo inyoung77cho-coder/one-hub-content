@@ -3,6 +3,7 @@
 // ★ 단일 점수 블랙박스 금지 — Portfolio Score는 구성요소를 펼쳐 보여준다(§11.2).
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import AssetBottomNav from "../../components/AssetBottomNav";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -177,7 +178,7 @@ export default function EtfDashboard() {
       <div className="foot">확정 계산(수익·세금·중복도)은 입력값 기반. 예측(Forecast)은 미탑재. · 세무자문 아님</div>
 
       <style jsx>{`
-        .etf { max-width: 480px; margin: 0 auto; padding: 0 14px 40px; font-family: -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
+        .etf { max-width: 480px; margin: 0 auto; padding: 0 14px 84px; font-family: -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
         .etf-hdr { display: flex; align-items: center; gap: 10px; padding: 16px 2px 10px; position: sticky; top: 0; background: #f8fafc; z-index: 5; }
         .etf-hdr h1 { font-size: 1.15rem; font-weight: 800; margin: 0; flex: 1; }
         .back { color: #0284c7; text-decoration: none; font-size: 0.82rem; font-weight: 600; }
@@ -222,6 +223,7 @@ export default function EtfDashboard() {
         .rb-tax { font-size: 0.72rem; color: #475569; margin-top: 10px; background: #f8fafc; padding: 7px 9px; border-radius: 8px; }
         .foot { font-size: 0.68rem; color: #94a3b8; text-align: center; margin-top: 16px; line-height: 1.5; }
       `}</style>
+      <AssetBottomNav active="etf" />
       <style jsx global>{`body { background: #f8fafc; margin: 0; }`}</style>
     </div>
   );

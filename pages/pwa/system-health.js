@@ -2,6 +2,7 @@
 // 실제 서버 상태(서비스/KIS토큰/Circuit/DB/스케줄러/이벤트로그) 30초 폴링.
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import AssetBottomNav from "../../components/AssetBottomNav";
 
 const COLOR = { ok: "#16a34a", active: "#16a34a", connected: "#16a34a", running: "#16a34a", success: "#16a34a",
   CLOSED: "#16a34a", warning: "#d97706", HALF_OPEN: "#d97706", unknown: "#9ca3af", missing: "#d97706",
@@ -134,8 +135,10 @@ export default function SystemHealth() {
 
       <div className="links"><Link href="/pwa" className="lk">← PWA 홈</Link><Link href="/pwa/ai-advisor" className="lk">AI 자산운영</Link></div>
 
+      <AssetBottomNav active="settings" />
+
       <style jsx>{`
-        .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #f7f9fc; padding: 0 14px 40px; font-family: -apple-system, sans-serif; color: #111827; }
+        .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #f7f9fc; padding: 0 14px 84px; font-family: -apple-system, sans-serif; color: #111827; }
         .hd { display: flex; align-items: center; justify-content: space-between; padding: 14px 2px; }
         .hd h1 { font-size: 1.05rem; font-weight: 800; margin: 0; } .ts { font-size: 0.68rem; color: #9ca3af; }
         .rf { border: 1px solid #e5e7eb; background: #fff; border-radius: 8px; width: 34px; height: 34px; font-size: 1rem; }

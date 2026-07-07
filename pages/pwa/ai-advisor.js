@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
+import AssetBottomNav from "../../components/AssetBottomNav";
 
 const api = (fn) => `/api/realestate/v2/${fn}?trader_id=A`;
 const Stars = ({ n }) => <span className="st">{"★".repeat(n)}{"☆".repeat(5 - n)}</span>;
@@ -94,8 +95,10 @@ export default function AIAdvisor() {
         <Link href="/pwa/etf" className="lk">📊 ETF 상세</Link>
       </div>
 
+      <AssetBottomNav active="ai" />
+
       <style jsx>{`
-        .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #f7f9fc; padding: 0 14px 40px; font-family: -apple-system, sans-serif; color: #111827; }
+        .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #f7f9fc; padding: 0 14px 84px; font-family: -apple-system, sans-serif; color: #111827; }
         .hd { display: flex; align-items: center; gap: 10px; padding: 14px 2px; } .bk { text-decoration: none; color: #2563eb; font-size: 1.2rem; font-weight: 700; } .hd h1 { font-size: 1.05rem; font-weight: 800; margin: 0; }
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .err { color: #dc2626; font-size: 0.85rem; }
