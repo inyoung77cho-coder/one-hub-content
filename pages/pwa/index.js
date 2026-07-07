@@ -17,6 +17,15 @@ function safeNum(v) {
   return isNaN(n) ? null : n;
 }
 
+// [Queue] KST 장중(평일 09:00~15:30) 여부 — 장외 승인은 예약으로 전환
+function isMarketHoursKST() {
+  const kst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const day = kst.getDay();
+  if (day === 0 || day === 6) return false;
+  const t = kst.getHours() * 60 + kst.getMinutes();
+  return t >= 9 * 60 && t < 15 * 60 + 30;
+}
+
 // [v9.0][11] AI Confidence 별점 — 실제 AI 확신도(%)에서만 사용.
 // 별점은 항상 같은 % 구간표에서 도출해 "18%인데 별 5개" 같은 불일치가 나지 않도록 함.
 function confidenceStars(pct) {
@@ -248,6 +257,27 @@ export default function PWADashboard({ latestReport }) {
   }, [mounted, loadPending]);
 
   const actOnPending = useCallback(async (code, action) => {
+    // [Queue] 장외 승인 → 다음장 09:00 예약 승인으로 전환
+    if (action === 'approve' && !isMarketHoursKST()) {
+      const ok = window.confirm(
+        '현재 장외 시간입니다.\n다음 영업일 09:00에 예약 승인으로 등록하시겠습니까?\n(09:00 자동 릴리스 — 유효 신호만 체결)');
+      if (!ok) return;
+      setActingCode(code);
+      try {
+        const res = await fetch('/api/queue-pending', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, trader }),
+        });
+        const d = await res.json();
+        if (d.ok) {
+          setPendingList(prev => prev.map(p => p.code === code
+            ? { ...p, status: 'queued', scheduled_at: d.scheduled_at } : p));
+        } else { setPendingError(d.error || '예약 실패'); }
+      } catch (e) { setPendingError(String(e)); }
+      finally { setActingCode(null); }
+      return;
+    }
     setActingCode(code);
     try {
       const res = await fetch(`/api/${action}-pending`, {
@@ -978,18 +1008,30 @@ export default function PWADashboard({ latestReport }) {
                             );
                           })()}
                           {p.reason && <div className="pending-reason">{p.reason}</div>}
+                          {p.status === 'queued' ? (
+                            <div className="pending-queued">
+                              ⏰ {p.scheduled_at ? `${p.scheduled_at} 예약` : '다음장 09:00 예약'} · 자동 릴리스 대기
+                              <button
+                                className="pending-btn reject"
+                                style={{ marginTop: 8, width: '100%' }}
+                                disabled={actingCode === p.code}
+                                onClick={() => actOnPending(p.code, 'skip')}
+                              >{actingCode === p.code ? '처리 중...' : '❌ 예약 취소'}</button>
+                            </div>
+                          ) : (
                           <div className="pending-actions">
                             <button
                               className="pending-btn approve"
                               disabled={actingCode === p.code}
                               onClick={() => actOnPending(p.code, 'approve')}
-                            >{actingCode === p.code ? '처리 중...' : '✅ 승인'}</button>
+                            >{actingCode === p.code ? '처리 중...' : (isMarketHoursKST() ? '✅ 승인' : '⏰ 예약 승인')}</button>
                             <button
                               className="pending-btn reject"
                               disabled={actingCode === p.code}
                               onClick={() => actOnPending(p.code, 'skip')}
                             >{actingCode === p.code ? '처리 중...' : '❌ 거절'}</button>
                           </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -2468,6 +2510,7 @@ export default function PWADashboard({ latestReport }) {
         .pending-price-grid > div { display: flex; flex-direction: column; gap: 2px; }
         .pending-price-grid.rr-3col { grid-template-columns: 1fr 1fr 1fr; }
         .pending-reason { font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5; }
+        .pending-queued { font-size: 0.75rem; font-weight: 700; color: var(--accent-warn); background: color-mix(in srgb, var(--accent-warn) 10%, transparent); border: 1px solid color-mix(in srgb, var(--accent-warn) 30%, var(--border)); border-radius: var(--radius-sm); padding: 10px; text-align: center; }
         .pending-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
         .pending-btn { padding: 11px 0; border-radius: var(--radius-sm); font-family: var(--font-display); font-size: 0.8rem; font-weight: 700; cursor: pointer; border: 1px solid; transition: opacity 0.15s, transform 0.1s; }
         .pending-btn:active { transform: scale(0.98); }
