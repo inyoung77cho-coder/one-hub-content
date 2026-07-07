@@ -514,6 +514,7 @@ export default function PWADashboard({ latestReport }) {
         <nav className="pwa-tabs">
           {[
             ['dashboard','홈'],
+            ['ai','AI'],
             ['recommend','추천'],
             ['portfolio','보유'],
             ['report','기록'],
@@ -521,7 +522,7 @@ export default function PWADashboard({ latestReport }) {
             ['realestate','부동산'],
             ['profile','설정'],
           ].map(([t,label]) => {
-            const routes = { etf: '/pwa/etf', realestate: '/pwa/realestate' };
+            const routes = { etf: '/pwa/etf', realestate: '/pwa/realestate', ai: '/pwa/ai-advisor' };
             return (
             <button key={t} className={`pwa-tab ${tab===t?'active':''}`}
               onClick={()=> routes[t] ? (window.location.href=routes[t]) : setTab(t)}>
