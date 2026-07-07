@@ -72,6 +72,7 @@ export default function PWADashboard({ latestReport }) {
   const [pendingError, setPendingError] = useState(null);
   const [actingCode, setActingCode] = useState(null); // 승인/거절 처리 중인 종목코드
   const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
+  const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
   const [expandedPos, setExpandedPos] = useState({}); // [v9.0] 보유 탭 왜? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
@@ -235,6 +236,10 @@ export default function PWADashboard({ latestReport }) {
     fetch(`/api/pwa-performance?trader=${trader}&days=30`)
       .then(r => r.json())
       .then(d => { if (d.ok) setPerf(d); })
+      .catch(() => {});
+    fetch(`/api/notifications?trader=${trader}`)
+      .then(r => r.json())
+      .then(d => { if (d.ok && Array.isArray(d.items)) setNotis(d.items); })
       .catch(() => {});
   }, [mounted, trader]);
 
@@ -643,6 +648,25 @@ export default function PWADashboard({ latestReport }) {
                   </div>
                 )}
               </section>
+
+              {/* [T-04] 오늘의 브리핑 — 텔레그램/리포트/큐 동기화 최신 알림 */}
+              {notis.length > 0 && (
+                <section className="pwa-card briefing-card">
+                  <span className="pwa-card-label">📮 오늘의 브리핑</span>
+                  <div className="briefing-list">
+                    {notis.slice(0, 3).map((n) => (
+                      <div key={n.id} className={`briefing-row bf-${n.type || 'info'}`}>
+                        <span className="bf-ic">{n.type === 'critical' ? '🔴' : n.type === 'important' ? '🟠' : '🔔'}</span>
+                        <div className="bf-mid">
+                          <div className="bf-title">{n.title}</div>
+                          <div className="bf-time mono dim">{n.sent_at}{n.source ? ` · ${n.source}` : ''}</div>
+                        </div>
+                        {!n.is_read && <span className="bf-dot" />}
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               {/* [v9.0] Hero 카드 */}
               {(() => {
@@ -2511,6 +2535,14 @@ export default function PWADashboard({ latestReport }) {
         .pending-price-grid.rr-3col { grid-template-columns: 1fr 1fr 1fr; }
         .pending-reason { font-size: 0.72rem; color: var(--text-secondary); line-height: 1.5; }
         .pending-queued { font-size: 0.75rem; font-weight: 700; color: var(--accent-warn); background: color-mix(in srgb, var(--accent-warn) 10%, transparent); border: 1px solid color-mix(in srgb, var(--accent-warn) 30%, var(--border)); border-radius: var(--radius-sm); padding: 10px; text-align: center; }
+        .briefing-list { display: flex; flex-direction: column; gap: 8px; }
+        .briefing-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); }
+        .briefing-row:last-child { border-bottom: none; }
+        .bf-ic { font-size: 1rem; }
+        .bf-mid { flex: 1; min-width: 0; }
+        .bf-title { font-size: 0.82rem; color: var(--text-primary); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .bf-time { font-size: 0.66rem; margin-top: 1px; }
+        .bf-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-buy); flex-shrink: 0; }
         .pending-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 2px; }
         .pending-btn { padding: 11px 0; border-radius: var(--radius-sm); font-family: var(--font-display); font-size: 0.8rem; font-weight: 700; cursor: pointer; border: 1px solid; transition: opacity 0.15s, transform 0.1s; }
         .pending-btn:active { transform: scale(0.98); }
