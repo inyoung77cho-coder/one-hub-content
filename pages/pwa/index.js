@@ -74,6 +74,7 @@ export default function PWADashboard({ latestReport }) {
   const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
+  const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
   const [expandedPos, setExpandedPos] = useState({}); // [v9.0] 보유 탭 왜? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
@@ -245,6 +246,10 @@ export default function PWADashboard({ latestReport }) {
     fetch(`/api/realestate/v2/total-asset?trader_id=${trader}`)
       .then(r => r.json())
       .then(d => { if (d && d.total_uk != null) setAssetSum(d); })
+      .catch(() => {});
+    fetch(`/api/realestate/v2/ai-summary?trader_id=${trader}`)
+      .then(r => r.json())
+      .then(d => { if (d && Array.isArray(d.summary_items)) setAiRec(d); })
       .catch(() => {});
   }, [mounted, trader]);
 
@@ -655,6 +660,19 @@ export default function PWADashboard({ latestReport }) {
                       </button>
                     ))}
                   </div>
+                </section>
+              )}
+
+              {/* [v11 2-A] 오늘 AI 자산 권고 — 자산 전체 관점의 오늘 할 일(ai-summary) */}
+              {aiRec && aiRec.summary_items?.length > 0 && (
+                <section className="pwa-card ai-rec-card" onClick={() => { window.location.href = '/pwa/ai-advisor'; }}>
+                  <span className="pwa-card-label">🤖 오늘 AI 자산 권고 <span className="ai-rec-score">배분 {aiRec.ai_score ?? 0}점</span></span>
+                  <div className="ai-rec-list">
+                    {aiRec.summary_items.slice(0, 4).map((t, i) => (
+                      <div className="ai-rec-item" key={i}>{t}</div>
+                    ))}
+                  </div>
+                  <div className="ai-rec-more">AI 자산운영 상세 →</div>
                 </section>
               )}
 
@@ -2476,6 +2494,12 @@ export default function PWADashboard({ latestReport }) {
         .ta-vl { margin-left: auto; font-size: 0.86rem; font-weight: 700; color: var(--text-primary); }
         .ta-vl.pend { color: var(--text-tertiary); font-weight: 600; }
         .ta-ar { color: var(--text-tertiary); font-size: 1.1rem; }
+        /* [v11 2-A] 오늘 AI 자산 권고 카드 */
+        .ai-rec-card { margin-bottom: 10px; cursor: pointer; border-color: color-mix(in srgb, var(--accent-info, #2563eb) 30%, var(--border)); }
+        .ai-rec-score { font-weight: 700; color: var(--accent-info, #2563eb); margin-left: 6px; font-size: 0.7rem; }
+        .ai-rec-list { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
+        .ai-rec-item { font-size: 0.85rem; color: var(--text-primary); line-height: 1.4; }
+        .ai-rec-more { font-size: 0.74rem; font-weight: 700; color: var(--accent-info, #2563eb); text-align: right; }
         .action-summary-headline { font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-bottom: 12px; }
         .action-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
         .action-summary-pill { display: flex; flex-direction: column; align-items: center; padding: 8px 4px; border-radius: var(--radius-md); border: 1.5px solid; gap: 2px; background: var(--inset-bg); }
