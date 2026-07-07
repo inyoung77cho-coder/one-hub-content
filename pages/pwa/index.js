@@ -73,6 +73,7 @@ export default function PWADashboard({ latestReport }) {
   const [actingCode, setActingCode] = useState(null); // 승인/거절 처리 중인 종목코드
   const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
+  const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
   const [expandedPos, setExpandedPos] = useState({}); // [v9.0] 보유 탭 왜? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
@@ -240,6 +241,10 @@ export default function PWADashboard({ latestReport }) {
     fetch(`/api/notifications?trader=${trader}`)
       .then(r => r.json())
       .then(d => { if (d.ok && Array.isArray(d.items)) setNotis(d.items); })
+      .catch(() => {});
+    fetch(`/api/realestate/v2/total-asset?trader_id=${trader}`)
+      .then(r => r.json())
+      .then(d => { if (d && d.total_uk != null) setAssetSum(d); })
       .catch(() => {});
   }, [mounted, trader]);
 
@@ -630,6 +635,28 @@ export default function PWADashboard({ latestReport }) {
               </div>
             )}
             {data && (<>
+
+              {/* [v11 1-B] 총 자산 — 홈 최상단 자산 중심(주식+ETF+부동산 통합) */}
+              {assetSum && (
+                <section className="pwa-card total-asset-card">
+                  <span className="pwa-card-label">💰 총 자산</span>
+                  <div className="ta-total mono">{assetSum.total_uk}<span>억</span></div>
+                  <div className="ta-rows">
+                    {[
+                      ['주식', '#3b82f6', assetSum.breakdown?.stock_uk, '/pwa?tab=recommend'],
+                      ['ETF', '#06b6d4', assetSum.breakdown?.etf_uk, '/pwa/etf'],
+                      ['부동산', '#14b8a6', assetSum.breakdown?.realestate_uk, '/pwa/realestate'],
+                    ].map(([label, color, val, href]) => (
+                      <button key={label} className="ta-row" onClick={() => { window.location.href = href; }}>
+                        <span className="ta-dot" style={{ background: color }} />
+                        <span className="ta-lb">{label}</span>
+                        <span className={`ta-vl ${val == null ? 'pend' : ''}`}>{val == null ? '준비중' : `${val}억`}</span>
+                        <span className="ta-ar">›</span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              )}
 
               {/* [v8.7] Action Summary Hero — 오늘 결론 한줄 + BUY/SELL/WATCH/PASS 4분할 */}
               <section className="action-summary-hero">
@@ -2438,6 +2465,17 @@ export default function PWADashboard({ latestReport }) {
 
         /* [v8.7] Action Summary Hero */
         .action-summary-hero { background: var(--card-bg); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
+        /* [v11 1-B] 총 자산 카드 */
+        .total-asset-card { margin-bottom: 10px; }
+        .ta-total { font-size: 2rem; font-weight: 800; color: var(--text-primary); margin: 4px 0 12px; }
+        .ta-total span { font-size: 0.95rem; margin-left: 3px; color: var(--text-secondary); }
+        .ta-rows { display: flex; flex-direction: column; gap: 8px; }
+        .ta-row { display: flex; align-items: center; gap: 9px; width: 100%; background: var(--inset-bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+        .ta-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+        .ta-lb { font-size: 0.86rem; font-weight: 700; color: var(--text-primary); }
+        .ta-vl { margin-left: auto; font-size: 0.86rem; font-weight: 700; color: var(--text-primary); }
+        .ta-vl.pend { color: var(--text-tertiary); font-weight: 600; }
+        .ta-ar { color: var(--text-tertiary); font-size: 1.1rem; }
         .action-summary-headline { font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-bottom: 12px; }
         .action-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
         .action-summary-pill { display: flex; flex-direction: column; align-items: center; padding: 8px 4px; border-radius: var(--radius-md); border: 1.5px solid; gap: 2px; background: var(--inset-bg); }
