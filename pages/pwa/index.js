@@ -542,6 +542,14 @@ export default function PWADashboard({ latestReport }) {
             >
               {theme === 'light' ? '🌙' : '☀️'}
             </button>
+            <button
+              className="pwa-theme-toggle"
+              onClick={() => router.push('/pwa/settings')}
+              aria-label="설정"
+              title="설정 · 시스템 상태"
+            >
+              ⚙️
+            </button>
           </div>
         </header>
 
