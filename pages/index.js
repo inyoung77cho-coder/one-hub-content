@@ -566,6 +566,7 @@ export default function Home({ reports, stats }) {
                 { href: '/pwa/etf', label: 'ETF 자산', desc: '수익·환차·세금·중복도', status: 'live', week: null },
                 { href: '/pwa/realestate', label: '부동산 자산', desc: 'ONE Score·저평가·시장', status: 'live', week: null },
                 { href: '/daily', label: 'Daily Report', desc: '매일 AI 운영일지', status: 'live', week: null },
+                { href: '/pwa/system-health', label: '시스템 상태', desc: '엔진·토큰·스케줄러 헬스', status: 'live', week: null },
                 { href: '/weekly', label: 'Weekly Digest', desc: '주간 성과 요약', status: 'soon', week: '3주차' },
                 { href: '/engines', label: 'Engine Hub', desc: 'AI 엔진 현황판', status: 'soon', week: '4주차' },
                 { href: '/strategies', label: 'Strategies', desc: '전략 라이브러리', status: 'soon', week: '4주차' },
