@@ -10,9 +10,21 @@ export default function AssetSummaryBar() {
   const [d, setD] = useState(null);
   const [err, setErr] = useState(false);
   useEffect(() => {
+    // 온보딩 입력 자산 병합 — 백엔드 값 우선, 없으면 온보딩 폴백
+    const merge = (j) => {
+      let onb = null;
+      try { onb = JSON.parse(localStorage.getItem("onehub_onboard_assets") || "null"); } catch (e) {}
+      const b = { ...(j?.breakdown || {}) };
+      const pick = (k) => (b[k] != null ? b[k] : (onb && onb[k] != null ? onb[k] : null));
+      const stock_uk = pick("stock_uk"), etf_uk = pick("etf_uk"), realestate_uk = pick("realestate_uk");
+      const parts = [stock_uk, etf_uk, realestate_uk].filter((v) => v != null);
+      if (parts.length === 0 && (j?.total_uk == null)) return null;
+      const total_uk = j?.total_uk != null && !onb ? j.total_uk : Math.round(parts.reduce((s, v) => s + Number(v), 0) * 100) / 100;
+      return { total_uk, breakdown: { stock_uk, etf_uk, realestate_uk } };
+    };
     fetch("/api/realestate/v2/total-asset?trader_id=A")
-      .then((r) => r.json()).then((j) => { if (j && j.total_uk != null) setD(j); else setErr(true); })
-      .catch(() => setErr(true));
+      .then((r) => r.json()).then((j) => { const m = merge(j); if (m) setD(m); else setErr(true); })
+      .catch(() => { const m = merge(null); if (m) setD(m); else setErr(true); });
   }, []);
 
   const b = d?.breakdown || {};

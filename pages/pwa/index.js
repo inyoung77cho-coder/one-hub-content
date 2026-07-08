@@ -17,6 +17,22 @@ function safeNum(v) {
   return isNaN(n) ? null : n;
 }
 
+// [v10 UI] 온보딩 입력 자산(onehub_onboard_assets)을 총자산 집계에 병합.
+//   백엔드 total-asset 값이 있으면 우선, 없으면 온보딩 입력값으로 폴백. total_uk 재계산.
+function mergeOnboardAssets(d) {
+  let onb = null;
+  try { onb = JSON.parse(window.localStorage.getItem('onehub_onboard_assets') || 'null'); } catch (e) {}
+  const b = { ...(d?.breakdown || {}) };
+  const pick = (k) => (b[k] != null ? b[k] : (onb && onb[k] != null ? onb[k] : null));
+  const stock_uk = pick('stock_uk'), etf_uk = pick('etf_uk'), realestate_uk = pick('realestate_uk');
+  const parts = [stock_uk, etf_uk, realestate_uk].filter(v => v != null);
+  if (parts.length === 0 && (d?.total_uk == null)) return null;
+  const total_uk = d?.total_uk != null && !onb
+    ? d.total_uk
+    : Math.round(parts.reduce((s, v) => s + Number(v), 0) * 100) / 100;
+  return { total_uk, breakdown: { stock_uk, etf_uk, realestate_uk } };
+}
+
 // [Queue] KST 장중(평일 09:00~15:30) 여부 — 장외 승인은 예약으로 전환
 function isMarketHoursKST() {
   const kst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
@@ -251,8 +267,8 @@ export default function PWADashboard({ latestReport }) {
       .catch(() => {});
     fetch(`/api/realestate/v2/total-asset?trader_id=${trader}`)
       .then(r => r.json())
-      .then(d => { if (d && d.total_uk != null) setAssetSum(d); })
-      .catch(() => {});
+      .then(d => setAssetSum(mergeOnboardAssets(d)))
+      .catch(() => setAssetSum(mergeOnboardAssets(null)));
     fetch(`/api/realestate/v2/ai-summary?trader_id=${trader}`)
       .then(r => r.json())
       .then(d => { if (d && Array.isArray(d.summary_items)) setAiRec(d); })
@@ -537,10 +553,7 @@ export default function PWADashboard({ latestReport }) {
             <h1 className="pwa-title">ONE-HUB</h1>
           </div>
           <div className="pwa-header-actions">
-            <div className="pwa-trader-toggle">
-              <button className={trader==='A'?'active':''} onClick={()=>setTrader('A')}>A</button>
-              <button className={trader==='B'?'active':''} onClick={()=>setTrader('B')}>B</button>
-            </div>
+            {/* [v10 UI] A/B 트레이더 토글 제거 — 헤더 줄바꿈/탭바 이동 유발. 기본 계좌 A 고정(설정에서 변경) */}
             {/* [v9.1 PWA-01] 검색: 중앙 FAB → 우측 상단 아이콘으로 이동 */}
             <button
               className={`pwa-search-toggle ${tab==='analyze'?'active':''}`}
@@ -1171,45 +1184,22 @@ export default function PWADashboard({ latestReport }) {
           <main className="pwa-main">
             {!data && !error && <div className="pwa-loading"><div className="pwa-spinner" /><span>Loading...</span></div>}
             {data && (<>
-              <section className="pwa-card">
-                <span className="pwa-card-label">계좌 현황</span>
-                <div className="pwa-balance-grid">
+              {/* [v10 UI 시안] 계좌 현황 — 다크 네이비 계좌 히어로(onehub-stock 보유탭) */}
+              <section className="acc-hero">
+                <div className="acc-hero-top">
+                  <span className="acc-hero-lbl">💳 계좌 현황 · 트레이더 {trader}</span>
                   {portReturnPct !== null && (
-                    <div className="pwa-bal-item">
-                      <span className="dim">평가수익률</span>
-                      <span className={`mono ${portReturnPct>=0?'bull':'bear'}`}>
-                        {portReturnPct>=0?'+':''}{portReturnPct.toFixed(2)}%
-                      </span>
-                    </div>
+                    <span className={`acc-badge ${portReturnPct >= 0 ? 'up' : 'down'}`}>{portReturnPct >= 0 ? '+' : ''}{portReturnPct.toFixed(2)}%</span>
                   )}
-                  {todayPnl !== null && (
-                    <div className="pwa-bal-item">
-                      <span className="dim">오늘 변동</span>
-                      <span className={`mono ${todayPnl>=0?'bull':'bear'}`}>
-                        {todayPnl>=0?'+':''}{Number(todayPnl).toLocaleString()}원
-                      </span>
-                    </div>
-                  )}
-                  <div className="pwa-bal-item">
-                    <span className="dim">총 자산</span>
-                    <span className="mono">{data.balance?.total_asset?.toLocaleString() ?? '-'}원</span>
-                  </div>
-                  <div className="pwa-bal-item">
-                    <span className="dim">예수금</span>
-                    <span className="mono">{data.balance?.cash?.toLocaleString() ?? '-'}원</span>
-                  </div>
-                  <div className="pwa-bal-item">
-                    <span className="dim">실현손익</span>
-                    <span className={`mono ${(data.balance?.realized_pnl??0)>=0?'bull':'bear'}`}>
-                      {data.balance?.realized_pnl?.toLocaleString() ?? '-'}원
-                    </span>
-                  </div>
-                  <div className="pwa-bal-item">
-                    <span className="dim">평가손익</span>
-                    <span className={`mono ${(data.balance?.unrealized_pnl??0)>=0?'bull':'bear'}`}>
-                      {data.balance?.unrealized_pnl?.toLocaleString() ?? '-'}원
-                    </span>
-                  </div>
+                </div>
+                <div className="acc-hero-total mono">{data.balance?.total_asset?.toLocaleString() ?? '-'}<span>원</span></div>
+                <div className="acc-hero-sub">
+                  평가손익 <b className={(data.balance?.unrealized_pnl ?? 0) >= 0 ? 'up' : 'dn'}>{(data.balance?.unrealized_pnl ?? 0) >= 0 ? '+' : ''}{data.balance?.unrealized_pnl?.toLocaleString() ?? '-'}원</b>
+                  {todayPnl !== null && <> · 오늘 변동 <b className={todayPnl >= 0 ? 'up' : 'dn'}>{todayPnl >= 0 ? '+' : ''}{Number(todayPnl).toLocaleString()}원</b></>}
+                </div>
+                <div className="acc-chips">
+                  <div className="acc-chip"><span>예수금</span><b>{data.balance?.cash?.toLocaleString() ?? '-'}원</b></div>
+                  <div className="acc-chip"><span>실현손익</span><b>{data.balance?.realized_pnl?.toLocaleString() ?? '-'}원</b></div>
                 </div>
               </section>
               <section className="pwa-card">
@@ -1402,20 +1392,20 @@ export default function PWADashboard({ latestReport }) {
                 },
               ];
               return (
-                <section className="pwa-card">
-                  <span className="pwa-card-label">🎬 오늘 AI 분석 흐름</span>
+                <section className="acc-hero">
+                  <div className="acc-hero-lbl" style={{ marginBottom: 4 }}>🎬 오늘 AI 분석 흐름</div>
                   <div style={{ marginTop: 12, position: 'relative', paddingLeft: 20 }}>
                     {/* 타임라인 선 */}
-                    <div style={{ position: 'absolute', left: 7, top: 8, bottom: 8, width: 2, background: 'var(--color-line)', borderRadius: 1 }} />
+                    <div style={{ position: 'absolute', left: 7, top: 8, bottom: 8, width: 2, background: 'var(--hero-fill-line)', borderRadius: 1 }} />
                     {steps.map((s, i) => (
                       <div key={i} style={{ position: 'relative', marginBottom: i < steps.length - 1 ? 18 : 0 }}>
                         {/* 점 */}
-                        <div style={{ position: 'absolute', left: -16, top: 4, width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)', border: '2px solid var(--card-bg)' }} />
-                        <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginBottom: 2 }}>{s.time} KST</div>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>
+                        <div style={{ position: 'absolute', left: -16, top: 4, width: 8, height: 8, borderRadius: '50%', background: 'var(--hero-accent)', border: '2px solid var(--hero-grad-1)' }} />
+                        <div style={{ fontSize: '0.68rem', color: 'var(--hero-ink-sub)', fontFamily: 'var(--font-mono)', marginBottom: 2 }}>{s.time} KST</div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--hero-ink)', marginBottom: 2 }}>
                           {s.icon} {s.title}
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>{s.desc}</div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--hero-ink-soft)', lineHeight: 1.4 }}>{s.desc}</div>
                       </div>
                     ))}
                   </div>
@@ -2056,6 +2046,23 @@ export default function PWADashboard({ latestReport }) {
         .v10-log-badge { font-size: 10px; font-weight: 800; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 3px 7px; border-radius: 6px; flex-shrink: 0; }
         .v10-log-txt { font-size: 12.5px; font-weight: 600; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .v10-log-cnt { font-size: 12px; font-weight: 700; color: var(--color-ink-3); flex-shrink: 0; }
+
+        /* [v10 UI 시안] 주식 보유/기록 다크 네이비 히어로 (계좌 현황 · AI 분석 흐름) */
+        .acc-hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 18px; box-shadow: var(--shadow-float); }
+        .acc-hero-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; gap: 8px; }
+        .acc-hero-lbl { font-size: 12.5px; font-weight: 700; color: var(--hero-ink-sub); }
+        .acc-badge { font-size: 12.5px; font-weight: 800; padding: 5px 12px; border-radius: 20px; }
+        .acc-badge.down { background: rgba(240,68,82,.2); color: var(--hero-danger); }
+        .acc-badge.up { background: rgba(22,199,132,.2); color: var(--hero-accent); }
+        .acc-hero-total { font-size: 29px; font-weight: 800; letter-spacing: -.5px; line-height: 1; color: var(--hero-ink); }
+        .acc-hero-total span { font-size: 17px; font-weight: 700; margin-left: 1px; }
+        .acc-hero-sub { font-size: 12.5px; color: var(--hero-ink-soft); margin-top: 9px; }
+        .acc-hero-sub b { font-weight: 700; color: var(--hero-ink); }
+        .acc-hero-sub .up { color: var(--hero-accent); } .acc-hero-sub .dn { color: var(--hero-danger); }
+        .acc-chips { display: flex; gap: 9px; margin-top: 16px; }
+        .acc-chip { flex: 1; background: var(--hero-fill); border: 1px solid var(--hero-fill-line); border-radius: 13px; padding: 11px 13px; }
+        .acc-chip span { display: block; font-size: 11px; color: var(--hero-ink-sub); font-weight: 600; margin-bottom: 4px; }
+        .acc-chip b { font-size: 14px; font-weight: 800; color: var(--hero-ink); }
 
         /* [v8.6] Hero 카드 — "오늘의 시장" */
         .hero-card { background: var(--hero-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 20px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; gap: 14px; }
