@@ -128,14 +128,16 @@ export default function PWADashboard({ latestReport }) {
     setMounted(true);
     // [v9.0] Splash: 2초 후 해제
     const splashTimer = setTimeout(() => setSplash(false), 2000);
-    // [v9.0] 투자성향 프로필 로드 — 없으면 온보딩 표시
+    // [v10 UI] 투자성향 프로필 로드 — 최초 진입(온보딩 미완료)이면 온보딩 위저드로 이동
     try {
       const saved = window.localStorage.getItem('onehub_profile');
+      const onboarded = window.localStorage.getItem('onehub_onboarded') === '1';
       if (saved) {
         setProfile(p => ({ ...p, ...JSON.parse(saved) }));
-      } else {
-        // Splash 2초 후 온보딩 표시
-        setTimeout(() => setOnboarding(true), 2100);
+      }
+      // 프로필도 없고 온보딩도 안 했으면 최초 사용자 → 위저드 1회 진입(시안 onehub-onboarding)
+      if (!saved && !onboarded && !router.query.tab && !router.query.code) {
+        router.replace('/pwa/onboarding');
       }
     } catch (e) { /* 무시 */ }
     // [v8.5] 최근 검색 종목 불러오기

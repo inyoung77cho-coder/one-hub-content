@@ -3,6 +3,7 @@
 //   운영자(A/B 토글 소유자): 시스템 상태 · Token · Scheduler · Circuit Breaker · 버전
 //   색상은 디자인 토큰(var(--…))만 사용. 다크모드는 <html data-theme> 단일 소스.
 import { useEffect, useState, useCallback, useRef } from "react";
+import { useRouter } from "next/router";
 import Link from "next/link";
 import TopNav from "../../components/TopNav";
 
@@ -22,6 +23,7 @@ const mmss = (s) => {
 };
 
 export default function Settings() {
+  const router = useRouter();
   const [health, setHealth] = useState(null);
   const [tokenSec, setTokenSec] = useState(null);
   const [theme, setTheme] = useState("light");
@@ -174,6 +176,11 @@ export default function Settings() {
               </div>
             </div>
             <div className="hint">선택한 계좌가 자산·주문 화면의 기본 계좌로 사용됩니다.</div>
+            <div className="row" style={{ marginTop: 12 }}>
+              <span className="l">온보딩 설정</span>
+              <button className="tbtn" onClick={() => { try { localStorage.removeItem("onehub_onboarded"); } catch {} router.push("/pwa/onboarding"); }}>🧭 다시 하기</button>
+            </div>
+            <div className="hint">투자 성향·보유 자산 입력을 다시 진행합니다.</div>
           </div>
 
           {/* 연동 */}
