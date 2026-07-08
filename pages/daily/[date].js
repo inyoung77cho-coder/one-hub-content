@@ -11,6 +11,8 @@ import Link from 'next/link'
 
 import Head from 'next/head'
 
+import { SITE, ORG_NAME, REGIME_KO } from '../../lib/site'
+
 import { useEffect, useState } from 'react'
 
 
@@ -26,6 +28,37 @@ export default function DailyReport({ meta, body, prev, next }) {
   const regimeClass = (r) => r === 'BULL' ? 'regime-bull' : r === 'BEAR' ? 'regime-bear' : 'regime-side'
 
   const heatColor   = (g) => ({ HOT:'heat-hot', WARM:'heat-warm', COOL:'heat-cool', COLD:'heat-cold' }[g] || 'heat-cool')
+
+  // ── SEO 파생값 (단일 출처 lib/site) ─────────────────────────
+  const canonical    = `${SITE}/daily/${meta.date}`
+  const regimeKo     = REGIME_KO[meta.regime] || '횡보장'
+  const publishedISO = `${meta.date}T15:30:00+09:00` // 운영일지는 매일 15:30 KST 발행
+  const ogImage      = `${SITE}/api/og?date=${encodeURIComponent(meta.date)}`
+    + `&regime=${encodeURIComponent(meta.regime)}`
+    + `&heat=${encodeURIComponent(meta.heat_score)}`
+    + `&grade=${encodeURIComponent(meta.heat_grade)}`
+    + `&trades=${encodeURIComponent(meta.trade_count)}`
+    + `&insight=${encodeURIComponent(meta.insight || '')}`
+  const keywords     = ['ONE-HUB','AI 자산운영','주식','ETF','부동산','자동매매 대안','AI 투자 판단', regimeKo, ...(meta.tags || [])].join(', ')
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: meta.title,
+    description: meta.insight || meta.title,
+    datePublished: publishedISO,
+    dateModified: publishedISO,
+    inLanguage: 'ko-KR',
+    image: ogImage,
+    author: { '@type': 'Organization', name: ORG_NAME },
+    publisher: {
+      '@type': 'Organization',
+      name: 'ONE-HUB',
+      logo: { '@type': 'ImageObject', url: `${SITE}/icons/icon-512.png` },
+    },
+    mainEntityOfPage: { '@type': 'WebPage', '@id': canonical },
+    about: ['주식', 'ETF', '부동산', 'AI 자산운영', regimeKo],
+  }
 
   return (
 
@@ -48,6 +81,40 @@ export default function DailyReport({ meta, body, prev, next }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
 
         <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+
+        {/* ── SEO 보강: canonical / Article OG / Twitter / 구조화 데이터 ── */}
+
+        <link rel="canonical" href={canonical} />
+
+        <meta name="keywords" content={keywords} />
+
+        <meta property="og:type" content="article" />
+
+        <meta property="og:site_name" content="ONE-HUB" />
+
+        <meta property="og:locale" content="ko_KR" />
+
+        <meta property="og:url" content={canonical} />
+
+        <meta property="og:image" content={ogImage} />
+
+        <meta property="og:image:width" content="1200" />
+
+        <meta property="og:image:height" content="630" />
+
+        <meta property="og:image:alt" content={`${meta.date} ${regimeKo} · ONE-HUB 오늘의 AI 자산운영 판단`} />
+
+        <meta property="article:published_time" content={publishedISO} />
+
+        <meta name="twitter:card" content="summary_large_image" />
+
+        <meta name="twitter:title" content={meta.title} />
+
+        <meta name="twitter:description" content={meta.insight || meta.title} />
+
+        <meta name="twitter:image" content={ogImage} />
+
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       </Head>
 
@@ -404,6 +471,8 @@ export async function getStaticProps({ params }) {
         trade_count: data.trade_count || 0,
 
         insight:     cleanInsight,
+
+        tags:        data.tags || [],
 
       },
 
