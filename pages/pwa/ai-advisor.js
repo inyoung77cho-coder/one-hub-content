@@ -12,8 +12,14 @@ export default function AIAdvisor() {
   const [summary, setSummary] = useState(null);
   const [rebal, setRebal] = useState(null);
   const [err, setErr] = useState(false);
+  const [targetAlloc, setTargetAlloc] = useState(null); // §5② 온보딩 성향→목표배분 소스
 
   useEffect(() => {
+    // §5② 온보딩에서 성향으로 산출한 목표 배분(%)을 "목표 %" 단일 소스로 사용
+    try {
+      const raw = localStorage.getItem("onehub_target_alloc");
+      if (raw) setTargetAlloc(JSON.parse(raw));
+    } catch (e) {}
     Promise.all([
       fetch(api("ai-advisor")).then((r) => r.json()),
       fetch(api("ai-summary")).then((r) => r.json()),
@@ -71,16 +77,22 @@ export default function AIAdvisor() {
       {advisor?.asset_judgments && (
         <div className="card">
           <div className="k">자산별 판단</div>
-          {advisor.asset_judgments.map((j) => (
-            <div className="jg" key={j.type}>
-              <span className="jg-ic">{j.icon}</span>
-              <div className="jg-mid">
-                <div className="jg-t">{j.type} <Stars n={j.stars} /></div>
-                <div className="jg-p">현재 {j.pct}% · 목표 {j.target}% <em className={j.diff > 0 ? "up" : j.diff < 0 ? "dn" : ""}>({j.diff > 0 ? "+" : ""}{j.diff}%p)</em></div>
+          {advisor.asset_judgments.map((j) => {
+            // §5② 온보딩 목표배분이 있으면 그 값을 목표%로, 갭도 재계산
+            const tgt = targetAlloc && targetAlloc[j.type] != null ? targetAlloc[j.type] : j.target;
+            const diff = targetAlloc && targetAlloc[j.type] != null ? Math.round((j.pct - tgt) * 10) / 10 : j.diff;
+            return (
+              <div className="jg" key={j.type}>
+                <span className="jg-ic">{j.icon}</span>
+                <div className="jg-mid">
+                  <div className="jg-t">{j.type} <Stars n={j.stars} /></div>
+                  <div className="jg-p">현재 {j.pct}% · 목표 {tgt}% <em className={diff > 0 ? "up" : diff < 0 ? "dn" : ""}>({diff > 0 ? "+" : ""}{diff}%p)</em></div>
+                </div>
+                <span className={`jg-ac ac-${j.action}`}>{j.action}</span>
               </div>
-              <span className={`jg-ac ac-${j.action}`}>{j.action}</span>
-            </div>
-          ))}
+            );
+          })}
+          {targetAlloc && <div className="tgt-src">목표 %는 온보딩 투자성향 결과에서 산출됩니다.</div>}
         </div>
       )}
 
@@ -132,6 +144,7 @@ export default function AIAdvisor() {
         .rb { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--color-line); }
         .rb-a { font-weight: 700; font-size: 0.86rem; width: 54px; } .rb-mv { flex: 1; font-size: 0.8rem; color: var(--color-ink-2); }
         .rb-note { font-size: 0.72rem; color: var(--color-ink-3); margin-top: 10px; }
+        .tgt-src { font-size: 0.68rem; color: var(--color-ink-3); margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--color-line); }
         .links { display: flex; gap: 8px; margin-top: 4px; }
         .lk { flex: 1; text-align: center; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 14px 8px; text-decoration: none; color: var(--color-ink); font-size: 0.84rem; font-weight: 700; }
       `}</style>
