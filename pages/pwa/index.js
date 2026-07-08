@@ -2360,13 +2360,15 @@ export default function PWADashboard({ latestReport }) {
         /* [v9.1 PWA-01] 검색 아이콘: 상단 우측 (theme-toggle과 동일 규격, 강조 최소화) */
         .pwa-search-toggle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--card-bg); cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
         .pwa-search-toggle.active { border-color: var(--accent-buy, var(--color-primary)); color: var(--accent-buy, var(--color-primary)); }
-        /* [v10 UI] 탭 스타일 라이트/다크 통일 (터미널 오버라이드 제거) */
-        .pwa-tabs { background: var(--inset-bg); padding: 4px; border-radius: var(--radius-md); margin: 4px 16px 8px; gap: 2px; }
-        .pwa-tab.active { background: var(--card-bg); color: var(--accent-info); border-radius: 10px; box-shadow: var(--card-shadow); }
+        /* [v10 UI] 탭 = 흰 라운드 컨테이너 · 활성 = 네이비 pill (시안 통일) */
+        .pwa-tabs { background: var(--card-bg); padding: 4px; border-radius: 16px; margin: 4px 16px 12px; gap: 2px; box-shadow: var(--card-shadow); }
+        .pwa-tab { min-height: 36px; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; }
+        .pwa-tab.active { background: var(--hero-grad-1); color: #fff; border-radius: 11px; box-shadow: none; }
+        :global([data-theme="dark"]) .pwa-tab.active { background: var(--color-primary); }
         /* [v11 IA] 주식 서브탭 (2차 내비) */
-        .pwa-subtabs { display: flex; align-items: center; gap: 6px; margin: 0 16px 8px; }
-        .pwa-subtab { padding: 5px 14px; background: none; border: 1px solid var(--border); border-radius: var(--radius-pill, 999px); cursor: pointer; color: var(--text-secondary); font-family: var(--font-display); font-size: 0.72rem; font-weight: 700; }
-        .pwa-subtab.active { background: var(--accent-info); color: #fff; border-color: var(--accent-info); }
+        .pwa-subtabs { display: flex; align-items: center; gap: 8px; margin: 0 16px 12px; }
+        .pwa-subtab { padding: 9px 20px; background: var(--card-bg); border: none; border-radius: var(--radius-pill, 999px); cursor: pointer; color: var(--text-secondary); font-family: var(--font-display); font-size: 0.78rem; font-weight: 700; box-shadow: var(--card-shadow); }
+        .pwa-subtab.active { background: var(--accent-buy); color: #fff; }
 
         /* Layout */
         .pwa-main { padding: 8px 16px 12px; display: flex; flex-direction: column; gap: 12px; }

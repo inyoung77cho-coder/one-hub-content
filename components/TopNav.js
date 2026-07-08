@@ -1,6 +1,6 @@
-// [v10 UI] 공유 상단 탭 내비 (AppShell / TopNav)
-//   워크오더 §2·§4.2: 하단 탭바를 제거하고 전 페이지를 상단 탭 내비로 일원화한다.
-//   홈 · AI자산 · 주식 · ETF · 부동산 · 설정. 색상은 디자인 토큰(var(--…))만 사용.
+// [v10 UI] 공유 상단 앱셸(AppShell / TopNav) — 시안(onehub-*.html) 통일 헤더+탭.
+//   로고 헤더(🔍/⚙️) + 흰 라운드 탭 컨테이너(활성 탭 = 네이비 pill).
+//   워크오더 §2·§4.2: 하단 탭 제거, 상단 탭으로 일원화. 색은 디자인 토큰만 사용.
 import { useRouter } from "next/router";
 
 const ITEMS = [
@@ -15,11 +15,14 @@ const ITEMS = [
 export default function TopNav({ active }) {
   const router = useRouter();
   return (
-    <header className="tn">
-      <div className="tn-brand">
-        <span className="tn-dot" />
-        <span className="tn-title">ONE-HUB</span>
-      </div>
+    <div className="tn">
+      <header className="tn-hd">
+        <div className="tn-logo">ONE<span className="tn-dot">·</span>HUB</div>
+        <div className="tn-ic">
+          <button aria-label="AI 종목 검색" onClick={() => router.push("/pwa?tab=analyze")}>🔍</button>
+          <button aria-label="설정" onClick={() => router.push("/pwa/settings")}>⚙️</button>
+        </div>
+      </header>
       <nav className="tn-tabs" aria-label="주요 자산 카테고리">
         {ITEMS.map(([key, label, href]) => (
           <button
@@ -36,27 +39,34 @@ export default function TopNav({ active }) {
         .tn {
           position: sticky; top: 0; z-index: 100;
           max-width: 480px; margin: 0 auto;
-          background: var(--color-bg); /* fallback */
-          background: color-mix(in srgb, var(--color-bg) 88%, transparent);
-          backdrop-filter: blur(10px);
-          -webkit-backdrop-filter: blur(10px);
-          border-bottom: 1px solid var(--color-line);
-          padding: calc(env(safe-area-inset-top, 0px) + 10px) 12px 0;
+          background: var(--color-bg);
+          padding: calc(env(safe-area-inset-top, 0px) + 8px) 2px 10px;
         }
-        .tn-brand { display: flex; align-items: center; gap: 7px; padding: 0 2px 8px; }
-        .tn-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-success); flex-shrink: 0; }
-        .tn-title { font-family: var(--font-sans); font-size: 1rem; font-weight: 800; letter-spacing: 0.04em; color: var(--color-ink); }
-        .tn-tabs { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
-        .tn-tabs::-webkit-scrollbar { display: none; }
+        .tn-hd { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 12px; }
+        .tn-logo { font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--hero-grad-1); font-family: var(--font-sans); }
+        :global([data-theme="dark"]) .tn-logo { color: var(--color-ink); }
+        .tn-dot { color: var(--color-success); }
+        .tn-ic { display: flex; gap: 8px; }
+        .tn-ic button {
+          width: 34px; height: 34px; border-radius: 50%; background: var(--color-card);
+          border: none; display: grid; place-items: center; font-size: 15px; cursor: pointer;
+          box-shadow: var(--shadow-card);
+        }
+        .tn-tabs {
+          display: flex; gap: 2px; background: var(--color-card); border-radius: 16px;
+          padding: 4px; box-shadow: var(--shadow-card);
+        }
         .tn-tab {
-          flex: 1 0 auto; white-space: nowrap;
-          padding: 9px 12px; background: none; border: none; cursor: pointer;
-          color: var(--color-ink-3); font-family: var(--font-sans);
-          font-size: 0.82rem; font-weight: 700;
-          border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
+          flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center;
+          white-space: nowrap; line-height: 1; min-height: 36px;
+          font-size: 12.5px; font-weight: 600; letter-spacing: -.4px;
+          color: var(--color-ink-3); background: none; border: none; cursor: pointer;
+          border-radius: 11px; font-family: var(--font-sans); transition: background .15s, color .15s;
         }
-        .tn-tab.on { color: var(--color-primary); border-bottom-color: var(--color-primary); }
+        .tn-tab.on { background: var(--hero-grad-1); color: #fff; font-weight: 700; }
+        :global([data-theme="dark"]) .tn-tab.on { background: var(--color-primary); }
+        @media (max-width: 380px) { .tn-tab { font-size: 11.5px; letter-spacing: -.5px; } }
       `}</style>
-    </header>
+    </div>
   );
 }
