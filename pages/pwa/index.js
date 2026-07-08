@@ -548,10 +548,9 @@ export default function PWADashboard({ latestReport }) {
 
       <div className={`pwa-wrapper theme-${theme}`} style={{ display: splash ? 'none' : undefined }}>
         <header className="pwa-header">
-          <div className="pwa-brand">
-            <span className="pwa-brand-dot" />
-            <h1 className="pwa-title">ONE-HUB</h1>
-          </div>
+          <button className="pwa-brand" onClick={() => setTab('dashboard')} aria-label="홈으로">
+            <span className="pwa-logo">ONE<span className="pwa-logo-dot">·</span>HUB</span>
+          </button>
           <div className="pwa-header-actions">
             {/* [v10 UI] A/B 트레이더 토글 제거 — 헤더 줄바꿈/탭바 이동 유발. 기본 계좌 A 고정(설정에서 변경) */}
             {/* [v9.1 PWA-01] 검색: 중앙 FAB → 우측 상단 아이콘으로 이동 */}
@@ -820,14 +819,16 @@ export default function PWADashboard({ latestReport }) {
         {/* ── Recommend Tab ── [v9.0] AI 매수 선별 전 기술 스코어링 상위 후보 — 실거래와 분리된 관심종목 전용 화면 */}
         {tab === 'recommend' && (
           <main className="pwa-main">
-            <section className="pwa-card">
-              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6}}>
-                <span className="pwa-card-label">🔍 추천 관심종목</span>
-                <LastUpdated timestamp={data?.ok ? new Date() : null} staleAfterSeconds={180} />
+            {/* [v10 UI] 추천 관심종목 — 네이비 히어로(타 페이지와 통일). 제목/업데이트 2줄 정렬 */}
+            <section className="rec-hero">
+              <div className="rec-hero-top">
+                <span className="rec-hero-title">🔍 추천 관심종목</span>
+                <span className="rec-hero-live">LIVE</span>
               </div>
-              <p className="dim" style={{fontSize:'0.72rem', marginBottom:10, lineHeight:1.5}}>
-                AI 매수 선별 전 기술 스코어링 상위 후보입니다. 실제 매수 신호와는 별개입니다.
-              </p>
+              <div className="rec-hero-upd"><LastUpdated timestamp={data?.ok ? new Date() : null} staleAfterSeconds={180} /></div>
+              <p className="rec-hero-desc">AI 매수 선별 전 기술 스코어링 상위 후보입니다. 실제 매수 신호와는 별개입니다.</p>
+            </section>
+            <section className="pwa-card">
               {!data && !error && (
                 <div className="pwa-loading"><div className="pwa-spinner" /><span>데이터 로딩 중...</span></div>
               )}
@@ -1932,7 +1933,10 @@ export default function PWADashboard({ latestReport }) {
 
         /* Header */
         .pwa-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px 12px; }
-        .pwa-brand { display: flex; align-items: center; gap: 8px; }
+        .pwa-brand { display: flex; align-items: center; gap: 8px; background: none; border: none; padding: 0; cursor: pointer; }
+        .pwa-logo { font-family: var(--font-sans); font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--hero-grad-1); }
+        :global([data-theme="dark"]) .pwa-logo { color: var(--color-ink); }
+        .pwa-logo-dot { color: var(--color-success); }
         .pwa-brand-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-buy); flex-shrink: 0; animation: pulse-live 2s ease-in-out infinite; }
         @keyframes pulse-live { 0%{transform:scale(1);opacity:1;} 50%{transform:scale(1.45);opacity:0.5;} 100%{transform:scale(1);opacity:1;} }
         .pwa-title { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; letter-spacing: 0.04em; color: var(--text-primary); }
@@ -2063,6 +2067,14 @@ export default function PWADashboard({ latestReport }) {
         .acc-chip { flex: 1; background: var(--hero-fill); border: 1px solid var(--hero-fill-line); border-radius: 13px; padding: 11px 13px; }
         .acc-chip span { display: block; font-size: 11px; color: var(--hero-ink-sub); font-weight: 600; margin-bottom: 4px; }
         .acc-chip b { font-size: 14px; font-weight: 800; color: var(--hero-ink); }
+
+        /* [v10 UI] 추천 관심종목 네이비 히어로 — 제목/업데이트/설명 2~3줄 정렬 */
+        .rec-hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 18px; box-shadow: var(--shadow-float); }
+        .rec-hero-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .rec-hero-title { font-size: 15px; font-weight: 800; color: var(--hero-ink); letter-spacing: -.2px; }
+        .rec-hero-live { background: var(--color-success); color: #04351f; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 5px; letter-spacing: .5px; flex-shrink: 0; }
+        .rec-hero-upd { margin-top: 7px; }
+        .rec-hero-desc { font-size: 12px; color: var(--hero-ink-soft); line-height: 1.55; margin-top: 10px; }
 
         /* [v8.6] Hero 카드 — "오늘의 시장" */
         .hero-card { background: var(--hero-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 20px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; gap: 14px; }

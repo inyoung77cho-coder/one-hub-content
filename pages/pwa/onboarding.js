@@ -14,6 +14,21 @@ const ALLOC_MAP = {
 const ALLOC_COLOR = { 주식: "var(--color-primary)", ETF: "var(--color-success)", 부동산: "var(--color-warning)", 현금: "var(--color-ink-3)" };
 const TOTAL_SECTIONS = 4; // 성향 + 3자산
 
+// 성향 질문 — 왼쪽 정렬 질문 + 각 답변 버튼(오른쪽 체크)
+const QUESTIONS = [
+  { q: "goal", title: "1. 투자 목표에 가까운 건?", opts: [
+    { val: "safe", t: "안정적 수익", sub: "잃지 않는 게 우선" },
+    { val: "balance", t: "균형", sub: "수익과 안정 사이" },
+    { val: "growth", t: "적극적 성장", sub: "변동성 감수, 수익 우선" },
+  ] },
+  { q: "risk", title: "2. 보유 자산이 −10% 되면?", opts: [
+    { val: "sell", t: "바로 정리한다" }, { val: "hold", t: "지켜본다" }, { val: "buy", t: "기회로 보고 더 산다" },
+  ] },
+  { q: "horizon", title: "3. 이 돈은 언제 쓰나요?", opts: [
+    { val: "short", t: "1년 안에" }, { val: "mid", t: "3~5년" }, { val: "long", t: "당분간 쓸 일 없음" },
+  ] },
+];
+
 export default function Onboarding() {
   const router = useRouter();
   const [step, setStep] = useState(0);
@@ -23,7 +38,10 @@ export default function Onboarding() {
   const [etfForm, setEtfForm] = useState({ name: "", qty: "", price: "" });
   const [etfList, setEtfList] = useState([]); // [{name, uk, listing}]
   const [etfListing, setEtfListing] = useState("US"); // US | KR
-  const [rePick, setRePick] = useState(null); // {name, amt}
+  const [reList, setReList] = useState([]); // [{name, area, uk}]
+  const [reQuery, setReQuery] = useState("시범");
+  const [customRE, setCustomRE] = useState({ name: "", area: "", price: "" });
+  const [customOpen, setCustomOpen] = useState(false);
   const USD_FX = 1350; // ETF($) 환산 환율(근사)
 
   const alloc = personality.goal ? ALLOC_MAP[personality.goal] : null;
@@ -31,7 +49,26 @@ export default function Onboarding() {
   const uk1 = (n) => Math.round(n / 1e8 * 100) / 100; // 원 → 억(소수2)
   const stockUk = stockList.reduce((s, x) => s + x.uk, 0);
   const etfUk = etfList.reduce((s, x) => s + x.uk, 0);
-  const reUk = rePick ? Number(String(rePick.amt).replace(/[^0-9.]/g, "")) || 0 : 0;
+  const reUk = Math.round(reList.reduce((s, x) => s + x.uk, 0) * 100) / 100;
+
+  // 분당구 단지 DB — 면적(㎡)별 실거래 근사 시세(억). 목록에 없는 지역은 직접 입력.
+  const RE_DB = [
+    { name: "시범우성", dong: "서현동", areas: { 59: 14.20, 84: 20.29, 114: 27.50 } },
+    { name: "시범삼성", dong: "서현동", areas: { 59: 15.10, 84: 21.54, 114: 29.00 } },
+    { name: "시범한양", dong: "서현동", areas: { 59: 14.30, 84: 20.33, 114: 27.80 } },
+    { name: "시범현대", dong: "서현동", areas: { 59: 14.25, 84: 20.30, 114: 27.60 } },
+    { name: "효자촌(대창)", dong: "정자동", areas: { 59: 11.00, 84: 15.84, 114: 21.00 } },
+    { name: "효자촌(현대)", dong: "정자동", areas: { 59: 12.30, 84: 17.83, 114: 23.50 } },
+  ];
+  const reMatches = RE_DB.filter((d) => !reQuery || d.name.includes(reQuery.trim()));
+  const addRE = (name, area, uk) => setReList((l) => [...l, { name, area, uk }]);
+  const addCustomRE = () => {
+    const uk = Math.round(num(customRE.price) * 100) / 100;
+    if (uk <= 0 || !customRE.name) return;
+    addRE(customRE.name, customRE.area ? `${customRE.area}㎡` : "직접입력", uk);
+    setCustomRE({ name: "", area: "", price: "" });
+  };
+  const removeRE = (i) => setReList((l) => l.filter((_, k) => k !== i));
 
   // 정확도 게이지 — 완료 섹션 수 기반
   const done = step >= 5 ? 4 : Math.max(0, Math.min(4, step - 1));
@@ -70,13 +107,6 @@ export default function Onboarding() {
 
   const finish = () => { persist(); router.push("/pwa"); };
   const go = (n) => { if (n >= 5) persist(); setStep(n); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
-
-  const Opt = ({ q, val, title, sub }) => (
-    <button className={`opt ${personality[q] === val ? "sel" : ""}`} onClick={() => pick(q, val)}>
-      <span>{title}{sub && <span className="osub">{sub}</span>}</span>
-      <span className="check">✓</span>
-    </button>
-  );
 
   return (
     <div className="wrap">
@@ -117,30 +147,19 @@ export default function Onboarding() {
               <div className="eyebrow">STEP 1 / 4 · 투자 성향</div>
               <h1>어떤 투자자<br />이신가요?</h1>
               <p className="lead">3가지만 골라주세요. 답에 따라 목표 자산 배분이 정해집니다.</p>
-              <div className="q">
-                <div className="q-t">1. 투자 목표에 가까운 건?</div>
-                <div className="opts">
-                  <Opt q="goal" val="safe" title="안정적 수익" sub="잃지 않는 게 우선" />
-                  <Opt q="goal" val="balance" title="균형" sub="수익과 안정 사이" />
-                  <Opt q="goal" val="growth" title="적극적 성장" sub="변동성 감수, 수익 우선" />
+              {QUESTIONS.map((Q) => (
+                <div className="q" key={Q.q}>
+                  <div className="q-t">{Q.title}</div>
+                  <div className="opts">
+                    {Q.opts.map((o) => (
+                      <button key={o.val} className={`opt ${personality[Q.q] === o.val ? "sel" : ""}`} onClick={() => pick(Q.q, o.val)}>
+                        <span className="opt-label">{o.t}{o.sub && <span className="osub">{o.sub}</span>}</span>
+                        <span className="check">✓</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div className="q">
-                <div className="q-t">2. 보유 자산이 −10% 되면?</div>
-                <div className="opts">
-                  <Opt q="risk" val="sell" title="바로 정리한다" />
-                  <Opt q="risk" val="hold" title="지켜본다" />
-                  <Opt q="risk" val="buy" title="기회로 보고 더 산다" />
-                </div>
-              </div>
-              <div className="q">
-                <div className="q-t">3. 이 돈은 언제 쓰나요?</div>
-                <div className="opts">
-                  <Opt q="horizon" val="short" title="1년 안에" />
-                  <Opt q="horizon" val="mid" title="3~5년" />
-                  <Opt q="horizon" val="long" title="당분간 쓸 일 없음" />
-                </div>
-              </div>
+              ))}
               {alloc && (
                 <div className="preview">
                   <div className="pt">✨ 당신의 목표 자산 배분</div>
@@ -223,22 +242,49 @@ export default function Onboarding() {
             <div className="step">
               <div className="eyebrow">STEP 4 / 4 · 부동산</div>
               <h1>내 부동산을<br />골라주세요</h1>
-              <p className="lead">단지만 선택하면 실거래 기반으로 시세가 자동 산정됩니다. 금액을 직접 입력할 필요 없어요.</p>
-              <div className="field"><label>단지 검색 (분당구)</label><input placeholder="예: 시범, 효자촌" defaultValue="시범" /></div>
+              <p className="lead">단지와 면적을 고르면 실거래 기반으로 시세가 자동 산정됩니다. 여러 채도 추가할 수 있어요.</p>
+              <div className="field"><label>단지 검색 (분당구)</label><input placeholder="예: 시범, 효자촌" value={reQuery} onChange={(e) => setReQuery(e.target.value)} /></div>
               <div className="search-res">
-                {[["시범우성", "서현동 · 84㎡ 기준", "20.29억"], ["시범삼성", "서현동 · 84㎡ 기준", "21.54억"], ["시범한양", "서현동 · 84㎡ 기준", "20.33억"]].map(([n, d, a]) => (
-                  <div key={n} className={`sr ${rePick?.name === n ? "sel" : ""}`} onClick={() => setRePick({ name: n, amt: a })}>
-                    <div><div className="sn">{n}</div><div className="sd">{d}</div></div><div className="sv">≈ {a}</div>
+                {reMatches.map((d) => (
+                  <div key={d.name} className="sr2">
+                    <div className="sr2-head"><span className="sn">{d.name}</span><span className="sd">{d.dong}</span></div>
+                    <div className="area-chips">
+                      {Object.entries(d.areas).map(([area, uk]) => (
+                        <button key={area} className="area-chip" onClick={() => addRE(d.name, `${area}㎡`, uk)}>
+                          <span className="ac-area">{area}㎡</span><span className="ac-uk">{uk}억</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 ))}
+                {reMatches.length === 0 && <div className="sr2-none">목록에 없는 지역이에요. 아래에서 직접 입력하세요.</div>}
               </div>
-              {rePick && (
-                <div className="auto-val">
-                  <div className="avt">✅ 실거래 기반 자동 산정 · {rePick.name}</div>
-                  <div className="avv">{rePick.amt}</div>
-                  <div className="avn">최근 실거래가 기준 · 직접 수정 가능</div>
+
+              {/* 목록에 없는 지역 — 직접 입력(가격·면적) */}
+              <button className="custom-toggle" onClick={() => setCustomOpen((o) => !o)}>{customOpen ? "▾ " : "▸ "}목록에 없는 지역 직접 입력</button>
+              {customOpen && (
+                <div className="card">
+                  <div className="field"><label>단지 / 지역명</label><input placeholder="예: 래미안 강남" value={customRE.name} onChange={(e) => setCustomRE((f) => ({ ...f, name: e.target.value }))} /></div>
+                  <div className="frow">
+                    <div className="field"><label>전용면적(㎡)</label><input placeholder="84" inputMode="numeric" value={customRE.area} onChange={(e) => setCustomRE((f) => ({ ...f, area: e.target.value }))} /></div>
+                    <div className="field"><label>시세(억)</label><input placeholder="20.5" inputMode="decimal" value={customRE.price} onChange={(e) => setCustomRE((f) => ({ ...f, price: e.target.value }))} /></div>
+                  </div>
+                  <button className="add-btn" onClick={addCustomRE}>+ 부동산 추가</button>
                 </div>
               )}
+
+              {reList.length > 0 && (
+                <div className="added">
+                  <div className="added-t">추가된 부동산 · 합계 {reUk}억</div>
+                  {reList.map((r, i) => (
+                    <div className="arow2" key={i}>
+                      <div><div className="an">{r.name}</div><div className="aq">{r.area}</div></div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div className="av">{r.uk}억</div><button className="re-del" onClick={() => removeRE(i)} aria-label="삭제">✕</button></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="foot"><button className="btn-prev" onClick={() => go(3)}>이전</button><button className="btn-next" onClick={() => go(5)}>완료하기 →</button></div>
             </div>
           )}
@@ -311,8 +357,10 @@ export default function Onboarding() {
         .q { margin-bottom: 22px; }
         .q-t { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
         .opts { display: flex; flex-direction: column; gap: 8px; }
-        .opt { display: flex; align-items: center; justify-content: space-between; background: var(--color-card); border: 1.5px solid var(--color-line); border-radius: 14px; padding: 14px 15px; font-size: 14px; font-weight: 600; cursor: pointer; transition: .15s; font-family: inherit; text-align: left; width: 100%; color: var(--color-ink); }
+        .opt { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--color-card); border: 1.5px solid var(--color-line); border-radius: 14px; padding: 14px 15px; font-size: 14px; font-weight: 600; cursor: pointer; transition: .15s; font-family: inherit; text-align: left; width: 100%; color: var(--color-ink); }
+        .opt-label { flex: 1 1 auto; min-width: 0; text-align: left; }
         .osub { display: block; font-size: 12px; color: var(--color-ink-3); font-weight: 500; margin-top: 2px; }
+        .opt .check { flex-shrink: 0; }
         .opt.sel { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); }
         .opt.sel .osub { color: var(--color-primary); }
         .opt .check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--color-line); flex-shrink: 0; display: grid; place-items: center; font-size: 11px; color: transparent; }
@@ -351,6 +399,18 @@ export default function Onboarding() {
         .sn { font-size: 14px; font-weight: 700; }
         .sd { font-size: 11.5px; color: var(--color-ink-3); margin-top: 2px; }
         .sv { font-size: 13px; font-weight: 700; color: var(--color-ink-2); }
+        /* 단지 카드 + 면적 칩(여러 면적 선택) */
+        .sr2 { border: 1.5px solid var(--color-line); border-radius: 13px; padding: 12px 13px; margin-bottom: 8px; background: var(--color-card); }
+        .sr2-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 9px; }
+        .sr2-head .sd { margin-top: 0; }
+        .sr2-none { font-size: 12px; color: var(--color-ink-3); padding: 8px 2px; }
+        .area-chips { display: flex; gap: 7px; flex-wrap: wrap; }
+        .area-chip { flex: 1; min-width: 88px; display: flex; flex-direction: column; align-items: center; gap: 2px; background: var(--color-card-soft); border: 1.5px solid var(--color-line); border-radius: 11px; padding: 9px 8px; cursor: pointer; font-family: inherit; }
+        .area-chip:active { border-color: var(--color-primary); background: var(--color-primary-soft); }
+        .ac-area { font-size: 12px; font-weight: 700; color: var(--color-ink); }
+        .ac-uk { font-size: 12.5px; font-weight: 800; color: var(--color-primary); }
+        .custom-toggle { width: 100%; text-align: left; background: none; border: none; font-family: inherit; font-size: 12.5px; font-weight: 700; color: var(--color-primary); padding: 8px 2px 10px; cursor: pointer; }
+        .re-del { background: none; border: none; color: var(--color-ink-3); font-size: 13px; cursor: pointer; padding: 2px 4px; }
         .auto-val { background: var(--hero-grad-1); color: var(--hero-ink); border-radius: 14px; padding: 15px; margin-top: 6px; animation: fade .4s ease; }
         .avt { font-size: 11.5px; color: var(--hero-ink-sub); margin-bottom: 5px; }
         .avv { font-size: 22px; font-weight: 800; }
