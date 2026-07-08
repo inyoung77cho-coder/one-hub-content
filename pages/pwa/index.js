@@ -77,6 +77,8 @@ export default function PWADashboard({ latestReport }) {
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
+  const [basisOpen, setBasisOpen] = useState(false); // [v10 UI] 홈 'AI 판단 근거' 접기
+  const [logOpen, setLogOpen] = useState(false);     // [v10 UI] 홈 '최근 활동' 접기
   const [sellConfirm, setSellConfirm] = useState({}); // [v8.7] 매도 1단계 확인 상태: { [code]: true }
   const [sellLoading, setSellLoading] = useState({}); // [v8.7] 매도 처리 중 상태
 
@@ -676,440 +678,124 @@ export default function PWADashboard({ latestReport }) {
                 );
               })()}
 
-              {/* [v11 1-B] 총 자산 — 홈 최상단 자산 중심(주식+ETF+부동산 통합) */}
-              {assetSum && (
-                <section className="pwa-card total-asset-card">
-                  <span className="pwa-card-label">💰 총 자산</span>
-                  <div className="ta-total mono">{assetSum.total_uk}<span>억</span></div>
-                  <div className="ta-rows">
-                    {[
-                      ['주식', 'var(--color-primary)', assetSum.breakdown?.stock_uk, '/pwa?tab=recommend'],
-                      ['ETF', 'var(--color-primary)', assetSum.breakdown?.etf_uk, '/pwa/etf'],
-                      ['부동산', 'var(--color-success)', assetSum.breakdown?.realestate_uk, '/pwa/realestate'],
-                    ].map(([label, color, val, href]) => (
-                      <button key={label} className="ta-row" onClick={() => { window.location.href = href; }}>
-                        <span className="ta-dot" style={{ background: color }} />
-                        <span className="ta-lb">{label}</span>
-                        <span className={`ta-vl ${val == null ? 'pend' : ''}`}>{val == null ? '준비중' : `${val}억`}</span>
-                        <span className="ta-ar">›</span>
-                      </button>
-                    ))}
+              {/* [v10 UI 시안] ② 총자산 — 라벨/금액 + 자산별 행(부동산 미입력 CTA) */}
+              <section className="card v10">
+                <div className="v10-total"><span className="v10-total-lbl">총자산</span><span className="v10-total-amt mono">{assetSum?.total_uk != null ? `${assetSum.total_uk}억` : '—'}</span></div>
+                {[
+                  ['주식', 'var(--color-primary)', assetSum?.breakdown?.stock_uk, '/pwa?tab=recommend'],
+                  ['ETF', 'var(--color-success)', assetSum?.breakdown?.etf_uk, '/pwa/etf'],
+                  ['부동산', 'var(--color-ink-3)', assetSum?.breakdown?.realestate_uk, '/pwa/realestate'],
+                ].map(([label, color, val, href]) => (
+                  <div className="v10-arow" key={label}>
+                    <span className="v10-aname"><i className="v10-adot" style={{ background: color }} />{label}</span>
+                    {val != null
+                      ? <span className="v10-aval mono">{val}억</span>
+                      : <span className="v10-miss"><span className="v10-miss-tag">미입력</span><button className="v10-miss-btn" onClick={() => { window.location.href = href; }}>입력하기 →</button></span>}
                   </div>
-                </section>
-              )}
+                ))}
+              </section>
 
-              {/* [v11 2-A] 오늘 AI 자산 권고 — 자산 전체 관점의 오늘 할 일(ai-summary) */}
-              {aiRec && aiRec.summary_items?.length > 0 && (
-                <section className="pwa-card ai-rec-card" onClick={() => { window.location.href = '/pwa/ai-advisor'; }}>
-                  <span className="pwa-card-label">🤖 오늘 AI 자산 권고 <span className="ai-rec-score">배분 {aiRec.ai_score ?? 0}점</span></span>
-                  <div className="ai-rec-list">
-                    {aiRec.summary_items.slice(0, 4).map((t, i) => (
-                      <div className="ai-rec-item" key={i}>{t}</div>
-                    ))}
-                  </div>
-                  <div className="ai-rec-more">AI 자산운영 상세 →</div>
-                </section>
-              )}
-
-              {/* [v8.7] Action Summary Hero — 오늘 결론 한줄 + BUY/SELL/WATCH/PASS 4분할 */}
-              <section className="action-summary-hero">
-                <div className="action-summary-headline">
-                  {buyCount > 0
-                    ? `🟢 오늘 ${buyCount}종목 매수 추천`
-                    : regime === 'BEAR'
-                      ? '🔴 오늘 관망'
-                      : '⚪ 오늘 매수 없음'}
-                </div>
-                <div className="action-summary-grid">
+              {/* [v10 UI 시안] ③ 오늘의 행동 — 4셀 + 요약 노트 */}
+              <section className="card v10">
+                <div className="v10-sect"><h3>🎯 오늘의 행동</h3><a onClick={() => setTab('report')}>기록 →</a></div>
+                <div className="v10-acts">
                   {[
-                    { label: 'BUY',   count: buyCount,   color: 'var(--color-success)' },
-                    { label: 'SELL',  count: sellCount,  color: 'var(--color-danger)' },
-                    { label: 'WATCH', count: watchCount, color: 'var(--color-primary)' },
-                    { label: 'PASS',  count: passCount,  color: 'var(--color-ink-3)' },
-                  ].map(({ label, count, color }) => (
-                    <div key={label} className="action-summary-pill" style={{ borderColor: color }}>
-                      <span className="action-summary-pill-count mono" style={{ color }}>{count}</span>
-                      <span className="action-summary-pill-label" style={{ color }}>{label}</span>
-                    </div>
+                    ['매수', buyCount, 'var(--color-success)'],
+                    ['매도', sellCount, 'var(--color-danger)'],
+                    ['관망', watchCount, 'var(--color-primary)'],
+                    ['차단', blockCount, 'var(--color-ink-3)'],
+                  ].map(([k, n, c]) => (
+                    <div className="v10-act" key={k}><div className="v10-act-n mono" style={{ color: c }}>{n}</div><div className="v10-act-k">{k}</div></div>
                   ))}
                 </div>
-                {/* [v8.7] P2-7 AI 차단손실 KPI */}
-                {data?.blocked_loss_pct != null && data.blocked_loss_pct !== 0 && (
-                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>AI가 막은 손실 (30일 평균)</span>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--color-success)', fontFamily: 'var(--font-mono)' }}>
-                      +{Math.abs(data.blocked_loss_pct).toFixed(1)}%
-                    </span>
-                  </div>
-                )}
+                <div className="v10-act-note">AI는 오늘 {buyCount > 0 ? <><b>{buyCount}종목을 매수</b>했습니다.</> : blockCount > 0 ? <>매수 없이 <b>{blockCount}건을 신중히 차단</b>했습니다.</> : <><b>선별 관망</b>했습니다.</>} 승인 대기 <b>{pendingList.length}건</b>.</div>
               </section>
 
-              {/* [T-04] 오늘의 브리핑 — 텔레그램/리포트/큐 동기화 최신 알림 */}
-              {notis.length > 0 && (
-                <section className="pwa-card briefing-card">
-                  <span className="pwa-card-label">📮 오늘의 브리핑</span>
-                  <div className="briefing-list">
-                    {notis.slice(0, 3).map((n) => (
-                      <div key={n.id} className={`briefing-row bf-${n.type || 'info'}`}>
-                        <span className="bf-ic">{n.type === 'critical' ? '🔴' : n.type === 'important' ? '🟠' : '🔔'}</span>
-                        <div className="bf-mid">
-                          <div className="bf-title">{n.title}</div>
-                          <div className="bf-time mono dim">{n.sent_at}{n.source ? ` · ${n.source}` : ''}</div>
-                        </div>
-                        {!n.is_read && <span className="bf-dot" />}
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {/* [v9.0][10] Today Mission — 승인대기/손절경고 등 지금 당장 필요한 개별 액션 */}
-              {(() => {
-                const stopWarnings = positions.filter(p => p.stop_loss > 0 && p.current_price > 0 && p.current_price <= p.stop_loss * 1.02);
-                const missionItems = [
-                  ...pendingList.slice(0, 3).map(p => ({ type: 'buy', icon: '✅', text: `${p.name} 매수 승인 대기` })),
-                  ...stopWarnings.map(p => ({ type: 'stop', icon: '🔴', text: `${p.name} 손절 검토 (${p.pnl_rate >= 0 ? '+' : ''}${p.pnl_rate}%)` })),
-                ];
-                if (missionItems.length === 0) return null;
-                return (
-                  <section className="pwa-card today-mission-card">
-                    <span className="pwa-card-label">⭐ TODAY MISSION</span>
-                    <div className="today-mission-list">
-                      {missionItems.map((m, i) => (
-                        <div key={i} className={`today-mission-row tm-${m.type}`}>
-                          <span className="tm-icon">{m.icon}</span>
-                          <span className="tm-text">{m.text}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                );
-              })()}
-
-              {/* [v9.0][5] Action Card — 📋 오늘 해야 할 일 */}
-              <section className="pwa-card action-card">
-                <span className="pwa-card-label">📋 오늘 해야 할 일</span>
-                <div className="action-grid">
-                  {[
-                    {
-                      label: '신규매수',
-                      ok:   regime === 'BULL',
-                      warn: regime === 'SIDEWAYS',
-                      no:   regime === 'BEAR',
-                    },
-                    {
-                      label: '추가매수',
-                      ok:   regime === 'BULL',
-                      warn: false,
-                      no:   regime !== 'BULL',
-                    },
-                    {
-                      label: '물타기',
-                      ok:   false,
-                      warn: false,
-                      no:   true,
-                    },
-                    {
-                      label: '현금유지',
-                      ok:   regime === 'BEAR' || regime === 'SIDEWAYS',
-                      warn: false,
-                      no:   regime === 'BULL',
-                    },
-                  ].map(({ label, ok, warn, no }) => (
-                    <div key={label} className={`action-item ${ok ? 'act-yes' : warn ? 'act-warn' : 'act-no'}`}>
-                      <span className="action-icon">{ok ? '✅' : warn ? '⚠️' : '❌'}</span>
-                      <span className="action-label">{label}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* [v9.0][27] Home 정보 우선순위 재정렬: Mission -> Top3 -> Market -> 보유 -> 뉴스 순서로 이동
-                  [v8.7] 추천종목 — 오늘의 TOP PICK (매수신호 없어도 관심종목으로 항상 최대 3개 노출) */}
-              <section className="pwa-card" id="recommend-section">
-                <span className="pwa-card-label">✅ 오늘의 TOP PICK</span>
-                {topPicks.length === 0
-                  ? <div className="pwa-empty">오늘 매수 없음 — {regime === 'BEAR' ? '헤지/방어 스캔 중' : '관망 중'}</div>
-                  : <div className="pwa-action-list">{topPicks.map((p, i) => (
-                      <div key={i} className="pwa-action-row">
-                        <span className="pwa-action-stock">{['🥇','🥈','🥉'][i] || ''} {p.name}</span>
-                        {p.isBuy
-                          ? <span className="pwa-action-score mono dim">{confidenceStars(p.score)} AI 확신도 {Math.round(p.score)}%</span>
-                          : <span className="pwa-action-score mono dim">관심도 {Math.round(p.score)}</span>}
-                        {p.reason && <span className="pwa-action-reason">{p.reason}</span>}
-                      </div>))}
-                    </div>}
-              </section>
-
-              {/* [v9.0][6] AI 판단 근거 카드 */}
+              {/* [v10 UI 시안] ④ AI 판단 근거 — 접기(요약 한 줄 → 지표/확률바) */}
               {regime && (() => {
-                const h  = heat      ?? 50;
-                const fg = fearGreed ?? 50;
-                const v  = vix       ?? 18;
-
-                // BUY/SELL/WAIT 확률
+                const h = heat ?? 50, fg = fearGreed ?? 50, v = vix ?? 18;
                 let buyP, sellP, waitP;
-                if (regime === 'BULL') {
-                  buyP  = Math.round(40 + (h / 100) * 35);
-                  sellP = Math.round(5  + ((100 - fg) / 100) * 10);
-                } else if (regime === 'BEAR') {
-                  sellP = Math.round(40 + ((100 - h) / 100) * 35);
-                  buyP  = Math.round(5  + (fg / 100) * 10);
-                } else {
-                  waitP = Math.round(45 + ((50 - Math.abs(h - 50)) / 50) * 20);
-                  buyP  = Math.round((100 - waitP) * (h / 100));
-                  sellP = 100 - buyP - waitP;
-                }
-                buyP  = Math.max(0, Math.min(buyP  ?? 0, 100));
-                sellP = Math.max(0, Math.min(sellP ?? 0, 100));
-                waitP = Math.max(0, 100 - buyP - sellP);
-
-                // 조건 기반 판단 이유 자동 생성
-                const actionLabel = regime === 'BULL' ? '매수한' : '관망한';
-                const reasons = [];
-                if (regime === 'BEAR')              reasons.push('BEAR 레짐 — 전체 시장 하락 국면');
-                if (fg < 20)                        reasons.push(`공포탐욕 ${fg} — 극단적 공포 구간`);
-                if (heat !== null && heat < 30)     reasons.push(`Heat ${heat}점 — 시장 투자온도 낮음`);
-                if (vix  !== null && vix >= 25)     reasons.push(`VIX ${vix} — 변동성 급등 경고`);
-                if (fearGreed !== null && fg >= 80) reasons.push(`공포탐욕 ${fg} — 극단적 탐욕, 과열 주의`);
-                if (reasons.length === 0 && regime === 'SIDEWAYS') reasons.push('뚜렷한 방향 없음 — 선별적 접근 권장');
-                if (reasons.length === 0)           reasons.push('종합 지표 정상 범위 — AI 매매 기준 충족');
-
+                if (regime === 'BULL') { buyP = Math.round(40 + (h / 100) * 35); sellP = Math.round(5 + ((100 - fg) / 100) * 10); }
+                else if (regime === 'BEAR') { sellP = Math.round(40 + ((100 - h) / 100) * 35); buyP = Math.round(5 + (fg / 100) * 10); }
+                else { waitP = Math.round(45 + ((50 - Math.abs(h - 50)) / 50) * 20); buyP = Math.round((100 - waitP) * (h / 100)); sellP = 100 - buyP - waitP; }
+                buyP = Math.max(0, Math.min(buyP ?? 0, 100)); sellP = Math.max(0, Math.min(sellP ?? 0, 100)); waitP = Math.max(0, 100 - buyP - sellP);
                 return (
-                  <section className="pwa-card ai-basis-card">
-                    <span className="pwa-card-label">🧠 AI 판단 근거</span>
-
-                    {/* [v8.7] Market 4지표 한줄 요약 */}
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
-                      {[
-                        { label: 'Regime', val: regime, color: regime === 'BULL' ? 'var(--color-success)' : regime === 'BEAR' ? 'var(--color-danger)' : 'var(--color-warning)' },
-                        { label: 'Heat',   val: heat != null ? `${heat}` : null, color: heatColor(heat) },
-                        { label: 'Fear',   val: fearGreed != null ? `${fearGreed}` : null, color: fgColor(fearGreed) },
-                        { label: 'AI%',    val: data?.ai_confidence != null ? `${data.ai_confidence}%` : null, color: 'var(--color-primary)' },
-                      ].filter(m => m.val != null).map(m => (
-                        <div key={m.label} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '3px 10px', background: 'var(--inset-bg)', borderRadius: 999 }}>
-                          <span style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)' }}>{m.label}</span>
-                          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: m.color, fontFamily: 'var(--font-mono)' }}>{m.val}</span>
-                        </div>
-                      ))}
+                  <section className={`card v10 v10-collap ai-basis-card ${basisOpen ? 'open' : ''}`}>
+                    <div className="v10-collap-head" onClick={() => setBasisOpen(o => !o)}>
+                      <div className="v10-basis-txt"><h3>🧠 AI 판단 근거</h3><p className="v10-basis-sum">시장 온도 {heat != null && heat < 40 ? '낮음' : heat != null && heat >= 70 ? '높음' : '보통'} · 매수 확률 <b>{buyP}%</b> · {buyP >= 50 ? '매수 우세' : waitP >= sellP ? '관망 우세' : '매도 우세'}</p></div>
+                      <span className="v10-caret">▾</span>
                     </div>
-
-                    {/* 지표 3개 + 방향 화살표 */}
-                    <div className="ai-basis-metrics" style={{ marginBottom: 14 }}>
-                      {[
-                        { label: 'VIX',    val: vix,      dir: v >= 20 ? '↑' : '↓', color: v >= 25 ? 'var(--accent-sell)' : v >= 20 ? 'var(--accent-warn)' : 'var(--accent-buy)', blogTag: '매크로' },
-                        { label: 'Fear&Greed', val: fearGreed, dir: fg >= 50 ? '↑' : '↓', color: fgColor(fearGreed), blogTag: '매크로', grade: fgLabel(fearGreed), reason: fgReason(fearGreed) },
-                        { label: 'Heat',   val: heat,     dir: h >= 50 ? '↑' : '↓', color: heatColor(heat), blogTag: 'AI분석' },
-                      ].map(m => m.val !== null && (
-                        <div key={m.label} className="ai-basis-metric">
-                          <span className="ai-basis-metric-label">
-                            {m.label}
-                            {/* [v9.0] 블로그 연결 📖 */}
-                            <a href={`/blog?tag=${m.blogTag}`} target="_blank" rel="noopener"
-                               style={{ fontSize: 10, color: 'var(--color-ink-3)', textDecoration: 'none', marginLeft: 4 }}
-                               title="관련 블로그 보기">📖</a>
-                          </span>
-                          <span className="ai-basis-metric-val mono" style={{ color: m.color }}>
-                            {m.val} <span className="ai-arrow">{m.dir}</span>
-                            {m.grade && <span style={{ fontSize: '0.62rem', fontWeight: 600, marginLeft: 4 }}>({m.grade})</span>}
-                          </span>
-                          {m.reason && <span style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', marginTop: 1 }}>{m.reason}</span>}
-                        </div>
+                    <div className="v10-collap-body"><div className="v10-collap-inner">
+                      <div className="v10-metrics">
+                        <div className="v10-metric"><div className="v10-mk">VIX</div><div className="v10-mv mono">{v}</div></div>
+                        <div className="v10-metric"><div className="v10-mk">Fear&amp;Greed</div><div className="v10-mv mono" style={{ color: 'var(--color-danger)' }}>{fg}</div></div>
+                        <div className="v10-metric"><div className="v10-mk">Heat</div><div className="v10-mv mono" style={{ color: 'var(--color-primary)' }}>{heat ?? '-'}</div></div>
+                      </div>
+                      {[['매수', buyP, 'var(--color-success)'], ['관망', waitP, 'var(--color-warning)'], ['매도', sellP, 'var(--color-danger)']].map(([k, p, c]) => (
+                        <div className="v10-bar-row" key={k}><span className="v10-bk">{k}</span><div className="v10-track"><div className="v10-fill" style={{ width: `${p}%`, background: c }} /></div><span className="v10-bv mono" style={{ color: c }}>{p}%</span></div>
                       ))}
-                    </div>
-
-                    {/* BUY / WAIT / SELL 확률 바 */}
-                    <div className="ai-basis-bars">
-                      {[
-                        { label: 'BUY',  pct: buyP,  color: 'var(--color-success)' },
-                        { label: 'WAIT', pct: waitP, color: 'var(--color-warning)' },
-                        { label: 'SELL', pct: sellP, color: 'var(--color-danger)' },
-                      ].map(b => (
-                        <div key={b.label} className="ai-basis-bar-row">
-                          <span className="ai-basis-bar-label mono">{b.label}</span>
-                          <div className="ai-basis-bar-track">
-                            <div className="ai-basis-bar-fill" style={{ width: `${b.pct}%`, background: b.color }} />
-                          </div>
-                          <span className="ai-basis-bar-pct mono" style={{ color: b.color }}>{b.pct}%</span>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* 판단 요약 ①②③ */}
-                    <div className="ai-reasons">
-                      <span className="ai-reasons-title">AI가 오늘 {actionLabel} 이유</span>
-                      {reasons.slice(0, 3).map((r, i) => (
-                        <div key={i} className="ai-reason-row">
-                          <span className="ai-reason-num">{'①②③'[i]}</span>
-                          <span className="ai-reason-text">{r}</span>
-                        </div>
-                      ))}
-                    </div>
+                    </div></div>
                   </section>
                 );
               })()}
 
-              {/* [v9.0] 투자성향 배지 */}
-              <div className="profile-badge-row">
-                <span className="profile-badge-label">
-                  현재 투자성향:&nbsp;
-                  <strong>{profile.style === 'conservative' ? '🛡️ 보수형' : profile.style === 'aggressive' ? '🚀 공격형' : '⚖️ 균형형'}</strong>
-                </span>
-                <button className="profile-badge-change" onClick={() => setTab('profile')}>변경 →</button>
-              </div>
+              {/* [v10 UI 시안] ⑤ TOP PICK — 공동순위 */}
+              {topPicks.length > 0 && (
+                <section className="card v10">
+                  <div className="v10-sect"><h3>⭐ 오늘의 TOP PICK</h3><a onClick={() => setTab('recommend')}>추천 전체 →</a></div>
+                  <div className="v10-pick-note">매수 선별 전 기술 스코어링 상위 후보 · 실제 매수 신호와 별개</div>
+                  {topPicks.map((p, i) => {
+                    const rank = topPicks.filter(x => (x.score ?? 0) > (p.score ?? 0)).length + 1;
+                    const tie = topPicks.filter(x => (x.score ?? 0) === (p.score ?? 0)).length > 1;
+                    return (
+                      <div className="v10-pick-row" key={i}>
+                        <div className="v10-pick-l"><div className="v10-medal" style={{ background: rank === 1 ? 'var(--color-warning)' : rank === 2 ? 'var(--color-ink-3)' : 'var(--color-warning-ink)' }}>{rank}</div><span className="v10-pick-name">{p.name}{tie && <span className="v10-tie">공동 {rank}위</span>}</span></div>
+                        <div className="v10-pick-r"><span className="v10-pick-score">{p.isBuy ? '매수신호' : `관심도 ${p.score ?? '-'}`}</span><button className="v10-mini-btn" onClick={() => setTab('recommend')}>AI<br />분석</button></div>
+                      </div>
+                    );
+                  })}
+                </section>
+              )}
 
-              {/* AI 활동 요약 — 4칸 그리드 */}
-              <section className="pwa-card">
-                <span className="pwa-card-label">오늘 AI가 한 일</span>
-                <p className="mission-summary">{missionSummary}</p>
-                <div className="mission-grid">
-                  <div className="mission-cell buy">
-                    <span className="mission-num">{buyCount}</span>
-                    <span className="mission-lbl">매수</span>
-                  </div>
-                  <div className="mission-cell block">
-                    <span className="mission-num">{blockCount}</span>
-                    <span className="mission-lbl">차단</span>
-                  </div>
-                  <div className="mission-cell analyze">
-                    <span className="mission-num">{watchCount}</span>
-                    <span className="mission-lbl">분석</span>
-                  </div>
-                  <div className="mission-cell hold">
-                    <span className="mission-num">{positions.length}</span>
-                    <span className="mission-lbl">보유</span>
-                  </div>
-                </div>
-              </section>
-
-              {/* [v8.5] 승인대기 카드 — 기존 6버튼 그리드를 제거하고 단일 카드로 통합 (중복 메뉴 해소) */}
-              <section className="pwa-card pending-panel">
-                <button
-                  className="pwa-card-label"
-                  style={{ background:'none', border:'none', padding:0, cursor:'pointer', display:'flex', alignItems:'center', gap:8, width:'100%' }}
-                  onClick={() => setPendingOpen(o => !o)}
-                >
-                  <span style={{flex:1, textAlign:'left'}}>⏳ 승인대기 ({pendingList.length}건)</span>
-                  <span className="dim mono" style={{fontSize:'0.7rem'}}>{pendingOpen ? '접기 ▲' : '펼치기 ▼'}</span>
-                </button>
-                {pendingOpen && (<>
-                  {pendingLoading && <div className="pwa-empty">불러오는 중...</div>}
-                  {pendingError && <div className="pwa-error">{pendingError}</div>}
-                  {!pendingLoading && !pendingError && pendingList.length === 0 && (
-                    <div className="pwa-empty">현재 승인 대기 중인 종목이 없습니다.</div>
-                  )}
-                  {!pendingLoading && pendingList.length > 0 && (
-                    <div className="pending-list">
-                      {pendingList.map((p) => (
-                        <div key={p.code} className="pending-card">
-                          <div className="pending-top">
-                            <span className="pending-name">{p.name} <span className="dim mono">({p.code})</span></span>
-                            <span className={`pending-regime mono ${regimeClass(p.regime)}`}>{p.regime}</span>
-                          </div>
-                          <div className="pending-mid mono">
-                            <span className="dim">score</span> <span>{p.final_score}</span>
-                            <span className="dim" style={{marginLeft:10}}>{p.ml_signal}</span>
-                          </div>
-                          <div className="pending-price-grid mono">
-                            <div><span className="dim">목표가</span> <span className="bull">{Number(p.target||0).toLocaleString()}원</span></div>
-                            <div><span className="dim">손절가</span> <span className="bear">{Number(p.stop_loss||0).toLocaleString()}원</span></div>
-                          </div>
-                          {/* [v9.0][12] Risk/Reward -- 승인 전 얼마를 벌고 얼마를 감수하는지 한눈에 */}
-                          {p.price > 0 && p.target > 0 && p.stop_loss > 0 && (() => {
-                            const rewardPct = (p.target / p.price - 1) * 100;
-                            const riskPct = (1 - p.stop_loss / p.price) * 100;
-                            const rr = riskPct > 0 ? rewardPct / riskPct : null;
-                            const rrColor = rr == null ? 'var(--text-secondary)' : rr >= 2 ? 'var(--color-success)' : rr >= 1.5 ? 'var(--color-warning)' : 'var(--color-danger)';
-                            return (
-                              <div className="pending-price-grid rr-3col mono" style={{ marginTop: 2 }}>
-                                <div><span className="dim">예상수익</span> <span className="bull">+{rewardPct.toFixed(1)}%</span></div>
-                                <div><span className="dim">손절률</span> <span className="bear">-{riskPct.toFixed(1)}%</span></div>
-                                <div><span className="dim">RR</span> <span style={{ color: rrColor, fontWeight: 700 }}>{rr != null ? rr.toFixed(1) : '-'}</span></div>
-                              </div>
-                            );
-                          })()}
-                          {p.reason && <div className="pending-reason">{p.reason}</div>}
-                          {p.status === 'queued' ? (
-                            <div className="pending-queued">
-                              ⏰ {p.scheduled_at ? `${p.scheduled_at} 예약` : '다음장 09:00 예약'} · 자동 릴리스 대기
-                              <button
-                                className="pending-btn reject"
-                                style={{ marginTop: 8, width: '100%' }}
-                                disabled={actingCode === p.code}
-                                onClick={() => actOnPending(p.code, 'skip')}
-                              >{actingCode === p.code ? '처리 중...' : '❌ 예약 취소'}</button>
-                            </div>
-                          ) : (
-                          <div className="pending-actions">
-                            <button
-                              className="pending-btn approve"
-                              disabled={actingCode === p.code}
-                              onClick={() => actOnPending(p.code, 'approve')}
-                            >{actingCode === p.code ? '처리 중...' : (isMarketHoursKST() ? '✅ 승인' : '⏰ 예약 승인')}</button>
-                            <button
-                              className="pending-btn reject"
-                              disabled={actingCode === p.code}
-                              onClick={() => actOnPending(p.code, 'skip')}
-                            >{actingCode === p.code ? '처리 중...' : '❌ 거절'}</button>
-                          </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>)}
-              </section>
-
-              {/* [v8.6] 보유종목 미리보기 — Hero 다음 우선순위로 신설 (전체 화면은 보유 탭) */}
-              <section className="pwa-card">
-                <span className="pwa-card-label">💼 보유 종목</span>
+              {/* [v10 UI 시안] ⑥ 보유 종목 */}
+              <section className="card v10">
+                <div className="v10-sect"><h3>💼 보유 종목</h3><a onClick={() => setTab('portfolio')}>전체 {positions.length}건 →</a></div>
                 {positions.length === 0
                   ? <div className="pwa-empty">보유 종목 없음</div>
-                  : (<>
-                      <div className="position-cards">
-                        {positions.slice(0, 3).map((p, i) => (
-                          <div key={i} className="position-card-mini">
-                            <span className="position-mini-name">{p.name}</span>
-                            <span className={`position-mini-pnl ${p.pnl_rate>=0?'bull':'bear'}`}>
-                              {p.pnl_rate>=0?'+':''}{p.pnl_rate}%
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                      <button className="pwa-link-btn" onClick={() => setTab('portfolio')}>
-                        보유종목 전체보기 ({positions.length}건) →
-                      </button>
-                    </>)}
+                  : positions.slice(0, 5).map((p, i) => (
+                    <div className="v10-hold-row" key={i}><span className="v10-hold-name">{p.name}</span><span className={`v10-hold-pct ${(p.pnl_rate ?? 0) >= 0 ? 'up' : 'down'}`}>{(p.pnl_rate ?? 0) >= 0 ? '+' : ''}{p.pnl_rate}%</span></div>
+                  ))}
               </section>
 
-              {/* 차단 top3 — [v8.5] STRONG_SELL 등 원시 ML 코드 대신 한글 설명 노출 */}
-              {blockCount > 0 && (
-                <section className="pwa-card">
-                  <span className="pwa-card-label">⛔ 매수 차단 사유 (상위 3)</span>
-                  <div className="pwa-blocked-list">
-                    {[...new Map((data.today_blocked||[]).map(b=>[b.stock,b])).values()].slice(0,3).map((b,i) => (
-                      <div key={i} className="pwa-blocked-row">
-                        <span className="pwa-blocked-stock">{b.stock}</span>
-                        <span className="pwa-blocked-signal mono dim bear">{blockedLabel(b.signal)}</span>
-                        <span className="pwa-blocked-reason">{b.reason}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              )}
+              {/* [v10 UI 시안] ⑦ 타임라인 — 오늘 AI 분석 흐름 */}
+              <section className="card v10">
+                <div className="v10-sect"><h3>🎬 오늘 AI 분석 흐름</h3></div>
+                <div className="v10-tl">
+                  <div className="v10-tl-item"><div className="v10-tl-time">분석 시작</div><div className="v10-tl-title">🔍 시장 분석</div><div className="v10-tl-desc">Regime {regime || '-'} · Heat {heat ?? '-'} · 공포탐욕 {fearGreed ?? '-'}</div></div>
+                  <div className="v10-tl-item"><div className="v10-tl-time">스크리닝</div><div className="v10-tl-title">📊 종목 스크리닝</div><div className="v10-tl-desc">후보 {(data.screening_candidates || []).length}종목 선별</div></div>
+                  <div className="v10-tl-item"><div className="v10-tl-time">최종 결정</div><div className="v10-tl-title">✅ 최종 결정</div><div className="v10-tl-desc">매수 {buyCount}건 · 차단 {blockCount}건 — 선별 실행</div></div>
+                </div>
+              </section>
 
-              {/* 최근 활동 타임라인 */}
-              <section className="pwa-card">
-                <span className="pwa-card-label">📋 최근 활동</span>
-                {(!data.recent_decisions || data.recent_decisions.length === 0)
-                  ? <div className="pwa-empty">기록된 활동 없음</div>
-                  : <div className="pwa-timeline">{data.recent_decisions.slice(0,8).map((e,i) => (
-                      <div key={i} className="pwa-timeline-row">
-                        <span className={`pwa-tl-icon mono tl-${e.event_type?.toLowerCase()}`}>{eventLabel(e.event_type)}</span>
-                        <span className="pwa-tl-time mono dim">{e.date?.slice(5,16)}</span>
-                        <span className="pwa-tl-summary">{e.summary}</span>
-                      </div>))}
-                    </div>}
+              {/* [v10 UI 시안] ⑧ 최근 활동 — 접기(같은 사유 묶기) */}
+              <section className={`card v10 v10-collap ${logOpen ? 'open' : ''}`}>
+                <div className="v10-collap-head" onClick={() => setLogOpen(o => !o)}>
+                  <h3 style={{ fontSize: '15px', fontWeight: 700 }}>🧾 최근 활동</h3>
+                  <span className="v10-caret">▾</span>
+                </div>
+                {(() => {
+                  const decs = data.recent_decisions || [];
+                  if (decs.length === 0) return <div className="pwa-empty" style={{ marginTop: 13 }}>기록된 활동 없음</div>;
+                  const groups = {};
+                  decs.forEach(e => { const key = e.summary || '-'; groups[key] = (groups[key] || 0) + 1; });
+                  const top = Object.entries(groups).sort((a, b) => b[1] - a[1])[0];
+                  return (<>
+                    <div className="v10-log-group"><div className="v10-log-l"><span className="v10-log-badge">{decs[0]?.event_type || 'LOG'}</span><span className="v10-log-txt">{top[0]}</span></div><span className="v10-log-cnt">×{top[1]}건</span></div>
+                    <div className="v10-collap-body"><div className="v10-collap-inner">
+                      <div className="v10-tl">{decs.slice(0, 6).map((e, i) => (<div className="v10-tl-item" key={i}><div className="v10-tl-time">{e.date?.slice(5, 16)}</div><div className="v10-tl-desc">{e.summary}</div></div>))}</div>
+                    </div></div>
+                  </>);
+                })()}
               </section>
 
             </>)}
@@ -2300,6 +1986,74 @@ export default function PWADashboard({ latestReport }) {
         .hh-chip { background: var(--hero-fill); border: 1px solid var(--hero-fill-line); padding: 6px 11px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; color: var(--hero-ink-soft); display: flex; align-items: center; gap: 5px; }
         .hh-chip .v { color: var(--hero-accent); font-weight: 700; }
         .hh-cta { margin-top: 14px; width: 100%; background: #fff; color: var(--hero-grad-1); border: none; font-family: var(--font-body); font-weight: 700; font-size: 0.86rem; padding: 13px; border-radius: 14px; cursor: pointer; }
+
+        /* [v10 UI 시안] 홈 카드 — onehub-home-redesign.html 구조 일치 */
+        .card.v10 { background: var(--color-card); border-radius: var(--radius-hero); padding: 18px; box-shadow: var(--shadow-card); }
+        .v10-sect { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; }
+        .v10-sect h3 { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 7px; color: var(--color-ink); }
+        .v10-sect a { font-size: 12px; color: var(--color-primary); font-weight: 600; cursor: pointer; }
+        .v10-total { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+        .v10-total-lbl { font-size: 13px; color: var(--color-ink-2); font-weight: 600; }
+        .v10-total-amt { font-size: 26px; font-weight: 800; letter-spacing: -.5px; color: var(--color-ink); }
+        .v10-arow { display: flex; align-items: center; justify-content: space-between; padding: 11px 0; border-top: 1px solid var(--color-line); }
+        .v10-aname { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--color-ink); }
+        .v10-adot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .v10-aval { font-size: 14px; font-weight: 700; color: var(--color-ink); }
+        .v10-miss { display: flex; align-items: center; gap: 8px; }
+        .v10-miss-tag { font-size: 11px; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); padding: 4px 8px; border-radius: 8px; }
+        .v10-miss-btn { font-family: var(--font-body); font-size: 12px; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border: none; padding: 6px 11px; border-radius: 9px; cursor: pointer; }
+        .v10-acts { display: flex; gap: 8px; }
+        .v10-act { flex: 1; text-align: center; background: var(--color-card-soft); border-radius: 14px; padding: 13px 4px; }
+        .v10-act-n { font-size: 22px; font-weight: 800; line-height: 1; }
+        .v10-act-k { font-size: 11px; font-weight: 600; color: var(--color-ink-3); margin-top: 5px; letter-spacing: .3px; }
+        .v10-act-note { margin-top: 13px; font-size: 12.5px; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 12px; padding: 11px 13px; line-height: 1.5; }
+        .v10-act-note b { color: var(--color-ink); }
+        .v10-collap-head { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
+        .v10-basis-txt h3 { font-size: 15px; font-weight: 700; margin-bottom: 5px; color: var(--color-ink); }
+        .v10-basis-sum { font-size: 12.5px; color: var(--color-ink-2); font-weight: 500; }
+        .v10-basis-sum b { color: var(--color-ink); font-weight: 700; }
+        .v10-caret { font-size: 12px; color: var(--color-ink-3); transition: transform .2s; }
+        .v10-collap.open .v10-caret { transform: rotate(180deg); }
+        .v10-collap-body { max-height: 0; overflow: hidden; transition: max-height .3s ease; }
+        .v10-collap.open .v10-collap-body { max-height: 720px; }
+        .v10-collap-inner { padding-top: 15px; }
+        .v10-metrics { display: flex; gap: 8px; margin-bottom: 15px; }
+        .v10-metric { flex: 1; background: var(--color-card-soft); border-radius: 12px; padding: 11px; text-align: center; }
+        .v10-mk { font-size: 11px; color: var(--color-ink-3); font-weight: 600; }
+        .v10-mv { font-size: 17px; font-weight: 800; margin-top: 3px; color: var(--color-ink); }
+        .v10-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+        .v10-bk { width: 40px; font-size: 12px; font-weight: 700; color: var(--color-ink-2); }
+        .v10-track { flex: 1; height: 8px; background: var(--color-line); border-radius: 6px; overflow: hidden; }
+        .v10-fill { height: 100%; border-radius: 6px; }
+        .v10-bv { width: 40px; text-align: right; font-size: 12px; font-weight: 700; }
+        .v10-pick-note { font-size: 11.5px; color: var(--color-ink-3); margin-bottom: 12px; line-height: 1.5; }
+        .v10-pick-row { display: flex; align-items: center; justify-content: space-between; padding: 11px 0; border-top: 1px solid var(--color-line); }
+        .v10-pick-row:first-of-type { border-top: none; }
+        .v10-pick-l { display: flex; align-items: center; gap: 11px; }
+        .v10-medal { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0; }
+        .v10-pick-name { font-size: 14px; font-weight: 700; display: flex; flex-direction: column; gap: 2px; line-height: 1.2; color: var(--color-ink); }
+        .v10-tie { font-size: 11px; color: var(--color-ink-3); font-weight: 500; }
+        .v10-pick-r { display: flex; align-items: center; gap: 10px; }
+        .v10-pick-score { font-size: 13px; font-weight: 700; color: var(--color-primary); white-space: nowrap; }
+        .v10-mini-btn { font-family: var(--font-body); font-size: 11px; font-weight: 600; color: var(--color-ink-2); background: var(--color-card-soft); border: none; padding: 7px 12px; border-radius: 9px; cursor: pointer; line-height: 1.3; text-align: center; }
+        .v10-hold-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--color-line); }
+        .v10-hold-row:first-of-type { border-top: none; }
+        .v10-hold-name { font-size: 14px; font-weight: 600; color: var(--color-ink); }
+        .v10-hold-pct { font-size: 14px; font-weight: 800; }
+        .v10-hold-pct.up { color: var(--color-success); } .v10-hold-pct.down { color: var(--color-danger); }
+        .v10-tl { position: relative; padding-left: 20px; }
+        .v10-tl::before { content: ""; position: absolute; left: 5px; top: 6px; bottom: 6px; width: 2px; background: var(--color-line); }
+        .v10-tl-item { position: relative; padding-bottom: 16px; }
+        .v10-tl-item:last-child { padding-bottom: 0; }
+        .v10-tl-item::before { content: ""; position: absolute; left: -19px; top: 3px; width: 12px; height: 12px; border-radius: 50%; background: var(--color-card); border: 2.5px solid var(--color-primary); }
+        .v10-tl-time { font-size: 11px; color: var(--color-ink-3); font-weight: 600; }
+        .v10-tl-title { font-size: 13.5px; font-weight: 700; margin: 2px 0 3px; color: var(--color-ink); }
+        .v10-tl-desc { font-size: 12px; color: var(--color-ink-2); line-height: 1.5; }
+        .v10-log-group { background: var(--color-card-soft); border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; margin-top: 13px; }
+        .v10-log-l { display: flex; align-items: center; gap: 9px; min-width: 0; }
+        .v10-log-badge { font-size: 10px; font-weight: 800; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 3px 7px; border-radius: 6px; flex-shrink: 0; }
+        .v10-log-txt { font-size: 12.5px; font-weight: 600; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .v10-log-cnt { font-size: 12px; font-weight: 700; color: var(--color-ink-3); flex-shrink: 0; }
 
         /* [v8.6] Hero 카드 — "오늘의 시장" */
         .hero-card { background: var(--hero-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 20px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; gap: 14px; }
