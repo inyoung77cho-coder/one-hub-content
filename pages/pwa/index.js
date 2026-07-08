@@ -1953,8 +1953,8 @@ export default function PWADashboard({ latestReport }) {
         :global(.pwa-wrapper a:focus-visible) { outline: 2px solid var(--accent-info); outline-offset: 2px; }
         @media (prefers-reduced-motion: reduce) { .pwa-spinner { animation-duration: 0.001s; } }
 
-        /* Header */
-        .pwa-header { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px 12px; }
+        /* Header — 공유 TopNav(.etf 14px + .tn 2px + .tn-hd 4px = 20px)와 기하 통일: 위치·높이 일치 */
+        .pwa-header { display: flex; justify-content: space-between; align-items: center; padding: calc(env(safe-area-inset-top, 0px) + 12px) 20px 12px; }
         .pwa-brand { display: flex; align-items: center; gap: 8px; background: none; border: none; padding: 0; cursor: pointer; }
         .pwa-logo { font-family: var(--font-sans); font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--hero-grad-1); }
         :global([data-theme="dark"]) .pwa-logo { color: var(--color-ink); }
@@ -1963,21 +1963,21 @@ export default function PWADashboard({ latestReport }) {
         @keyframes pulse-live { 0%{transform:scale(1);opacity:1;} 50%{transform:scale(1.45);opacity:0.5;} 100%{transform:scale(1);opacity:1;} }
         .pwa-title { font-family: var(--font-display); font-size: 1.15rem; font-weight: 800; letter-spacing: 0.04em; color: var(--text-primary); }
         .pwa-header-actions { display: flex; align-items: center; gap: 8px; }
+        /* [v10 UI] 헤더 아이콘 = 공유 TopNav(.tn-ic button)와 동일 규격(34px·그림자·무테두리) */
+        .pwa-search-toggle, .pwa-theme-toggle { width: 34px; height: 34px; border-radius: 50%; background: var(--color-card); border: none; display: grid; place-items: center; font-size: 15px; cursor: pointer; box-shadow: var(--shadow-card); flex-shrink: 0; }
+        .pwa-search-toggle.active { color: var(--color-primary); }
         .pwa-trader-toggle { display: flex; gap: 3px; background: var(--inset-bg); padding: 3px; border-radius: var(--radius-pill); }
         .pwa-trader-toggle button { background: none; border: none; color: var(--text-secondary); padding: 5px 13px; border-radius: var(--radius-pill); cursor: pointer; font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; }
         .pwa-trader-toggle button.active { background: var(--card-bg); color: var(--accent-info); box-shadow: var(--card-shadow); }
-        .pwa-theme-toggle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--card-bg); cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
-        /* Tabs */
+        /* Tabs — 공유 TopNav(.tn-tabs/.tn-tab)와 기하·타이포 통일 */
         .pwa-tabs { display: flex; align-items: center; }
-        .pwa-tab { flex: 1; padding: 10px 4px; background: none; border: none; cursor: pointer; color: var(--text-tertiary); font-family: var(--font-display); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; }
-        /* [v9.1 PWA-01] 검색 아이콘: 상단 우측 (theme-toggle과 동일 규격, 강조 최소화) */
-        .pwa-search-toggle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--card-bg); cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .pwa-search-toggle.active { border-color: var(--accent-buy, var(--color-primary)); color: var(--accent-buy, var(--color-primary)); }
-        /* [v10 UI] 탭 = 흰 라운드 컨테이너 · 활성 = 네이비 pill (시안 통일) */
-        .pwa-tabs { background: var(--card-bg); padding: 4px; border-radius: 16px; margin: 4px 16px 12px; gap: 2px; box-shadow: var(--card-shadow); }
-        .pwa-tab { min-height: 36px; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; }
-        .pwa-tab.active { background: var(--hero-grad-1); color: #fff; border-radius: 11px; box-shadow: none; }
+        .pwa-tab { flex: 1 1 0; min-width: 0; background: none; border: none; cursor: pointer; color: var(--color-ink-3); font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; letter-spacing: -.4px; }
+        /* [v10 UI] 탭 = 흰 라운드 컨테이너 · 활성 = 네이비 pill (시안 통일, TopNav와 16px 인셋 일치) */
+        .pwa-tabs { background: var(--color-card); padding: 4px; border-radius: 16px; margin: 0 16px 10px; gap: 2px; box-shadow: var(--shadow-card); }
+        .pwa-tab { min-height: 36px; display: flex; align-items: center; justify-content: center; white-space: nowrap; line-height: 1; border-radius: 11px; }
+        .pwa-tab.active { background: var(--hero-grad-1); color: #fff; font-weight: 700; border-radius: 11px; box-shadow: none; }
+        @media (max-width: 380px) { .pwa-tab { font-size: 11.5px; letter-spacing: -.5px; } }
         :global([data-theme="dark"]) .pwa-tab.active { background: var(--color-primary); }
         /* [v11 IA] 주식 서브탭 (2차 내비) */
         .pwa-subtabs { display: flex; align-items: center; gap: 8px; margin: 0 16px 12px; }
