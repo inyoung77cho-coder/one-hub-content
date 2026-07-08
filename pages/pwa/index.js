@@ -105,7 +105,8 @@ export default function PWADashboard({ latestReport }) {
   useEffect(() => {
     if (!router.isReady) return;
     const { tab: tabParam, code, name } = router.query;
-    if (tabParam) setTab(tabParam);
+    // [v10 UI] 딥링크(?tab=)로 진입 시 = 다른 페이지에서 넘어온 재방문 → 스플래시 건너뜀(버그#3)
+    if (tabParam) { setTab(tabParam); setSplash(false); }
     if (code && name) {
       setSearchQuery(name);
       // 분석 자동 실행
@@ -642,6 +643,39 @@ export default function PWADashboard({ latestReport }) {
             )}
             {data && (<>
 
+              {/* [v10 UI] 홈 히어로 — "오늘 AI 판단" 결론 한 줄(재방문 훅). 시안 순서상 최상단 앵커 */}
+              {(() => {
+                const aiConf = data?.ai_confidence ?? heat;
+                const verb = buyCount > 0 ? `${buyCount}종목 샀습니다.` : '사지 않았습니다.';
+                const reason = buyCount > 0
+                  ? <>조건을 충족한 <b>{buyCount}종목</b>에 매수 신호가 나왔습니다. 시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> 기준.</>
+                  : blockCount > 0
+                    ? <>시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b>로 투자 열기가 낮아 <b>선별 관망</b>이 낫다고 판단했습니다. 후보는 매수 기준 미달로 {blockCount}건을 걸렀습니다.</>
+                    : <>시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> 기준, 매수 조건을 충족한 종목이 없어 <b>선별 관망</b>했습니다.</>;
+                return (
+                  <section className="home-hero">
+                    <div className="hh-eyebrow">
+                      <div className="hh-eyebrow-top">
+                        <span className="hh-label">📊 오늘의 AI 판단</span>
+                        <span className="hh-live">LIVE</span>
+                      </div>
+                      {regimeDays !== null && <div className="hh-date">Regime {regimeKo(regime)} · {regimeDays}일째</div>}
+                    </div>
+                    <h1 className="hh-h1">오늘, AI는<br /><em>{verb}</em></h1>
+                    <div className="hh-reason">{reason}</div>
+                    <div className="hh-foot">
+                      <span className="hh-chip">Regime <span className="v">{regime || '-'}</span></span>
+                      <span className="hh-chip">매수 예측 신뢰도 <span className="v">{aiConf !== null ? `${aiConf}%` : '-'}</span></span>
+                      {fearGreed !== null && <span className="hh-chip">Fear&amp;Greed <span className="v">{fearGreed}</span></span>}
+                    </div>
+                    <button className="hh-cta" onClick={() => {
+                      setTab('dashboard');
+                      setTimeout(() => document.querySelector('.ai-basis-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+                    }}>오늘의 판단 근거 자세히 보기 →</button>
+                  </section>
+                );
+              })()}
+
               {/* [v11 1-B] 총 자산 — 홈 최상단 자산 중심(주식+ETF+부동산 통합) */}
               {assetSum && (
                 <section className="pwa-card total-asset-card">
@@ -728,40 +762,6 @@ export default function PWADashboard({ latestReport }) {
                   </div>
                 </section>
               )}
-
-              {/* [v10 UI] 홈 히어로 — "오늘 AI 판단" 결론 한 줄(재방문 훅). 시안 onehub-home-redesign */}
-              {(() => {
-                const aiConf = data?.ai_confidence ?? heat;
-                const hTier = heatTier(heat);
-                const verb = buyCount > 0 ? `${buyCount}종목 샀습니다.` : '사지 않았습니다.';
-                const reason = buyCount > 0
-                  ? <>조건을 충족한 <b>{buyCount}종목</b>에 매수 신호가 나왔습니다. 시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> 기준.</>
-                  : blockCount > 0
-                    ? <>시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b>로 투자 열기가 낮아 <b>선별 관망</b>이 낫다고 판단했습니다. 후보는 매수 기준 미달로 {blockCount}건을 걸렀습니다.</>
-                    : <>시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> 기준, 매수 조건을 충족한 종목이 없어 <b>선별 관망</b>했습니다.</>;
-                return (
-                  <section className="home-hero">
-                    <div className="hh-eyebrow">
-                      <div className="hh-eyebrow-top">
-                        <span className="hh-label">📊 오늘의 AI 판단</span>
-                        <span className="hh-live">LIVE</span>
-                      </div>
-                      {regimeDays !== null && <div className="hh-date">Regime {regimeKo(regime)} · {regimeDays}일째</div>}
-                    </div>
-                    <h1 className="hh-h1">오늘, AI는<br /><em>{verb}</em></h1>
-                    <div className="hh-reason">{reason}</div>
-                    <div className="hh-foot">
-                      <span className="hh-chip">Regime <span className="v">{regime || '-'}</span></span>
-                      <span className="hh-chip">매수 예측 신뢰도 <span className="v">{aiConf !== null ? `${aiConf}%` : '-'}</span></span>
-                      {fearGreed !== null && <span className="hh-chip">Fear&amp;Greed <span className="v">{fearGreed}</span></span>}
-                    </div>
-                    <button className="hh-cta" onClick={() => {
-                      setTab('dashboard');
-                      setTimeout(() => document.querySelector('.ai-basis-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
-                    }}>오늘의 판단 근거 자세히 보기 →</button>
-                  </section>
-                );
-              })()}
 
               {/* [v9.0][10] Today Mission — 승인대기/손절경고 등 지금 당장 필요한 개별 액션 */}
               {(() => {
@@ -2244,34 +2244,8 @@ export default function PWADashboard({ latestReport }) {
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         /* [v8.6] 라이트(기본) — Apple Finance / Toss / Notion 톤. */
-        /* [v10 UI] 레거시 로컬 변수를 디자인 토큰에 브리지 — 색상 하드코딩 제거, 다크는 <html data-theme> 단일 소스.
-           라이트/다크 색은 모두 --color-*/--hero-* 토큰이 결정하므로 두 블록의 색 정의는 동일하다(레이아웃/폰트 공통). */
-        .pwa-wrapper.theme-light,
-        .pwa-wrapper.theme-dark {
-          --bg: var(--color-bg);
-          --card-bg: var(--color-card);
-          --inset-bg: var(--color-card-soft);
-          --border: var(--color-line);
-          --text-primary: var(--color-ink);
-          --text-secondary: var(--color-ink-2);
-          --text-tertiary: var(--color-ink-3);
-          --accent-buy: var(--color-success);
-          --accent-sell: var(--color-danger);
-          --accent-warn: var(--color-warning);
-          --accent-info: var(--color-primary);
-          --label-color: var(--color-ink-2);
-          --font-display: 'Syne', var(--font-sans);
-          --font-body: var(--font-sans);
-          --font-mono: ui-monospace, 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
-          --radius-card: 20px;
-          --radius-md: 14px;
-          --radius-sm: 10px;
-          --radius-pill: 999px;
-          --card-shadow: var(--shadow-card);
-          /* 홈 히어로: 라이트는 밝은 표면 그라데이션(다크 텍스트 대비 확보), 다크는 토큰이 자동 반전 */
-          --hero-bg: linear-gradient(135deg, var(--color-card-soft) 0%, var(--color-card) 65%);
-        }
-
+        /* [v10 UI] 레거시 로컬 변수 → 디자인 토큰 브리지는 globals.css 로 이전(전역·비스코프)해
+           styled-jsx 스코프 문제로 다크모드가 안 먹던 버그를 해결. 여기서는 레이아웃만. */
         .pwa-wrapper { min-height: 100vh; background: var(--bg); color: var(--text-primary); font-family: var(--font-body); padding-bottom: 40px; transition: background 0.2s ease, color 0.2s ease; }
         button, input { font-family: inherit; }
         button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-info); outline-offset: 2px; }
