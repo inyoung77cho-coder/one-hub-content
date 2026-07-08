@@ -18,12 +18,20 @@ export default function Onboarding() {
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [personality, setPersonality] = useState({}); // goal / risk / horizon
-  const [stockAdded, setStockAdded] = useState(false);
-  const [etfAdded, setEtfAdded] = useState(false);
+  const [stockForm, setStockForm] = useState({ name: "", qty: "", price: "" });
+  const [stockList, setStockList] = useState([]); // [{name, uk}]
+  const [etfForm, setEtfForm] = useState({ name: "", qty: "", price: "" });
+  const [etfList, setEtfList] = useState([]); // [{name, uk, listing}]
   const [etfListing, setEtfListing] = useState("US"); // US | KR
   const [rePick, setRePick] = useState(null); // {name, amt}
+  const USD_FX = 1350; // ETF($) 환산 환율(근사)
 
   const alloc = personality.goal ? ALLOC_MAP[personality.goal] : null;
+  const num = (v) => { const n = Number(String(v).replace(/[,\s]/g, "")); return isFinite(n) ? n : 0; };
+  const uk1 = (n) => Math.round(n / 1e8 * 100) / 100; // 원 → 억(소수2)
+  const stockUk = stockList.reduce((s, x) => s + x.uk, 0);
+  const etfUk = etfList.reduce((s, x) => s + x.uk, 0);
+  const reUk = rePick ? Number(String(rePick.amt).replace(/[^0-9.]/g, "")) || 0 : 0;
 
   // 정확도 게이지 — 완료 섹션 수 기반
   const done = step >= 5 ? 4 : Math.max(0, Math.min(4, step - 1));
@@ -31,12 +39,32 @@ export default function Onboarding() {
 
   const pick = (q, val) => setPersonality((p) => ({ ...p, [q]: val }));
 
+  const addStock = () => {
+    const uk = uk1(num(stockForm.qty) * num(stockForm.price));
+    if (uk <= 0 && !stockForm.name) return;
+    setStockList((l) => [...l, { name: stockForm.name || "종목", uk }]);
+    setStockForm({ name: "", qty: "", price: "" });
+  };
+  const addEtf = () => {
+    const won = num(etfForm.qty) * num(etfForm.price) * (etfListing === "US" ? USD_FX : 1);
+    const uk = uk1(won);
+    if (uk <= 0 && !etfForm.name) return;
+    setEtfList((l) => [...l, { name: etfForm.name || "ETF", uk, listing: etfListing }]);
+    setEtfForm({ name: "", qty: "", price: "" });
+  };
+
   const persist = () => {
-    // §5② 성향→목표배분을 AI자산 목표% 소스로 저장
     try {
+      // §5② 성향→목표배분을 AI자산 목표% 소스로 저장
       if (alloc) localStorage.setItem("onehub_target_alloc", JSON.stringify(alloc));
       localStorage.setItem("onehub_profile_goal", personality.goal || "");
       localStorage.setItem("onehub_onboarded", "1");
+      // 온보딩 입력 자산 → 총자산 반영 소스로 저장(백엔드 값 없을 때 폴백)
+      localStorage.setItem("onehub_onboard_assets", JSON.stringify({
+        stock_uk: stockUk || null,
+        etf_uk: etfUk || null,
+        realestate_uk: reUk || null,
+      }));
     } catch (e) {}
   };
 
@@ -139,16 +167,18 @@ export default function Onboarding() {
               <h1>보유 주식을<br />넣어주세요</h1>
               <p className="lead">직접 입력하거나, 증권사 앱에서 받은 거래내역 CSV를 올리면 자동으로 채워집니다.</p>
               <div className="card">
-                <div className="field"><label>종목명 또는 코드</label><input placeholder="예: 한국항공우주 / 047810" /></div>
+                <div className="field"><label>종목명 또는 코드</label><input placeholder="예: 한국항공우주 / 047810" value={stockForm.name} onChange={(e) => setStockForm((f) => ({ ...f, name: e.target.value }))} /></div>
                 <div className="frow">
-                  <div className="field"><label>수량</label><input placeholder="6" inputMode="numeric" /></div>
-                  <div className="field"><label>평균 매수가</label><input placeholder="156,600" inputMode="numeric" /></div>
+                  <div className="field"><label>수량</label><input placeholder="6" inputMode="numeric" value={stockForm.qty} onChange={(e) => setStockForm((f) => ({ ...f, qty: e.target.value }))} /></div>
+                  <div className="field"><label>평균 매수가</label><input placeholder="156,600" inputMode="numeric" value={stockForm.price} onChange={(e) => setStockForm((f) => ({ ...f, price: e.target.value }))} /></div>
                 </div>
-                <button className="add-btn" onClick={() => setStockAdded(true)}>+ 종목 추가</button>
-                {stockAdded && (
+                <button className="add-btn" onClick={addStock}>+ 종목 추가</button>
+                {stockList.length > 0 && (
                   <div className="added">
-                    <div className="added-t">추가된 종목</div>
-                    <div className="arow2"><div><div className="an">한국항공우주</div><div className="aq">6주 · 156,600원</div></div><div className="av">0.09억</div></div>
+                    <div className="added-t">추가된 종목 · 합계 {stockUk}억</div>
+                    {stockList.map((s, i) => (
+                      <div className="arow2" key={i}><div><div className="an">{s.name}</div></div><div className="av">{s.uk}억</div></div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -163,22 +193,24 @@ export default function Onboarding() {
               <h1>보유 ETF를<br />넣어주세요</h1>
               <p className="lead">주식과 동일하게 입력하고, 상장 국가만 골라주세요. 세금 계산에 반영됩니다.</p>
               <div className="card">
-                <div className="field"><label>ETF명 또는 티커</label><input placeholder="예: SMH / QQQM" /></div>
+                <div className="field"><label>ETF명 또는 티커</label><input placeholder="예: SMH / QQQM" value={etfForm.name} onChange={(e) => setEtfForm((f) => ({ ...f, name: e.target.value }))} /></div>
                 <div className="frow">
-                  <div className="field"><label>수량</label><input placeholder="120" inputMode="numeric" /></div>
-                  <div className="field"><label>평균 매수가($)</label><input placeholder="245.30" inputMode="decimal" /></div>
+                  <div className="field"><label>수량</label><input placeholder="120" inputMode="numeric" value={etfForm.qty} onChange={(e) => setEtfForm((f) => ({ ...f, qty: e.target.value }))} /></div>
+                  <div className="field"><label>평균 매수가({etfListing === "US" ? "$" : "원"})</label><input placeholder="245.30" inputMode="decimal" value={etfForm.price} onChange={(e) => setEtfForm((f) => ({ ...f, price: e.target.value }))} /></div>
                 </div>
                 <label className="flabel">상장 국가</label>
                 <div className="chips2">
                   <button className={`lc ${etfListing === "US" ? "on" : ""}`} onClick={() => setEtfListing("US")}>🇺🇸 미국 상장</button>
                   <button className={`lc ${etfListing === "KR" ? "on" : ""}`} onClick={() => setEtfListing("KR")}>🇰🇷 국내 상장</button>
                 </div>
-                <div className="tax-note">💡 <b>미국 상장</b>은 양도소득세 22%, <b>국내 상장</b> 해외 ETF는 배당소득세 15.4%로 계산됩니다.</div>
-                <button className="add-btn" style={{ marginTop: 12 }} onClick={() => setEtfAdded(true)}>+ ETF 추가</button>
-                {etfAdded && (
+                <div className="tax-note">💡 <b>미국 상장</b>은 양도소득세 22%, <b>국내 상장</b> 해외 ETF는 배당소득세 15.4%로 계산됩니다.{etfListing === "US" && <> 달러는 {USD_FX.toLocaleString()}원 환산.</>}</div>
+                <button className="add-btn" style={{ marginTop: 12 }} onClick={addEtf}>+ ETF 추가</button>
+                {etfList.length > 0 && (
                   <div className="added">
-                    <div className="added-t">추가된 ETF</div>
-                    <div className="arow2"><div><div className="an">SMH {etfListing === "US" ? "🇺🇸" : "🇰🇷"}</div><div className="aq">{etfListing === "US" ? "미국 상장" : "국내 상장"} · 반도체</div></div><div className="av">1.15억</div></div>
+                    <div className="added-t">추가된 ETF · 합계 {etfUk}억</div>
+                    {etfList.map((s, i) => (
+                      <div className="arow2" key={i}><div><div className="an">{s.name} {s.listing === "US" ? "🇺🇸" : "🇰🇷"}</div><div className="aq">{s.listing === "US" ? "미국 상장" : "국내 상장"}</div></div><div className="av">{s.uk}억</div></div>
+                    ))}
                   </div>
                 )}
               </div>
