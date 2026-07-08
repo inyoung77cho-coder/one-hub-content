@@ -42,14 +42,16 @@ export default function Onboarding() {
   const [reQuery, setReQuery] = useState("시범");
   const [customRE, setCustomRE] = useState({ name: "", area: "", price: "" });
   const [customOpen, setCustomOpen] = useState(false);
+  const [cashInput, setCashInput] = useState(""); // 보유 현금(억)
   const USD_FX = 1350; // ETF($) 환산 환율(근사)
 
   const alloc = personality.goal ? ALLOC_MAP[personality.goal] : null;
   const num = (v) => { const n = Number(String(v).replace(/[,\s]/g, "")); return isFinite(n) ? n : 0; };
   const uk1 = (n) => Math.round(n / 1e8 * 100) / 100; // 원 → 억(소수2)
-  const stockUk = stockList.reduce((s, x) => s + x.uk, 0);
-  const etfUk = etfList.reduce((s, x) => s + x.uk, 0);
+  const stockUk = Math.round(stockList.reduce((s, x) => s + x.uk, 0) * 100) / 100;
+  const etfUk = Math.round(etfList.reduce((s, x) => s + x.uk, 0) * 100) / 100;
   const reUk = Math.round(reList.reduce((s, x) => s + x.uk, 0) * 100) / 100;
+  const cashUk = Math.round(num(cashInput) * 100) / 100; // 입력 보유 현금(억)
 
   // 분당구 단지 DB — 면적(㎡)별 실거래 근사 시세(억). 목록에 없는 지역은 직접 입력.
   const RE_DB = [
@@ -101,6 +103,7 @@ export default function Onboarding() {
         stock_uk: stockUk || null,
         etf_uk: etfUk || null,
         realestate_uk: reUk || null,
+        cash_uk: cashUk || null,
       }));
     } catch (e) {}
   };
@@ -200,6 +203,14 @@ export default function Onboarding() {
                     ))}
                   </div>
                 )}
+              </div>
+              {/* 보유 현금 — 주식계좌 예수금과 합산되어 총자산에 반영 */}
+              <div className="card">
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <label>보유 현금 (억) · 선택</label>
+                  <input placeholder="예: 0.5 (=5천만원)" inputMode="decimal" value={cashInput} onChange={(e) => setCashInput(e.target.value)} />
+                </div>
+                <div className="tax-note" style={{ marginTop: 10 }}>💡 입력한 현금은 <b>주식계좌 예수금</b>과 <b>합산</b>되어 총자산 '현금'에 반영됩니다.</div>
               </div>
               <div className="foot"><button className="btn-prev" onClick={() => go(1)}>이전</button><button className="btn-next" onClick={() => go(3)}>다음 →</button></div>
             </div>

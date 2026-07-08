@@ -3,24 +3,30 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 
-const COLOR = { stock: "var(--color-primary)", etf: "var(--color-etf)", realestate: "var(--color-success)" };
+const COLOR = { stock: "var(--color-primary)", etf: "var(--color-etf)", realestate: "var(--color-success)", cash: "var(--color-warning)" };
 
 export default function AssetSummaryBar() {
   const router = useRouter();
   const [d, setD] = useState(null);
   const [err, setErr] = useState(false);
   useEffect(() => {
-    // 온보딩 입력 자산 병합 — 백엔드 값 우선, 없으면 온보딩 폴백
+    // 온보딩 입력 자산 병합 — 백엔드 집계 값 + 온보딩 입력 값 합산
     const merge = (j) => {
       let onb = null;
       try { onb = JSON.parse(localStorage.getItem("onehub_onboard_assets") || "null"); } catch (e) {}
       const b = { ...(j?.breakdown || {}) };
-      const pick = (k) => (b[k] != null ? b[k] : (onb && onb[k] != null ? onb[k] : null));
-      const stock_uk = pick("stock_uk"), etf_uk = pick("etf_uk"), realestate_uk = pick("realestate_uk");
-      const parts = [stock_uk, etf_uk, realestate_uk].filter((v) => v != null);
+      const add = (x, y) => {
+        if (x == null && y == null) return null;
+        return Math.round(((Number(x) || 0) + (Number(y) || 0)) * 100) / 100;
+      };
+      const stock_uk = add(b.stock_uk, onb && onb.stock_uk);
+      const etf_uk = add(b.etf_uk, onb && onb.etf_uk);
+      const realestate_uk = add(b.realestate_uk, onb && onb.realestate_uk);
+      const cash_uk = add(b.cash_uk, onb && onb.cash_uk);
+      const parts = [stock_uk, etf_uk, realestate_uk, cash_uk].filter((v) => v != null);
       if (parts.length === 0 && (j?.total_uk == null)) return null;
-      const total_uk = j?.total_uk != null && !onb ? j.total_uk : Math.round(parts.reduce((s, v) => s + Number(v), 0) * 100) / 100;
-      return { total_uk, breakdown: { stock_uk, etf_uk, realestate_uk } };
+      const total_uk = Math.round(parts.reduce((s, v) => s + Number(v), 0) * 100) / 100;
+      return { total_uk, breakdown: { stock_uk, etf_uk, realestate_uk, cash_uk } };
     };
     fetch("/api/realestate/v2/total-asset?trader_id=A")
       .then((r) => r.json()).then((j) => { const m = merge(j); if (m) setD(m); else setErr(true); })
@@ -32,6 +38,7 @@ export default function AssetSummaryBar() {
     ["주식", "stock", b.stock_uk, "/pwa?tab=recommend"],
     ["ETF", "etf", b.etf_uk, "/pwa/etf"],
     ["부동산", "realestate", b.realestate_uk, "/pwa/realestate"],
+    ["현금", "cash", b.cash_uk, "/pwa/onboarding"],
   ];
 
   return (
