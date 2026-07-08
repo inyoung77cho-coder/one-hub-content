@@ -17,7 +17,7 @@ export default function TopNav({ active }) {
   return (
     <div className="tn">
       <header className="tn-hd">
-        <div className="tn-logo">ONE<span className="tn-dot">·</span>HUB</div>
+        <button type="button" className="tn-logo" onClick={() => router.push("/pwa")} aria-label="홈으로">ONE<span className="tn-dot">·</span>HUB</button>
         <div className="tn-ic">
           <button aria-label="AI 종목 검색" onClick={() => router.push("/pwa?tab=analyze")}>🔍</button>
           <button aria-label="설정" onClick={() => router.push("/pwa/settings")}>⚙️</button>
@@ -43,8 +43,8 @@ export default function TopNav({ active }) {
           padding: calc(env(safe-area-inset-top, 0px) + 8px) 2px 10px;
         }
         .tn-hd { display: flex; align-items: center; justify-content: space-between; padding: 4px 4px 12px; }
-        .tn-logo { font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--hero-grad-1); font-family: var(--font-sans); }
-        :global([data-theme="dark"]) .tn-logo { color: var(--color-ink); }
+        /* [통일] 로고 글자톤 = PWA 본문/제목색(--color-ink)과 동일. 클릭 시 홈 이동 */
+        .tn-logo { font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--color-ink); font-family: var(--font-sans); background: none; border: none; padding: 0; cursor: pointer; }
         .tn-dot { color: var(--color-success); }
         .tn-ic { display: flex; gap: 8px; }
         .tn-ic button {

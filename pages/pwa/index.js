@@ -1956,8 +1956,8 @@ export default function PWADashboard({ latestReport }) {
         /* Header — 공유 TopNav(.etf 14px + .tn 2px + .tn-hd 4px = 20px)와 기하 통일: 위치·높이 일치 */
         .pwa-header { display: flex; justify-content: space-between; align-items: center; padding: calc(env(safe-area-inset-top, 0px) + 12px) 20px 12px; }
         .pwa-brand { display: flex; align-items: center; gap: 8px; background: none; border: none; padding: 0; cursor: pointer; }
-        .pwa-logo { font-family: var(--font-sans); font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--hero-grad-1); }
-        :global([data-theme="dark"]) .pwa-logo { color: var(--color-ink); }
+        /* [통일] 로고 글자톤 = PWA 본문/제목색(--color-ink)과 동일 (테마 대응) */
+        .pwa-logo { font-family: var(--font-sans); font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--color-ink); }
         .pwa-logo-dot { color: var(--color-success); }
         .pwa-brand-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-buy); flex-shrink: 0; animation: pulse-live 2s ease-in-out infinite; }
         @keyframes pulse-live { 0%{transform:scale(1);opacity:1;} 50%{transform:scale(1.45);opacity:0.5;} 100%{transform:scale(1);opacity:1;} }
