@@ -2,8 +2,7 @@
 // 독립 라우트. 확정값(수익3단분해·세금·중복도)은 진한색/실선. 예측(Forecast)은 미구현(P6).
 // ★ 단일 점수 블랙박스 금지 — Portfolio Score는 구성요소를 펼쳐 보여준다(§11.2).
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import AssetBottomNav from "../../components/AssetBottomNav";
+import TopNav from "../../components/TopNav";
 import AssetSummaryBar from "../../components/AssetSummaryBar";
 
 const won = (n) => {
@@ -38,40 +37,33 @@ export default function EtfDashboard() {
 
   return (
     <div className="etf">
-      <header className="etf-hdr">
-        <Link href="/pwa" className="back">← ONE-HUB</Link>
-        <h1>ETF 자산</h1>
-        <span className="live">LIVE</span>
-      </header>
+      <TopNav active="etf" />
+
+      {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해 (시안: 다크 네이비 히어로) */}
+      <section className="hero">
+        <div className="eyebrow">
+          <span className="lbl">📊 ETF 자산{report?.as_of ? ` · ${report.as_of.price_date || "-"} 기준 · 환율 ${report.as_of.fx?.toLocaleString()}원` : ""}</span>
+          <span className="live">LIVE</span>
+        </div>
+        {s ? (
+          <>
+            <div className="big">{won(s.value_krw)}<span>원</span></div>
+            <div className="hsub">취득 {won(s.krw_cost)} → 평가손익 <b>{won(s.value_krw - s.krw_cost)}원</b> · <b>{pct(s.total_pnl_pct)}</b></div>
+            <div className="decomp">
+              <div className="drow"><span className="dk">ETF 자체수익 ($)</span><span className={`dv ${sign(s.etf_self_pct)}`}>{pct(s.etf_self_pct)}</span></div>
+              <div className="drow"><span className="dk">환차손익</span><span className={`dv ${sign(s.fx_pure_pct)}`}>{pct(s.fx_pure_pct)}</span></div>
+              <div className="drow"><span className="dk">교차항</span><span className={`dv ${sign(s.cross_pct)}`}>{pct(s.cross_pct)}</span></div>
+              <div className="drow total"><span className="dk">실질 원화수익</span><span className={`dv ${sign(s.total_pnl_pct)}`}>{pct(s.total_pnl_pct)}</span></div>
+            </div>
+            <div className="foot-note">달러 수익 {pct(s.etf_self_pct)} 위에 환율효과 {pct((s.fx_pure_pct||0) + (s.cross_pct||0))}가 더해진 원화 실질 수익입니다.</div>
+          </>
+        ) : (
+          <div className="hsub">{err ? "데이터 로드 오류" : "불러오는 중…"}</div>
+        )}
+      </section>
 
       <AssetSummaryBar />
-
-      {report?.as_of && (
-        <div className="asof">
-          기준 {report.as_of.price_date || "-"} · 환율 {report.as_of.fx?.toLocaleString()}원
-          {" "}<span className="asof-tag">수동/자동 스냅샷</span>
-        </div>
-      )}
       {err && <div className="err">데이터 로드 오류: {err}</div>}
-      {!report && !err && <div className="loading">불러오는 중…</div>}
-
-      {/* 1) 자산총액 + 수익 3단 분해 (확정값) */}
-      {s && (
-        <section className="card solid">
-          <div className="label">총 평가액 (원화, 확정)</div>
-          <div className="big">{won(s.value_krw)}원</div>
-          <div className={`change ${sign(s.total_pnl_pct)}`}>
-            {pct(s.total_pnl_pct)} · 취득 {won(s.krw_cost)}원 → 평가손익 {won(s.value_krw - s.krw_cost)}원
-          </div>
-          <div className="decomp">
-            <div className="drow"><span>ETF 자체수익</span><b className="pos">{pct(s.etf_self_pct)}</b></div>
-            <div className="drow"><span>환차손익</span><b className={sign(s.fx_pure_pct)}>{pct(s.fx_pure_pct)}</b></div>
-            <div className="drow"><span>교차항</span><b className={sign(s.cross_pct)}>{pct(s.cross_pct)}</b></div>
-            <div className="drow total"><span>실질 원화수익</span><b className={sign(s.total_pnl_pct)}>{pct(s.total_pnl_pct)}</b></div>
-          </div>
-          <div className="hint">달러 수익 {pct(s.etf_self_pct)} 위에 환율효과 {pct(s.fx_pure_pct + s.cross_pct)}가 더해진 원화 실질 수익</div>
-        </section>
-      )}
 
       {/* 2) Portfolio Score — 블랙박스 금지, 구성요소 공개 */}
       {s && tax && overlap && (
@@ -160,74 +152,119 @@ export default function EtfDashboard() {
         </section>
       )}
 
-      {/* 5) 종목별 3단 분해 */}
+      {/* 5) 종목별 수익 분해 — 총투자액/총이익금 SummaryBar + 3열 정렬(시안) */}
       {positions.length > 0 && (
         <section className="card">
           <div className="label">종목별 수익 분해</div>
-          {[...positions].sort((a, b) => (b.total_pnl_pct ?? b.usd_pnl_pct ?? 0) - (a.total_pnl_pct ?? a.usd_pnl_pct ?? 0)).map((p) => (
-            <div className="prow" key={p.ticker}>
-              <span className="pt">{p.ticker}</span>
-              {p.mode === "full" ? (
-                <span className="pd">ETF {pct(p.etf_self_pct)} · 환차 {pct(p.fx_pure_pct)}</span>
-              ) : (
-                <span className="pd sub">USD only</span>
-              )}
-              <b className={sign(p.total_pnl_pct ?? p.usd_pnl_pct)}>{pct(p.total_pnl_pct ?? p.usd_pnl_pct)}</b>
+          {s && (
+            <div className="ebd-sum">
+              <div className="es-item"><span className="es-k">총 투자액</span><span className="es-v">{won(s.krw_cost)}</span></div>
+              <div className="es-item"><span className="es-k">총 이익금</span><span className={`es-v ${sign(s.value_krw - s.krw_cost)}`}>{won(s.value_krw - s.krw_cost)}</span></div>
             </div>
-          ))}
+          )}
+          {[...positions].sort((a, b) => (b.total_pnl_pct ?? b.usd_pnl_pct ?? 0) - (a.total_pnl_pct ?? a.usd_pnl_pct ?? 0)).map((p) => {
+            const invest = p.krw_cost ?? p.invested_krw ?? p.cost_krw ?? null;
+            const profit = p.pnl_krw ?? p.profit_krw ?? (p.value_krw != null && invest != null ? p.value_krw - invest : null);
+            const tot = p.total_pnl_pct ?? p.usd_pnl_pct;
+            return (
+              <div className="erow" key={p.ticker}>
+                <span className="eleft">
+                  <span className="etk">{p.ticker}</span>
+                  {invest != null && <span className="einv">{won(invest)}</span>}
+                </span>
+                <span className="emid">
+                  {p.mode === "full" ? (
+                    <><span className="eself">{pct(p.etf_self_pct)}</span><span className="echa">환차 {pct(p.fx_pure_pct)}</span></>
+                  ) : (
+                    <span className="eself sub">USD only</span>
+                  )}
+                </span>
+                <span className="eright">
+                  <span className={`ett ${sign(tot)}`}>{pct(tot)}</span>
+                  {profit != null && <span className={`eprofit ${sign(profit)}`}>{profit >= 0 ? "+" : ""}{won(profit)}</span>}
+                </span>
+              </div>
+            );
+          })}
+          <div className="ebd-note">왼쪽은 투자액, 가운데는 자체수익(달러)·환차손익, 오른쪽은 원화 실질수익률과 이익금입니다.</div>
         </section>
       )}
 
       <div className="foot">확정 계산(수익·세금·중복도)은 입력값 기반. 예측(Forecast)은 미탑재. · 세무자문 아님</div>
 
       <style jsx>{`
-        .etf { max-width: 480px; margin: 0 auto; padding: 0 14px 84px; font-family: -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
-        .etf-hdr { display: flex; align-items: center; gap: 10px; padding: 16px 2px 10px; position: sticky; top: 0; background: #f8fafc; z-index: 5; }
-        .etf-hdr h1 { font-size: 1.15rem; font-weight: 800; margin: 0; flex: 1; }
-        .back { color: #0284c7; text-decoration: none; font-size: 0.82rem; font-weight: 600; }
-        .live { font-size: 0.62rem; font-weight: 800; color: #fff; background: #0ea5e9; padding: 2px 7px; border-radius: 6px; letter-spacing: 0.05em; }
-        .err { background: #fef2f2; color: #b91c1c; padding: 10px 12px; border-radius: 10px; font-size: 0.82rem; }
-        .loading { color: #64748b; padding: 24px; text-align: center; }
-        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(15,23,42,0.04); }
-        .card.solid { background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border-color: #bae6fd; }
-        .label { font-size: 0.78rem; font-weight: 700; color: #475569; margin-bottom: 8px; }
-        .label .sub, .sub { font-weight: 600; color: #94a3b8; font-size: 0.68rem; margin-left: 6px; }
-        .big { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; }
-        .change { font-size: 0.8rem; color: #475569; margin: 2px 0 12px; }
-        .decomp { border-top: 1px dashed #cbd5e1; padding-top: 8px; }
-        .drow { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.9rem; }
-        .drow span { color: #475569; }
-        .drow.total { border-top: 1px solid #e2e8f0; margin-top: 4px; padding-top: 8px; font-weight: 800; }
-        .hint { font-size: 0.72rem; color: #0369a1; margin-top: 8px; background: #f0f9ff; padding: 7px 9px; border-radius: 8px; }
-        .pos { color: #dc2626; } .neg { color: #2563eb; }
-        .score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .sc { background: #f8fafc; border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
-        .sc span { font-size: 0.68rem; color: #64748b; } .sc b { font-size: 0.92rem; }
+        .etf { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
+        .err { background: var(--color-danger-soft); color: var(--color-danger); padding: 10px 12px; border-radius: 10px; font-size: 0.82rem; margin-bottom: 12px; }
+        .loading { color: var(--color-ink-2); padding: 24px; text-align: center; }
+        .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow-card); }
+        /* HERO */
+        .hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 20px 18px; box-shadow: var(--shadow-float); margin-bottom: 14px; }
+        .hero .eyebrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+        .hero .lbl { font-size: 12px; font-weight: 700; color: var(--hero-ink-sub); }
+        .live { background: var(--color-success); color: #04351f; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 5px; letter-spacing: .5px; }
+        .hero .big { font-size: 32px; font-weight: 800; letter-spacing: -.8px; line-height: 1; }
+        .hero .big span { font-size: 19px; font-weight: 700; }
+        .hero .hsub { font-size: 12.5px; color: var(--hero-ink-soft); margin-top: 9px; }
+        .hero .hsub b { color: var(--hero-accent); font-weight: 700; }
+        .decomp { background: var(--hero-fill); border: 1px solid var(--hero-fill-line); border-radius: 14px; padding: 14px; margin-top: 16px; }
+        .drow { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; }
+        .drow .dk { font-size: 12.5px; color: var(--hero-ink-soft); font-weight: 500; }
+        .drow .dv { font-size: 13px; font-weight: 700; color: var(--hero-accent); }
+        .drow .dv.neg { color: var(--hero-danger); }
+        .drow.total { border-top: 1px solid var(--hero-fill-line); margin-top: 6px; padding-top: 11px; }
+        .drow.total .dk { color: var(--hero-ink); font-weight: 700; font-size: 13px; }
+        .drow.total .dv { font-size: 16px; font-weight: 800; }
+        .hero .foot-note { font-size: 11px; color: var(--hero-ink-faint); margin-top: 12px; line-height: 1.5; }
+        .label { font-size: 0.9rem; font-weight: 700; color: var(--color-ink); margin-bottom: 12px; display: flex; align-items: center; }
+        .label .sub, .sub { font-weight: 600; color: var(--color-ink-3); font-size: 0.68rem; margin-left: 6px; }
+        /* [v10 UI §1] 초록=수익, 빨강=손실/비용 */
+        .pos { color: var(--color-success); } .neg { color: var(--color-danger); }
+        .score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; }
+        .sc { display: flex; flex-direction: column; gap: 3px; }
+        .sc span { font-size: 0.72rem; color: var(--color-ink-3); font-weight: 600; } .sc b { font-size: 1rem; font-weight: 800; }
         .heat { display: flex; flex-direction: column; gap: 6px; }
-        .hrow { display: flex; align-items: center; gap: 8px; }
-        .ht { width: 54px; font-size: 0.78rem; font-weight: 700; font-family: ui-monospace, monospace; }
-        .hbar { flex: 1; background: #f1f5f9; border-radius: 5px; height: 14px; overflow: hidden; }
-        .hbar div { height: 100%; background: linear-gradient(90deg, #0ea5e9, #0284c7); border-radius: 5px; }
-        .hw { width: 44px; text-align: right; font-size: 0.76rem; font-weight: 700; color: #0369a1; }
-        .sectors { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-        .chip { font-size: 0.7rem; font-weight: 600; background: #e0f2fe; color: #0369a1; padding: 3px 9px; border-radius: 20px; }
-        .warn { margin-top: 10px; font-size: 0.74rem; color: #b45309; background: #fffbeb; padding: 7px 9px; border-radius: 8px; }
-        .tax-line { display: flex; justify-content: space-between; font-size: 1rem; font-weight: 700; }
-        .tax-hint { font-size: 0.72rem; color: #64748b; margin-top: 6px; }
-        .prow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.84rem; }
-        .prow .pt { width: 56px; font-weight: 700; font-family: ui-monospace, monospace; }
-        .prow .pd { flex: 1; color: #64748b; font-size: 0.74rem; }
-        .prow b { font-size: 0.86rem; }
-        .asof { font-size: 0.7rem; color: #64748b; margin: -4px 2px 10px; }
-        .asof-tag { background: #f1f5f9; color: #94a3b8; padding: 1px 6px; border-radius: 6px; font-size: 0.62rem; margin-left: 4px; }
-        .rb { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.84rem; }
+        .hrow { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+        .ht { width: 52px; font-size: 0.78rem; font-weight: 700; }
+        .hbar { flex: 1; background: var(--color-line); border-radius: 6px; height: 9px; overflow: hidden; }
+        .hbar div { height: 100%; background: var(--color-primary); border-radius: 6px; }
+        .hw { width: 44px; text-align: right; font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); }
+        .sectors { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+        .chip { font-size: 0.72rem; font-weight: 700; background: var(--color-card-soft); color: var(--color-ink-2); padding: 6px 10px; border-radius: 9px; }
+        .warn { margin-top: 10px; font-size: 0.74rem; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 7px 9px; border-radius: 8px; }
+        .tax-line { display: flex; justify-content: space-between; align-items: baseline; font-size: 1.05rem; font-weight: 800; }
+        .tax-line b { font-size: 1.3rem; }
+        .tax-hint { font-size: 0.78rem; color: var(--color-ink-2); margin-top: 8px; line-height: 1.6; background: var(--color-card-soft); border-radius: 12px; padding: 12px 14px; }
+        .tax-hint.sub { background: var(--color-success-soft); color: var(--color-success-ink); font-weight: 600; }
+        /* per-ETF SummaryBar + aligned rows */
+        .ebd-sum { display: flex; background: var(--color-card-soft); border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; }
+        .es-item { flex: 1; display: flex; flex-direction: column; gap: 5px; }
+        .es-item + .es-item { border-left: 1px solid var(--color-line); padding-left: 16px; }
+        .es-k { font-size: 0.72rem; color: var(--color-ink-3); font-weight: 600; }
+        .es-v { font-size: 1.05rem; font-weight: 800; color: var(--color-ink); }
+        .es-v.pos { color: var(--color-success); } .es-v.neg { color: var(--color-danger); }
+        .erow { display: grid; grid-template-columns: 1fr 84px 92px; align-items: center; gap: 6px; padding: 12px 0; border-top: 1px solid var(--color-line); }
+        .erow:first-of-type { border-top: none; }
+        .eleft { display: flex; flex-direction: column; gap: 3px; }
+        .eleft .etk { font-size: 0.9rem; font-weight: 800; }
+        .eleft .einv { font-size: 0.68rem; color: var(--color-ink-3); font-weight: 500; }
+        .emid { display: flex; flex-direction: column; gap: 3px; text-align: right; }
+        .emid .eself { font-size: 0.74rem; color: var(--color-ink-2); font-weight: 600; }
+        .emid .eself.sub { color: var(--color-ink-3); }
+        .emid .echa { font-size: 0.66rem; color: var(--color-ink-3); font-weight: 500; }
+        .eright { display: flex; flex-direction: column; gap: 3px; text-align: right; }
+        .eright .ett { font-size: 0.9rem; font-weight: 800; }
+        .eright .ett.pos { color: var(--color-success); } .eright .ett.neg { color: var(--color-danger); }
+        .eright .eprofit { font-size: 0.72rem; font-weight: 700; }
+        .eright .eprofit.pos { color: var(--color-success); } .eright .eprofit.neg { color: var(--color-danger); }
+        .ebd-note { font-size: 0.66rem; color: var(--color-ink-3); line-height: 1.55; margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--color-line); }
+        .rb { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--color-line); font-size: 0.84rem; }
         .rb .rt { width: 56px; font-weight: 700; font-family: ui-monospace, monospace; }
-        .rb .rw { flex: 1; color: #64748b; font-size: 0.74rem; }
-        .rb-tax { font-size: 0.72rem; color: #475569; margin-top: 10px; background: #f8fafc; padding: 7px 9px; border-radius: 8px; }
-        .foot { font-size: 0.68rem; color: #94a3b8; text-align: center; margin-top: 16px; line-height: 1.5; }
+        .rb .rw { flex: 1; color: var(--color-ink-2); font-size: 0.74rem; }
+        .rb-tax { font-size: 0.72rem; color: var(--color-ink-2); margin-top: 10px; background: var(--color-card-soft); padding: 7px 9px; border-radius: 8px; }
+        .sample-badge { font-size: 10px; font-weight: 800; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 3px 8px; border-radius: 6px; margin-left: auto; }
+        .foot { font-size: 0.68rem; color: var(--color-ink-3); text-align: center; margin-top: 16px; line-height: 1.5; }
       `}</style>
-      <AssetBottomNav active="etf" />
-      <style jsx global>{`body { background: #f8fafc; margin: 0; }`}</style>
+      <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>
   );
 }

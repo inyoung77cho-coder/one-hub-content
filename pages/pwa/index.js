@@ -76,7 +76,6 @@ export default function PWADashboard({ latestReport }) {
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
-  const [expandedPos, setExpandedPos] = useState({}); // [v9.0] 보유 탭 왜? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
   const [sellConfirm, setSellConfirm] = useState({}); // [v8.7] 매도 1단계 확인 상태: { [code]: true }
   const [sellLoading, setSellLoading] = useState({}); // [v8.7] 매도 처리 중 상태
@@ -175,6 +174,8 @@ export default function PWADashboard({ latestReport }) {
     setTheme(prev => {
       const next = prev === 'light' ? 'dark' : 'light';
       try { window.localStorage.setItem('onehub_theme', next); } catch (e) {}
+      // [v10 UI] <html data-theme> 단일 소스 동기화 — 디자인 토큰 기반 컴포넌트 즉시 반영
+      try { window.dispatchEvent(new Event('onehub-theme-change')); } catch (e) {}
       return next;
     });
   }, []);
@@ -472,7 +473,7 @@ export default function PWADashboard({ latestReport }) {
       <Head>
         <title>ONE-HUB Dashboard</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content={theme === 'light' ? '#F4F9FF' : '#0B0E14'} />
+        <meta name="theme-color" content={theme === 'light' ? '#EAF1FA' : '#0F1B30'} />
         <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
         <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet" />
       </Head>
@@ -648,9 +649,9 @@ export default function PWADashboard({ latestReport }) {
                   <div className="ta-total mono">{assetSum.total_uk}<span>억</span></div>
                   <div className="ta-rows">
                     {[
-                      ['주식', '#3b82f6', assetSum.breakdown?.stock_uk, '/pwa?tab=recommend'],
-                      ['ETF', '#06b6d4', assetSum.breakdown?.etf_uk, '/pwa/etf'],
-                      ['부동산', '#14b8a6', assetSum.breakdown?.realestate_uk, '/pwa/realestate'],
+                      ['주식', 'var(--color-primary)', assetSum.breakdown?.stock_uk, '/pwa?tab=recommend'],
+                      ['ETF', 'var(--color-primary)', assetSum.breakdown?.etf_uk, '/pwa/etf'],
+                      ['부동산', 'var(--color-success)', assetSum.breakdown?.realestate_uk, '/pwa/realestate'],
                     ].map(([label, color, val, href]) => (
                       <button key={label} className="ta-row" onClick={() => { window.location.href = href; }}>
                         <span className="ta-dot" style={{ background: color }} />
@@ -687,10 +688,10 @@ export default function PWADashboard({ latestReport }) {
                 </div>
                 <div className="action-summary-grid">
                   {[
-                    { label: 'BUY',   count: buyCount,   color: '#1E8449' },
-                    { label: 'SELL',  count: sellCount,  color: '#C0392B' },
-                    { label: 'WATCH', count: watchCount, color: '#2980B9' },
-                    { label: 'PASS',  count: passCount,  color: '#95A5A6' },
+                    { label: 'BUY',   count: buyCount,   color: 'var(--color-success)' },
+                    { label: 'SELL',  count: sellCount,  color: 'var(--color-danger)' },
+                    { label: 'WATCH', count: watchCount, color: 'var(--color-primary)' },
+                    { label: 'PASS',  count: passCount,  color: 'var(--color-ink-3)' },
                   ].map(({ label, count, color }) => (
                     <div key={label} className="action-summary-pill" style={{ borderColor: color }}>
                       <span className="action-summary-pill-count mono" style={{ color }}>{count}</span>
@@ -702,7 +703,7 @@ export default function PWADashboard({ latestReport }) {
                 {data?.blocked_loss_pct != null && data.blocked_loss_pct !== 0 && (
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>AI가 막은 손실 (30일 평균)</span>
-                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: '#1E8449', fontFamily: 'var(--font-mono)' }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--color-success)', fontFamily: 'var(--font-mono)' }}>
                       +{Math.abs(data.blocked_loss_pct).toFixed(1)}%
                     </span>
                   </div>
@@ -728,100 +729,36 @@ export default function PWADashboard({ latestReport }) {
                 </section>
               )}
 
-              {/* [v9.0] Hero 카드 */}
+              {/* [v10 UI] 홈 히어로 — "오늘 AI 판단" 결론 한 줄(재방문 훅). 시안 onehub-home-redesign */}
               {(() => {
-                const rColor = regime === 'BEAR' ? '#ef4444' : regime === 'BULL' ? '#22c55e' : '#f59e0b';
                 const aiConf = data?.ai_confidence ?? heat;
-                const verdictText = regime === 'BEAR' ? '🚫 관망' : regime === 'BULL' ? '📈 매수' : '🔍 선별매수';
-                // [v9.0][14] 오늘 시장 AI 한줄 브리핑 -- 숫자 대신 사람이 읽을 문장으로 상황 요약
-                const marketBrief = (() => {
-                  if (regime === 'BEAR' && fearGreed !== null && fearGreed < 20) return '극단적 공포 국면 — 관망이 최선의 전략입니다';
-                  if (regime === 'BEAR') return '시장 전반 하락 국면 — 신규 매수보다 현금 비중 유지 권장';
-                  if (regime === 'BULL' && (heat ?? 0) >= 60) return '강한 매수세 지속 — 적극적 진입 구간';
-                  if (regime === 'BULL') return '상승 흐름 유지 중 — 선별적 진입 가능';
-                  if (regime === 'SIDEWAYS') return '방향성 불분명 — 선별적 접근 권장';
-                  return null;
-                })();
-                // [v9.3 PWA-09] BEAR 상태: 한 줄 요약 + 리포트/AI판단근거 2버튼으로 축소 (추천보기 숨김)
-                if (regime === 'BEAR') {
-                  return (
-                    <section className="hero-v9 hero-v9-compact" style={{ borderColor: rColor }}>
-                      <div className="hero-v9-regime-row">
-                        <span className="hero-v9-regime-compact" style={{ color: rColor }}>
-                          🔴 BEAR{heat !== null ? ` · Heat ${heat}` : ''} · 매수금지
-                        </span>
-                        {regimeDays !== null && (
-                          <span className="hero-v9-days dim mono">{regimeDays}일째</span>
-                        )}
-                      </div>
-                      {marketBrief && <p className="hero-v9-brief">{marketBrief}</p>}
-                      <div className="hero-v9-btns">
-                        <button className="hero-v9-btn primary" onClick={() => setTab('report')}>
-                          📋 오늘 리포트
-                        </button>
-                        <button className="hero-v9-btn secondary" onClick={() => {
-                          setTab('dashboard');
-                          setTimeout(() => document.querySelector('.ai-basis-card')?.scrollIntoView({ behavior:'smooth', block:'start' }), 150);
-                        }}>
-                          🧠 AI 판단근거
-                        </button>
-                      </div>
-                    </section>
-                  );
-                }
+                const hTier = heatTier(heat);
+                const verb = buyCount > 0 ? `${buyCount}종목 샀습니다.` : '사지 않았습니다.';
+                const reason = buyCount > 0
+                  ? <>조건을 충족한 <b>{buyCount}종목</b>에 매수 신호가 나왔습니다. 시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> 기준.</>
+                  : blockCount > 0
+                    ? <>시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b>로 투자 열기가 낮아 <b>선별 관망</b>이 낫다고 판단했습니다. 후보는 매수 기준 미달로 {blockCount}건을 걸렀습니다.</>
+                    : <>시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> 기준, 매수 조건을 충족한 종목이 없어 <b>선별 관망</b>했습니다.</>;
                 return (
-                  <section className="hero-v9" style={{ borderColor: rColor }}>
-                    {/* Regime 크게 */}
-                    <div className="hero-v9-regime-row">
-                      <span className="hero-v9-regime" style={{ color: rColor }}>
-                        {regimeIcon(regime)} {regimeMarket(regime)}
-                      </span>
-                      {regimeDays !== null && (
-                        <span className="hero-v9-days dim mono">{regimeDays}일째</span>
-                      )}
-                    </div>
-                    {marketBrief && (
-                      <p className="hero-v9-brief">{marketBrief}</p>
-                    )}
-
-                    {/* AI 신뢰도 */}
-                    <div className="hero-v9-conf-row">
-                      <div>
-                        <span className="hero-v9-conf-label">AI 매수 확률</span>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: 1 }}>(오늘 예측 신뢰도)</div>
+                  <section className="home-hero">
+                    <div className="hh-eyebrow">
+                      <div className="hh-eyebrow-top">
+                        <span className="hh-label">📊 오늘의 AI 판단</span>
+                        <span className="hh-live">LIVE</span>
                       </div>
-                      <span className="hero-v9-conf-val" style={{ color: rColor }}>
-                        {aiConf !== null ? `${aiConf}%` : '-'}
-                      </span>
+                      {regimeDays !== null && <div className="hh-date">Regime {regimeKo(regime)} · {regimeDays}일째</div>}
                     </div>
-
-                    {/* 오늘 행동 */}
-                    <div className="hero-v9-verdict-row">
-                      <span className="hero-v9-verdict-label">오늘 행동</span>
-                      <span className="hero-v9-verdict-badge" style={{
-                        background: `${rColor}1a`,
-                        color: rColor,
-                        border: `1px solid ${rColor}55`,
-                      }}>
-                        {verdictText}
-                      </span>
+                    <h1 className="hh-h1">오늘, AI는<br /><em>{verb}</em></h1>
+                    <div className="hh-reason">{reason}</div>
+                    <div className="hh-foot">
+                      <span className="hh-chip">Regime <span className="v">{regime || '-'}</span></span>
+                      <span className="hh-chip">매수 예측 신뢰도 <span className="v">{aiConf !== null ? `${aiConf}%` : '-'}</span></span>
+                      {fearGreed !== null && <span className="hh-chip">Fear&amp;Greed <span className="v">{fearGreed}</span></span>}
                     </div>
-
-                    {/* 버튼 2개 */}
-                    <div className="hero-v9-btns">
-                      <button className="hero-v9-btn primary" onClick={() => setTab('report')}>
-                        📋 오늘 리포트
-                      </button>
-                      <button className="hero-v9-btn secondary" onClick={() => setTab('recommend')}>
-                        ⭐ 추천 보기
-                      </button>
-                      <button className="hero-v9-btn secondary" onClick={() => {
-                        setTab('dashboard');
-                        setTimeout(() => document.querySelector('.ai-basis-card')?.scrollIntoView({ behavior:'smooth', block:'start' }), 150);
-                      }}>
-                        🧠 AI 판단근거
-                      </button>
-                    </div>
+                    <button className="hh-cta" onClick={() => {
+                      setTab('dashboard');
+                      setTimeout(() => document.querySelector('.ai-basis-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+                    }}>오늘의 판단 근거 자세히 보기 →</button>
                   </section>
                 );
               })()}
@@ -945,10 +882,10 @@ export default function PWADashboard({ latestReport }) {
                     {/* [v8.7] Market 4지표 한줄 요약 */}
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10, paddingBottom: 10, borderBottom: '1px solid var(--border)' }}>
                       {[
-                        { label: 'Regime', val: regime, color: regime === 'BULL' ? '#22c55e' : regime === 'BEAR' ? '#ef4444' : '#f59e0b' },
+                        { label: 'Regime', val: regime, color: regime === 'BULL' ? 'var(--color-success)' : regime === 'BEAR' ? 'var(--color-danger)' : 'var(--color-warning)' },
                         { label: 'Heat',   val: heat != null ? `${heat}` : null, color: heatColor(heat) },
                         { label: 'Fear',   val: fearGreed != null ? `${fearGreed}` : null, color: fgColor(fearGreed) },
-                        { label: 'AI%',    val: data?.ai_confidence != null ? `${data.ai_confidence}%` : null, color: '#2563eb' },
+                        { label: 'AI%',    val: data?.ai_confidence != null ? `${data.ai_confidence}%` : null, color: 'var(--color-primary)' },
                       ].filter(m => m.val != null).map(m => (
                         <div key={m.label} style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '3px 10px', background: 'var(--inset-bg)', borderRadius: 999 }}>
                           <span style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)' }}>{m.label}</span>
@@ -969,7 +906,7 @@ export default function PWADashboard({ latestReport }) {
                             {m.label}
                             {/* [v9.0] 블로그 연결 📖 */}
                             <a href={`/blog?tag=${m.blogTag}`} target="_blank" rel="noopener"
-                               style={{ fontSize: 10, color: '#94a3b8', textDecoration: 'none', marginLeft: 4 }}
+                               style={{ fontSize: 10, color: 'var(--color-ink-3)', textDecoration: 'none', marginLeft: 4 }}
                                title="관련 블로그 보기">📖</a>
                           </span>
                           <span className="ai-basis-metric-val mono" style={{ color: m.color }}>
@@ -984,9 +921,9 @@ export default function PWADashboard({ latestReport }) {
                     {/* BUY / WAIT / SELL 확률 바 */}
                     <div className="ai-basis-bars">
                       {[
-                        { label: 'BUY',  pct: buyP,  color: '#22c55e' },
-                        { label: 'WAIT', pct: waitP, color: '#f59e0b' },
-                        { label: 'SELL', pct: sellP, color: '#ef4444' },
+                        { label: 'BUY',  pct: buyP,  color: 'var(--color-success)' },
+                        { label: 'WAIT', pct: waitP, color: 'var(--color-warning)' },
+                        { label: 'SELL', pct: sellP, color: 'var(--color-danger)' },
                       ].map(b => (
                         <div key={b.label} className="ai-basis-bar-row">
                           <span className="ai-basis-bar-label mono">{b.label}</span>
@@ -1082,7 +1019,7 @@ export default function PWADashboard({ latestReport }) {
                             const rewardPct = (p.target / p.price - 1) * 100;
                             const riskPct = (1 - p.stop_loss / p.price) * 100;
                             const rr = riskPct > 0 ? rewardPct / riskPct : null;
-                            const rrColor = rr == null ? 'var(--text-secondary)' : rr >= 2 ? '#1E8449' : rr >= 1.5 ? '#F39C12' : '#C0392B';
+                            const rrColor = rr == null ? 'var(--text-secondary)' : rr >= 2 ? 'var(--color-success)' : rr >= 1.5 ? 'var(--color-warning)' : 'var(--color-danger)';
                             return (
                               <div className="pending-price-grid rr-3col mono" style={{ marginTop: 2 }}>
                                 <div><span className="dim">예상수익</span> <span className="bull">+{rewardPct.toFixed(1)}%</span></div>
@@ -1402,7 +1339,7 @@ export default function PWADashboard({ latestReport }) {
                     const rewardPct = (analyzeResult.target / cp - 1) * 100;
                     const riskPct = (1 - analyzeResult.stop_loss / cp) * 100;
                     const rr = riskPct > 0 ? rewardPct / riskPct : null;
-                    const rrColor = rr == null ? 'var(--text-secondary)' : rr >= 2 ? '#1E8449' : rr >= 1.5 ? '#F39C12' : '#C0392B';
+                    const rrColor = rr == null ? 'var(--text-secondary)' : rr >= 2 ? 'var(--color-success)' : rr >= 1.5 ? 'var(--color-warning)' : 'var(--color-danger)';
                     return (
                       <div className="rr-summary">
                         <div className="rr-summary-row">
@@ -1432,16 +1369,16 @@ export default function PWADashboard({ latestReport }) {
                   const b2  = cur > 0 ? Math.round(cur * 0.98) : null;
                   const aiConf = analyzeResult.confidence_score ?? analyzeResult.ai_score ?? null;
                   const risk = analyzeResult.risk_level ?? (aiConf >= 70 ? '낮음' : aiConf >= 50 ? '중간' : '높음');
-                  const riskColor = risk === '낮음' || risk === 'low' ? '#22c55e' : risk === '중간' || risk === 'medium' ? '#f59e0b' : '#ef4444';
+                  const riskColor = risk === '낮음' || risk === 'low' ? 'var(--color-success)' : risk === '중간' || risk === 'medium' ? 'var(--color-warning)' : 'var(--color-danger)';
                   const riskPct   = risk === '낮음' || risk === 'low' ? 30 : risk === '중간' || risk === 'medium' ? 60 : 90;
                   const pctStr = (base, val) => base > 0 && val > 0 ? `현재가 ${val >= base ? '+' : ''}${((val/base-1)*100).toFixed(1)}%` : '';
 
                   const levels = [
-                    { label: '현재가',  price: cur,  color: '#1A1A1A' },
-                    { label: '1차 매수', price: b1,  color: '#2980B9' },
-                    { label: '2차 매수', price: b2,  color: '#5DADE2' },
-                    { label: '손절',    price: stp,  color: '#C0392B' },
-                    { label: '목표가',  price: tgt,  color: '#1E8449' },
+                    { label: '현재가',  price: cur,  color: 'var(--color-ink)' },
+                    { label: '1차 매수', price: b1,  color: 'var(--color-primary)' },
+                    { label: '2차 매수', price: b2,  color: 'var(--color-primary)' },
+                    { label: '손절',    price: stp,  color: 'var(--color-danger)' },
+                    { label: '목표가',  price: tgt,  color: 'var(--color-success)' },
                   ];
 
                   return (
@@ -1459,7 +1396,7 @@ export default function PWADashboard({ latestReport }) {
                                   {lv.price.toLocaleString()}원
                                 </span>
                                 {li > 0 && cur > 0 && lv.price > 0 && (
-                                  <span style={{ fontSize: '0.68rem', color: '#94a3b8', flexShrink: 0 }}>
+                                  <span style={{ fontSize: '0.68rem', color: 'var(--color-ink-3)', flexShrink: 0 }}>
                                     {lv.price >= cur ? '+' : ''}{((lv.price / cur - 1) * 100).toFixed(1)}%
                                   </span>
                                 )}
@@ -1486,10 +1423,10 @@ export default function PWADashboard({ latestReport }) {
                           <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
                               <span style={{ color: 'var(--text-secondary)' }}>AI 확신도 {confidenceStars(aiConf)}</span>
-                              <span style={{ color: '#2563eb', fontWeight: 700 }}>{aiConf}%</span>
+                              <span style={{ color: 'var(--color-primary)', fontWeight: 700 }}>{aiConf}%</span>
                             </div>
                             <div style={{ height: 6, background: 'var(--inset-bg)', borderRadius: 3, overflow: 'hidden' }}>
-                              <div style={{ height: '100%', width: `${aiConf}%`, background: '#2563eb', borderRadius: 3 }} />
+                              <div style={{ height: '100%', width: `${aiConf}%`, background: 'var(--color-primary)', borderRadius: 3 }} />
                             </div>
                           </div>
                         )}
@@ -1593,26 +1530,12 @@ export default function PWADashboard({ latestReport }) {
                   ? <div className="pwa-empty">보유 종목 없음</div>
                   : <div className="position-cards">{positions.map((p,i) => (
                       <div key={i} className="position-card">
+                        {/* [v10 UI §5④] 중복 'AI 분석 보기' 버튼 제거 — 상단은 손익 배지만, 분석 버튼은 하단 액션행에 1개로 통일 */}
                         <div className="position-card-top">
                           <span className="position-card-name">{p.name}</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <button
-                              style={{ fontSize: '0.65rem', padding: '2px 7px', borderRadius: 8, background: 'var(--inset-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                              onClick={() => setBottomSheet({
-                                name: p.name, code: p.code,
-                                scores: { macro: p.macro_score ?? null, ml: p.ml_score != null ? Math.round(p.ml_score) : null, technical: p.tech_score ?? null, risk: p.risk_score ?? null },
-                                final_score: p.final_score ?? null,
-                                win_rate: p.win_rate ?? null,
-                                reasons: [
-                                  ...(p.reason ? [{ text: p.reason, positive: true }] : []),
-                                  ...(p.pnl_rate != null ? [{ text: `현재 ${p.pnl_rate >= 0 ? '+' : ''}${p.pnl_rate}% 수익중`, positive: p.pnl_rate >= 0 }] : []),
-                                ],
-                              })}
-                            >AI 분석 보기</button>
-                            <span className={`position-card-badge mono ${p.pnl_rate>=0?'bull':'bear'}`}>
-                              {p.pnl_rate>=0?'+':''}{p.pnl_rate}%
-                            </span>
-                          </div>
+                          <span className={`position-card-badge mono ${p.pnl_rate>=0?'bull':'bear'}`}>
+                            {p.pnl_rate>=0?'+':''}{p.pnl_rate}%
+                          </span>
                         </div>
                         <div className="position-card-grid mono">
                           <div className="position-card-cell">
@@ -1660,7 +1583,7 @@ export default function PWADashboard({ latestReport }) {
                             {p.rsi != null && <span>RSI {p.rsi}</span>}
                             {p.macd != null && <span>MACD {p.macd > 0 ? '+' : ''}{p.macd}</span>}
                             {p.atr != null && <span>ATR {p.atr}</span>}
-                            {p.ml_score != null && <span style={{ fontWeight: 700, color: '#2980B9' }}>AI {p.ml_score}</span>}
+                            {p.ml_score != null && <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>AI {p.ml_score}</span>}
                           </div>
                         )}
                         {(() => {
@@ -1670,13 +1593,12 @@ export default function PWADashboard({ latestReport }) {
                           const stp = safeNum(p.stop_loss) ?? 0;
                           const pnlR = p.pnl_rate ?? 0;
                           let badge = null;
-                          if (tgt > 0 && cur >= tgt)        badge = { label: '손절', color: '#ef4444', icon: '🔴', bg: '#fef2f2' };
-                          else if (stp > 0 && cur <= stp)   badge = { label: '손절', color: '#ef4444', icon: '🔴', bg: '#fef2f2' };
-                          else if (pnlR >= 5)                badge = { label: '추가매수', color: '#2563eb', icon: '🔵', bg: '#eff6ff' };
-                          else if (avg > 0 && cur < avg * 0.97) badge = { label: '관망', color: '#f59e0b', icon: '🟡', bg: '#fffbeb' };
-                          else                               badge = { label: '보유', color: '#22c55e', icon: '🟢', bg: '#f0fdf4' };
+                          if (tgt > 0 && cur >= tgt)        badge = { label: '손절', color: 'var(--color-danger)', icon: '🔴', bg: 'var(--color-danger-soft)' };
+                          else if (stp > 0 && cur <= stp)   badge = { label: '손절', color: 'var(--color-danger)', icon: '🔴', bg: 'var(--color-danger-soft)' };
+                          else if (pnlR >= 5)                badge = { label: '추가매수', color: 'var(--color-primary)', icon: '🔵', bg: 'var(--color-primary-soft)' };
+                          else if (avg > 0 && cur < avg * 0.97) badge = { label: '관망', color: 'var(--color-warning)', icon: '🟡', bg: 'var(--color-warning-soft)' };
+                          else                               badge = { label: '보유', color: 'var(--color-success)', icon: '🟢', bg: 'var(--color-success-soft)' };
                           const posKey = p.code || i;
-                          const isPosExp = !!expandedPos[posKey];
                           return (
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, gap: 6 }}>
@@ -1685,15 +1607,24 @@ export default function PWADashboard({ latestReport }) {
                                 </span>
                                 <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                                   <button
-                                    style={{ fontSize: '0.68rem', padding: '3px 9px', borderRadius: 8, background: isPosExp ? '#2563eb' : 'var(--inset-bg)', color: isPosExp ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}
-                                    onClick={() => setExpandedPos(prev => ({ ...prev, [posKey]: !isPosExp }))}
+                                    style={{ fontSize: '0.68rem', padding: '3px 9px', borderRadius: 8, background: 'var(--inset-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}
+                                    onClick={() => setBottomSheet({
+                                      name: p.name, code: p.code,
+                                      scores: { macro: p.macro_score ?? null, ml: p.ml_score != null ? Math.round(p.ml_score) : null, technical: p.tech_score ?? null, risk: p.risk_score ?? null },
+                                      final_score: p.final_score ?? null,
+                                      win_rate: p.win_rate ?? null,
+                                      reasons: [
+                                        ...(p.reason ? [{ text: p.reason, positive: true }] : []),
+                                        ...(p.pnl_rate != null ? [{ text: `현재 ${p.pnl_rate >= 0 ? '+' : ''}${p.pnl_rate}% 수익중`, positive: p.pnl_rate >= 0 }] : []),
+                                      ],
+                                    })}
                                   >
-                                    {isPosExp ? '접기 ▲' : 'AI 분석 보기'}
+                                    AI 분석 보기
                                   </button>
                                   <button
                                     className={`sell-btn${sellConfirm[posKey] ? ' confirm' : ''}`}
                                     disabled={sellLoading[posKey]}
-                                    style={{ fontSize: '0.68rem', padding: '3px 9px', borderRadius: 8, border: 'none', cursor: sellLoading[posKey] ? 'default' : 'pointer', fontFamily: 'var(--font-body)', fontWeight: 700, background: sellConfirm[posKey] ? '#C0392B' : '#fef2f2', color: sellConfirm[posKey] ? '#fff' : '#C0392B', opacity: sellLoading[posKey] ? 0.6 : 1 }}
+                                    style={{ fontSize: '0.68rem', padding: '3px 9px', borderRadius: 8, border: 'none', cursor: sellLoading[posKey] ? 'default' : 'pointer', fontFamily: 'var(--font-body)', fontWeight: 700, background: sellConfirm[posKey] ? 'var(--color-danger)' : 'var(--color-danger-soft)', color: sellConfirm[posKey] ? '#fff' : 'var(--color-danger)', opacity: sellLoading[posKey] ? 0.6 : 1 }}
                                     onClick={async () => {
                                       if (!sellConfirm[posKey]) {
                                         setSellConfirm(prev => ({ ...prev, [posKey]: true }));
@@ -1714,21 +1645,6 @@ export default function PWADashboard({ latestReport }) {
                                   </button>
                                 </div>
                               </div>
-                              {isPosExp && (
-                                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                                  {[
-                                    { label: 'RSI',    value: p.rsi   != null ? p.rsi   : '-' },
-                                    { label: 'MACD',   value: p.macd  != null ? p.macd  : '-' },
-                                    { label: 'ATR',    value: p.atr   != null ? p.atr   : '-' },
-                                    { label: 'ML점수', value: p.ml_score != null ? `${p.ml_score}점` : '-' },
-                                  ].map(m => (
-                                    <div key={m.label} style={{ background: 'var(--inset-bg)', borderRadius: 8, padding: '6px 10px' }}>
-                                      <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{m.label}</div>
-                                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{m.value}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
                             </div>
                           );
                         })()}
@@ -1802,11 +1718,11 @@ export default function PWADashboard({ latestReport }) {
                   <span className="pwa-card-label">🎬 오늘 AI 분석 흐름</span>
                   <div style={{ marginTop: 12, position: 'relative', paddingLeft: 20 }}>
                     {/* 타임라인 선 */}
-                    <div style={{ position: 'absolute', left: 7, top: 8, bottom: 8, width: 2, background: '#e2e8f0', borderRadius: 1 }} />
+                    <div style={{ position: 'absolute', left: 7, top: 8, bottom: 8, width: 2, background: 'var(--color-line)', borderRadius: 1 }} />
                     {steps.map((s, i) => (
                       <div key={i} style={{ position: 'relative', marginBottom: i < steps.length - 1 ? 18 : 0 }}>
                         {/* 점 */}
-                        <div style={{ position: 'absolute', left: -16, top: 4, width: 8, height: 8, borderRadius: '50%', background: '#2563eb', border: '2px solid var(--card-bg)' }} />
+                        <div style={{ position: 'absolute', left: -16, top: 4, width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)', border: '2px solid var(--card-bg)' }} />
                         <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginBottom: 2 }}>{s.time} KST</div>
                         <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: 2 }}>
                           {s.icon} {s.title}
@@ -1929,13 +1845,13 @@ export default function PWADashboard({ latestReport }) {
                         return `${x},${y}`;
                       }).join(' ');
                       const lastVal = vals[vals.length - 1];
-                      const color = lastVal >= 0 ? '#1E8449' : '#C0392B';
+                      const color = lastVal >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
                       return (
                         <div>
                           <div style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', marginBottom: 2 }}>누적수익률</div>
                           <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
                             <polyline fill="none" stroke={color} strokeWidth="2" points={pts} strokeLinejoin="round" strokeLinecap="round" />
-                            <line x1="0" y1={H - 4 - ((0 - min) / range) * (H - 8)} x2={W} y2={H - 4 - ((0 - min) / range) * (H - 8)} stroke="#94a3b8" strokeWidth="0.5" strokeDasharray="3,2" />
+                            <line x1="0" y1={H - 4 - ((0 - min) / range) * (H - 8)} x2={W} y2={H - 4 - ((0 - min) / range) * (H - 8)} stroke="var(--color-ink-3)" strokeWidth="0.5" strokeDasharray="3,2" />
                           </svg>
                           <div style={{ fontSize: '0.7rem', fontWeight: 700, color, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>
                             {lastVal >= 0 ? '+' : ''}{lastVal.toFixed(1)}%
@@ -1954,10 +1870,10 @@ export default function PWADashboard({ latestReport }) {
                           <div style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', marginBottom: 2 }}>승률</div>
                           <svg width="56" height="56" viewBox="0 0 56 56">
                             <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--inset-bg)" strokeWidth={stroke} />
-                            <circle cx={cx} cy={cy} r={r} fill="none" stroke="#1E8449" strokeWidth={stroke}
+                            <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--color-success)" strokeWidth={stroke}
                               strokeDasharray={`${filled} ${circ}`} strokeLinecap="round"
                               transform={`rotate(-90 ${cx} ${cy})`} />
-                            <text x={cx} y={cy + 4} textAnchor="middle" fontSize="10" fontWeight="800" fill="#1E8449" fontFamily="monospace">{wr}%</text>
+                            <text x={cx} y={cy + 4} textAnchor="middle" fontSize="10" fontWeight="800" fill="var(--color-success)" fontFamily="monospace">{wr}%</text>
                           </svg>
                         </div>
                       );
@@ -1970,9 +1886,9 @@ export default function PWADashboard({ latestReport }) {
                         <div style={{ flexShrink: 0, textAlign: 'center' }}>
                           <div style={{ fontSize: '0.62rem', color: 'var(--text-tertiary)', marginBottom: 2 }}>MDD</div>
                           <div style={{ width: 12, height: 52, background: 'var(--inset-bg)', borderRadius: 6, overflow: 'hidden', position: 'relative', margin: '0 auto' }}>
-                            <div style={{ position: 'absolute', bottom: 0, width: '100%', height: `${dangerPct}%`, background: '#C0392B', borderRadius: 6 }} />
+                            <div style={{ position: 'absolute', bottom: 0, width: '100%', height: `${dangerPct}%`, background: 'var(--color-danger)', borderRadius: 6 }} />
                           </div>
-                          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#C0392B', marginTop: 2, fontFamily: 'var(--font-mono)' }}>-{mdd}%</div>
+                          <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--color-danger)', marginTop: 2, fontFamily: 'var(--font-mono)' }}>-{mdd}%</div>
                         </div>
                       );
                     })()}
@@ -2134,9 +2050,9 @@ export default function PWADashboard({ latestReport }) {
             {/* [v9.0] 투자 성향 예상 결과 */}
             {(() => {
               const PROFILE_STATS = {
-                conservative: { label: '보수형', icon: '🛡️', trades: '2~4회', stop: '-3%', hold: '14~21일', risk: '낮음', riskColor: '#22c55e' },
-                balanced:     { label: '균형형', icon: '⚖️', trades: '4~8회', stop: '-5%', hold: '7~14일',  risk: '중간', riskColor: '#f59e0b' },
-                aggressive:   { label: '공격형', icon: '🚀', trades: '8~15회',stop: '-7%', hold: '3~7일',   risk: '높음', riskColor: '#ef4444' },
+                conservative: { label: '보수형', icon: '🛡️', trades: '2~4회', stop: '-3%', hold: '14~21일', risk: '낮음', riskColor: 'var(--color-success)' },
+                balanced:     { label: '균형형', icon: '⚖️', trades: '4~8회', stop: '-5%', hold: '7~14일',  risk: '중간', riskColor: 'var(--color-warning)' },
+                aggressive:   { label: '공격형', icon: '🚀', trades: '8~15회',stop: '-7%', hold: '3~7일',   risk: '높음', riskColor: 'var(--color-danger)' },
               };
               const ps = PROFILE_STATS[profile.style] || PROFILE_STATS.balanced;
               return (
@@ -2252,10 +2168,10 @@ export default function PWADashboard({ latestReport }) {
             {/* 점수 바 4개 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
               {[
-                { label: 'Macro',      score: bottomSheet.scores?.macro      ?? null, color: '#2563eb' },
-                { label: 'ML Signal',  score: bottomSheet.scores?.ml         ?? null, color: '#7c3aed' },
-                { label: 'Technical',  score: bottomSheet.scores?.technical  ?? null, color: '#0891b2' },
-                { label: 'Risk',       score: bottomSheet.scores?.risk       ?? null, color: '#16a34a' },
+                { label: 'Macro',      score: bottomSheet.scores?.macro      ?? null, color: 'var(--color-primary)' },
+                { label: 'ML Signal',  score: bottomSheet.scores?.ml         ?? null, color: 'var(--purple)' },
+                { label: 'Technical',  score: bottomSheet.scores?.technical  ?? null, color: 'var(--color-primary)' },
+                { label: 'Risk',       score: bottomSheet.scores?.risk       ?? null, color: 'var(--color-success)' },
               ].map(({ label, score, color }) => (
                 <div key={label}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', marginBottom: 4 }}>
@@ -2264,7 +2180,7 @@ export default function PWADashboard({ latestReport }) {
                       {score != null ? `${score}점` : '-'}
                     </span>
                   </div>
-                  <div style={{ height: 8, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ height: 8, background: 'var(--color-line)', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${score ?? 0}%`, background: color, borderRadius: 4, transition: 'width 0.5s ease' }} />
                   </div>
                 </div>
@@ -2274,16 +2190,16 @@ export default function PWADashboard({ latestReport }) {
             {/* 최종 점수 + 등급 */}
             {(() => {
               const fs = bottomSheet.final_score ?? 0;
-              const grade = fs >= 85 ? { label: 'Strong Buy', color: '#16a34a' }
-                : fs >= 70 ? { label: 'Buy', color: '#22c55e' }
-                : fs >= 50 ? { label: 'Hold', color: '#f59e0b' }
-                : { label: 'Sell', color: '#ef4444' };
+              const grade = fs >= 85 ? { label: 'Strong Buy', color: 'var(--color-success)' }
+                : fs >= 70 ? { label: 'Buy', color: 'var(--color-success)' }
+                : fs >= 50 ? { label: 'Hold', color: 'var(--color-warning)' }
+                : { label: 'Sell', color: 'var(--color-danger)' };
               return (
                 <div style={{ padding: '10px 14px', background: 'var(--inset-bg)', borderRadius: 12, marginBottom: 14 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 6 }}>
                     <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>최종 점수</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 800, color: '#2563eb', fontFamily: 'var(--font-mono)' }}>
+                      <span style={{ fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'var(--font-mono)' }}>
                         {bottomSheet.final_score != null ? `${bottomSheet.final_score}점` : '-'}
                       </span>
                       <span style={{ fontSize: '0.72rem', fontWeight: 800, color: grade.color, padding: '2px 8px', borderRadius: 6, background: `${grade.color}18`, border: `1px solid ${grade.color}44` }}>
@@ -2291,7 +2207,7 @@ export default function PWADashboard({ latestReport }) {
                       </span>
                     </div>
                   </div>
-                  <div style={{ height: 8, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ height: 8, background: 'var(--color-line)', borderRadius: 4, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${fs}%`, background: grade.color, borderRadius: 4, transition: 'width 0.5s ease' }} />
                   </div>
                 </div>
@@ -2304,7 +2220,7 @@ export default function PWADashboard({ latestReport }) {
                 <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>판단 근거</div>
                 {bottomSheet.reasons.map((r, i) => (
                   <div key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: '0.82rem', padding: '5px 0', borderBottom: '1px solid var(--border)' }}>
-                    <span style={{ color: r.positive ? '#16a34a' : '#ef4444', fontWeight: 700, flexShrink: 0 }}>{r.positive ? '✓' : '✗'}</span>
+                    <span style={{ color: r.positive ? 'var(--color-success)' : 'var(--color-danger)', fontWeight: 700, flexShrink: 0 }}>{r.positive ? '✓' : '✗'}</span>
                     <span style={{ color: 'var(--text-primary)', lineHeight: 1.4 }}>{r.text}</span>
                   </div>
                 ))}
@@ -2315,7 +2231,7 @@ export default function PWADashboard({ latestReport }) {
             {bottomSheet.win_rate != null && (
               <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', paddingTop: 10, borderTop: '1px solid var(--border)' }}>
                 과거 동일 조건 승률 &nbsp;
-                <span style={{ fontWeight: 800, color: bottomSheet.win_rate >= 60 ? '#16a34a' : '#f59e0b', fontFamily: 'var(--font-mono)' }}>
+                <span style={{ fontWeight: 800, color: bottomSheet.win_rate >= 60 ? 'var(--color-success)' : 'var(--color-warning)', fontFamily: 'var(--font-mono)' }}>
                   {bottomSheet.win_rate}%
                 </span>
               </div>
@@ -2328,53 +2244,32 @@ export default function PWADashboard({ latestReport }) {
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         /* [v8.6] 라이트(기본) — Apple Finance / Toss / Notion 톤. */
-        .pwa-wrapper.theme-light {
-          --bg: #F4F9FF;
-          --card-bg: #FFFFFF;
-          --inset-bg: #EAF3FC;
-          --border: #DCE9F7;
-          --text-primary: #16213D;
-          --text-secondary: #5B7088;
-          --text-tertiary: #93A6BC;
-          --accent-buy: #00D26A;
-          --accent-sell: #FF5B5B;
-          --accent-warn: #FFA73C;
-          --accent-info: #4A90E2;
-          --label-color: var(--text-secondary);
-          --font-display: 'Syne', sans-serif;
-          --font-body: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
-          --font-mono: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+        /* [v10 UI] 레거시 로컬 변수를 디자인 토큰에 브리지 — 색상 하드코딩 제거, 다크는 <html data-theme> 단일 소스.
+           라이트/다크 색은 모두 --color-*/--hero-* 토큰이 결정하므로 두 블록의 색 정의는 동일하다(레이아웃/폰트 공통). */
+        .pwa-wrapper.theme-light,
+        .pwa-wrapper.theme-dark {
+          --bg: var(--color-bg);
+          --card-bg: var(--color-card);
+          --inset-bg: var(--color-card-soft);
+          --border: var(--color-line);
+          --text-primary: var(--color-ink);
+          --text-secondary: var(--color-ink-2);
+          --text-tertiary: var(--color-ink-3);
+          --accent-buy: var(--color-success);
+          --accent-sell: var(--color-danger);
+          --accent-warn: var(--color-warning);
+          --accent-info: var(--color-primary);
+          --label-color: var(--color-ink-2);
+          --font-display: 'Syne', var(--font-sans);
+          --font-body: var(--font-sans);
+          --font-mono: ui-monospace, 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
           --radius-card: 20px;
           --radius-md: 14px;
           --radius-sm: 10px;
           --radius-pill: 999px;
-          --card-shadow: 0 2px 16px rgba(20, 38, 68, 0.07);
-          --hero-bg: linear-gradient(135deg, #EAF3FC 0%, #FFFFFF 65%);
-        }
-
-        /* [v8.6] 다크(터미널) — 기존 디자인을 옵션으로 보존 */
-        .pwa-wrapper.theme-dark {
-          --bg: #0B0E14;
-          --card-bg: #12161F;
-          --inset-bg: #0B0E14;
-          --border: #1E2330;
-          --text-primary: #E8E6E3;
-          --text-secondary: #888888;
-          --text-tertiary: #555555;
-          --accent-buy: #00FF85;
-          --accent-sell: #FF4444;
-          --accent-warn: #FFAA00;
-          --accent-info: #4488FF;
-          --label-color: var(--accent-buy);
-          --font-display: 'Syne', sans-serif;
-          --font-body: 'Space Mono', monospace;
-          --font-mono: 'Space Mono', monospace;
-          --radius-card: 8px;
-          --radius-md: 6px;
-          --radius-sm: 6px;
-          --radius-pill: 6px;
-          --card-shadow: none;
-          --hero-bg: var(--card-bg);
+          --card-shadow: var(--shadow-card);
+          /* 홈 히어로: 라이트는 밝은 표면 그라데이션(다크 텍스트 대비 확보), 다크는 토큰이 자동 반전 */
+          --hero-bg: linear-gradient(135deg, var(--color-card-soft) 0%, var(--color-card) 65%);
         }
 
         .pwa-wrapper { min-height: 100vh; background: var(--bg); color: var(--text-primary); font-family: var(--font-body); padding-bottom: 40px; transition: background 0.2s ease, color 0.2s ease; }
@@ -2393,7 +2288,6 @@ export default function PWADashboard({ latestReport }) {
         .pwa-trader-toggle { display: flex; gap: 3px; background: var(--inset-bg); padding: 3px; border-radius: var(--radius-pill); }
         .pwa-trader-toggle button { background: none; border: none; color: var(--text-secondary); padding: 5px 13px; border-radius: var(--radius-pill); cursor: pointer; font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; }
         .pwa-trader-toggle button.active { background: var(--card-bg); color: var(--accent-info); box-shadow: var(--card-shadow); }
-        .theme-dark .pwa-trader-toggle button.active { background: var(--accent-buy); color: var(--bg); box-shadow: none; }
         .pwa-theme-toggle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--card-bg); cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 
         /* Tabs */
@@ -2401,28 +2295,43 @@ export default function PWADashboard({ latestReport }) {
         .pwa-tab { flex: 1; padding: 10px 4px; background: none; border: none; cursor: pointer; color: var(--text-tertiary); font-family: var(--font-display); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.02em; }
         /* [v9.1 PWA-01] 검색 아이콘: 상단 우측 (theme-toggle과 동일 규격, 강조 최소화) */
         .pwa-search-toggle { width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border); background: var(--card-bg); cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .pwa-search-toggle.active { border-color: var(--accent-buy, #2980B9); color: var(--accent-buy, #2980B9); }
-        .theme-light .pwa-tabs { background: var(--inset-bg); padding: 4px; border-radius: var(--radius-md); margin: 4px 16px 8px; gap: 2px; }
-        .theme-light .pwa-tab.active { background: var(--card-bg); color: var(--text-primary); border-radius: 10px; box-shadow: var(--card-shadow); }
-        .theme-dark .pwa-tabs { border-bottom: 1px solid var(--border); }
-        .theme-dark .pwa-tab { text-transform: uppercase; font-family: var(--font-mono); font-size: 0.65rem; border-bottom: 2px solid transparent; }
-        .theme-dark .pwa-tab.active { color: var(--accent-buy); border-bottom-color: var(--accent-buy); }
+        .pwa-search-toggle.active { border-color: var(--accent-buy, var(--color-primary)); color: var(--accent-buy, var(--color-primary)); }
+        /* [v10 UI] 탭 = 흰 라운드 컨테이너 · 활성 = 네이비 pill (시안 통일) */
+        .pwa-tabs { background: var(--card-bg); padding: 4px; border-radius: 16px; margin: 4px 16px 12px; gap: 2px; box-shadow: var(--card-shadow); }
+        .pwa-tab { min-height: 36px; display: flex; align-items: center; justify-content: center; font-size: 0.78rem; }
+        .pwa-tab.active { background: var(--hero-grad-1); color: #fff; border-radius: 11px; box-shadow: none; }
+        :global([data-theme="dark"]) .pwa-tab.active { background: var(--color-primary); }
         /* [v11 IA] 주식 서브탭 (2차 내비) */
-        .pwa-subtabs { display: flex; align-items: center; gap: 6px; margin: 0 16px 8px; }
-        .pwa-subtab { padding: 5px 14px; background: none; border: 1px solid var(--border); border-radius: var(--radius-pill, 999px); cursor: pointer; color: var(--text-secondary); font-family: var(--font-display); font-size: 0.72rem; font-weight: 700; }
-        .pwa-subtab.active { background: var(--accent-buy, #2980B9); color: #fff; border-color: var(--accent-buy, #2980B9); }
-        .theme-dark .pwa-subtab.active { background: var(--accent-buy); color: var(--bg); }
+        .pwa-subtabs { display: flex; align-items: center; gap: 8px; margin: 0 16px 12px; }
+        .pwa-subtab { padding: 9px 20px; background: var(--card-bg); border: none; border-radius: var(--radius-pill, 999px); cursor: pointer; color: var(--text-secondary); font-family: var(--font-display); font-size: 0.78rem; font-weight: 700; box-shadow: var(--card-shadow); }
+        .pwa-subtab.active { background: var(--accent-buy); color: #fff; }
 
         /* Layout */
         .pwa-main { padding: 8px 16px 12px; display: flex; flex-direction: column; gap: 12px; }
         .pwa-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 16px; box-shadow: var(--card-shadow); }
         .pwa-card-label { display: block; font-size: 0.68rem; letter-spacing: 0.08em; color: var(--label-color); text-transform: uppercase; margin-bottom: 10px; font-weight: 700; }
 
+        /* [v10 UI] 홈 히어로 — 다크 네이비 결론 앵커 (시안) */
+        .home-hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 26px 22px; box-shadow: var(--shadow-float); overflow: hidden; }
+        .hh-eyebrow { margin-bottom: 14px; }
+        .hh-eyebrow-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .hh-label { font-size: 0.8rem; font-weight: 700; color: var(--hero-ink-sub); display: flex; align-items: center; gap: 6px; }
+        .hh-live { background: var(--color-success); color: #04351f; font-size: 0.56rem; font-weight: 800; padding: 2px 6px; border-radius: 5px; letter-spacing: .5px; }
+        .hh-date { font-size: 0.72rem; color: var(--hero-ink-faint); font-weight: 500; margin-top: 5px; }
+        .hh-h1 { font-size: 1.6rem; font-weight: 800; letter-spacing: -.03em; line-height: 1.25; margin-bottom: 10px; color: var(--hero-ink); font-family: var(--font-body); }
+        .hh-h1 em { font-style: normal; color: var(--hero-accent); }
+        .hh-reason { font-size: 0.86rem; line-height: 1.55; color: var(--hero-ink-soft); }
+        .hh-reason b { color: var(--hero-ink); font-weight: 700; }
+        .hh-foot { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+        .hh-chip { background: var(--hero-fill); border: 1px solid var(--hero-fill-line); padding: 6px 11px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; color: var(--hero-ink-soft); display: flex; align-items: center; gap: 5px; }
+        .hh-chip .v { color: var(--hero-accent); font-weight: 700; }
+        .hh-cta { margin-top: 14px; width: 100%; background: #fff; color: var(--hero-grad-1); border: none; font-family: var(--font-body); font-weight: 700; font-size: 0.86rem; padding: 13px; border-radius: 14px; cursor: pointer; }
+
         /* [v8.6] Hero 카드 — "오늘의 시장" */
         .hero-card { background: var(--hero-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 20px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; gap: 14px; }
 
         /* [v9.0] Splash Screen */
-        .splash-screen { position: fixed; inset: 0; z-index: 9999; background: #2563eb; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+        .splash-screen { position: fixed; inset: 0; z-index: 9999; background: var(--color-primary); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
         .splash-logo { font-family: 'Syne', sans-serif; font-size: 2.4rem; font-weight: 800; color: #fff; letter-spacing: 0.05em; }
         .splash-sub { font-size: 0.9rem; color: rgba(255,255,255,0.75); font-family: 'Pretendard', sans-serif; }
         .splash-dots { display: flex; gap: 8px; }
@@ -2434,18 +2343,18 @@ export default function PWADashboard({ latestReport }) {
         /* [v9.0] Onboarding Gate */
         .onboarding-overlay { position: fixed; inset: 0; z-index: 9000; background: rgba(15,23,42,0.72); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 20px; }
         .onboarding-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 28px 22px 24px; max-width: 400px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
-        .onboarding-logo { font-family: var(--font-display); font-size: 1.1rem; font-weight: 800; color: #2563eb; letter-spacing: 0.15em; margin-bottom: 12px; }
+        .onboarding-logo { font-family: var(--font-display); font-size: 1.1rem; font-weight: 800; color: var(--color-primary); letter-spacing: 0.15em; margin-bottom: 12px; }
         .onboarding-title { font-size: 1.15rem; font-weight: 700; color: var(--text-primary); margin: 0 0 6px; }
         .onboarding-desc { font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 18px; line-height: 1.5; }
         .onboarding-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
         .onboarding-opt { display: flex; align-items: flex-start; gap: 12px; padding: 13px 14px; border-radius: var(--radius-md); border: 1.5px solid var(--border); background: var(--inset-bg); cursor: pointer; text-align: left; font-family: var(--font-body); transition: border-color 0.15s, background 0.15s; }
-        .onboarding-opt.selected { border-color: #2563eb; background: color-mix(in srgb, #2563eb 10%, var(--card-bg)); }
+        .onboarding-opt.selected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 10%, var(--card-bg)); }
         .onboarding-opt-icon { font-size: 1.4rem; flex-shrink: 0; margin-top: 2px; }
         .onboarding-opt-text { display: flex; flex-direction: column; gap: 2px; }
         .onboarding-opt-label { font-size: 0.88rem; font-weight: 700; color: var(--text-primary); }
         .onboarding-opt-desc { font-size: 0.76rem; color: var(--text-secondary); line-height: 1.4; }
         .onboarding-opt-sub { font-size: 0.7rem; color: var(--text-tertiary); font-style: italic; }
-        .onboarding-confirm { width: 100%; padding: 12px; background: #2563eb; color: #fff; border: none; border-radius: var(--radius-md); font-size: 0.9rem; font-weight: 700; cursor: pointer; font-family: var(--font-body); }
+        .onboarding-confirm { width: 100%; padding: 12px; background: var(--color-primary); color: #fff; border: none; border-radius: var(--radius-md); font-size: 0.9rem; font-weight: 700; cursor: pointer; font-family: var(--font-body); }
 
         /* [v9.0] Hero 카드 v9 — Regime 크게 + AI Confidence + 오늘행동 + 버튼2 */
         .hero-v9 { background: var(--hero-bg); border: 2px solid var(--border); border-radius: var(--radius-card); padding: 22px 20px 18px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; gap: 12px; }
@@ -2465,20 +2374,20 @@ export default function PWADashboard({ latestReport }) {
         .hero-v9-regime-compact { font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; line-height: 1.2; }
         .hero-v9-compact .hero-v9-btns { grid-template-columns: repeat(2, 1fr); }
         .hero-v9-btn { width: 100%; padding: 10px 4px; border-radius: var(--radius-md); font-size: 0.78rem; font-weight: 700; cursor: pointer; border: none; font-family: var(--font-body); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .hero-v9-btn.primary { background: #2563eb; color: #fff; }
+        .hero-v9-btn.primary { background: var(--color-primary); color: #fff; }
         .hero-v9-btn.secondary { background: var(--inset-bg); color: var(--text-secondary); border: 1px solid var(--border); }
 
         /* [v8.7] Top3 Hero Cards */
         .top3-hero-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
         .top3-hero-card { display: flex; flex-direction: column; align-items: center; padding: 12px 6px; background: var(--card-bg); border-radius: var(--radius-md); border: 1.5px solid var(--border); gap: 4px; cursor: pointer; text-align: center; transition: border-color 0.15s; }
-        .top3-hero-card:hover { border-color: #2563eb; }
-        .top3-hero-card:nth-child(1) { border-color: #f59e0b; }
-        .top3-hero-card:nth-child(2) { border-color: #94a3b8; }
-        .top3-hero-card:nth-child(3) { border-color: #b45309; }
+        .top3-hero-card:hover { border-color: var(--color-primary); }
+        .top3-hero-card:nth-child(1) { border-color: var(--color-warning); }
+        .top3-hero-card:nth-child(2) { border-color: var(--color-ink-3); }
+        .top3-hero-card:nth-child(3) { border-color: var(--color-warning-ink); }
         .top3-medal { font-size: 1.4rem; line-height: 1; }
         .top3-name { font-size: 0.8rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-        .top3-stars { font-size: 0.7rem; letter-spacing: -1px; color: #f59e0b; }
-        .top3-ai-pct { font-size: 0.78rem; font-weight: 800; color: #2563eb; }
+        .top3-stars { font-size: 0.7rem; letter-spacing: -1px; color: var(--color-warning); }
+        .top3-ai-pct { font-size: 0.78rem; font-weight: 800; color: var(--color-primary); }
         .top3-why-btn { font-size: 0.62rem; padding: 3px 8px; border-radius: 6px; background: var(--inset-bg); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; }
 
         /* [v8.7] Action Summary Hero */
@@ -2495,11 +2404,11 @@ export default function PWADashboard({ latestReport }) {
         .ta-vl.pend { color: var(--text-tertiary); font-weight: 600; }
         .ta-ar { color: var(--text-tertiary); font-size: 1.1rem; }
         /* [v11 2-A] 오늘 AI 자산 권고 카드 */
-        .ai-rec-card { margin-bottom: 10px; cursor: pointer; border-color: color-mix(in srgb, var(--accent-info, #2563eb) 30%, var(--border)); }
-        .ai-rec-score { font-weight: 700; color: var(--accent-info, #2563eb); margin-left: 6px; font-size: 0.7rem; }
+        .ai-rec-card { margin-bottom: 10px; cursor: pointer; border-color: color-mix(in srgb, var(--accent-info, var(--color-primary)) 30%, var(--border)); }
+        .ai-rec-score { font-weight: 700; color: var(--accent-info, var(--color-primary)); margin-left: 6px; font-size: 0.7rem; }
         .ai-rec-list { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 10px; }
         .ai-rec-item { font-size: 0.85rem; color: var(--text-primary); line-height: 1.4; }
-        .ai-rec-more { font-size: 0.74rem; font-weight: 700; color: var(--accent-info, #2563eb); text-align: right; }
+        .ai-rec-more { font-size: 0.74rem; font-weight: 700; color: var(--accent-info, var(--color-primary)); text-align: right; }
         .action-summary-headline { font-size: 1.05rem; font-weight: 800; color: var(--text-primary); margin-bottom: 12px; }
         .action-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
         .action-summary-pill { display: flex; flex-direction: column; align-items: center; padding: 8px 4px; border-radius: var(--radius-md); border: 1.5px solid; gap: 2px; background: var(--inset-bg); }
@@ -2516,7 +2425,7 @@ export default function PWADashboard({ latestReport }) {
         .action-label { font-size: 0.78rem; font-weight: 600; color: var(--text-primary); }
 
         /* [v9.0][10] Today Mission */
-        .today-mission-card { border-color: color-mix(in srgb, #f59e0b 30%, var(--border)); }
+        .today-mission-card { border-color: color-mix(in srgb, var(--color-warning) 30%, var(--border)); }
         .today-mission-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
         .today-mission-row { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-radius: var(--radius-md); background: var(--inset-bg); }
         .today-mission-row.tm-stop { background: color-mix(in srgb, var(--accent-sell) 10%, var(--card-bg)); }
@@ -2539,19 +2448,19 @@ export default function PWADashboard({ latestReport }) {
         .ai-reasons { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
         .ai-reasons-title { font-size: 0.68rem; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
         .ai-reason-row { display: flex; align-items: flex-start; gap: 8px; }
-        .ai-reason-num { font-size: 0.8rem; color: #2563eb; font-weight: 700; flex-shrink: 0; }
+        .ai-reason-num { font-size: 0.8rem; color: var(--color-primary); font-weight: 700; flex-shrink: 0; }
         .ai-reason-text { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.4; }
 
         /* [v9.0] Profile Tab */
         /* 투자성향 배지 */
-        .profile-badge-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: color-mix(in srgb, #2563eb 8%, var(--card-bg)); border: 1px solid color-mix(in srgb, #2563eb 20%, var(--border)); border-radius: var(--radius-md); }
+        .profile-badge-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px; background: color-mix(in srgb, var(--color-primary) 8%, var(--card-bg)); border: 1px solid color-mix(in srgb, var(--color-primary) 20%, var(--border)); border-radius: var(--radius-md); }
         .profile-badge-label { font-size: 0.78rem; color: var(--text-secondary); }
         .profile-badge-label strong { color: var(--text-primary); }
-        .profile-badge-change { background: none; border: none; font-size: 0.75rem; color: #2563eb; cursor: pointer; font-weight: 700; font-family: var(--font-body); padding: 0; }
+        .profile-badge-change { background: none; border: none; font-size: 0.75rem; color: var(--color-primary); cursor: pointer; font-weight: 700; font-family: var(--font-body); padding: 0; }
 
         .profile-style-grid { display: flex; flex-direction: column; gap: 8px; }
         .profile-style-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: var(--radius-md); border: 2px solid var(--border); background: var(--inset-bg); cursor: pointer; text-align: left; transition: border-color 0.15s, background 0.15s; }
-        .profile-style-card.selected { border-color: #2563eb; background: color-mix(in srgb, #2563eb 8%, var(--card-bg)); }
+        .profile-style-card.selected { border-color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, var(--card-bg)); }
         .profile-style-icon { font-size: 1.4rem; flex-shrink: 0; }
         .profile-style-label { font-size: 0.9rem; font-weight: 700; color: var(--text-primary); flex-shrink: 0; width: 44px; }
         .profile-style-desc { font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4; }
@@ -2559,11 +2468,11 @@ export default function PWADashboard({ latestReport }) {
         .profile-row-top { display: flex; justify-content: space-between; align-items: center; }
         .profile-row-label { font-size: 0.82rem; font-weight: 600; color: var(--text-primary); }
         .profile-row-val { font-size: 0.88rem; }
-        .profile-slider { width: 100%; accent-color: #2563eb; cursor: pointer; }
+        .profile-slider { width: 100%; accent-color: var(--color-primary); cursor: pointer; }
         .profile-slider-hint { display: flex; justify-content: space-between; font-size: 0.64rem; color: var(--text-tertiary); margin-top: 2px; }
         .profile-period-btns { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
         .profile-period-btn { padding: 9px 14px; border-radius: var(--radius-sm); border: 1.5px solid var(--border); background: var(--inset-bg); color: var(--text-secondary); font-size: 0.8rem; cursor: pointer; text-align: left; font-family: var(--font-body); }
-        .profile-period-btn.selected { border-color: #2563eb; color: #2563eb; background: color-mix(in srgb, #2563eb 8%, var(--card-bg)); font-weight: 700; }
+        .profile-period-btn.selected { border-color: var(--color-primary); color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 8%, var(--card-bg)); font-weight: 700; }
         .profile-summary { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
         .profile-sum-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; }
         .profile-app-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.84rem; color: var(--text-primary); }

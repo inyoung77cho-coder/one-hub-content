@@ -8,6 +8,108 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap');
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
 
+/* =========================================================
+   ONE-HUB Design Tokens  (v10 UI 통일 시안 기반)
+   - 모든 v10 통일 컴포넌트는 이 변수만 참조합니다. 색상 하드코딩 금지.
+   - 라이트가 기본, <html data-theme="dark"> 로 다크 전환 (설정 탭 토글).
+   - 기존 v8.x 변수(--bg-base 등)는 하위호환을 위해 아래 :root 에 그대로 둡니다.
+   ========================================================= */
+:root {
+  /* ---- 표면 / 배경 ---- */
+  --color-bg-deep:      #DCE6F3;   /* 앱 바깥(디바이스 프레임) */
+  --color-bg:           #EAF1FA;   /* 화면 배경 */
+  --color-card:         #FFFFFF;   /* 카드 표면 */
+  --color-card-soft:    #F8FAFC;   /* 카드 내부 보조 셀 */
+  --color-line:         #EEF2F7;   /* 구분선 / 보더 */
+
+  /* ---- 텍스트 ---- */
+  --color-ink:          #1E293B;   /* 본문/제목 */
+  --color-ink-2:        #64748B;   /* 보조 텍스트 */
+  --color-ink-3:        #94A3B8;   /* 캡션/비활성 */
+
+  /* ---- 브랜드 / 시맨틱 ---- */
+  --color-primary:      #2F6BFF;   /* 주요 액션/링크 (매수검토 포함) */
+  --color-primary-soft: #EAF1FF;
+  --color-etf:          #06B6D4;   /* 앱 확장: ETF 자산군 구분색(도넛/칩) */
+  --color-success:      #16C784;   /* 수익 / 저평가 / 매수 */
+  --color-success-ink:  #0E9E6A;   /* 초록 배경 위 텍스트용 진한 초록 */
+  --color-success-soft: #E7FAF2;
+  --color-danger:       #F04452;   /* 손실 / 고평가 / 차단 */
+  --color-danger-soft:  #FDECEE;
+  --color-warning:      #F5A524;   /* 손절 / 주의 / SAMPLE */
+  --color-warning-soft: #FEF3C7;
+  --color-warning-ink:  #B45309;
+
+  /* ---- 다크 네이비 히어로 (화면마다 상단 앵커) ---- */
+  --hero-grad-1:        #12213B;
+  --hero-grad-2:        #20375F;
+  --hero-ink:           #FFFFFF;
+  --hero-ink-soft:      #C7D4EC;   /* 히어로 본문 */
+  --hero-ink-sub:       #9DB6E6;   /* 히어로 라벨 */
+  --hero-ink-faint:     #8AA0C6;   /* 히어로 각주 */
+  --hero-accent:        #7FE9C0;   /* 히어로 위 강조(수익/실질) */
+  --hero-danger:        #FF9BA8;   /* 히어로 위 손실 */
+  --hero-fill:          rgba(255,255,255,.07);  /* 히어로 내부 반투명 박스 */
+  --hero-fill-line:     rgba(255,255,255,.12);
+
+  /* ---- 타이포 ---- */
+  --font-sans: 'Pretendard', -apple-system, BlinkMacSystemFont,
+               'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+
+  /* ---- 라운드 (v10 통일 컴포넌트 전용, 기존 --radius-sm/md/lg 는 유지) ---- */
+  --radius-hero:  22px;
+  --radius-card:  22px;
+  --radius-pill:  20px;
+
+  /* ---- 그림자 ---- */
+  --shadow-card:  0 6px 20px rgba(31,63,120,.06);
+  --shadow-float: 0 20px 50px rgba(15,33,62,.18);
+
+  /* ---- 간격 스케일 (선택) ---- */
+  --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;  --sp-4: 14px;
+  --sp-5: 16px; --sp-6: 18px; --sp-7: 22px;
+}
+
+/* =========================================================
+   다크 모드  ( <html data-theme="dark"> )
+   히어로는 이미 어두우므로 거의 그대로 두고,
+   표면/텍스트/보조색만 반전합니다.
+   ========================================================= */
+[data-theme="dark"] {
+  --color-bg-deep:      #0A1424;
+  --color-bg:           #0F1B30;
+  --color-card:         #16233C;
+  --color-card-soft:    #1C2C48;
+  --color-line:         #26375A;
+
+  --color-ink:          #EAF1FB;
+  --color-ink-2:        #9FB2D0;
+  --color-ink-3:        #6B7F9E;
+
+  --color-primary:      #5A8BFF;
+  --color-primary-soft: #1E2E52;
+  --color-success:      #2CD48C;
+  --color-success-ink:  #6FE3B4;
+  --color-success-soft: #133A2C;
+  --color-danger:       #FF6473;
+  --color-danger-soft:  #3A1E24;
+  --color-warning:      #F7B84B;
+  --color-warning-soft: #3A2E12;
+  --color-warning-ink:  #F5C97A;
+
+  /* 히어로는 배경과 대비를 위해 살짝만 밝게 */
+  --hero-grad-1:        #1A2C4A;
+  --hero-grad-2:        #24406C;
+
+  --shadow-card:  0 6px 20px rgba(0,0,0,.35);
+  --shadow-float: 0 20px 50px rgba(0,0,0,.5);
+}
+
+/* v10 재사용 유틸: 시맨틱 색 텍스트 */
+.u-up   { color: var(--color-success); }
+.u-down { color: var(--color-danger); }
+.u-mut  { color: var(--color-ink-3); }
+
 /* ── Reset ── */
 *, *::before, *::after {
   box-sizing: border-box;

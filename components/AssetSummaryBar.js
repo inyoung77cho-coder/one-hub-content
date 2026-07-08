@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 
-const COLOR = { stock: "#3b82f6", etf: "#06b6d4", realestate: "#14b8a6" };
+const COLOR = { stock: "var(--color-primary)", etf: "var(--color-etf)", realestate: "var(--color-success)" };
 
 export default function AssetSummaryBar() {
   const router = useRouter();
@@ -38,16 +38,16 @@ export default function AssetSummaryBar() {
         ))}
       </div>
       <style jsx>{`
-        .asb { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 14px; margin: 8px 0 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .asb { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md, 14px); padding: 12px 14px; margin: 8px 0 12px; box-shadow: var(--shadow-card); }
         .asb-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
-        .asb-lbl { font-size: 0.72rem; color: #6b7280; font-weight: 700; }
-        .asb-total { font-size: 1.5rem; font-weight: 800; color: #0f172a; }
+        .asb-lbl { font-size: 0.72rem; color: var(--color-ink-2); font-weight: 700; }
+        .asb-total { font-size: 1.5rem; font-weight: 800; color: var(--color-ink); }
         .asb-chips { display: flex; gap: 6px; overflow-x: auto; }
-        .asb-chip { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; background: #f8fafc; border: 1px solid #eef2f7; border-radius: 9px; padding: 7px 8px; cursor: pointer; }
+        .asb-chip { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 9px; padding: 7px 8px; cursor: pointer; }
         .asb-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .asb-cl { font-size: 0.72rem; color: #475569; font-weight: 700; }
-        .asb-cv { font-size: 0.72rem; color: #0f172a; font-weight: 700; margin-left: auto; }
-        .asb-cv.pend { color: #cbd5e1; font-weight: 600; }
+        .asb-cl { font-size: 0.72rem; color: var(--color-ink-2); font-weight: 700; }
+        .asb-cv { font-size: 0.72rem; color: var(--color-ink); font-weight: 700; margin-left: auto; }
+        .asb-cv.pend { color: var(--color-ink-3); font-weight: 600; }
       `}</style>
     </div>
   );
