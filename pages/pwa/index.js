@@ -23,14 +23,19 @@ function mergeOnboardAssets(d) {
   let onb = null;
   try { onb = JSON.parse(window.localStorage.getItem('onehub_onboard_assets') || 'null'); } catch (e) {}
   const b = { ...(d?.breakdown || {}) };
-  const pick = (k) => (b[k] != null ? b[k] : (onb && onb[k] != null ? onb[k] : null));
-  const stock_uk = pick('stock_uk'), etf_uk = pick('etf_uk'), realestate_uk = pick('realestate_uk');
-  const parts = [stock_uk, etf_uk, realestate_uk].filter(v => v != null);
+  // 백엔드 집계 값 + 온보딩 입력 값을 합산(둘 다 없으면 null)
+  const add = (x, y) => {
+    if (x == null && y == null) return null;
+    return Math.round(((Number(x) || 0) + (Number(y) || 0)) * 100) / 100;
+  };
+  const stock_uk = add(b.stock_uk, onb && onb.stock_uk);
+  const etf_uk = add(b.etf_uk, onb && onb.etf_uk);
+  const realestate_uk = add(b.realestate_uk, onb && onb.realestate_uk);
+  const cash_uk = add(b.cash_uk, onb && onb.cash_uk); // 온보딩 보유 현금(주식계좌 예수금은 렌더에서 합산)
+  const parts = [stock_uk, etf_uk, realestate_uk, cash_uk].filter(v => v != null);
   if (parts.length === 0 && (d?.total_uk == null)) return null;
-  const total_uk = d?.total_uk != null && !onb
-    ? d.total_uk
-    : Math.round(parts.reduce((s, v) => s + Number(v), 0) * 100) / 100;
-  return { total_uk, breakdown: { stock_uk, etf_uk, realestate_uk } };
+  const total_uk = Math.round(parts.reduce((s, v) => s + Number(v), 0) * 100) / 100;
+  return { total_uk, breakdown: { stock_uk, etf_uk, realestate_uk, cash_uk } };
 }
 
 // [Queue] KST 장중(평일 09:00~15:30) 여부 — 장외 승인은 예약으로 전환
@@ -693,21 +698,38 @@ export default function PWADashboard({ latestReport }) {
               })()}
 
               {/* [v10 UI 시안] ② 총자산 — 라벨/금액 + 자산별 행(부동산 미입력 CTA) */}
-              <section className="card v10">
-                <div className="v10-total"><span className="v10-total-lbl">총자산</span><span className="v10-total-amt mono">{assetSum?.total_uk != null ? `${assetSum.total_uk}억` : '—'}</span></div>
-                {[
-                  ['주식', 'var(--color-primary)', assetSum?.breakdown?.stock_uk, '/pwa?tab=recommend'],
-                  ['ETF', 'var(--color-success)', assetSum?.breakdown?.etf_uk, '/pwa/etf'],
-                  ['부동산', 'var(--color-ink-3)', assetSum?.breakdown?.realestate_uk, '/pwa/realestate'],
-                ].map(([label, color, val, href]) => (
-                  <div className="v10-arow" key={label}>
-                    <span className="v10-aname"><i className="v10-adot" style={{ background: color }} />{label}</span>
-                    {val != null
-                      ? <span className="v10-aval mono">{val}억</span>
-                      : <span className="v10-miss"><span className="v10-miss-tag">미입력</span><button className="v10-miss-btn" onClick={() => { window.location.href = href; }}>입력하기 →</button></span>}
-                  </div>
-                ))}
-              </section>
+              {(() => {
+                // 현금 = 주식계좌 예수금(원→억) + 온보딩 입력 보유 현금(억)
+                const acctCashUk = data?.balance?.cash != null
+                  ? Math.round((Number(data.balance.cash) / 1e8) * 100) / 100 : null;
+                const onbCashUk = assetSum?.breakdown?.cash_uk ?? null;
+                const cashUk = (acctCashUk == null && onbCashUk == null)
+                  ? null
+                  : Math.round(((acctCashUk || 0) + (onbCashUk || 0)) * 100) / 100;
+                // 표시 총자산 = 온보딩 병합 합계 + 주식계좌 예수금(병합에는 미포함)
+                const baseTotal = assetSum?.total_uk ?? null;
+                const totalUk = (baseTotal == null && acctCashUk == null)
+                  ? null
+                  : Math.round(((baseTotal || 0) + (acctCashUk || 0)) * 100) / 100;
+                return (
+                  <section className="card v10">
+                    <div className="v10-total"><span className="v10-total-lbl">총자산</span><span className="v10-total-amt mono">{totalUk != null ? `${totalUk}억` : '—'}</span></div>
+                    {[
+                      ['주식', 'var(--color-primary)', assetSum?.breakdown?.stock_uk, '/pwa?tab=recommend'],
+                      ['ETF', 'var(--color-success)', assetSum?.breakdown?.etf_uk, '/pwa/etf'],
+                      ['부동산', 'var(--color-ink-3)', assetSum?.breakdown?.realestate_uk, '/pwa/realestate'],
+                      ['현금', 'var(--color-warning)', cashUk, '/pwa/onboarding'],
+                    ].map(([label, color, val, href]) => (
+                      <div className="v10-arow" key={label}>
+                        <span className="v10-aname"><i className="v10-adot" style={{ background: color }} />{label}</span>
+                        {val != null
+                          ? <span className="v10-aval mono">{val}억</span>
+                          : <span className="v10-miss"><span className="v10-miss-tag">미입력</span><button className="v10-miss-btn" onClick={() => { window.location.href = href; }}>입력하기 →</button></span>}
+                      </div>
+                    ))}
+                  </section>
+                );
+              })()}
 
               {/* [v10 UI 시안] ③ 오늘의 행동 — 4셀 + 요약 노트 */}
               <section className="card v10">
