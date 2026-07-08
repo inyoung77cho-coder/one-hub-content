@@ -41,23 +41,23 @@ export default function AIAdvisor() {
   return (
     <div className="m">
       <TopNav active="ai" />
-      <div className="hd"><h1>🤖 AI 자산운영</h1></div>
+
+      {/* HERO — AI 자산운영 배분 점수 (다크 네이비 앵커). 미측정은 회색 "측정 준비 중" (§5③) */}
+      <section className="hero">
+        <div className="h-eyebrow">
+          <span className="h-lbl">🤖 AI 자산운영 · 통합 배분 점수</span>
+          <span className="h-live">LIVE</span>
+        </div>
+        {measured
+          ? <div className="h-score">{score}<span>점</span></div>
+          : <div className="h-pending">측정 준비 중</div>}
+        <div className="h-bar"><div className="h-fill" style={{ width: `${measured ? score : 0}%`, background: measured ? "var(--hero-accent)" : "var(--hero-ink-faint)" }} /></div>
+        <div className="h-note">{measured ? "자산 배분의 균형도를 100점 기준으로 평가합니다." : "자산 입력이 완료되면 배분 점수가 산출됩니다."}</div>
+      </section>
 
       <AssetSummaryBar />
 
       {err && <div className="card err">AI 엔진 연결에 실패했습니다. 잠시 후 다시 시도하세요.</div>}
-
-      {/* 배분 점수 — 미측정은 회색 "측정 준비 중" (§5③) */}
-      <div className="card score">
-        <div className="sc-l">
-          <div className="k">통합 배분 점수</div>
-          {measured
-            ? <div className="sc-n" style={{ color: scoreColor }}>{score}<span>점</span></div>
-            : <div className="sc-pending">측정 준비 중</div>}
-        </div>
-        <div className="sc-bar"><div className="sc-fill" style={{ width: `${measured ? score : 0}%`, background: scoreColor }} /></div>
-        {!measured && <div className="sc-hint">자산 입력이 완료되면 배분 점수가 산출됩니다.</div>}
-      </div>
 
       {/* 오늘의 AI 요약 */}
       <div className="card">
@@ -118,17 +118,20 @@ export default function AIAdvisor() {
 
       <style jsx>{`
         .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--color-bg); padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
-        .hd { display: flex; align-items: center; gap: 10px; padding: 12px 2px 6px; } .hd h1 { font-size: 1.05rem; font-weight: 800; margin: 0; }
+        .hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 20px 18px; box-shadow: var(--shadow-float); margin-bottom: 12px; }
+        .h-eyebrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+        .h-lbl { font-size: 12px; font-weight: 700; color: var(--hero-ink-sub); }
+        .h-live { background: var(--color-success); color: #04351f; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 5px; letter-spacing: .5px; }
+        .h-score { font-size: 2.6rem; font-weight: 800; letter-spacing: -.02em; line-height: 1; color: var(--hero-accent); }
+        .h-score span { font-size: 1.1rem; font-weight: 700; margin-left: 3px; color: var(--hero-ink-soft); }
+        .h-pending { font-size: 1.3rem; font-weight: 800; color: var(--hero-ink-faint); }
+        .h-bar { height: 8px; background: var(--hero-fill-line); border-radius: 4px; overflow: hidden; margin-top: 12px; }
+        .h-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+        .h-note { font-size: 11px; color: var(--hero-ink-faint); margin-top: 10px; line-height: 1.5; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); }
         .err { color: var(--color-danger); font-size: 0.85rem; }
         .k { font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); margin-bottom: 10px; }
         .none { color: var(--color-ink-3); font-size: 0.85rem; }
-        .score { display: flex; flex-direction: column; gap: 10px; }
-        .sc-l { display: flex; align-items: baseline; justify-content: space-between; }
-        .sc-n { font-size: 2rem; font-weight: 800; } .sc-n span { font-size: 0.9rem; margin-left: 2px; }
-        .sc-pending { font-size: 1.05rem; font-weight: 800; color: var(--color-ink-3); }
-        .sc-bar { height: 8px; background: var(--color-line); border-radius: 4px; overflow: hidden; } .sc-fill { height: 100%; border-radius: 4px; transition: width .4s; }
-        .sc-hint { font-size: 0.72rem; color: var(--color-ink-3); }
         .sm { font-size: 0.9rem; padding: 7px 0; border-bottom: 1px solid var(--color-line); color: var(--color-ink); }
         .sm:last-child { border-bottom: none; }
         .advice { font-size: 0.9rem; line-height: 1.6; color: var(--color-ink); margin: 0; }

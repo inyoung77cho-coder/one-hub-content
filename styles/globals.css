@@ -110,6 +110,34 @@
 .u-down { color: var(--color-danger); }
 .u-mut  { color: var(--color-ink-3); }
 
+/* [v10 UI] PWA 대시보드(pages/pwa/index.js) 레거시 로컬 변수 → 디자인 토큰 브리지.
+   전역(비스코프)으로 선언해 styled-jsx 스코프 누락 시에도 다크모드가 정상 반전되도록 한다.
+   라이트/다크 색은 모두 v10 color/hero 토큰(html data-theme)이 결정한다. */
+.pwa-wrapper.theme-light,
+.pwa-wrapper.theme-dark {
+  --bg: var(--color-bg);
+  --card-bg: var(--color-card);
+  --inset-bg: var(--color-card-soft);
+  --border: var(--color-line);
+  --text-primary: var(--color-ink);
+  --text-secondary: var(--color-ink-2);
+  --text-tertiary: var(--color-ink-3);
+  --accent-buy: var(--color-success);
+  --accent-sell: var(--color-danger);
+  --accent-warn: var(--color-warning);
+  --accent-info: var(--color-primary);
+  --label-color: var(--color-ink-2);
+  --font-display: 'Syne', var(--font-sans);
+  --font-body: var(--font-sans);
+  --font-mono: ui-monospace, 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius-card: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --radius-pill: 999px;
+  --card-shadow: var(--shadow-card);
+  --hero-bg: linear-gradient(135deg, var(--color-card-soft) 0%, var(--color-card) 65%);
+}
+
 /* ── Reset ── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -145,14 +173,14 @@
   --text-secondary: #5B7088;
   --text-dim:     #93A6BC;
 
-  /* [v8.6] dashboard.js / today-activity 위젯이 참조하던 별칭 — 이전엔 정의가 없어 배경/테두리가 비어 보이는 버그가 있었음 */
-  --color-bg:      var(--bg-base);
-  --color-surface: var(--bg-surface);
-  --color-card:    var(--bg-card);
-  --color-border:  var(--bg-border);
-  --color-text:    var(--text-primary);
-  --color-muted:   var(--text-secondary);
-  --color-accent:  var(--green);
+  /* [v10 UI] 레거시 위젯 별칭 — v10 디자인 토큰에 매핑(단일 소스). 다크모드 자동 반전.
+     ※ --color-bg / --color-card 는 위 v10 :root/[data-theme] 정의가 소유하므로 여기서 재정의하지 않는다
+        (재정의 시 나중 소스가 이겨서 다크모드가 깨짐 — v10 회귀 버그 수정). */
+  --color-surface: var(--color-card);
+  --color-border:  var(--color-line);
+  --color-text:    var(--color-ink);
+  --color-muted:   var(--color-ink-2);
+  --color-accent:  var(--color-success);
 
   /* Fonts */
   --font-display: 'Syne', sans-serif;
@@ -179,8 +207,8 @@ html {
 }
 
 body {
-  background: var(--bg-base);
-  color: var(--text-primary);
+  background: var(--color-bg-deep);
+  color: var(--color-ink);
   font-family: var(--font-body);
   font-size: 15px;
   line-height: 1.6;
