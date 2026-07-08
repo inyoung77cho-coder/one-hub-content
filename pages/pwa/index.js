@@ -2102,11 +2102,12 @@ export default function PWADashboard({ latestReport }) {
         .hero-card { background: var(--hero-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 20px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; gap: 14px; }
 
         /* [v9.0] Splash Screen */
-        .splash-screen { position: fixed; inset: 0; z-index: 9999; background: var(--color-primary); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
-        .splash-logo { font-family: 'Syne', sans-serif; font-size: 2.4rem; font-weight: 800; color: #fff; letter-spacing: 0.05em; }
-        .splash-sub { font-size: 0.9rem; color: rgba(255,255,255,0.75); font-family: 'Pretendard', sans-serif; }
+        /* [색상 통일] 스플래시 배경 = 카드 표면색(--color-card)으로 → 대시보드 전환 톤 단절 제거. 색상만 교체(레이아웃/타이밍 유지) */
+        .splash-screen { position: fixed; inset: 0; z-index: 9999; background: var(--color-card); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+        .splash-logo { font-family: 'Syne', sans-serif; font-size: 2.4rem; font-weight: 800; color: var(--color-primary); letter-spacing: 0.05em; }
+        .splash-sub { font-size: 0.9rem; color: var(--color-ink-2); font-family: 'Pretendard', sans-serif; }
         .splash-dots { display: flex; gap: 8px; }
-        .splash-dots span { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.6); animation: splash-bounce 1.2s infinite ease-in-out; }
+        .splash-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--color-primary); animation: splash-bounce 1.2s infinite ease-in-out; }
         .splash-dots span:nth-child(2) { animation-delay: 0.2s; }
         .splash-dots span:nth-child(3) { animation-delay: 0.4s; }
         @keyframes splash-bounce { 0%,80%,100%{transform:scale(0.8);opacity:0.5} 40%{transform:scale(1.2);opacity:1} }
