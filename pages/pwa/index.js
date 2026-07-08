@@ -76,7 +76,6 @@ export default function PWADashboard({ latestReport }) {
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
-  const [expandedPos, setExpandedPos] = useState({}); // [v9.0] 보유 탭 왜? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
   const [sellConfirm, setSellConfirm] = useState({}); // [v8.7] 매도 1단계 확인 상태: { [code]: true }
   const [sellLoading, setSellLoading] = useState({}); // [v8.7] 매도 처리 중 상태
@@ -175,6 +174,8 @@ export default function PWADashboard({ latestReport }) {
     setTheme(prev => {
       const next = prev === 'light' ? 'dark' : 'light';
       try { window.localStorage.setItem('onehub_theme', next); } catch (e) {}
+      // [v10 UI] <html data-theme> 단일 소스 동기화 — 디자인 토큰 기반 컴포넌트 즉시 반영
+      try { window.dispatchEvent(new Event('onehub-theme-change')); } catch (e) {}
       return next;
     });
   }, []);
@@ -1593,26 +1594,12 @@ export default function PWADashboard({ latestReport }) {
                   ? <div className="pwa-empty">보유 종목 없음</div>
                   : <div className="position-cards">{positions.map((p,i) => (
                       <div key={i} className="position-card">
+                        {/* [v10 UI §5④] 중복 'AI 분석 보기' 버튼 제거 — 상단은 손익 배지만, 분석 버튼은 하단 액션행에 1개로 통일 */}
                         <div className="position-card-top">
                           <span className="position-card-name">{p.name}</span>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <button
-                              style={{ fontSize: '0.65rem', padding: '2px 7px', borderRadius: 8, background: 'var(--inset-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', whiteSpace: 'nowrap' }}
-                              onClick={() => setBottomSheet({
-                                name: p.name, code: p.code,
-                                scores: { macro: p.macro_score ?? null, ml: p.ml_score != null ? Math.round(p.ml_score) : null, technical: p.tech_score ?? null, risk: p.risk_score ?? null },
-                                final_score: p.final_score ?? null,
-                                win_rate: p.win_rate ?? null,
-                                reasons: [
-                                  ...(p.reason ? [{ text: p.reason, positive: true }] : []),
-                                  ...(p.pnl_rate != null ? [{ text: `현재 ${p.pnl_rate >= 0 ? '+' : ''}${p.pnl_rate}% 수익중`, positive: p.pnl_rate >= 0 }] : []),
-                                ],
-                              })}
-                            >AI 분석 보기</button>
-                            <span className={`position-card-badge mono ${p.pnl_rate>=0?'bull':'bear'}`}>
-                              {p.pnl_rate>=0?'+':''}{p.pnl_rate}%
-                            </span>
-                          </div>
+                          <span className={`position-card-badge mono ${p.pnl_rate>=0?'bull':'bear'}`}>
+                            {p.pnl_rate>=0?'+':''}{p.pnl_rate}%
+                          </span>
                         </div>
                         <div className="position-card-grid mono">
                           <div className="position-card-cell">
@@ -1676,7 +1663,6 @@ export default function PWADashboard({ latestReport }) {
                           else if (avg > 0 && cur < avg * 0.97) badge = { label: '관망', color: '#f59e0b', icon: '🟡', bg: '#fffbeb' };
                           else                               badge = { label: '보유', color: '#22c55e', icon: '🟢', bg: '#f0fdf4' };
                           const posKey = p.code || i;
-                          const isPosExp = !!expandedPos[posKey];
                           return (
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, gap: 6 }}>
@@ -1685,10 +1671,19 @@ export default function PWADashboard({ latestReport }) {
                                 </span>
                                 <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                                   <button
-                                    style={{ fontSize: '0.68rem', padding: '3px 9px', borderRadius: 8, background: isPosExp ? '#2563eb' : 'var(--inset-bg)', color: isPosExp ? '#fff' : 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}
-                                    onClick={() => setExpandedPos(prev => ({ ...prev, [posKey]: !isPosExp }))}
+                                    style={{ fontSize: '0.68rem', padding: '3px 9px', borderRadius: 8, background: 'var(--inset-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}
+                                    onClick={() => setBottomSheet({
+                                      name: p.name, code: p.code,
+                                      scores: { macro: p.macro_score ?? null, ml: p.ml_score != null ? Math.round(p.ml_score) : null, technical: p.tech_score ?? null, risk: p.risk_score ?? null },
+                                      final_score: p.final_score ?? null,
+                                      win_rate: p.win_rate ?? null,
+                                      reasons: [
+                                        ...(p.reason ? [{ text: p.reason, positive: true }] : []),
+                                        ...(p.pnl_rate != null ? [{ text: `현재 ${p.pnl_rate >= 0 ? '+' : ''}${p.pnl_rate}% 수익중`, positive: p.pnl_rate >= 0 }] : []),
+                                      ],
+                                    })}
                                   >
-                                    {isPosExp ? '접기 ▲' : 'AI 분석 보기'}
+                                    AI 분석 보기
                                   </button>
                                   <button
                                     className={`sell-btn${sellConfirm[posKey] ? ' confirm' : ''}`}
@@ -1714,21 +1709,6 @@ export default function PWADashboard({ latestReport }) {
                                   </button>
                                 </div>
                               </div>
-                              {isPosExp && (
-                                <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                                  {[
-                                    { label: 'RSI',    value: p.rsi   != null ? p.rsi   : '-' },
-                                    { label: 'MACD',   value: p.macd  != null ? p.macd  : '-' },
-                                    { label: 'ATR',    value: p.atr   != null ? p.atr   : '-' },
-                                    { label: 'ML점수', value: p.ml_score != null ? `${p.ml_score}점` : '-' },
-                                  ].map(m => (
-                                    <div key={m.label} style={{ background: 'var(--inset-bg)', borderRadius: 8, padding: '6px 10px' }}>
-                                      <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)' }}>{m.label}</div>
-                                      <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{m.value}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
                             </div>
                           );
                         })()}

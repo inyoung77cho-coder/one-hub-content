@@ -14,6 +14,26 @@ export default function App({ Component, pageProps }) {
     }
   }, []);
 
+  // [v10 UI] 다크모드 단일 소스 — <html data-theme> 를 onehub_theme(localStorage)와 동기화.
+  //   설정 탭 토글이 localStorage 를 바꾸고 'onehub-theme-change' 이벤트를 쏘면 즉시 반영.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const apply = () => {
+      let t = "light";
+      try { t = window.localStorage.getItem("onehub_theme") || "light"; } catch (e) {}
+      document.documentElement.setAttribute("data-theme", t === "dark" ? "dark" : "light");
+    };
+    apply();
+    window.addEventListener("storage", apply);           // 다른 탭에서 변경
+    window.addEventListener("onehub-theme-change", apply); // 같은 탭 토글
+    router.events.on("routeChangeComplete", apply);       // 라우트 이동 시 재확인
+    return () => {
+      window.removeEventListener("storage", apply);
+      window.removeEventListener("onehub-theme-change", apply);
+      router.events.off("routeChangeComplete", apply);
+    };
+  }, [router.events]);
+
   return (
     <>
       <Head>

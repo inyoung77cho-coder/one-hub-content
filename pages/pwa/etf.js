@@ -2,8 +2,7 @@
 // 독립 라우트. 확정값(수익3단분해·세금·중복도)은 진한색/실선. 예측(Forecast)은 미구현(P6).
 // ★ 단일 점수 블랙박스 금지 — Portfolio Score는 구성요소를 펼쳐 보여준다(§11.2).
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import AssetBottomNav from "../../components/AssetBottomNav";
+import TopNav from "../../components/TopNav";
 import AssetSummaryBar from "../../components/AssetSummaryBar";
 
 const won = (n) => {
@@ -38,11 +37,8 @@ export default function EtfDashboard() {
 
   return (
     <div className="etf">
-      <header className="etf-hdr">
-        <Link href="/pwa" className="back">← ONE-HUB</Link>
-        <h1>ETF 자산</h1>
-        <span className="live">LIVE</span>
-      </header>
+      <TopNav active="etf" />
+      <div className="etf-title"><h1>ETF 자산</h1><span className="live">LIVE</span></div>
 
       <AssetSummaryBar />
 
@@ -181,53 +177,61 @@ export default function EtfDashboard() {
       <div className="foot">확정 계산(수익·세금·중복도)은 입력값 기반. 예측(Forecast)은 미탑재. · 세무자문 아님</div>
 
       <style jsx>{`
-        .etf { max-width: 480px; margin: 0 auto; padding: 0 14px 84px; font-family: -apple-system, "Segoe UI", sans-serif; color: #1e293b; }
-        .etf-hdr { display: flex; align-items: center; gap: 10px; padding: 16px 2px 10px; position: sticky; top: 0; background: #f8fafc; z-index: 5; }
-        .etf-hdr h1 { font-size: 1.15rem; font-weight: 800; margin: 0; flex: 1; }
-        .back { color: #0284c7; text-decoration: none; font-size: 0.82rem; font-weight: 600; }
-        .live { font-size: 0.62rem; font-weight: 800; color: #fff; background: #0ea5e9; padding: 2px 7px; border-radius: 6px; letter-spacing: 0.05em; }
-        .err { background: #fef2f2; color: #b91c1c; padding: 10px 12px; border-radius: 10px; font-size: 0.82rem; }
-        .loading { color: #64748b; padding: 24px; text-align: center; }
-        .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(15,23,42,0.04); }
-        .card.solid { background: linear-gradient(135deg, #f0f9ff, #e0f2fe); border-color: #bae6fd; }
-        .label { font-size: 0.78rem; font-weight: 700; color: #475569; margin-bottom: 8px; }
-        .label .sub, .sub { font-weight: 600; color: #94a3b8; font-size: 0.68rem; margin-left: 6px; }
+        .etf { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
+        .etf-title { display: flex; align-items: center; gap: 10px; padding: 12px 2px 6px; }
+        .etf-title h1 { font-size: 1.15rem; font-weight: 800; margin: 0; flex: 1; color: var(--color-ink); }
+        .live { font-size: 0.62rem; font-weight: 800; color: #fff; background: var(--color-primary); padding: 2px 7px; border-radius: 6px; letter-spacing: 0.05em; }
+        .err { background: var(--color-danger-soft); color: var(--color-danger); padding: 10px 12px; border-radius: 10px; font-size: 0.82rem; }
+        .loading { color: var(--color-ink-2); padding: 24px; text-align: center; }
+        .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
+        .card.solid { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); border-color: transparent; color: var(--hero-ink); }
+        .card.solid .label { color: var(--hero-ink-sub); }
+        .card.solid .big { color: var(--hero-ink); }
+        .card.solid .change { color: var(--hero-ink-soft); }
+        .card.solid .drow span { color: var(--hero-ink-soft); }
+        .card.solid .drow.total { border-top-color: var(--hero-fill-line); }
+        .card.solid .decomp { border-top-color: var(--hero-fill-line); }
+        .card.solid .hint { color: var(--hero-ink-soft); background: var(--hero-fill); }
+        .card.solid .pos { color: var(--hero-accent); }
+        .card.solid .neg { color: var(--hero-danger); }
+        .label { font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); margin-bottom: 8px; }
+        .label .sub, .sub { font-weight: 600; color: var(--color-ink-3); font-size: 0.68rem; margin-left: 6px; }
         .big { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.02em; }
-        .change { font-size: 0.8rem; color: #475569; margin: 2px 0 12px; }
-        .decomp { border-top: 1px dashed #cbd5e1; padding-top: 8px; }
+        .change { font-size: 0.8rem; color: var(--color-ink-2); margin: 2px 0 12px; }
+        .decomp { border-top: 1px dashed var(--color-line); padding-top: 8px; }
         .drow { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.9rem; }
-        .drow span { color: #475569; }
-        .drow.total { border-top: 1px solid #e2e8f0; margin-top: 4px; padding-top: 8px; font-weight: 800; }
-        .hint { font-size: 0.72rem; color: #0369a1; margin-top: 8px; background: #f0f9ff; padding: 7px 9px; border-radius: 8px; }
-        .pos { color: #dc2626; } .neg { color: #2563eb; }
+        .drow span { color: var(--color-ink-2); }
+        .drow.total { border-top: 1px solid var(--color-line); margin-top: 4px; padding-top: 8px; font-weight: 800; }
+        .hint { font-size: 0.72rem; color: var(--color-primary); margin-top: 8px; background: var(--color-primary-soft); padding: 7px 9px; border-radius: 8px; }
+        /* [v10 UI §1] 초록=수익, 빨강=손실/비용 */
+        .pos { color: var(--color-success); } .neg { color: var(--color-danger); }
         .score-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .sc { background: #f8fafc; border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
-        .sc span { font-size: 0.68rem; color: #64748b; } .sc b { font-size: 0.92rem; }
+        .sc { background: var(--color-card-soft); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 2px; }
+        .sc span { font-size: 0.68rem; color: var(--color-ink-2); } .sc b { font-size: 0.92rem; }
         .heat { display: flex; flex-direction: column; gap: 6px; }
         .hrow { display: flex; align-items: center; gap: 8px; }
         .ht { width: 54px; font-size: 0.78rem; font-weight: 700; font-family: ui-monospace, monospace; }
-        .hbar { flex: 1; background: #f1f5f9; border-radius: 5px; height: 14px; overflow: hidden; }
-        .hbar div { height: 100%; background: linear-gradient(90deg, #0ea5e9, #0284c7); border-radius: 5px; }
-        .hw { width: 44px; text-align: right; font-size: 0.76rem; font-weight: 700; color: #0369a1; }
+        .hbar { flex: 1; background: var(--color-line); border-radius: 5px; height: 14px; overflow: hidden; }
+        .hbar div { height: 100%; background: var(--color-primary); border-radius: 5px; }
+        .hw { width: 44px; text-align: right; font-size: 0.76rem; font-weight: 700; color: var(--color-primary); }
         .sectors { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-        .chip { font-size: 0.7rem; font-weight: 600; background: #e0f2fe; color: #0369a1; padding: 3px 9px; border-radius: 20px; }
-        .warn { margin-top: 10px; font-size: 0.74rem; color: #b45309; background: #fffbeb; padding: 7px 9px; border-radius: 8px; }
+        .chip { font-size: 0.7rem; font-weight: 600; background: var(--color-primary-soft); color: var(--color-primary); padding: 3px 9px; border-radius: 20px; }
+        .warn { margin-top: 10px; font-size: 0.74rem; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 7px 9px; border-radius: 8px; }
         .tax-line { display: flex; justify-content: space-between; font-size: 1rem; font-weight: 700; }
-        .tax-hint { font-size: 0.72rem; color: #64748b; margin-top: 6px; }
-        .prow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.84rem; }
+        .tax-hint { font-size: 0.72rem; color: var(--color-ink-2); margin-top: 6px; }
+        .prow { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--color-line); font-size: 0.84rem; }
         .prow .pt { width: 56px; font-weight: 700; font-family: ui-monospace, monospace; }
-        .prow .pd { flex: 1; color: #64748b; font-size: 0.74rem; }
+        .prow .pd { flex: 1; color: var(--color-ink-2); font-size: 0.74rem; }
         .prow b { font-size: 0.86rem; }
-        .asof { font-size: 0.7rem; color: #64748b; margin: -4px 2px 10px; }
-        .asof-tag { background: #f1f5f9; color: #94a3b8; padding: 1px 6px; border-radius: 6px; font-size: 0.62rem; margin-left: 4px; }
-        .rb { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.84rem; }
+        .asof { font-size: 0.7rem; color: var(--color-ink-2); margin: -4px 2px 10px; }
+        .asof-tag { background: var(--color-card-soft); color: var(--color-ink-3); padding: 1px 6px; border-radius: 6px; font-size: 0.62rem; margin-left: 4px; }
+        .rb { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--color-line); font-size: 0.84rem; }
         .rb .rt { width: 56px; font-weight: 700; font-family: ui-monospace, monospace; }
-        .rb .rw { flex: 1; color: #64748b; font-size: 0.74rem; }
-        .rb-tax { font-size: 0.72rem; color: #475569; margin-top: 10px; background: #f8fafc; padding: 7px 9px; border-radius: 8px; }
-        .foot { font-size: 0.68rem; color: #94a3b8; text-align: center; margin-top: 16px; line-height: 1.5; }
+        .rb .rw { flex: 1; color: var(--color-ink-2); font-size: 0.74rem; }
+        .rb-tax { font-size: 0.72rem; color: var(--color-ink-2); margin-top: 10px; background: var(--color-card-soft); padding: 7px 9px; border-radius: 8px; }
+        .foot { font-size: 0.68rem; color: var(--color-ink-3); text-align: center; margin-top: 16px; line-height: 1.5; }
       `}</style>
-      <AssetBottomNav active="etf" />
-      <style jsx global>{`body { background: #f8fafc; margin: 0; }`}</style>
+      <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>
   );
 }

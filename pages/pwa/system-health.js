@@ -2,12 +2,14 @@
 // 실제 서버 상태(서비스/KIS토큰/Circuit/DB/스케줄러/이벤트로그) 30초 폴링.
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import AssetBottomNav from "../../components/AssetBottomNav";
+import TopNav from "../../components/TopNav";
 
-const COLOR = { ok: "#16a34a", active: "#16a34a", connected: "#16a34a", running: "#16a34a", success: "#16a34a",
-  CLOSED: "#16a34a", warning: "#d97706", HALF_OPEN: "#d97706", unknown: "#9ca3af", missing: "#d97706",
-  error: "#dc2626", OPEN: "#dc2626", stopped: "#dc2626", failed: "#dc2626", inactive: "#dc2626" };
-const dot = (s) => COLOR[s] || "#9ca3af";
+// 상태 색은 시맨틱 토큰으로 — 정상=초록, 주의=주황, 오류=빨강, 미상=중립회색
+const OK = "var(--color-success)", WARN = "var(--color-warning)", ERR = "var(--color-danger)", MUT = "var(--color-ink-3)";
+const COLOR = { ok: OK, active: OK, connected: OK, running: OK, success: OK,
+  CLOSED: OK, warning: WARN, HALF_OPEN: WARN, unknown: MUT, missing: WARN,
+  error: ERR, OPEN: ERR, stopped: ERR, failed: ERR, inactive: ERR };
+const dot = (s) => COLOR[s] || MUT;
 
 export default function SystemHealth() {
   const [data, setData] = useState(null);
@@ -48,11 +50,11 @@ export default function SystemHealth() {
       <button onClick={() => load(adminKey)}>접속</button>
       {err && <p className="e">{err}</p>}
       <style jsx>{`
-        .gate { max-width: 360px; margin: 80px auto; padding: 0 20px; font-family: -apple-system, sans-serif; text-align: center; }
+        .gate { max-width: 360px; margin: 80px auto; padding: 0 20px; font-family: var(--font-sans); text-align: center; color: var(--color-ink); }
         h1 { font-size: 1.1rem; margin-bottom: 20px; }
-        input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 10px; margin-bottom: 10px; font-size: 0.9rem; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; border: none; border-radius: 10px; background: #2563eb; color: #fff; font-weight: 700; }
-        .e { color: #dc2626; font-size: 0.82rem; margin-top: 10px; }
+        input { width: 100%; padding: 12px; border: 1px solid var(--color-line); border-radius: 10px; margin-bottom: 10px; font-size: 0.9rem; box-sizing: border-box; background: var(--color-card); color: var(--color-ink); }
+        button { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--color-primary); color: #fff; font-weight: 700; }
+        .e { color: var(--color-danger); font-size: 0.82rem; margin-top: 10px; }
       `}</style>
     </div>
   );
@@ -62,6 +64,7 @@ export default function SystemHealth() {
 
   return (
     <div className="m">
+      <TopNav active="settings" />
       <header className="hd">
         <div><h1>System Health</h1><span className="ts">{data?.timestamp} · {data?.app_version}</span></div>
         <button className="rf" onClick={() => load(adminKey)}>↻</button>
@@ -135,27 +138,25 @@ export default function SystemHealth() {
 
       <div className="links"><Link href="/pwa" className="lk">← PWA 홈</Link><Link href="/pwa/ai-advisor" className="lk">AI 자산운영</Link></div>
 
-      <AssetBottomNav active="settings" />
-
       <style jsx>{`
-        .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: #f7f9fc; padding: 0 14px 84px; font-family: -apple-system, sans-serif; color: #111827; }
-        .hd { display: flex; align-items: center; justify-content: space-between; padding: 14px 2px; }
-        .hd h1 { font-size: 1.05rem; font-weight: 800; margin: 0; } .ts { font-size: 0.68rem; color: #9ca3af; }
-        .rf { border: 1px solid #e5e7eb; background: #fff; border-radius: 8px; width: 34px; height: 34px; font-size: 1rem; }
-        .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        .ec { color: #dc2626; font-size: 0.84rem; }
-        .k { font-size: 0.76rem; font-weight: 700; color: #6b7280; margin-bottom: 10px; }
-        .row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #f1f5f9; font-size: 0.86rem; }
-        .row:last-child { border-bottom: none; } .l { display: flex; align-items: center; color: #374151; } .v { font-weight: 700; }
+        .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--color-bg); padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
+        .hd { display: flex; align-items: center; justify-content: space-between; padding: 12px 2px; }
+        .hd h1 { font-size: 1.05rem; font-weight: 800; margin: 0; } .ts { font-size: 0.68rem; color: var(--color-ink-3); }
+        .rf { border: 1px solid var(--color-line); background: var(--color-card); border-radius: 8px; width: 34px; height: 34px; font-size: 1rem; color: var(--color-ink); }
+        .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow-card); }
+        .ec { color: var(--color-danger); font-size: 0.84rem; }
+        .k { font-size: 0.76rem; font-weight: 700; color: var(--color-ink-2); margin-bottom: 10px; }
+        .row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--color-line); font-size: 0.86rem; }
+        .row:last-child { border-bottom: none; } .l { display: flex; align-items: center; color: var(--color-ink); } .v { font-weight: 700; }
         .dt { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; }
-        .none { color: #9ca3af; font-size: 0.84rem; }
-        .flt { display: flex; gap: 6px; margin-bottom: 8px; } .flt select { flex: 1; padding: 6px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.74rem; color: #374151; }
-        .ev { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid #f1f5f9; align-items: flex-start; } .ev:last-child { border-bottom: none; }
+        .none { color: var(--color-ink-3); font-size: 0.84rem; }
+        .flt { display: flex; gap: 6px; margin-bottom: 8px; } .flt select { flex: 1; padding: 6px; border: 1px solid var(--color-line); border-radius: 8px; font-size: 0.74rem; color: var(--color-ink); background: var(--color-card); }
+        .ev { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--color-line); align-items: flex-start; } .ev:last-child { border-bottom: none; }
         .ev .dt { margin-top: 5px; } .ev-m { flex: 1; } .ev-t { font-size: 0.82rem; font-weight: 600; } .ev-s { font-size: 0.7rem; font-weight: 700; margin-left: 6px; }
-        .ev-sub { font-size: 0.7rem; color: #9ca3af; margin-top: 1px; } .ev-err { font-size: 0.7rem; color: #dc2626; margin-top: 2px; }
-        .links { display: flex; gap: 8px; } .lk { flex: 1; text-align: center; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px; text-decoration: none; color: #2563eb; font-size: 0.82rem; font-weight: 700; }
+        .ev-sub { font-size: 0.7rem; color: var(--color-ink-3); margin-top: 1px; } .ev-err { font-size: 0.7rem; color: var(--color-danger); margin-top: 2px; }
+        .links { display: flex; gap: 8px; } .lk { flex: 1; text-align: center; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 12px; text-decoration: none; color: var(--color-primary); font-size: 0.82rem; font-weight: 700; }
       `}</style>
-      <style jsx global>{`body { background: #f7f9fc; margin: 0; }`}</style>
+      <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>
   );
 }
