@@ -2106,7 +2106,8 @@ export default function PWADashboard({ latestReport }) {
         /* [v9.0] Splash Screen */
         /* [색상 통일] 스플래시 배경 = 카드 표면색(--color-card)으로 → 대시보드 전환 톤 단절 제거. 색상만 교체(레이아웃/타이밍 유지) */
         .splash-screen { position: fixed; inset: 0; z-index: 9999; background: var(--color-card); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
-        .splash-logo { font-family: 'Syne', sans-serif; font-size: 2.4rem; font-weight: 800; color: var(--color-primary); letter-spacing: 0.05em; }
+        /* [브랜드 시안] 워드마크 = 디스플레이 폰트(Syne) + 블루→퍼플 그라디언트 텍스트 */
+        .splash-logo { font-family: var(--font-display); font-size: 2.4rem; font-weight: 800; letter-spacing: 0.05em; background: linear-gradient(90deg, var(--color-primary) 0%, var(--purple) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
         .splash-sub { font-size: 0.9rem; color: var(--color-ink-2); font-family: 'Pretendard', sans-serif; }
         .splash-dots { display: flex; gap: 8px; }
         .splash-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--color-primary); animation: splash-bounce 1.2s infinite ease-in-out; }
