@@ -30,6 +30,7 @@
   /* ---- 브랜드 / 시맨틱 ---- */
   --color-primary:      #2F6BFF;   /* 주요 액션/링크 (매수검토 포함) */
   --color-primary-soft: #EAF1FF;
+  --color-etf:          #06B6D4;   /* 앱 확장: ETF 자산군 구분색(도넛/칩) */
   --color-success:      #16C784;   /* 수익 / 저평가 / 매수 */
   --color-success-ink:  #0E9E6A;   /* 초록 배경 위 텍스트용 진한 초록 */
   --color-success-soft: #E7FAF2;

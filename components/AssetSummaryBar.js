@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 
-const COLOR = { stock: "var(--color-primary)", etf: "#06b6d4", realestate: "var(--color-success)" };
+const COLOR = { stock: "var(--color-primary)", etf: "var(--color-etf)", realestate: "var(--color-success)" };
 
 export default function AssetSummaryBar() {
   const router = useRouter();

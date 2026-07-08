@@ -58,7 +58,7 @@ export default function Portfolio() {
   const hasRe = re > 0;
   const segments = [
     { label: "주식", value: s, color: "var(--color-primary)" },
-    { label: "ETF", value: e, color: "#06b6d4" },
+    { label: "ETF", value: e, color: "var(--color-etf)" },
     ...(hasRe ? [{ label: "부동산", value: re, color: "var(--color-success)" }] : []),
   ];
   const pct = (v) => (total > 0 ? (v / total * 100).toFixed(1) : "0");
