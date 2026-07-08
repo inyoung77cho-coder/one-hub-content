@@ -511,6 +511,8 @@ export default function PWADashboard({ latestReport }) {
           <div className="splash-dots">
             <span /><span /><span />
           </div>
+          {/* [브랜드] 하단 태그라인 캡션 — 조용한 보조 요소 */}
+          <div className="splash-caption">AI ASSET OS</div>
         </div>
       )}
 
@@ -2111,6 +2113,8 @@ export default function PWADashboard({ latestReport }) {
         .splash-dots span:nth-child(2) { animation-delay: 0.2s; }
         .splash-dots span:nth-child(3) { animation-delay: 0.4s; }
         @keyframes splash-bounce { 0%,80%,100%{transform:scale(0.8);opacity:0.5} 40%{transform:scale(1.2);opacity:1} }
+        /* [브랜드] 하단 태그라인 — 워드마크가 주인공, 캡션은 절제된 연회색·넓은 자간 */
+        .splash-caption { position: absolute; bottom: 26px; left: 0; right: 0; text-align: center; font-size: 11px; font-weight: 600; letter-spacing: 0.14em; color: var(--color-ink-3); font-family: 'Pretendard', sans-serif; }
 
         /* [v9.0] Onboarding Gate */
         .onboarding-overlay { position: fixed; inset: 0; z-index: 9000; background: rgba(15,23,42,0.72); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; padding: 20px; }
