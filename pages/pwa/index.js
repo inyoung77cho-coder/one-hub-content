@@ -729,100 +729,36 @@ export default function PWADashboard({ latestReport }) {
                 </section>
               )}
 
-              {/* [v9.0] Hero 카드 */}
+              {/* [v10 UI] 홈 히어로 — "오늘 AI 판단" 결론 한 줄(재방문 훅). 시안 onehub-home-redesign */}
               {(() => {
-                const rColor = regime === 'BEAR' ? 'var(--color-danger)' : regime === 'BULL' ? 'var(--color-success)' : 'var(--color-warning)';
                 const aiConf = data?.ai_confidence ?? heat;
-                const verdictText = regime === 'BEAR' ? '🚫 관망' : regime === 'BULL' ? '📈 매수' : '🔍 선별매수';
-                // [v9.0][14] 오늘 시장 AI 한줄 브리핑 -- 숫자 대신 사람이 읽을 문장으로 상황 요약
-                const marketBrief = (() => {
-                  if (regime === 'BEAR' && fearGreed !== null && fearGreed < 20) return '극단적 공포 국면 — 관망이 최선의 전략입니다';
-                  if (regime === 'BEAR') return '시장 전반 하락 국면 — 신규 매수보다 현금 비중 유지 권장';
-                  if (regime === 'BULL' && (heat ?? 0) >= 60) return '강한 매수세 지속 — 적극적 진입 구간';
-                  if (regime === 'BULL') return '상승 흐름 유지 중 — 선별적 진입 가능';
-                  if (regime === 'SIDEWAYS') return '방향성 불분명 — 선별적 접근 권장';
-                  return null;
-                })();
-                // [v9.3 PWA-09] BEAR 상태: 한 줄 요약 + 리포트/AI판단근거 2버튼으로 축소 (추천보기 숨김)
-                if (regime === 'BEAR') {
-                  return (
-                    <section className="hero-v9 hero-v9-compact" style={{ borderColor: rColor }}>
-                      <div className="hero-v9-regime-row">
-                        <span className="hero-v9-regime-compact" style={{ color: rColor }}>
-                          🔴 BEAR{heat !== null ? ` · Heat ${heat}` : ''} · 매수금지
-                        </span>
-                        {regimeDays !== null && (
-                          <span className="hero-v9-days dim mono">{regimeDays}일째</span>
-                        )}
-                      </div>
-                      {marketBrief && <p className="hero-v9-brief">{marketBrief}</p>}
-                      <div className="hero-v9-btns">
-                        <button className="hero-v9-btn primary" onClick={() => setTab('report')}>
-                          📋 오늘 리포트
-                        </button>
-                        <button className="hero-v9-btn secondary" onClick={() => {
-                          setTab('dashboard');
-                          setTimeout(() => document.querySelector('.ai-basis-card')?.scrollIntoView({ behavior:'smooth', block:'start' }), 150);
-                        }}>
-                          🧠 AI 판단근거
-                        </button>
-                      </div>
-                    </section>
-                  );
-                }
+                const hTier = heatTier(heat);
+                const verb = buyCount > 0 ? `${buyCount}종목 샀습니다.` : '사지 않았습니다.';
+                const reason = buyCount > 0
+                  ? <>조건을 충족한 <b>{buyCount}종목</b>에 매수 신호가 나왔습니다. 시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> 기준.</>
+                  : blockCount > 0
+                    ? <>시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b>로 투자 열기가 낮아 <b>선별 관망</b>이 낫다고 판단했습니다. 후보는 매수 기준 미달로 {blockCount}건을 걸렀습니다.</>
+                    : <>시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> 기준, 매수 조건을 충족한 종목이 없어 <b>선별 관망</b>했습니다.</>;
                 return (
-                  <section className="hero-v9" style={{ borderColor: rColor }}>
-                    {/* Regime 크게 */}
-                    <div className="hero-v9-regime-row">
-                      <span className="hero-v9-regime" style={{ color: rColor }}>
-                        {regimeIcon(regime)} {regimeMarket(regime)}
-                      </span>
-                      {regimeDays !== null && (
-                        <span className="hero-v9-days dim mono">{regimeDays}일째</span>
-                      )}
-                    </div>
-                    {marketBrief && (
-                      <p className="hero-v9-brief">{marketBrief}</p>
-                    )}
-
-                    {/* AI 신뢰도 */}
-                    <div className="hero-v9-conf-row">
-                      <div>
-                        <span className="hero-v9-conf-label">AI 매수 확률</span>
-                        <div style={{ fontSize: '0.65rem', color: 'var(--text-tertiary)', marginTop: 1 }}>(오늘 예측 신뢰도)</div>
+                  <section className="home-hero">
+                    <div className="hh-eyebrow">
+                      <div className="hh-eyebrow-top">
+                        <span className="hh-label">📊 오늘의 AI 판단</span>
+                        <span className="hh-live">LIVE</span>
                       </div>
-                      <span className="hero-v9-conf-val" style={{ color: rColor }}>
-                        {aiConf !== null ? `${aiConf}%` : '-'}
-                      </span>
+                      {regimeDays !== null && <div className="hh-date">Regime {regimeKo(regime)} · {regimeDays}일째</div>}
                     </div>
-
-                    {/* 오늘 행동 */}
-                    <div className="hero-v9-verdict-row">
-                      <span className="hero-v9-verdict-label">오늘 행동</span>
-                      <span className="hero-v9-verdict-badge" style={{
-                        background: `${rColor}1a`,
-                        color: rColor,
-                        border: `1px solid ${rColor}55`,
-                      }}>
-                        {verdictText}
-                      </span>
+                    <h1 className="hh-h1">오늘, AI는<br /><em>{verb}</em></h1>
+                    <div className="hh-reason">{reason}</div>
+                    <div className="hh-foot">
+                      <span className="hh-chip">Regime <span className="v">{regime || '-'}</span></span>
+                      <span className="hh-chip">매수 예측 신뢰도 <span className="v">{aiConf !== null ? `${aiConf}%` : '-'}</span></span>
+                      {fearGreed !== null && <span className="hh-chip">Fear&amp;Greed <span className="v">{fearGreed}</span></span>}
                     </div>
-
-                    {/* 버튼 2개 */}
-                    <div className="hero-v9-btns">
-                      <button className="hero-v9-btn primary" onClick={() => setTab('report')}>
-                        📋 오늘 리포트
-                      </button>
-                      <button className="hero-v9-btn secondary" onClick={() => setTab('recommend')}>
-                        ⭐ 추천 보기
-                      </button>
-                      <button className="hero-v9-btn secondary" onClick={() => {
-                        setTab('dashboard');
-                        setTimeout(() => document.querySelector('.ai-basis-card')?.scrollIntoView({ behavior:'smooth', block:'start' }), 150);
-                      }}>
-                        🧠 AI 판단근거
-                      </button>
-                    </div>
+                    <button className="hh-cta" onClick={() => {
+                      setTab('dashboard');
+                      setTimeout(() => document.querySelector('.ai-basis-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
+                    }}>오늘의 판단 근거 자세히 보기 →</button>
                   </section>
                 );
               })()}
@@ -2374,6 +2310,22 @@ export default function PWADashboard({ latestReport }) {
         .pwa-main { padding: 8px 16px 12px; display: flex; flex-direction: column; gap: 12px; }
         .pwa-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 16px; box-shadow: var(--card-shadow); }
         .pwa-card-label { display: block; font-size: 0.68rem; letter-spacing: 0.08em; color: var(--label-color); text-transform: uppercase; margin-bottom: 10px; font-weight: 700; }
+
+        /* [v10 UI] 홈 히어로 — 다크 네이비 결론 앵커 (시안) */
+        .home-hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 26px 22px; box-shadow: var(--shadow-float); overflow: hidden; }
+        .hh-eyebrow { margin-bottom: 14px; }
+        .hh-eyebrow-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .hh-label { font-size: 0.8rem; font-weight: 700; color: var(--hero-ink-sub); display: flex; align-items: center; gap: 6px; }
+        .hh-live { background: var(--color-success); color: #04351f; font-size: 0.56rem; font-weight: 800; padding: 2px 6px; border-radius: 5px; letter-spacing: .5px; }
+        .hh-date { font-size: 0.72rem; color: var(--hero-ink-faint); font-weight: 500; margin-top: 5px; }
+        .hh-h1 { font-size: 1.6rem; font-weight: 800; letter-spacing: -.03em; line-height: 1.25; margin-bottom: 10px; color: var(--hero-ink); font-family: var(--font-body); }
+        .hh-h1 em { font-style: normal; color: var(--hero-accent); }
+        .hh-reason { font-size: 0.86rem; line-height: 1.55; color: var(--hero-ink-soft); }
+        .hh-reason b { color: var(--hero-ink); font-weight: 700; }
+        .hh-foot { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+        .hh-chip { background: var(--hero-fill); border: 1px solid var(--hero-fill-line); padding: 6px 11px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; color: var(--hero-ink-soft); display: flex; align-items: center; gap: 5px; }
+        .hh-chip .v { color: var(--hero-accent); font-weight: 700; }
+        .hh-cta { margin-top: 14px; width: 100%; background: #fff; color: var(--hero-grad-1); border: none; font-family: var(--font-body); font-weight: 700; font-size: 0.86rem; padding: 13px; border-radius: 14px; cursor: pointer; }
 
         /* [v8.6] Hero 카드 — "오늘의 시장" */
         .hero-card { background: var(--hero-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 20px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; gap: 14px; }
