@@ -54,7 +54,7 @@ function NewsletterForm() {
           placeholder="이메일 입력" disabled={status === "loading" || status === "success"}
           style={{ flex: 1, minWidth: "140px", background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: "6px", padding: "8px 12px", fontFamily: "monospace", fontSize: "11px", color: "#0f172a", outline: "none" }} />
         <button type="submit" disabled={status === "loading" || status === "success"}
-          style={{ background: status === "success" ? "#E8F8EF" : "#00AA55", color: status === "success" ? "#00AA55" : "#f8fafc", border: "none", borderRadius: "6px", padding: "8px 16px", fontFamily: "monospace", fontSize: "11px", fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
+          style={{ background: status === "success" ? "#E8F8EF" : "#16C784", color: status === "success" ? "#16C784" : "#f8fafc", border: "none", borderRadius: "6px", padding: "8px 16px", fontFamily: "monospace", fontSize: "11px", fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
           {status === "loading" ? "..." : status === "success" ? "✓ 완료" : "구독"}
         </button>
       </div>
@@ -88,8 +88,8 @@ export default function CommunityPage() {
       <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "860px", margin: "0 auto", padding: isMobile ? "24px 16px" : "40px 24px" }}>
 
-          <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#9A9690", textTransform: "uppercase", marginBottom: "8px" }}>Community</h1>
-          <p style={{ fontSize: "13px", color: "#6A6660", marginBottom: "36px" }}>AI 자동매매 여정을 함께하는 투자 생태계</p>
+          <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#94A3B8", textTransform: "uppercase", marginBottom: "8px" }}>Community</h1>
+          <p style={{ fontSize: "13px", color: "#64748B", marginBottom: "36px" }}>AI 자동매매 여정을 함께하는 투자 생태계</p>
 
           {/* ① 채널 카드 6개 */}
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "14px", marginBottom: "40px" }}>
@@ -98,21 +98,21 @@ export default function CommunityPage() {
                 <div style={{ fontSize: "28px" }}>{ch.icon}</div>
                 <div>
                   <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#0f172a", marginBottom: "3px" }}>{ch.name}</div>
-                  <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690" }}>{ch.handle}</div>
+                  <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#94A3B8" }}>{ch.handle}</div>
                 </div>
-                <p style={{ fontSize: "12px", color: "#6A6660", lineHeight: 1.6, margin: 0, flex: 1 }}>{ch.desc}</p>
+                <p style={{ fontSize: "12px", color: "#64748B", lineHeight: 1.6, margin: 0, flex: 1 }}>{ch.desc}</p>
                 <div>
                   <span style={{ display: "inline-block", fontFamily: "monospace", fontSize: "10px", fontWeight: 700, padding: "3px 8px", borderRadius: "4px",
                     background: ch.status === "LIVE" ? "#E8F8EF" : "#f1f5f9",
-                    color:      ch.status === "LIVE" ? "#00AA55" : "#64748b",
+                    color:      ch.status === "LIVE" ? "#16C784" : "#64748b",
                     marginBottom: "10px" }}>
                     {ch.status}
                   </span>
                   {ch.newsletter ? <NewsletterForm /> : ch.link ? (
                     <a href={ch.link} target={ch.link.startsWith("http") ? "_blank" : undefined} rel={ch.link.startsWith("http") ? "noopener noreferrer" : undefined}
-                      style={{ display: "block", fontFamily: "monospace", fontSize: "11px", color: "#00AA55", textDecoration: "none" }}>{ch.action} →</a>
+                      style={{ display: "block", fontFamily: "monospace", fontSize: "11px", color: "#16C784", textDecoration: "none" }}>{ch.action} →</a>
                   ) : (
-                    <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#9A9690" }}>{ch.action}</span>
+                    <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#94A3B8" }}>{ch.action}</span>
                   )}
                 </div>
               </div>
@@ -121,14 +121,14 @@ export default function CommunityPage() {
 
           {/* ② ONE-HUB 운영 현황 통계 카드 */}
           <div style={{ background: "#FFFFFF", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "24px 20px", marginBottom: "24px" }}>
-            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "18px" }}>
+            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#94A3B8", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "18px" }}>
               📊 ONE-HUB 운영 현황
             </div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(5, 1fr)", gap: 12 }}>
               {STATS.map(({ label, val, unit }) => (
                 <div key={label} style={{ textAlign: "center", padding: "12px 8px", background: "#f8fafc", borderRadius: 10 }}>
-                  <div style={{ fontFamily: "monospace", fontSize: "1.1rem", fontWeight: 800, color: "#0f172a" }}>{val}<span style={{ fontSize: "0.7rem", color: "#9A9690", marginLeft: 2 }}>{unit}</span></div>
-                  <div style={{ fontSize: "10px", color: "#6A6660", marginTop: 4 }}>{label}</div>
+                  <div style={{ fontFamily: "monospace", fontSize: "1.1rem", fontWeight: 800, color: "#0f172a" }}>{val}<span style={{ fontSize: "0.7rem", color: "#94A3B8", marginLeft: 2 }}>{unit}</span></div>
+                  <div style={{ fontSize: "10px", color: "#64748B", marginTop: 4 }}>{label}</div>
                 </div>
               ))}
             </div>
@@ -136,14 +136,14 @@ export default function CommunityPage() {
 
           {/* ③ 커뮤니티 원칙 — 카드형 */}
           <div style={{ background: "#FFFFFF", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "28px 24px", marginBottom: "32px" }}>
-            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "20px" }}>커뮤니티 원칙</div>
+            <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#94A3B8", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "20px" }}>커뮤니티 원칙</div>
             <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: "12px" }}>
               {principles.map(p => (
                 <div key={p.title} style={{ background: "#f8fafc", borderRadius: 12, padding: 16, display: "flex", gap: 14, alignItems: "flex-start" }}>
                   <span style={{ fontSize: "20px", flexShrink: 0 }}>{p.icon}</span>
                   <div>
                     <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>{p.title}</div>
-                    <div style={{ fontSize: "12px", color: "#6A6660", lineHeight: 1.5 }}>{p.desc}</div>
+                    <div style={{ fontSize: "12px", color: "#64748B", lineHeight: 1.5 }}>{p.desc}</div>
                   </div>
                 </div>
               ))}

@@ -140,7 +140,7 @@ export default function ApiKeySettings() {
                 onClick={handleInviteCheck}
                 style={{
                   width: "100%", padding: "12px", borderRadius: "8px",
-                  background: "#1A1A1A", color: "#F8F7F2",
+                  background: "#12213B", color: "#F4F9FF",
                   border: "none", fontSize: "0.9rem", fontWeight: 600,
                   cursor: "pointer", fontFamily: "Syne, sans-serif"
                 }}
@@ -224,7 +224,7 @@ export default function ApiKeySettings() {
               <div style={{ display: "flex", gap: "8px", marginTop: "1.5rem" }}>
                 <button onClick={handleSubmit} disabled={status === "loading"} style={{
                   flex: 1, padding: "12px", borderRadius: "8px",
-                  background: "#1A1A1A", color: "#F8F7F2",
+                  background: "#12213B", color: "#F4F9FF",
                   border: "none", fontSize: "0.9rem", fontWeight: 600,
                   cursor: status === "loading" ? "not-allowed" : "pointer",
                   opacity: status === "loading" ? 0.6 : 1,
@@ -233,7 +233,7 @@ export default function ApiKeySettings() {
                 </button>
                 <button onClick={handleVerify} disabled={status === "loading"} style={{
                   padding: "12px 20px", borderRadius: "8px",
-                  background: "transparent", color: "#1A1A1A",
+                  background: "transparent", color: "#12213B",
                   border: "1px solid var(--color-border)",
                   fontSize: "0.9rem", fontWeight: 600,
                   cursor: status === "loading" ? "not-allowed" : "pointer",
