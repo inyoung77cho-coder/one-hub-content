@@ -38,6 +38,9 @@ function mergeOnboardAssets(d) {
   return { total_uk, breakdown: { stock_uk, etf_uk, realestate_uk, cash_uk } };
 }
 
+// [AI 판단근거] 최종 점수 가중치(합=1.0) — 화면 산출식에도 동일하게 노출해 공신력 확보.
+const SCORE_WEIGHTS = { macro: 0.15, ml: 0.35, technical: 0.30, risk: 0.20 };
+
 // [AI 판단근거] 종목별 서브점수(Macro/ML/Technical/Risk) 유도.
 //   백엔드 집계 서브점수가 상수 플레이스홀더(예: 0/50/0/50)로 내려와 모든 종목이 동일하게 보이는 문제를
 //   보완: 종목별 실제 신호(레짐·RSI·거래량·5일 모멘텀·ml_score)로 재계산해 종목마다 다른 값을 산출한다.
@@ -55,7 +58,18 @@ function deriveScores(x) {
   const technical = clamp(50 + (mom ?? 0) * 1.0 + ((vol ?? 1) - 1) * 6 - Math.max(0, Math.abs((rsi ?? 50) - 55) - 10) * 1.5);
   // Risk(높을수록 안전): 과열 RSI·거래량 급증·하락 모멘텀이 리스크
   const risk = clamp(72 - Math.max(0, (rsi ?? 50) - 70) * 2.2 - Math.max(0, (vol ?? 1) - 2.5) * 7 - Math.max(0, -(mom ?? 0)) * 1.4);
-  return { macro, ml, technical, risk };
+  // 최종(종합) 점수 = 4개 지표 가중 평균 → 서브점수와 일관되게, 직관적으로 산출
+  const final = clamp(macro * SCORE_WEIGHTS.macro + ml * SCORE_WEIGHTS.ml + technical * SCORE_WEIGHTS.technical + risk * SCORE_WEIGHTS.risk);
+  return { macro, ml, technical, risk, final };
+}
+
+// 종합 점수 → 등급(관심도 후보이므로 매수/매도 명령이 아닌 '매력도' 표현)
+function scoreGrade(fs) {
+  if (fs >= 80) return { label: '매우 우수', color: 'var(--color-success)' };
+  if (fs >= 65) return { label: '우수', color: 'var(--color-success)' };
+  if (fs >= 50) return { label: '양호', color: 'var(--color-warning)' };
+  if (fs >= 35) return { label: '보통', color: 'var(--color-warning)' };
+  return { label: '주의', color: 'var(--color-danger)' };
 }
 
 // [Queue] KST 장중(평일 09:00~15:30) 여부 — 장외 승인은 예약으로 전환
@@ -954,7 +968,8 @@ export default function PWADashboard({ latestReport }) {
                   setBottomSheet({
                     name: s.name, code: s.code,
                     scores: { macro: sc.macro, ml: sc.ml, technical: sc.technical, risk: sc.risk },
-                    final_score: Math.round(s.score ?? 0),
+                    final_score: sc.final, // 4개 지표 가중 평균(서브점수와 일관)
+                    interest: Math.round(s.score ?? 0), // 백엔드 관심도(스크리닝 원점수) — 별도 표기
                     win_rate: s.win_rate ?? null,
                     // [v9.0][13] Why Now? -- 근거를 최대 5개까지 노출
                     reasons: [
@@ -1394,7 +1409,7 @@ export default function PWADashboard({ latestReport }) {
                                     onClick={() => setBottomSheet({
                                       name: p.name, code: p.code,
                                       scores: deriveScores(p), // 종목별 실제 신호로 서브점수 재계산(상수 표기 방지)
-                                      final_score: p.final_score ?? null,
+                                      final_score: deriveScores(p).final, // 4개 지표 가중 평균(서브점수와 일관)
                                       win_rate: p.win_rate ?? null,
                                       reasons: [
                                         ...(p.reason ? [{ text: p.reason, positive: true }] : []),
@@ -2025,27 +2040,55 @@ export default function PWADashboard({ latestReport }) {
             {/* 최종 점수 + 등급 */}
             {(() => {
               const fs = bottomSheet.final_score ?? 0;
-              const grade = fs >= 85 ? { label: 'Strong Buy', color: 'var(--color-success)' }
-                : fs >= 70 ? { label: 'Buy', color: 'var(--color-success)' }
-                : fs >= 50 ? { label: 'Hold', color: 'var(--color-warning)' }
-                : { label: 'Sell', color: 'var(--color-danger)' };
+              const grade = scoreGrade(fs);
+              const sc = bottomSheet.scores || {};
+              const W = SCORE_WEIGHTS;
+              // 최종 의견(자연어): 강점/약점 지표 요약
+              const pillars = [['매크로', sc.macro], ['ML 신호', sc.ml], ['기술', sc.technical], ['안전(리스크)', sc.risk]].filter((p) => p[1] != null);
+              const strong = pillars.length ? pillars.reduce((a, b) => (b[1] > a[1] ? b : a)) : null;
+              const weak = pillars.length ? pillars.reduce((a, b) => (b[1] < a[1] ? b : a)) : null;
+              const num = (n) => (n != null ? Number(n) : 0);
               return (
-                <div style={{ padding: '10px 14px', background: 'var(--inset-bg)', borderRadius: 12, marginBottom: 14 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', marginBottom: 6 }}>
-                    <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>최종 점수</span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'var(--font-mono)' }}>
-                        {bottomSheet.final_score != null ? `${bottomSheet.final_score}점` : '-'}
-                      </span>
-                      <span style={{ fontSize: '0.72rem', fontWeight: 800, color: grade.color, padding: '2px 8px', borderRadius: 6, background: `${grade.color}18`, border: `1px solid ${grade.color}44` }}>
-                        {grade.label}
-                      </span>
+                <>
+                  <div style={{ padding: '12px 14px', background: 'var(--inset-bg)', borderRadius: 12, marginBottom: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+                      <span style={{ fontWeight: 700, color: 'var(--text-primary)', fontSize: '0.82rem' }}>최종 점수 <span style={{ fontWeight: 600, fontSize: '0.66rem', color: 'var(--text-secondary)' }}>· 4개 지표 가중 평균</span></span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontWeight: 800, fontSize: '1.05rem', color: grade.color, fontFamily: 'var(--font-mono)' }}>{fs}점</span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 800, color: grade.color, padding: '2px 8px', borderRadius: 6, background: `${grade.color}18`, border: `1px solid ${grade.color}44` }}>{grade.label}</span>
+                      </div>
+                    </div>
+                    <div style={{ height: 8, background: 'var(--color-line)', borderRadius: 4, overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${fs}%`, background: grade.color, borderRadius: 4, transition: 'width 0.5s ease' }} />
+                    </div>
+                    {strong && weak && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', lineHeight: 1.55, marginTop: 9 }}>
+                        종합 <b style={{ color: grade.color }}>{grade.label}</b> — <b style={{ color: 'var(--text-primary)' }}>{strong[0]} {strong[1]}점</b> 강점, {weak[0]} {weak[1]}점은 상대적 약점입니다.
+                      </div>
+                    )}
+                  </div>
+                  {/* [공신력] 점수 산출식 — 최종 의견 바로 아래에 계산식 공개 */}
+                  <div style={{ background: 'var(--inset-bg)', borderRadius: 12, padding: '11px 13px', marginBottom: 14, border: '1px dashed var(--border)' }}>
+                    <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--text-secondary)', marginBottom: 7 }}>🧮 점수 산출식</div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', lineHeight: 1.6, fontFamily: 'var(--font-mono)' }}>
+                      최종 = 매크로×{W.macro} + ML×{W.ml} + 기술×{W.technical} + 안전×{W.risk}
+                    </div>
+                    <div style={{ fontSize: '0.72rem', color: 'var(--text-primary)', lineHeight: 1.7, fontFamily: 'var(--font-mono)', marginTop: 3 }}>
+                      = {num(sc.macro)}×{W.macro} + {num(sc.ml)}×{W.ml} + {num(sc.technical)}×{W.technical} + {num(sc.risk)}×{W.risk}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--color-primary)', fontFamily: 'var(--font-mono)', marginTop: 3 }}>
+                      {(() => {
+                        const r1 = (n) => Math.round(n * 10) / 10;
+                        const parts = [r1(num(sc.macro) * W.macro), r1(num(sc.ml) * W.ml), r1(num(sc.technical) * W.technical), r1(num(sc.risk) * W.risk)];
+                        const psum = Math.round(parts.reduce((a, b) => a + b, 0) * 10) / 10;
+                        return <>= {parts[0]} + {parts[1]} + {parts[2]} + {parts[3]} = {psum} <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>→</span> <span style={{ color: grade.color }}>{fs}점</span></>;
+                      })()}
+                    </div>
+                    <div style={{ fontSize: '0.66rem', color: 'var(--text-secondary)', marginTop: 8, lineHeight: 1.5 }}>
+                      가중치: ML 35% · 기술 30% · 안전(리스크) 20% · 매크로 15%. <b>안전</b>은 값이 높을수록 위험이 낮음을 뜻합니다.{bottomSheet.interest != null ? ` 스크리닝 관심도 ${bottomSheet.interest}점은 별도 지표입니다.` : ''}
                     </div>
                   </div>
-                  <div style={{ height: 8, background: 'var(--color-line)', borderRadius: 4, overflow: 'hidden' }}>
-                    <div style={{ height: '100%', width: `${fs}%`, background: grade.color, borderRadius: 4, transition: 'width 0.5s ease' }} />
-                  </div>
-                </div>
+                </>
               );
             })()}
 
