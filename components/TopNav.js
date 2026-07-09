@@ -6,7 +6,7 @@ import { useRouter } from "next/router";
 const ITEMS = [
   ["home", "홈", "/pwa"],
   ["ai", "AI자산", "/pwa/ai-advisor"],
-  ["stock", "주식", "/pwa?tab=recommend"],
+  ["stock", "주식", "/pwa?tab=portfolio"],
   ["etf", "ETF", "/pwa/etf"],
   ["realestate", "부동산", "/pwa/realestate"],
   ["settings", "설정", "/pwa/settings"],

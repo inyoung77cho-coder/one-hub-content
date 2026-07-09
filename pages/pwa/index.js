@@ -620,7 +620,7 @@ export default function PWADashboard({ latestReport }) {
             const isActive = t === 'stock' ? stockTabs.includes(tab) : tab === t;
             const go = () => {
               if (routes[t]) { window.location.href = routes[t]; return; }
-              if (t === 'stock') { setTab('recommend'); return; }
+              if (t === 'stock') { setTab('portfolio'); return; }
               setTab(t);
             };
             return (
