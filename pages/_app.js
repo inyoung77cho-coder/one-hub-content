@@ -39,6 +39,7 @@ export default function App({ Component, pageProps }) {
     <>
       <Head>
         <meta name="google-site-verification" content="Sqkl2VEdEQR2Calqdn4Fxa4QzLTk56dNTvpJBaMuIEs" />
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#F4F9FF" />
         <link rel="icon" href="/icons/icon-192.png" />

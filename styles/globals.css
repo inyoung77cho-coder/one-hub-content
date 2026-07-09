@@ -156,14 +156,14 @@
 /* ── Design Tokens ── */
 :root {
   /* Brand colors */
-  --green:       #00D26A;
+  --green:       #16C784;
   --green-dim:   #00A857;
   --green-dark:  #046A3D;
   --amber:       #FFA73C;
   --amber-dim:   #E08A1E;
   --red:         #FF5B5B;
   --red-dim:     #E14B4B;
-  --blue:        #4A90E2;
+  --blue:        #2F6BFF;
   --blue-dim:    #3576C4;
   --purple:      #A855F7;
 
@@ -189,7 +189,7 @@
   --color-accent:  var(--color-success);
 
   /* Fonts */
-  --font-display: 'Syne', sans-serif;
+  --font-display: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono:    'Space Mono', monospace;
   --font-body:    'Pretendard', -apple-system, BlinkMacSystemFont, 'Malgun Gothic', sans-serif;
 

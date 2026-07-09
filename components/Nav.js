@@ -98,8 +98,8 @@ export default function Nav() {
         zIndex: 1000,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', maxWidth: 1080, margin: '0 auto', height: '100%' }}>
-          <Link href="/" style={{ fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700, letterSpacing: '0.08em', color: '#16213D', textDecoration: 'none', flexShrink: 0, marginRight: 8 }}>
-            [ONE-HUB]
+          <Link href="/" style={{ fontFamily: "'Pretendard', sans-serif", fontSize: 19, fontWeight: 800, letterSpacing: '-0.02em', color: '#12213B', textDecoration: 'none', flexShrink: 0, marginRight: 12 }}>
+            ONE<span style={{ color: '#16C784' }}>·</span>HUB
           </Link>
 
           {/* PC 드롭다운 네비게이션 */}
@@ -118,7 +118,7 @@ export default function Nav() {
                       cursor: 'pointer', height: 40,
                       background: active || open ? '#16213D' : 'transparent',
                       color: active || open ? '#F4F9FF' : '#5B7088',
-                      fontFamily: "'Syne', sans-serif", fontSize: 14, fontWeight: 600,
+                      fontFamily: "'Pretendard', sans-serif", fontSize: 14, fontWeight: 600,
                       whiteSpace: 'nowrap', transition: 'all 0.15s',
                     }}>
                     {menu.label}
@@ -150,7 +150,7 @@ export default function Nav() {
                             style={{
                               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                               padding: '10px 14px', borderRadius: 8, textDecoration: 'none',
-                              color: isCurrent ? '#2563eb' : '#1e293b',
+                              color: isCurrent ? '#2F6BFF' : '#1e293b',
                               fontSize: 14, fontWeight: isCurrent ? 700 : 400,
                               background: isCurrent ? '#eff6ff' : 'transparent',
                             }}
@@ -176,11 +176,11 @@ export default function Nav() {
           <Link href="/pwa" className="nav-app-btn" style={{
             flexShrink: 0, alignItems: 'center', justifyContent: 'center',
             height: 36, padding: '0 16px', borderRadius: 8,
-            background: '#2563eb', color: '#fff',
-            textDecoration: 'none', fontFamily: "'Syne', sans-serif",
+            background: '#2F6BFF', color: '#fff',
+            textDecoration: 'none', fontFamily: "'Pretendard', sans-serif",
             fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap',
           }}>
-            📱 App
+            앱 열기 →
           </Link>
 
           {/* 모바일 햄버거 */}
@@ -218,7 +218,7 @@ export default function Nav() {
                       background: 'transparent', cursor: 'pointer',
                       display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     }}>
-                    <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 700, color: '#0f172a' }}>{menu.label}</span>
+                    <span style={{ fontFamily: "'Pretendard', sans-serif", fontSize: 17, fontWeight: 700, color: '#0f172a' }}>{menu.label}</span>
                     <svg width="14" height="8" viewBox="0 0 14 8" fill="none" style={{ flexShrink: 0, transform: isExp ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
                       <path d="M1 1L7 7L13 1" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round"/>
                     </svg>
@@ -233,9 +233,9 @@ export default function Nav() {
                             style={{
                               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                               padding: '16px 24px 16px 36px', textDecoration: 'none',
-                              color: isCurrent ? '#2563eb' : '#374151',
+                              color: isCurrent ? '#2F6BFF' : '#374151',
                               fontSize: 16, fontWeight: isCurrent ? 700 : 400,
-                              borderLeft: isCurrent ? '3px solid #2563eb' : '3px solid transparent',
+                              borderLeft: isCurrent ? '3px solid #2F6BFF' : '3px solid transparent',
                               background: isCurrent ? '#eff6ff' : 'transparent',
                             }}>
                             {item.label}
@@ -256,7 +256,7 @@ export default function Nav() {
             <div style={{ padding: '20px 20px 0' }}>
               <Link href="/pwa" style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                height: 52, borderRadius: 12, background: '#2563eb', color: '#fff',
+                height: 52, borderRadius: 12, background: '#2F6BFF', color: '#fff',
                 textDecoration: 'none', fontWeight: 700, fontSize: 17,
               }}>
                 📱 ONE-HUB 앱 열기
