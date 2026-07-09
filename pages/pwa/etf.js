@@ -43,6 +43,14 @@ export default function EtfDashboard() {
   const todayKST = (() => { try { return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }); } catch (e) { return null; } })();
   const fxDate = asof?.fx_date || asof?.price_date || null;
   const fxFresh = fxDate && todayKST ? fxDate === todayKST : null;
+  // [종가 신선도] ETF 평가 기준일(백엔드 종가)이 최근 거래일인지 표기 — 백엔드가 갱신되면 자동으로 '최신'.
+  const priceDate = asof?.price_date || null;
+  const priceDaysAgo = (() => {
+    if (!priceDate || !todayKST) return null;
+    const diff = Math.round((new Date(todayKST).getTime() - new Date(priceDate).getTime()) / 86400000);
+    return Number.isFinite(diff) ? Math.max(0, diff) : null;
+  })();
+  const priceStale = priceDaysAgo != null && priceDaysAgo > 2; // 주말 감안 2일 초과면 지연 표기
   const fxDaysAgo = (() => {
     if (!fxDate || !todayKST) return null;
     const diff = Math.round((new Date(todayKST).getTime() - new Date(fxDate).getTime()) / 86400000);
@@ -56,7 +64,7 @@ export default function EtfDashboard() {
       {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해 (시안: 다크 네이비 히어로) */}
       <section className="hero">
         <div className="eyebrow">
-          <span className="lbl">📊 ETF 자산{asof?.price_date ? ` · ${asof.price_date} 종가 기준` : ""}</span>
+          <span className="lbl">📊 ETF 자산{priceDate ? ` · ${priceDate} 종가 기준` : ""}{priceDate ? <span className={`date-flag ${priceStale ? "stale" : "fresh"}`}>{priceStale ? `지연 ${priceDaysAgo}일` : "최신"}</span> : null}</span>
           <span className="live">LIVE</span>
         </div>
         {liveFx?.ok ? (
@@ -234,6 +242,9 @@ export default function EtfDashboard() {
         .live { background: var(--color-success); color: #04351f; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 5px; letter-spacing: .5px; }
         .hero .big { font-size: 32px; font-weight: 800; letter-spacing: -.8px; line-height: 1; }
         .hero .big span { font-size: 19px; font-weight: 700; }
+        .date-flag { display: inline-block; margin-left: 7px; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; letter-spacing: .2px; vertical-align: middle; }
+        .date-flag.fresh { background: color-mix(in srgb, var(--color-success) 22%, transparent); color: var(--color-success); }
+        .date-flag.stale { background: color-mix(in srgb, var(--color-warning) 22%, transparent); color: var(--color-warning); }
         .fx-note { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--hero-ink-soft); margin: -6px 0 4px; }
         .fx-note b { color: var(--hero-ink); font-weight: 700; }
         .fx-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); flex-shrink: 0; }
