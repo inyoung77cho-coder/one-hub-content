@@ -13,6 +13,7 @@ const ENDPOINTS = {
   ranking: "/api/v2/ranking",
   stats: "/api/db/stats",
   holdings: "/api/v2/holdings",
+  feed: "/api/feed", // [v11 #16] 최근 실거래 변동 피드
 };
 
 export default async function handler(req, res) {
