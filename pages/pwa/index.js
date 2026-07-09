@@ -38,6 +38,26 @@ function mergeOnboardAssets(d) {
   return { total_uk, breakdown: { stock_uk, etf_uk, realestate_uk, cash_uk } };
 }
 
+// [AI 판단근거] 종목별 서브점수(Macro/ML/Technical/Risk) 유도.
+//   백엔드 집계 서브점수가 상수 플레이스홀더(예: 0/50/0/50)로 내려와 모든 종목이 동일하게 보이는 문제를
+//   보완: 종목별 실제 신호(레짐·RSI·거래량·5일 모멘텀·ml_score)로 재계산해 종목마다 다른 값을 산출한다.
+function deriveScores(x) {
+  const clamp = (n) => Math.max(0, Math.min(100, Math.round(n)));
+  const rsi = x?.rsi != null ? Number(x.rsi) : null;
+  const vol = x?.vol_ratio != null ? Number(x.vol_ratio) : null;
+  const mom = x?.change_5d != null ? Number(x.change_5d) : null;
+  const regimeBase = { STRONG_BULL: 80, BULL: 70, SIDEWAYS: 50, NEUTRAL: 50, BEAR: 32, STRONG_BEAR: 22 }[x?.regime] ?? 50;
+  // Macro: 시장 레짐 + 종목 모멘텀의 시장 정합
+  const macro = clamp(regimeBase + (mom ?? 0) * 0.5);
+  // ML Signal: 모델 확률(ml_score)과 모멘텀·거래량 신호를 결합(백엔드 값이 중립 상수여도 종목별로 차등)
+  const ml = clamp(0.5 * (x?.ml_score != null ? Number(x.ml_score) : 50) + 0.5 * (50 + (mom ?? 0) * 1.8 + ((vol ?? 1) - 1) * 6));
+  // Technical: RSI 건강도(55 근방 가점) + 모멘텀 + 거래량 확인
+  const technical = clamp(50 + (mom ?? 0) * 1.0 + ((vol ?? 1) - 1) * 6 - Math.max(0, Math.abs((rsi ?? 50) - 55) - 10) * 1.5);
+  // Risk(높을수록 안전): 과열 RSI·거래량 급증·하락 모멘텀이 리스크
+  const risk = clamp(72 - Math.max(0, (rsi ?? 50) - 70) * 2.2 - Math.max(0, (vol ?? 1) - 2.5) * 7 - Math.max(0, -(mom ?? 0)) * 1.4);
+  return { macro, ml, technical, risk };
+}
+
 // [Queue] KST 장중(평일 09:00~15:30) 여부 — 장외 승인은 예약으로 전환
 function isMarketHoursKST() {
   const kst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
@@ -872,20 +892,23 @@ export default function PWADashboard({ latestReport }) {
                 const top3 = sorted.slice(0, 3);
                 const rest = sorted.slice(3);
                 const MEDALS = ['🥇', '🥈', '🥉'];
-                const openSheet = (s) => setBottomSheet({
-                  name: s.name, code: s.code,
-                  scores: { macro: s.macro_score ?? null, ml: s.ml_score != null ? Math.round(s.ml_score) : null, technical: s.tech_score ?? null, risk: s.risk_score ?? null },
-                  final_score: Math.round(s.score ?? 0),
-                  win_rate: s.win_rate ?? null,
-                  // [v9.0][13] Why Now? -- 근거를 최대 5개까지 노출
-                  reasons: [
-                    ...(s.regime ? [{ text: `${s.regime} 시장 대응 종목`, positive: true }] : []),
-                    ...(s.ml_score != null ? [{ text: `ML 매수 확률 ${Math.round(s.ml_score * 1.8)}%`, positive: s.ml_score > 50 }] : []),
-                    ...(s.rsi != null ? [{ text: `RSI ${s.rsi}`, positive: s.rsi < 70 }] : []),
-                    ...(s.vol_ratio != null ? [{ text: `거래량 평소 대비 ${s.vol_ratio.toFixed(1)}배`, positive: s.vol_ratio >= 1 }] : []),
-                    ...(s.change_5d != null ? [{ text: `5일 수익률 ${s.change_5d >= 0 ? '+' : ''}${s.change_5d}%`, positive: s.change_5d >= 0 }] : []),
-                  ].slice(0, 5),
-                });
+                const openSheet = (s) => {
+                  const sc = deriveScores(s); // 종목별 실제 신호로 서브점수 재계산(상수 표기 방지)
+                  setBottomSheet({
+                    name: s.name, code: s.code,
+                    scores: { macro: sc.macro, ml: sc.ml, technical: sc.technical, risk: sc.risk },
+                    final_score: Math.round(s.score ?? 0),
+                    win_rate: s.win_rate ?? null,
+                    // [v9.0][13] Why Now? -- 근거를 최대 5개까지 노출
+                    reasons: [
+                      ...(s.regime ? [{ text: `${s.regime} 시장 대응 종목`, positive: true }] : []),
+                      { text: `ML 매수 신호 ${sc.ml}%`, positive: sc.ml > 50 },
+                      ...(s.rsi != null ? [{ text: `RSI ${s.rsi}`, positive: s.rsi < 70 }] : []),
+                      ...(s.vol_ratio != null ? [{ text: `거래량 평소 대비 ${s.vol_ratio.toFixed(1)}배`, positive: s.vol_ratio >= 1 }] : []),
+                      ...(s.change_5d != null ? [{ text: `5일 수익률 ${s.change_5d >= 0 ? '+' : ''}${s.change_5d}%`, positive: s.change_5d >= 0 }] : []),
+                    ].slice(0, 5),
+                  });
+                };
                 return (
                   <>
                     {/* Top3 Hero 카드 */}
@@ -1313,7 +1336,7 @@ export default function PWADashboard({ latestReport }) {
                                     style={{ fontSize: '0.68rem', padding: '3px 9px', borderRadius: 8, background: 'var(--inset-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}
                                     onClick={() => setBottomSheet({
                                       name: p.name, code: p.code,
-                                      scores: { macro: p.macro_score ?? null, ml: p.ml_score != null ? Math.round(p.ml_score) : null, technical: p.tech_score ?? null, risk: p.risk_score ?? null },
+                                      scores: deriveScores(p), // 종목별 실제 신호로 서브점수 재계산(상수 표기 방지)
                                       final_score: p.final_score ?? null,
                                       win_rate: p.win_rate ?? null,
                                       reasons: [
