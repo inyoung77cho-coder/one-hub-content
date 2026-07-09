@@ -39,6 +39,9 @@
   --color-warning:      #F5A524;   /* 손절 / 주의 / SAMPLE */
   --color-warning-soft: #FEF3C7;
   --color-warning-ink:  #B45309;
+  --ob:                 #6A4CFF;   /* AI자산: 온보딩/세금 액센트(인디고) */
+  --ob-soft:            #EEE9FF;
+  --ob-ink:             #3A2B8C;
 
   /* ---- 다크 네이비 히어로 (화면마다 상단 앵커) ---- */
   --hero-grad-1:        #12213B;
@@ -96,6 +99,9 @@
   --color-warning:      #F7B84B;
   --color-warning-soft: #3A2E12;
   --color-warning-ink:  #F5C97A;
+  --ob:                 #9B87FF;
+  --ob-soft:            #241E42;
+  --ob-ink:             #CFC4FF;
 
   /* 히어로는 배경과 대비를 위해 살짝만 밝게 */
   --hero-grad-1:        #1A2C4A;
