@@ -35,6 +35,17 @@ export default function EtfDashboard() {
   const s = report?.summary;
   const positions = (report?.positions || []).filter((p) => !p.error);
 
+  // [환율 신선도] 기준일이 오늘(KST)인지 표시 — 오래된 종가 환율이면 사용자에게 명확히 알림
+  const asof = report?.as_of;
+  const todayKST = (() => { try { return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }); } catch (e) { return null; } })();
+  const fxDate = asof?.fx_date || asof?.price_date || null;
+  const fxFresh = fxDate && todayKST ? fxDate === todayKST : null;
+  const fxDaysAgo = (() => {
+    if (!fxDate || !todayKST) return null;
+    const diff = Math.round((new Date(todayKST).getTime() - new Date(fxDate).getTime()) / 86400000);
+    return Number.isFinite(diff) ? Math.max(0, diff) : null;
+  })();
+
   return (
     <div className="etf">
       <TopNav active="etf" />
@@ -42,9 +53,18 @@ export default function EtfDashboard() {
       {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해 (시안: 다크 네이비 히어로) */}
       <section className="hero">
         <div className="eyebrow">
-          <span className="lbl">📊 ETF 자산{report?.as_of ? ` · ${report.as_of.price_date || "-"} 기준 · 환율 ${report.as_of.fx?.toLocaleString()}원` : ""}</span>
+          <span className="lbl">📊 ETF 자산{asof?.price_date ? ` · ${asof.price_date} 종가 기준` : ""}</span>
           <span className="live">LIVE</span>
         </div>
+        {asof?.fx != null && (
+          <div className={`fx-note ${fxFresh === false ? "stale" : ""}`}>
+            <span className="fx-dot" />
+            환율 <b>{asof.fx.toLocaleString()}원</b>
+            {fxFresh === true ? " · 오늘 기준"
+              : fxDaysAgo != null && fxDaysAgo > 0 ? ` · ${fxDaysAgo}일 전 종가 환율`
+              : fxDate ? ` · ${fxDate} 종가 환율` : ""}
+          </div>
+        )}
         {s ? (
           <>
             <div className="big">{won(s.value_krw)}<span>원</span></div>
@@ -204,6 +224,12 @@ export default function EtfDashboard() {
         .live { background: var(--color-success); color: #04351f; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 5px; letter-spacing: .5px; }
         .hero .big { font-size: 32px; font-weight: 800; letter-spacing: -.8px; line-height: 1; }
         .hero .big span { font-size: 19px; font-weight: 700; }
+        .fx-note { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--hero-ink-soft); margin: -6px 0 4px; }
+        .fx-note b { color: var(--hero-ink); font-weight: 700; }
+        .fx-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); flex-shrink: 0; }
+        .fx-note.stale { color: var(--color-warning); }
+        .fx-note.stale .fx-dot { background: var(--color-warning); }
+        .fx-note.stale b { color: var(--color-warning); }
         .hero .hsub { font-size: 12.5px; color: var(--hero-ink-soft); margin-top: 9px; }
         .hero .hsub b { color: var(--hero-accent); font-weight: 700; }
         .decomp { background: var(--hero-fill); border: 1px solid var(--hero-fill-line); border-radius: 14px; padding: 14px; margin-top: 16px; }
