@@ -50,8 +50,7 @@ export default function AssetSummaryBar() {
       <div className="asb-chips">
         {chips.map(([label, key, val, href]) => (
           <button key={key} className="asb-chip" onClick={() => router.push(href)}>
-            <span className="asb-dot" style={{ background: COLOR[key] }} />
-            <span className="asb-cl">{label}</span>
+            <span className="asb-cl"><span className="asb-dot" style={{ background: COLOR[key] }} />{label}</span>
             <span className={`asb-cv ${val == null ? "pend" : ""}`}>{val == null ? "준비중" : `${val}억`}</span>
           </button>
         ))}
@@ -61,12 +60,13 @@ export default function AssetSummaryBar() {
         .asb-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
         .asb-lbl { font-size: 0.72rem; color: var(--color-ink-2); font-weight: 700; }
         .asb-total { font-size: 1.5rem; font-weight: 800; color: var(--color-ink); }
-        .asb-chips { display: flex; gap: 6px; overflow-x: auto; }
-        .asb-chip { flex: 1; min-width: 0; display: flex; align-items: center; gap: 5px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 9px; padding: 7px 8px; cursor: pointer; }
-        .asb-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-        .asb-cl { font-size: 0.72rem; color: var(--color-ink-2); font-weight: 700; }
-        .asb-cv { font-size: 0.72rem; color: var(--color-ink); font-weight: 700; margin-left: auto; }
-        .asb-cv.pend { color: var(--color-ink-3); font-weight: 600; }
+        .asb-chips { display: flex; gap: 6px; }
+        /* [balance] 4칩 세로 스택 — 좁은 폭에서 라벨이 글자 단위로 깨지지 않도록 nowrap */
+        .asb-chip { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 10px; padding: 9px 4px; cursor: pointer; text-align: center; }
+        .asb-cl { display: inline-flex; align-items: center; gap: 4px; font-size: 0.7rem; color: var(--color-ink-2); font-weight: 600; white-space: nowrap; }
+        .asb-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .asb-cv { font-size: 0.8rem; color: var(--color-ink); font-weight: 800; white-space: nowrap; }
+        .asb-cv.pend { color: var(--color-ink-3); font-weight: 600; font-size: 0.72rem; }
       `}</style>
     </div>
   );
