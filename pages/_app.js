@@ -7,6 +7,7 @@ import { useRouter } from "next/router";
 export default function App({ Component, pageProps }) {
   const router = useRouter();
   const isPWARoute = router.pathname.startsWith("/pwa");
+  const isHome = router.pathname === "/"; // 홈은 자체 네이비 nav 사용 → 전역 Nav 숨김
 
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
@@ -46,7 +47,7 @@ export default function App({ Component, pageProps }) {
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="ONE-HUB" />
       </Head>
-      {!isPWARoute && <Nav />}
+      {!isPWARoute && !isHome && <Nav />}
       <Component {...pageProps} />
     </>
   );

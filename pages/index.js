@@ -1,612 +1,494 @@
-﻿import Head from 'next/head';
+import Head from 'next/head';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
-import MarketScore from '../components/MarketScore';
-import LastUpdated from '../components/LastUpdated';
-import { APP_VERSION } from '../lib/version';
+import { SITE, ORG_NAME } from '../lib/site';
+
+const REGIME_EMOJI = { BULL: '📈', BEAR: '📉', SIDEWAYS: '➖' };
+const REGIME_LABEL = { BULL: '상승장', BEAR: '하락장', SIDEWAYS: '횡보장' };
+const REGIME_TAG = { BULL: 'p-bull', BEAR: 'p-bear', SIDEWAYS: 'p-flat' };
 
 export default function Home({ reports, stats }) {
   const latest = reports[0] || null;
-  const [mounted, setMounted] = useState(false);
-  const [engineVersion, setEngineVersion] = useState(APP_VERSION);
-  const [liveData, setLiveData] = useState(null); // [v8.7] 홈페이지 ↔ PWA 실시간 연동
-  const [dashboardTs, setDashboardTs] = useState(null);  // [v8.8] LastUpdated
-  const [accuracyPct, setAccuracyPct] = useState(null);       // [v9.0] AI 정확도
-  const [winRate, setWinRate] = useState(null);               // [v9.0] 누적 승률
+  const emoji = (r) => REGIME_EMOJI[r] || '➖';
+  const label = (r) => REGIME_LABEL[r] || '횡보장';
+  const analyzed = latest ? (latest.block_count || 0) + (latest.trade_count || 0) : 0;
 
-  useEffect(() => {
-    setMounted(true);
-    fetch("/api/engine-status")
-      .then(r => r.json())
-      .then(d => { if (d.version) setEngineVersion(d.version); })
-      .catch(() => {});
-    fetch("/api/pwa-dashboard?trader=A")
-      .then(r => r.json())
-      .then(d => { if (d.ok) { setLiveData(d); setDashboardTs(new Date()); } })
-      .catch(() => {});
-    fetch("/api/pwa/accuracy?trader_id=A")
-      .then(r => r.json())
-      .then(d => { if (d.ok && d.summary?.accuracy_pct != null) setAccuracyPct(d.summary.accuracy_pct); })
-      .catch(() => {});
-    fetch("/api/pwa-performance?trader=A")
-      .then(r => r.json())
-      .then(d => { if (d.win_rate != null) setWinRate(d.win_rate); })
-      .catch(() => {});
-  }, []);
+  const canonical = `${SITE}/`;
+  const ogImage = `${SITE}/api/og-home`;
+  const description =
+    '주식·ETF·부동산을 하나의 AI가 분석·배분·운영합니다. AI가 시장을 읽고 후보를 선별하면 최종 결정은 사람이 하며, 그 판단 과정을 매일 운영일지로 투명하게 공개합니다.';
 
-  const regimeIcon = (regime) => {
-    if (regime === 'BULL') return '📈';
-    if (regime === 'BEAR') return '📉';
-    return '➖';
-  };
-  const regimeLabel = (regime) => {
-    if (regime === 'BULL') return '상승장';
-    if (regime === 'BEAR') return '하락장';
-    return '횡보장';
-  };
-  const regimeClass = (regime) => {
-    if (regime === 'BULL') return '시장 흐름-bull';
-    if (regime === 'BEAR') return '시장 흐름-bear';
-    return 'REGIME-side';
-  };
-
-  let liveHoldCount = 0;
-  if (liveData?.balance?.positions) {
-    try { liveHoldCount = JSON.parse(liveData.balance.positions).length; } catch (e) {}
-  }
-  const liveHeat = liveData?.market?.heat_score ?? null;
-
-  // 다음 분석 시간 계산 (KST: 08:50, 13:30, 15:30)
-  const getNextAnalysisTime = () => {
-    const now = new Date();
-    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-    const h = kst.getUTCHours(), m = kst.getUTCMinutes();
-    const cur = h * 60 + m;
-    const slots = [{ h: 8, m: 50 }, { h: 13, m: 30 }, { h: 15, m: 30 }];
-    for (const s of slots) {
-      const t = s.h * 60 + s.m;
-      if (cur < t) return `${String(s.h).padStart(2,'0')}:${String(s.m).padStart(2,'0')} KST`;
-    }
-    return '08:50 KST (내일)';
-  };
+  const jsonLd = [
+    {
+      '@context': 'https://schema.org',
+      '@type': 'Organization',
+      '@id': `${SITE}/#org`,
+      name: 'ONE-HUB',
+      alternateName: ORG_NAME,
+      url: `${SITE}/`,
+      logo: `${SITE}/icons/icon-512.png`,
+      description: '주식·ETF·부동산을 하나의 AI가 분석·배분·운영하는 통합 자산관리 플랫폼',
+      sameAs: ['https://t.me/onehub', 'https://blog.naver.com/onehub'],
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      '@id': `${SITE}/#website`,
+      name: 'ONE-HUB',
+      url: `${SITE}/`,
+      inLanguage: 'ko-KR',
+      publisher: { '@id': `${SITE}/#org` },
+    },
+    {
+      '@context': 'https://schema.org',
+      '@type': 'ItemList',
+      name: 'ONE-HUB 운영일지 최신 리포트',
+      itemListOrder: 'https://schema.org/ItemListOrderDescending',
+      itemListElement: reports.slice(0, 4).map((r, i) => ({
+        '@type': 'ListItem',
+        position: i + 1,
+        url: `${SITE}/daily/${r.date}`,
+        name: `${r.date} · ${label(r.regime)} 판단`,
+      })),
+    },
+  ];
 
   return (
     <>
       <Head>
-        <title>ONE-HUB — AI 투자 의사결정 기록 플랫폼</title>
-        <meta name="description" content="AI가 매일 어떤 종목을 왜 분석하고, 왜 차단했는지 투명하게 기록합니다. 수익보다 판단 과정이 먼저입니다." />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+        <title>ONE-HUB · 주식·ETF·부동산을 AI가 함께 운영하는 통합 자산관리 플랫폼</title>
+        <meta name="description" content={description} />
+        <meta
+          name="keywords"
+          content="ONE-HUB, AI 자산운영, 통합 자산관리, 주식, ETF, 부동산, AI 투자 판단, 리밸런싱, 자동매매 대안, 운영일지"
+        />
+        <link rel="canonical" href={canonical} />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css"
+        />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="ONE-HUB" />
+        <meta property="og:locale" content="ko_KR" />
+        <meta property="og:url" content={canonical} />
+        <meta property="og:title" content="ONE-HUB · 주식·ETF·부동산 AI 통합 자산운영 플랫폼" />
+        <meta property="og:description" content={description} />
+        <meta property="og:image" content={ogImage} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="ONE-HUB · 주식·ETF·부동산 AI 통합 자산운영" />
+        <meta name="twitter:description" content={description} />
+        <meta name="twitter:image" content={ogImage} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       </Head>
 
-      <div className="page-wrapper">
-
-        {/* ── HERO STATUS BAR ── */}
-        <div className="status-bar">
-          <div className="status-item">
-            <span className="status-dot pulse"></span>
-            <span className="status-label">LIVE</span>
+      <div className="wrap">
+        {/* NAV */}
+        <header className="nav">
+          <div className="container nav-in">
+            <Link href="/" className="brand" aria-label="ONE-HUB 홈">
+              ONE<span className="dot">·</span>HUB
+            </Link>
+            <nav className="nav-links" aria-label="주 메뉴">
+              <Link href="/daily">운영일지</Link>
+              <Link href="/blog">인사이트</Link>
+              <Link href="/community">커뮤니티</Link>
+              <Link href="/about">About</Link>
+              <Link href="/pwa" className="btn btn-primary">앱 열기 →</Link>
+            </nav>
+            <Link href="/pwa" className="btn btn-primary nav-app-m" aria-label="ONE-HUB 앱 열기">앱 열기</Link>
           </div>
-          <div className="status-divider">|</div>
-          <div className="status-item">
-            <span className="status-label mono">auto_trade {engineVersion}</span>
+        </header>
+
+        <main>
+          {/* HERO */}
+          <section className="hero">
+            <div className="container">
+              <p className="hero-live">
+                <span className="dotlive" aria-hidden="true"></span> LIVE · 주식·ETF·부동산 통합 운영
+                {latest && <> · 오늘 {emoji(latest.regime)} {label(latest.regime)}</>}
+              </p>
+              <h1>
+                주식 · ETF · 부동산을<br />
+                <em>AI가 함께 운영</em>합니다.
+              </h1>
+              <p className="lead">
+                흩어진 세 자산을 한 곳에서 분석하고 배분합니다. AI가 시장을 읽고 후보를 선별하면 최종 결정은 사람이
+                하며, 그 판단 과정을 매일 투명하게 공개합니다.
+              </p>
+              <div className="hero-cta">
+                <Link className="btn btn-white btn-lg" href="/pwa">🚀 ONE-HUB 앱 시작하기</Link>
+                <Link className="btn btn-line btn-lg" href={latest ? `/daily/${latest.date}` : '/daily'}>
+                  📋 오늘의 판단 보기
+                </Link>
+              </div>
+              <div className="hero-teaser">
+                <span className="tchip">통합 자산 <b>주식 · ETF · 부동산</b></span>
+                {latest && (
+                  <span className="tchip">
+                    오늘 판단 <b>{latest.trade_count > 0 ? `실행 ${latest.trade_count}건` : '진입 자제'}</b>
+                  </span>
+                )}
+                <span className="tchip">누적 운영 <b>{stats.totalDays}일</b></span>
+              </div>
+            </div>
+          </section>
+
+          {/* DEFINITION BAND */}
+          <div className="defband">
+            <div className="container defband-in">
+              <p className="defband-txt">
+                ONE-HUB는 <span>주식 · ETF · 부동산</span>을 하나의 AI가 분석·배분·운영하는{' '}
+                <span>통합 자산관리 플랫폼</span>입니다.
+              </p>
+              <div className="asset-chips">
+                <span className="asset-chip ac-stock">📈 주식</span>
+                <span className="asset-chip ac-etf">📊 ETF</span>
+                <span className="asset-chip ac-re">🏢 부동산</span>
+              </div>
+            </div>
           </div>
+
+          {/* WHY */}
+          <section>
+            <div className="container">
+              <div className="sec-head">
+                <p className="eyebrow">WHY ONE-HUB</p>
+                <h2>수익률이 아니라, 판단 과정을 봅니다</h2>
+                <p>
+                  주식·ETF·부동산을 AI가 한 곳에서 분석하고 배분합니다. 결과만 보여주는 자산 서비스와 달리, 매일
+                  무엇을 왜 그렇게 결정했는지 기록으로 남깁니다.
+                </p>
+              </div>
+              <div className="pillars">
+                <article className="pillar">
+                  <div className="pic pic-blue" aria-hidden="true">🔍</div>
+                  <h3>투명한 기록</h3>
+                  <p>매수·관망·차단의 이유를 매일 공개. 실패와 &ldquo;아무것도 안 한 날&rdquo;까지 그대로 남깁니다.</p>
+                </article>
+                <article className="pillar">
+                  <div className="pic pic-green" aria-hidden="true">🤝</div>
+                  <h3>AI + 사람</h3>
+                  <p>AI가 시장을 읽고 후보를 선별하면, 최종 실행은 사람이 승인합니다. 블랙박스가 아닙니다.</p>
+                </article>
+                <article className="pillar">
+                  <div className="pic pic-amber" aria-hidden="true">📐</div>
+                  <h3>3자산 통합 운영</h3>
+                  <p>주식·ETF·부동산을 각각의 기준(Heat·Regime·세금·실거래)으로 판단하고, 목표 배분에 맞춰 리밸런싱합니다.</p>
+                </article>
+              </div>
+            </div>
+          </section>
+
+          {/* TODAY */}
           {latest && (
-            <>
-              <div className="status-divider">|</div>
-              <div className="status-item">
-                <span className={`REGIME-badge ${regimeClass(latest.regime)}`}>
-                  {regimeIcon(latest.regime)} {regimeLabel(latest.regime)}
-                </span>
-              </div>
-            </>
-          )}
-          {liveData && (
-            <>
-              <div className="status-divider">|</div>
-              {liveHeat !== null && (
-                <div className="status-item">
-                  <span className="status-label mono">Heat {liveHeat}</span>
+            <section style={{ paddingTop: 0 }}>
+              <div className="container">
+                <div className="sec-head">
+                  <p className="eyebrow">TODAY&apos;S JUDGMENT</p>
+                  <h2>오늘 AI는 무엇을 했는가?</h2>
                 </div>
-              )}
-              <div className="status-item">
-                <span className="status-label mono">보유 {liveHoldCount}종목</span>
-              </div>
-              <div className="status-divider">|</div>
-              <Link href="/pwa" className="status-cta">앱 열기 →</Link>
-            </>
-          )}
-        </div>
-
-        <main className="main">
-
-          {/* ── LIVE 위젯 ── */}
-        {liveData && mounted && (
-          <section className="live-widget">
-            {dashboardTs && <div style={{ textAlign: 'right', padding: '2px 12px 0' }}><LastUpdated timestamp={dashboardTs} /></div>}
-            <div className="live-widget-inner">
-              <div className="live-widget-item">
-                <span className="live-widget-label">🌡 AI 투자온도</span>
-                <a href="/blog?tag=AI분석" title="관련 블로그 보기"
-                   style={{ textDecoration: 'none', borderBottom: '1px dashed #94a3b8', cursor: 'pointer' }}>
-                  <span className="live-widget-val" style={{
-                    color: (liveData.market?.heat_score ?? 0) >= 70 ? '#e53935'
-                         : (liveData.market?.heat_score ?? 0) >= 40 ? '#f57c00' : '#2e7d32'
-                  }}>
-                    {liveData.market?.heat_score ?? '-'}<span className="live-widget-unit">점</span>
-                  </span>
-                </a>
-              </div>
-              <div className="live-widget-divider" />
-              <div className="live-widget-item">
-                <span className="live-widget-label">😨 공포탐욕</span>
-                <a href="/blog?tag=매크로" title="관련 블로그 보기"
-                   style={{ textDecoration: 'none', borderBottom: '1px dashed #94a3b8', cursor: 'pointer' }}>
-                  <span className="live-widget-val" style={{
-                    color: (liveData.market?.fear_greed ?? 50) <= 30 ? '#e53935'
-                         : (liveData.market?.fear_greed ?? 50) >= 70 ? '#2e7d32' : '#f57c00'
-                  }}>
-                    {liveData.market?.fear_greed ?? '-'}<span className="live-widget-unit">점</span>
-                  </span>
-                </a>
-              </div>
-              <div className="live-widget-divider" />
-              <div className="live-widget-item">
-                <span className="live-widget-label">🎯 TOP PICK</span>
-                <span className="live-widget-val" style={{ fontSize: '0.95rem' }}>
-                  {liveData.screening_candidates?.length
-                    ? [...liveData.screening_candidates].sort((a,b)=>(b.score??0)-(a.score??0))[0]?.name
-                    : '-'}
-                </span>
-              </div>
-              {accuracyPct != null && (
-                <>
-                  <div className="live-widget-divider" />
-                  <div className="live-widget-item">
-                    <span className="live-widget-label">🎯 AI 정확도</span>
-                    <span className="live-widget-val" style={{
-                      color: accuracyPct >= 70 ? '#2e7d32' : accuracyPct >= 50 ? '#f57c00' : '#e53935'
-                    }}>
-                      {accuracyPct}<span className="live-widget-unit">%</span>
-                    </span>
+                <Link className="today-wrap" href={`/daily/${latest.date}`} aria-label={`${latest.date} 오늘의 판단 전체 보기`}>
+                  <div className="today-l">
+                    <p className="d">{latest.date} · 오늘의 판단</p>
+                    <p className="phase">
+                      {emoji(latest.regime)} {label(latest.regime)} ·{' '}
+                      {latest.trade_count > 0 ? `실행 ${latest.trade_count}건` : '진입 자제'}
+                    </p>
+                    <div className="today-metrics">
+                      <div className="tm"><div className="k">분석</div><div className="v">{analyzed}</div></div>
+                      <div className="tm"><div className="k">차단</div><div className="v">{latest.block_count || 0}</div></div>
+                      <div className="tm"><div className="k">실행</div><div className="v">{latest.trade_count || 0}</div></div>
+                    </div>
                   </div>
-                </>
-              )}
-              {winRate != null && (
-                <>
-                  <div className="live-widget-divider" />
-                  <div className="live-widget-item">
-                    <span className="live-widget-label">📈 누적 승률</span>
-                    <span className="live-widget-val" style={{
-                      color: winRate >= 60 ? '#2e7d32' : winRate >= 45 ? '#f57c00' : '#e53935'
-                    }}>
-                      {winRate}<span className="live-widget-unit">%</span>
-                    </span>
+                  <div className="today-r">
+                    <div className="quote-mark" aria-hidden="true">&ldquo;</div>
+                    <p className="quote">{latest.insight}</p>
+                    <p className="quote-meta">ONE-HUB Insight · AI 분석 15:30 KST</p>
+                    <span className="link-arrow">전체 분석 보기 →</span>
                   </div>
-                </>
-              )}
-              <div className="live-widget-divider" />
-              <a href="/pwa" className="live-widget-cta">ONE-HUB 열기 →</a>
-              <a href="/pwa-guide" className="live-widget-cta" style={{marginLeft:8, background:'#e0edff', color:'#2563eb'}}>📱 설치 가이드</a>
-            </div>
-          </section>
-        )}
-        {/* ── [v9.0] HERO 섹션 ── */}
-          <section className="home-hero-section">
-            {/* LIVE 배지 */}
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#22c55e', marginBottom: 12, fontFamily: 'monospace' }}>
-              <span className="live-dot" />
-              LIVE · auto_trade {engineVersion} RUNNING
-            </div>
-            {/* 포지셔닝 문구 */}
-            <h1 className="home-hero-h1">
-              AI가 시장을 읽고<br/>
-              사람이 최종 결정합니다.
-            </h1>
-            {/* 오늘 현황 뱃지 */}
-            {mounted && (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 24 }}>
-                {latest?.regime && (
-                  <span style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700,
-                    background: latest.regime === 'BEAR' ? '#fef2f2' : latest.regime === 'BULL' ? '#f0fdf4' : '#fffbeb',
-                    color:      latest.regime === 'BEAR' ? '#ef4444' : latest.regime === 'BULL' ? '#22c55e' : '#f59e0b',
-                  }}>
-                    {latest.regime === 'BEAR' ? '📉 BEAR' : latest.regime === 'BULL' ? '📈 BULL' : '➖ SIDEWAYS'}
-                  </span>
-                )}
-                {liveData?.market?.heat_score != null && (
-                  <span style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: '#fff7ed', color: '#f59e0b' }}>
-                    🌡 Heat {liveData.market.heat_score}
-                  </span>
-                )}
-                {latest?.trade_count != null && (
-                  <span style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: '#f0fdf4', color: '#22c55e' }}>
-                    ✅ 매수 {latest.trade_count}건
-                  </span>
-                )}
-                {latest?.block_count != null && (
-                  <span style={{ padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700, background: '#f1f5f9', color: '#64748b' }}>
-                    🚫 차단 {latest.block_count}건
-                  </span>
-                )}
-              </div>
-            )}
-            {/* 다음 분석 시간 */}
-            {mounted && (
-              <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 20, fontFamily: 'monospace' }}>
-                ⏰ 다음 분석: <strong style={{ color: '#2563eb' }}>{getNextAnalysisTime()}</strong>
-              </div>
-            )}
-            {/* CTA 버튼 3개 */}
-            <div className="home-cta-row">
-              <Link href="/pwa" className="home-cta-btn home-cta-primary">🚀 ONE-HUB 시작하기</Link>
-              <Link href="/daily" className="home-cta-btn home-cta-secondary">📋 오늘 리포트</Link>
-              <Link href="/decision-log" className="home-cta-btn home-cta-secondary">🧠 AI 판단근거</Link>
-            </div>
-          </section>
-
-        {/* ── PLATFORM INTRO ── */}
-          <section className="platform-intro">
-            <div className="pi-copy">
-              <h1 className="pi-title">AI가 매일 어떻게 판단하는지, 투명하게 기록합니다.</h1>
-              <p className="pi-sub">왜 샀는지, 왜 안 샀는지, 왜 차단했는지 매일 공개합니다. 수익보다 판단 과정이 먼저입니다.</p>
-            </div>
-            <div className="pi-stats">
-              <div className="pi-stat">
-                <span className="pi-stat-val mono">{stats.totalAnalyzed.toLocaleString()}</span>
-                <span className="pi-stat-label">누적 분석</span>
-              </div>
-              <div className="pi-stat-div"></div>
-              <div className="pi-stat">
-                <span className="pi-stat-val mono">{stats.totalBlocked.toLocaleString()}</span>
-                <span className="pi-stat-label">AI 차단</span>
-              </div>
-              <div className="pi-stat-div"></div>
-              <div className="pi-stat">
-                <span className="pi-stat-val mono">{stats.totalTrades}</span>
-                <span className="pi-stat-label">최종 실행</span>
-              </div>
-              <div className="pi-stat-div"></div>
-              <div className="pi-stat">
-                <span className="pi-stat-val mono">{stats.totalDays}</span>
-                <span className="pi-stat-label">운영 일수</span>
-              </div>
-            </div>
-          </section>
-
-          {/* ── 오늘 AI 활동 요약 ── */}
-          {latest && (
-            <section className="section">
-              <div className="section-header">
-                <h2 className="section-title">오늘 AI는 무엇을 했는가?</h2>
-                <span className="section-subtitle mono">{latest.date}</span>
-              </div>
-              <div className="today-activity-card">
-                <div className="ta-funnel">
-                  <div className="ta-step">
-                    <span className="ta-step-icon">🔍</span>
-                    <span className="ta-step-val">{(latest.block_count ?? 0) + (latest.trade_count ?? 0)}개</span>
-                    <span className="ta-step-label">분석</span>
-                  </div>
-                  <span className="ta-arrow">→</span>
-                  <div className="ta-step blocked">
-                    <span className="ta-step-icon">🚫</span>
-                    <span className="ta-step-val">{latest.block_count ?? 0}개</span>
-                    <span className="ta-step-label">차단</span>
-                  </div>
-                  <span className="ta-arrow">→</span>
-                  <div className="ta-step executed">
-                    <span className="ta-step-icon">✅</span>
-                    <span className="ta-step-val">{latest.trade_count}건</span>
-                    <span className="ta-step-label">실행</span>
-                  </div>
-                </div>
-                <div className="ta-reason">
-                  <span className="ta-reason-text">
-                    {latest.trade_count === 0
-                      ? `${regimeLabel(latest.regime)} 판단으로 신규 진입을 차단했습니다.`
-                      : `조건을 충족한 ${latest.trade_count}건만 선별 실행했습니다.`}
-                  </span>
-                </div>
-                <Link href={`/daily/${latest.date}`} className="ta-link">이유 보기 →</Link>
+                </Link>
               </div>
             </section>
           )}
 
-          {/* ── [B4] KPI 카드 4개 그리드 ── */}
-          {(liveData || latest) && mounted && (
-            <section className="home-kpi-section">
-              <div className="kpi-grid">
-                {[
-                  { label: 'Regime', val: liveData?.market?.regime ?? (latest?.regime ?? '-'), unit: '',
-                    color: (liveData?.market?.regime ?? latest?.regime) === 'BULL' ? '#22c55e'
-                          :(liveData?.market?.regime ?? latest?.regime) === 'BEAR' ? '#ef4444' : '#f59e0b' },
-                  { label: '🌡 Heat', val: liveData?.market?.heat_score ?? '-', unit: '/100',
-                    color: (liveData?.market?.heat_score ?? 0) >= 70 ? '#ef4444'
-                          :(liveData?.market?.heat_score ?? 0) >= 40 ? '#f59e0b' : '#22c55e' },
-                  { label: '🚫 차단', val: latest?.block_count ?? '-', unit: '건', color: '#ef4444' },
-                  { label: '✅ 매수', val: latest?.trade_count ?? '-', unit: '건', color: '#22c55e' },
-                ].map(k => (
-                  <div key={k.label} style={{ background: '#fff', border: '1px solid #e2e8f0',
-                    borderRadius: 20, padding: '16px 12px', boxShadow: '0 2px 16px rgba(0,0,0,0.07)', textAlign: 'center' }}>
-                    <div style={{ fontSize: 11, color: '#94a3b8', marginBottom: 6, fontWeight: 600 }}>{k.label}</div>
-                    <div style={{ fontSize: 22, fontWeight: 800, color: k.color, fontFamily: 'monospace' }}>
-                      {k.val}<span style={{ fontSize: 12, fontWeight: 400, color: '#94a3b8' }}>{k.unit}</span>
+          {/* OPERATING LOG */}
+          <section style={{ paddingTop: 0 }}>
+            <div className="container">
+              <div className="sec-head">
+                <p className="eyebrow">DAILY REPORTS · 매일 15:30 업데이트</p>
+                <h2>운영일지</h2>
+                <p>매일의 시장 판단을 기록으로 남깁니다. ONE-HUB의 콘텐츠이자 신뢰의 근거입니다.</p>
+              </div>
+              <div className="logs">
+                {reports.slice(0, 4).map((r) => (
+                  <Link className="log" key={r.date} href={`/daily/${r.date}`}>
+                    <div className="log-top">
+                      <span className="log-date">{r.date}</span>
+                      <span className={`phase-tag ${REGIME_TAG[r.regime] || 'p-flat'}`}>
+                        {emoji(r.regime)} {r.regime}
+                      </span>
                     </div>
-                  </div>
+                    <p className="log-txt">{r.insight}</p>
+                    <span className="log-foot">실행 {r.trade_count || 0}건 · 자세히 →</span>
+                  </Link>
                 ))}
               </div>
-            </section>
-          )}
-
-          {/* ── TODAY HERO ── */}
-          {latest ? (
-            <section className="hero-section">
-              <div style={{marginBottom:'1rem'}}>
-                <MarketScore score={latest.market_score || latest.heat_score} heatGrade={latest.heat_grade} regime={latest.regime} />
+              <div style={{ textAlign: 'center', marginTop: 28 }}>
+                <Link className="btn btn-ghost" href="/daily">운영일지 전체 보기 →</Link>
               </div>
+            </div>
+          </section>
 
-              <div className="hero-date-line">
-                <span className="mono dim">{latest.date}</span>
-                <span className="hero-separator">—</span>
-                <span className="hero-title-text">오늘의 ONE-HUB 판단</span>
+          {/* TRUST STATS */}
+          <section className="trust">
+            <div className="container">
+              <div className="sec-head">
+                <p className="eyebrow eyebrow-green">TRACK RECORD</p>
+                <h2 style={{ color: '#fff' }}>{stats.totalDays}일간, 있는 그대로 기록했습니다</h2>
               </div>
+              <div className="stats">
+                <div className="stat"><div className="num">{stats.totalAnalyzed}</div><div className="lbl">누적 분석</div></div>
+                <div className="stat"><div className="num">{stats.totalBlocked}</div><div className="lbl">AI 차단</div></div>
+                <div className="stat"><div className="num">{stats.totalTrades}</div><div className="lbl">최종 실행</div></div>
+                <div className="stat"><div className="num">{stats.totalDays}</div><div className="lbl">운영 일수</div></div>
+              </div>
+              <p className="trust-note">※ 모든 수치는 운영일지 데이터(매일 15:30 KST 갱신)에서 자동 집계됩니다.</p>
+            </div>
+          </section>
 
-              <div className="hero-grid">
-                {/* 왼쪽: 핵심 상태 */}
-                <div className="hero-main">
-                  <div className="today-judgment-card">
-
-                    <div className="tj-header">
-                      <span className="tj-label">TODAY&apos;S JUDGMENT</span>
-                      <span className={`tj-시장 흐름 ${regimeClass(latest.regime)}`}>
-                        {regimeIcon(latest.regime)} {regimeLabel(latest.regime)}
-                      </span>
+          {/* PWA PREVIEW */}
+          <section>
+            <div className="container">
+              <div className="sec-head">
+                <p className="eyebrow">THE CONSOLE</p>
+                <h2>주식·ETF·부동산, 한 콘솔에서</h2>
+                <p>세 자산의 분석·배분·리밸런싱·의사결정을 PWA 콘솔에서 통합 운영합니다. 홈페이지는 기록을, 앱은 운영을 담당합니다.</p>
+              </div>
+              <div className="previews">
+                {[
+                  { href: '/pwa/ai-advisor', icon: '🤖', t: 'AI 자산운영', d: '3자산 종합 판단과 리밸런싱 플랜.' },
+                  { href: '/pwa/portfolio', icon: '💼', t: '통합 자산', d: '주식·ETF·부동산 총자산을 한 화면에.' },
+                  { href: '/pwa/etf', icon: '📊', t: 'ETF 자산', d: '실질수익·환차·세금·중복도 분석.' },
+                  { href: '/pwa/realestate', icon: '🏢', t: '부동산 자산', d: 'ONE Score 랭킹·저평가·시장 브리핑.' },
+                  { href: '/pwa', icon: '📈', t: '주식 운영', d: '추천·보유·AI 판단 기록.' },
+                  { href: '/pwa/system-health', icon: '🛡️', t: '시스템 상태', d: '엔진·토큰·스케줄러 헬스체크.' },
+                ].map((p) => (
+                  <Link className="pv" key={p.t} href={p.href}>
+                    <div className="pv-shot">
+                      <span aria-hidden="true">{p.icon}</span>
+                      <span className="pv-badge">LIVE</span>
                     </div>
-
-                    <div className="tj-metrics">
-                      <div className="tj-metric">
-                        <span className="tj-metric-label">시장 흐름</span>
-                        <span className={`tj-metric-val ${regimeClass(latest.regime)}`}>{regimeLabel(latest.regime)}</span>
-                      </div>
-                      <div className="tj-metric-divider"></div>
-                      <div className="tj-metric">
-                        <span className="tj-metric-label">Heat Score</span>
-                        <span className="tj-metric-val">{latest.market_score || latest.heat_score}/100</span>
-                      </div>
-                      <div className="tj-metric-divider"></div>
-                      <div className="tj-metric">
-                        <span className="tj-metric-label">분석 종목</span>
-                        <span className="tj-metric-val">{(latest.block_count ?? 0) + (latest.trade_count ?? 0)}개</span>
-                      </div>
-                      <div className="tj-metric-divider"></div>
-                      <div className="tj-metric">
-                        <span className="tj-metric-label">AI 차단</span>
-                        <span className="tj-metric-val tj-blocked">{latest.block_count ?? 0}건</span>
-                      </div>
-                      <div className="tj-metric-divider"></div>
-                      <div className="tj-metric">
-                        <span className="tj-metric-label">최종 실행</span>
-                        <span className="tj-metric-val tj-executed">{latest.trade_count}건</span>
-                      </div>
+                    <div className="pv-body">
+                      <h3>{p.t}</h3>
+                      <p>{p.d}</p>
+                      <span className="pv-link">앱에서 열기 →</span>
                     </div>
-
-                    <div className="tj-summary">
-                      <span className="tj-summary-text">
-                        {latest.trade_count === 0
-                          ? `${regimeLabel(latest.regime)} 판단으로 신규 진입을 차단했습니다.`
-                          : `조건을 충족한 ${latest.trade_count}건만 선별 실행했습니다.`}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="tags-row">
-                    {latest.tags && latest.tags.map(tag => (
-                      <span key={tag} className="tag">#{tag}</span>
-                    ))}
-                  </div>
-                </div>
-
-                {/* 오른쪽: ONE-HUB Insight */}
-                <div className="insight-card">
-                  <div className="insight-header">
-                    <span className="insight-engine-badge">
-                      <span className="insight-dot"></span>
-                      ONE-HUB Insight
-                    </span>
-                  </div>
-                  <blockquote className="insight-text">
-                    &ldquo;{latest.insight}&rdquo;
-                  </blockquote>
-                  <div className="insight-meta">
-                    <span className="mono dim">AI 분석 · 15:30 KST</span>
-                  </div>
-                  <Link href={`/daily/${latest.date}`} className="insight-link">
-                    전체 분석 보기 →
                   </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* CONTENT & COMMUNITY */}
+          <section style={{ paddingTop: 0 }}>
+            <div className="container">
+              <div className="cc">
+                <div className="cc-card cc-news">
+                  <h3>📮 개발로그 · 인사이트</h3>
+                  <p>1인 기업이 AI 투자 OS를 만들어가는 과정과 시장 인사이트를 기록합니다. &ldquo;머니더버니&rdquo;의 빌드 로그.</p>
+                  <div className="cc-btns">
+                    <Link href="/blog">개발로그 보기 →</Link>
+                  </div>
+                </div>
+                <div className="cc-card cc-comm">
+                  <h3>💬 커뮤니티</h3>
+                  <p>매일의 AI 판단과 리포트를 실시간으로 받아보고, 함께 이야기 나눠요.</p>
+                  <div className="cc-btns">
+                    <a href="https://t.me/onehub" target="_blank" rel="noopener">텔레그램 채널</a>
+                    <a href="https://pf.kakao.com/onehub" target="_blank" rel="noopener">카카오 채널</a>
+                  </div>
                 </div>
               </div>
-            </section>
-          ) : (
-            <section className="hero-section">
-              <div className="no-data">아직 데이터가 없습니다.</div>
-            </section>
-          )}
-
-          {/* ── AI 판단 근거 ── */}
-          <section className="section">
-            <div className="section-header">
-              <h2 className="section-title">AI 판단 근거</h2>
-              <span className="section-subtitle mono">매매 차단 사유 분석</span>
-            </div>
-            <div className="judgment-reason-card">
-              {latest && (
-                <>
-                  <div className="jr-insight">
-                    <span className="jr-quote">&ldquo;{latest.insight}&rdquo;</span>
-                  </div>
-                  <div className="jr-factors">
-                    <div className="jr-factor">
-                      <span className="jr-factor-dot" style={{background:'var(--amber)'}}></span>
-                      <span className="jr-factor-label">Fear &amp; Greed 지수</span>
-                      <span className="jr-factor-val" style={{color:'var(--amber)'}}>극단적 공포</span>
-                    </div>
-                    <div className="jr-factor">
-                      <span className="jr-factor-dot" style={{background:'var(--blue)'}}></span>
-                      <span className="jr-factor-label">시장 흐름</span>
-                      <span className={`jr-factor-val ${regimeClass(latest.regime)}`}>{latest.regime}</span>
-                    </div>
-                    <div className="jr-factor">
-                      <span className="jr-factor-dot" style={{background:'var(--green)'}}></span>
-                      <span className="jr-factor-label">Heat Score</span>
-                      <span className="jr-factor-val">{latest.market_score || latest.heat_score}/100</span>
-                    </div>
-                    <div className="jr-factor">
-                      <span className="jr-factor-dot" style={{background:'var(--red)'}}></span>
-                      <span className="jr-factor-label">AI 차단 종목</span>
-                      <span className="jr-factor-val" style={{color:'var(--red)'}}>{latest.block_count ?? 0}건</span>
-                    </div>
-                  </div>
-                  <div className="jr-conclusion">
-                    <span className="jr-conclusion-label">결론</span>
-                    <span className="jr-conclusion-text">
-                      {latest.trade_count === 0
-                        ? '오늘은 매매하지 않는 것이 최선의 판단이었습니다.'
-                        : `조건을 충족한 ${latest.trade_count}건만 선별 실행했습니다.`}
-                    </span>
-                  </div>
-                </>
-              )}
             </div>
           </section>
 
-          {/* ── 누적 통계 ── */}
-          <section className="section">
-            <div className="section-header">
-              <h2 className="section-title">누적 통계</h2>
-              <span className="section-subtitle mono">운영 시작 이후 전체</span>
-            </div>
-            <div className="stats-grid">
-              <div className="stat-card">
-                <span className="stat-label">운영 일수</span>
-                <span className="stat-value">{stats.totalDays}<span className="stat-unit">일</span></span>
+          {/* ROADMAP */}
+          <section style={{ paddingTop: 0 }}>
+            <div className="container">
+              <div className="sec-head">
+                <p className="eyebrow">ROADMAP</p>
+                <h2>다음에 올 것들</h2>
               </div>
-              <div className="stat-card">
-                <span className="stat-label">총 리포트</span>
-                <span className="stat-value">{stats.totalReports}<span className="stat-unit">건</span></span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-label">📈 상승장</span>
-                <span className="stat-value 시장 흐름-bull">{stats.bullDays}<span className="stat-unit">일</span></span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-label">📉 하락장</span>
-                <span className="stat-value 시장 흐름-bear">{stats.bearDays}<span className="stat-unit">일</span></span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-label">➖ 횡보장</span>
-                <span className="stat-value REGIME-side">{stats.sidewaysDays}<span className="stat-unit">일</span></span>
-              </div>
-              <div className="stat-card">
-                <span className="stat-label">AI 매매 없음</span>
-                <span className="stat-value dim">{stats.zeroTradeDays}<span className="stat-unit">일</span></span>
-              </div>
-            </div>
-            <div className="시장 흐름-bar-section">
-              <span className="시장 흐름-bar-label mono dim">장세 분포</span>
-              <div className="시장 흐름-bar">
-                <div className="시장 흐름-bar-segment bull" style={{ width: `${stats.totalDays > 0 ? (stats.bullDays / stats.totalDays) * 100 : 33}%` }} title={`📈 상승장 ${stats.bullDays}일`}></div>
-                <div className="시장 흐름-bar-segment side" style={{ width: `${stats.totalDays > 0 ? (stats.sidewaysDays / stats.totalDays) * 100 : 34}%` }} title={`➖ 횡보장 ${stats.sidewaysDays}일`}></div>
-                <div className="시장 흐름-bar-segment bear" style={{ width: `${stats.totalDays > 0 ? (stats.bearDays / stats.totalDays) * 100 : 33}%` }} title={`📉 하락장 ${stats.bearDays}일`}></div>
-              </div>
-              <div className="시장 흐름-bar-legend">
-                <span className="rbl-item"><span className="rbl-dot bull"></span>📈 상승장 {stats.bullDays}일</span>
-                <span className="rbl-item"><span className="rbl-dot side"></span>➖ 횡보장 {stats.sidewaysDays}일</span>
-                <span className="rbl-item"><span className="rbl-dot bear"></span>📉 하락장 {stats.bearDays}일</span>
+              <div className="roadmap">
+                <div className="rm">Weekly Digest<span>3주차</span></div>
+                <div className="rm">Engine Hub<span>4주차</span></div>
+                <div className="rm">전략 라이브러리<span>4주차</span></div>
+                <div className="rm">참여자 온보딩 위저드<span>예정</span></div>
               </div>
             </div>
           </section>
-
-          {/* ── 최근 리포트 목록 ── */}
-          <section className="section">
-            <div className="section-header">
-              <h2 className="section-title">최근 운영일지</h2>
-              <Link href="/daily" className="section-more">전체 보기 →</Link>
-            </div>
-            <div className="report-list">
-              {reports.slice(0, 7).map((r, i) => (
-                <Link key={r.date} href={`/daily/${r.date}`} className="report-row">
-                  <span className="rr-index mono dim">{String(i + 1).padStart(2, '0')}</span>
-                  <span className="rr-date mono">{r.date}</span>
-                  <span className={`rr-시장 흐름 ${regimeClass(r.regime)}`}>{regimeIcon(r.regime)} {r.regime}</span>
-                  <span className="rr-emoji">{r.pnl_emoji}</span>
-                  <span className="rr-insight">{r.insight}</span>
-                  <span className="rr-trades mono dim">{r.trade_count}건</span>
-                  <span className="rr-arrow">→</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-
-          {/* ── 플랫폼 로드맵 ── */}
-          <section className="section">
-            <div className="section-header">
-              <h2 className="section-title">플랫폼 로드맵</h2>
-              <span className="section-subtitle mono">30일 구축 플랜</span>
-            </div>
-            <div className="hub-grid">
-              {[
-                { href: '/pwa/ai-advisor', label: 'AI 자산운영', desc: '종합 판단·리밸런싱 조언', status: 'live', week: null },
-                { href: '/pwa/portfolio', label: '통합 자산', desc: '주식+ETF+부동산 총자산', status: 'live', week: null },
-                { href: '/pwa/etf', label: 'ETF 자산', desc: '수익·환차·세금·중복도', status: 'live', week: null },
-                { href: '/pwa/realestate', label: '부동산 자산', desc: 'ONE Score·저평가·시장', status: 'live', week: null },
-                { href: '/daily', label: 'Daily Report', desc: '매일 AI 운영일지', status: 'live', week: null },
-                { href: '/pwa/system-health', label: '시스템 상태', desc: '엔진·토큰·스케줄러 헬스', status: 'live', week: null },
-                { href: '/weekly', label: 'Weekly Digest', desc: '주간 성과 요약', status: 'soon', week: '3주차' },
-                { href: '/engines', label: 'Engine Hub', desc: 'AI 엔진 현황판', status: 'soon', week: '4주차' },
-                { href: '/strategies', label: 'Strategies', desc: '전략 라이브러리', status: 'soon', week: '4주차' },
-                { href: '/community', label: 'Community', desc: '텔레그램·카카오', status: 'soon', week: '2주차' },
-                { href: '/about', label: 'About', desc: 'ONE-HUB 철학', status: 'soon', week: '1주차' },
-              ].map(item => (
-                <Link key={item.href} href={item.href} className={`hub-card ${item.status}`}>
-                  <div className="hc-top">
-                    <span className="hc-label">{item.label}</span>
-                    {item.status === 'live'
-                      ? <span className="hc-badge live">LIVE</span>
-                      : <span className="hc-badge soon">{item.week}</span>
-                    }
-                  </div>
-                  <span className="hc-desc">{item.desc}</span>
-                </Link>
-              ))}
-            </div>
-          </section>
-
         </main>
 
-        {/* ── Trust Center 링크 ── */}
-        <div style={{ textAlign: 'center', padding: '8px 0 24px', fontSize: 13 }}>
-          <Link href="/trust" style={{ color: '#94a3b8', textDecoration: 'none', fontFamily: 'monospace' }}>
-            🛡️ 시스템 상태 보기 →
-          </Link>
-        </div>
-
-        {/* ── FOOTER ── */}
+        {/* FOOTER */}
         <footer className="footer">
-          <div className="footer-inner">
-            <span className="mono dim">ONE-HUB © 2026</span>
-            <span className="footer-sep">·</span>
-            <span className="mono dim">auto_trade {engineVersion} running on AWS Lightsail</span>
-            <span className="footer-sep">·</span>
-            <span className="mono dim">매일 15:30 KST 자동 업데이트</span>
+          <div className="container">
+            <div className="foot-in">
+              <div>
+                <div className="foot-brand">ONE<span style={{ color: '#16C784' }}>·</span>HUB</div>
+                <div style={{ marginTop: 8 }}>주식·ETF·부동산 AI 통합 자산운영 플랫폼 · auto_trade v10.0</div>
+              </div>
+              <nav className="foot-links" aria-label="푸터 메뉴">
+                <Link href="/daily">운영일지</Link>
+                <Link href="/about">About</Link>
+                <Link href="/community">커뮤니티</Link>
+                <Link href="/pwa">앱 열기</Link>
+              </nav>
+            </div>
+            <p className="foot-disclaimer">
+              © 2026 ONE-HUB · running on AWS Lightsail · 매일 15:30 KST 자동 업데이트
+              <br />
+              ONE-HUB가 제공하는 정보는 투자 판단의 참고 자료이며 투자 자문·일임이 아닙니다. 모든 투자의 최종 결정과 책임은 이용자 본인에게 있습니다.
+            </p>
           </div>
         </footer>
       </div>
+
+      <style jsx>{`
+        .wrap {
+          --bg:#F4F9FF;--card:#FFFFFF;--ink:#1E293B;--ink2:#64748B;--ink3:#94A3B8;
+          --line:#E8EEF7;--blue:#2F6BFF;--blue-soft:#EAF1FF;--green:#16C784;--green-soft:#E7FAF2;
+          --red:#F04452;--amber:#F5A524;--shadow:0 8px 28px rgba(31,63,120,.07);
+          --hero1:#12213B;--hero2:#20375F;--maxw:1080px;
+          min-height:100vh;background:var(--bg);color:var(--ink);
+          font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;
+        }
+        .wrap :global(a){text-decoration:none;color:inherit}
+        .container{max-width:var(--maxw);margin:0 auto;padding:0 22px}
+        .eyebrow{font-size:12.5px;font-weight:800;letter-spacing:.4px;color:var(--blue);margin-bottom:12px}
+        .eyebrow-green{color:#7FE9C0}
+        section{padding:64px 0}
+        .sec-head{text-align:center;max-width:640px;margin:0 auto 40px}
+        .sec-head h2{font-size:30px;font-weight:800;letter-spacing:-.6px;line-height:1.3}
+        .sec-head p{font-size:15px;color:var(--ink2);margin-top:12px;line-height:1.6}
+
+        .nav{position:sticky;top:0;z-index:50;background:rgba(244,249,255,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+        .nav-in{display:flex;align-items:center;justify-content:space-between;height:64px}
+        .brand{font-size:20px;font-weight:800;letter-spacing:-.5px}
+        .brand .dot{color:var(--green)}
+        .nav-links{display:flex;align-items:center;gap:28px}
+        .nav-links :global(a){font-size:14px;font-weight:600;color:var(--ink2)}
+        .nav-links :global(a:hover){color:var(--ink)}
+        .btn{display:inline-flex;align-items:center;gap:7px;font-weight:700;border-radius:12px;cursor:pointer;border:none;font-family:inherit}
+        .btn-primary{background:var(--blue);color:#fff;font-size:14px;padding:11px 18px}
+        .btn-ghost{background:#fff;color:var(--ink);font-size:14px;padding:11px 18px;border:1px solid var(--line)}
+        .nav-app-m{display:none}
+        @media(max-width:760px){.nav-links{display:none}.nav-app-m{display:inline-flex}}
+
+        .hero{background:linear-gradient(150deg,var(--hero1),var(--hero2));color:#fff;padding:80px 0 88px;overflow:hidden}
+        .hero-live{display:inline-flex;align-items:center;gap:9px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:20px;padding:7px 14px;font-size:12.5px;font-weight:600;color:#C7D4EC;margin-bottom:24px}
+        .dotlive{width:8px;height:8px;border-radius:50%;background:#16C784;box-shadow:0 0 0 4px rgba(22,199,132,.2)}
+        .hero h1{font-size:46px;font-weight:800;letter-spacing:-1.5px;line-height:1.18}
+        .hero h1 :global(em){font-style:normal;color:#7FE9C0}
+        .hero .lead{font-size:16.5px;color:#C7D4EC;margin-top:20px;max-width:560px;line-height:1.65}
+        .hero-cta{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
+        .btn-lg{font-size:15px;padding:15px 24px;border-radius:14px}
+        .btn-white{background:#fff;color:var(--hero1)}
+        .btn-line{background:rgba(255,255,255,.06);color:#fff;border:1px solid rgba(255,255,255,.2)}
+        .hero-teaser{display:flex;gap:10px;margin-top:34px;flex-wrap:wrap}
+        .tchip{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 15px;font-size:13px;color:#C7D4EC}
+        .tchip b{color:#fff;font-weight:700}
+        @media(max-width:640px){.hero h1{font-size:34px}}
+
+        .defband{background:var(--card);border-bottom:1px solid var(--line)}
+        .defband-in{padding:26px 22px;display:flex;align-items:center;justify-content:center;gap:22px;flex-wrap:wrap;text-align:center}
+        .defband-txt{font-size:15.5px;font-weight:700;letter-spacing:-.3px}
+        .defband-txt span{color:var(--blue)}
+        .asset-chips{display:flex;gap:10px}
+        .asset-chip{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;padding:8px 13px;border-radius:11px}
+        .ac-stock{background:var(--blue-soft);color:var(--blue)}
+        .ac-etf{background:var(--green-soft);color:#0E9E6A}
+        .ac-re{background:#FFF6E5;color:#B45309}
+
+        .pillars{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+        .pillar{background:var(--card);border-radius:20px;padding:28px 24px;box-shadow:var(--shadow)}
+        .pillar .pic{width:52px;height:52px;border-radius:15px;display:grid;place-items:center;font-size:24px;margin-bottom:16px}
+        .pic-blue{background:var(--blue-soft)}.pic-green{background:var(--green-soft)}.pic-amber{background:#FFF6E5}
+        .pillar h3{font-size:18px;font-weight:800;letter-spacing:-.3px}
+        .pillar p{font-size:14px;color:var(--ink2);margin-top:9px;line-height:1.6}
+        @media(max-width:760px){.pillars{grid-template-columns:1fr}}
+
+        .today-wrap{background:var(--card);border-radius:24px;box-shadow:var(--shadow);overflow:hidden;display:grid;grid-template-columns:1fr 1fr}
+        .today-l{background:linear-gradient(150deg,var(--hero1),var(--hero2));color:#fff;padding:36px 32px}
+        .today-l .d{font-size:13px;color:#9DB6E6;font-weight:600}
+        .today-l .phase{font-size:26px;font-weight:800;margin:8px 0 20px}
+        .today-metrics{display:flex;gap:10px}
+        .tm{flex:1;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:13px;text-align:center}
+        .tm .k{font-size:11px;color:#9DB6E6;font-weight:600}
+        .tm .v{font-size:19px;font-weight:800;margin-top:4px}
+        .today-r{padding:36px 32px;display:flex;flex-direction:column;justify-content:center}
+        .quote-mark{font-size:34px;color:var(--blue);font-weight:800;line-height:.6}
+        .quote{font-size:17px;font-weight:600;line-height:1.6;letter-spacing:-.2px;margin:12px 0 18px}
+        .quote-meta{font-size:12.5px;color:var(--ink3);font-weight:600;margin-bottom:20px}
+        .link-arrow{font-size:13px;font-weight:700;color:var(--blue)}
+        @media(max-width:760px){.today-wrap{grid-template-columns:1fr}}
+
+        .logs{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+        .log{background:var(--card);border-radius:18px;padding:20px 22px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px;transition:transform .15s ease,box-shadow .15s ease}
+        .log:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(31,63,120,.12)}
+        .log-top{display:flex;align-items:center;justify-content:space-between}
+        .log-date{font-size:13px;font-weight:800}
+        .phase-tag{font-size:11px;font-weight:800;padding:4px 9px;border-radius:7px}
+        .p-bear{background:#FDECEE;color:var(--red)}
+        .p-bull{background:var(--green-soft);color:#0E9E6A}
+        .p-flat{background:#F1F5F9;color:var(--ink2)}
+        .log-txt{font-size:14px;color:var(--ink);line-height:1.6}
+        .log-foot{font-size:12px;color:var(--ink3);font-weight:600}
+        @media(max-width:760px){.logs{grid-template-columns:1fr}}
+
+        .trust{background:#12213B;color:#fff}
+        .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:24px;text-align:center}
+        .stat .num{font-size:40px;font-weight:800;letter-spacing:-1px;color:#7FE9C0}
+        .stat .lbl{font-size:13px;color:#9DB6E6;font-weight:600;margin-top:6px}
+        .trust-note{text-align:center;font-size:12px;color:#5F7290;margin-top:26px}
+        @media(max-width:640px){.stats{grid-template-columns:1fr 1fr;gap:28px 16px}}
+
+        .previews{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+        .pv{background:var(--card);border-radius:20px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;transition:transform .15s ease}
+        .pv:hover{transform:translateY(-2px)}
+        .pv-shot{height:150px;background:linear-gradient(150deg,#EAF1FF,#DDE8FB);display:grid;place-items:center;font-size:40px;position:relative}
+        .pv-badge{position:absolute;top:12px;right:12px;font-size:10px;font-weight:800;color:var(--green);background:#fff;padding:3px 8px;border-radius:6px}
+        .pv-body{padding:18px 20px}
+        .pv-body h3{font-size:16px;font-weight:800}
+        .pv-body p{font-size:13px;color:var(--ink2);margin-top:6px;line-height:1.55}
+        .pv-link{font-size:13px;font-weight:700;color:var(--blue);margin-top:12px;display:inline-block}
+        @media(max-width:760px){.previews{grid-template-columns:1fr}}
+
+        .cc{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+        .cc-card{border-radius:22px;padding:34px 30px;color:#fff}
+        .cc-news{background:linear-gradient(150deg,#2F6BFF,#5A8BFF)}
+        .cc-comm{background:linear-gradient(150deg,#16C784,#0E9E6A)}
+        .cc-card h3{font-size:22px;font-weight:800;letter-spacing:-.4px}
+        .cc-card p{font-size:14px;margin-top:10px;line-height:1.6;opacity:.92}
+        .cc-btns{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+        .cc-btns :global(a){background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:12px;padding:12px 18px;font-size:14px;font-weight:700}
+        @media(max-width:760px){.cc{grid-template-columns:1fr}}
+
+        .roadmap{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+        .rm{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 18px;font-size:13.5px;font-weight:700;color:var(--ink2)}
+        .rm span{font-size:11px;font-weight:800;color:var(--amber);margin-left:7px}
+
+        .footer{background:#0E1A2E;color:#8AA0C6;padding:44px 0;font-size:13px}
+        .foot-in{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+        .foot-brand{color:#fff;font-weight:800;font-size:18px}
+        .foot-links{display:flex;gap:20px}
+        .foot-links :global(a){color:#8AA0C6}
+        .foot-links :global(a:hover){color:#fff}
+        .foot-disclaimer{margin-top:20px;font-size:11.5px;color:#5F7290;line-height:1.6}
+      `}</style>
     </>
   );
 }
@@ -616,28 +498,26 @@ export async function getStaticProps() {
   let reports = [];
 
   try {
-    const files = fs.readdirSync(contentDir)
-      .filter(f => f.endsWith('.md'))
-      .sort()
-      .reverse();
-
-    reports = files.slice(0, 30).map(file => {
-      const raw = fs.readFileSync(path.join(contentDir, file), 'utf8');
-      const { data } = matter(raw);
-      return {
-        date: data.date || file.replace('.md', ''),
-        regime: data.regime || 'SIDEWAYS',
-        heat_score: data.heat_score || 50,
-        market_score: data.market_score || data.heat_score || 50,
-        heat_grade: data.heat_grade || 'WARM',
-        pnl_emoji: data.pnl_emoji || '➖',
-        trade_count: data.trade_count || 0,
-        block_count: data.block_count || 0,
-        tags: data.tags || [],
-        insight: data.insight || '',
-        published: data.published !== false,
-      };
-    }).filter(r => r.published);
+    const files = fs.readdirSync(contentDir).filter((f) => f.endsWith('.md')).sort().reverse();
+    reports = files
+      .slice(0, 30)
+      .map((file) => {
+        const raw = fs.readFileSync(path.join(contentDir, file), 'utf8');
+        const { data } = matter(raw);
+        return {
+          date: data.date || file.replace('.md', ''),
+          regime: data.regime || 'SIDEWAYS',
+          heat_score: data.heat_score || 50,
+          heat_grade: data.heat_grade || 'WARM',
+          pnl_emoji: data.pnl_emoji || '➖',
+          trade_count: data.trade_count || 0,
+          block_count: data.block_count || 0,
+          tags: data.tags || [],
+          insight: (data.insight || '').replace(/\\"/g, '"'),
+          published: data.published !== false,
+        };
+      })
+      .filter((r) => r.published);
   } catch (e) {
     reports = [];
   }
@@ -645,19 +525,10 @@ export async function getStaticProps() {
   const stats = {
     totalDays: reports.length,
     totalReports: reports.length,
-    bullDays: reports.filter(r => r.regime === 'BULL').length,
-    bearDays: reports.filter(r => r.regime === 'BEAR').length,
-    sidewaysDays: reports.filter(r => r.regime === 'SIDEWAYS').length,
-    zeroTradeDays: reports.filter(r => r.trade_count === 0).length,
-    totalTrades: reports.reduce((sum, r) => sum + (r.trade_count || 0), 0),
-    totalBlocked: reports.reduce((sum, r) => sum + (r.block_count || 0), 0),
-    totalAnalyzed: reports.reduce((sum, r) => sum + (r.block_count || 0) + (r.trade_count || 0), 0),
-    blockRate: reports.length > 0
-      ? Math.round(
-          reports.reduce((sum, r) => sum + (r.block_count || 0), 0) /
-          Math.max(reports.reduce((sum, r) => sum + (r.trade_count || 0) + (r.block_count || 0), 0), 1) * 100
-        )
-      : 0,
+    totalTrades: reports.reduce((s, r) => s + (r.trade_count || 0), 0),
+    totalBlocked: reports.reduce((s, r) => s + (r.block_count || 0), 0),
+    totalAnalyzed: reports.reduce((s, r) => s + (r.block_count || 0) + (r.trade_count || 0), 0),
   };
+
   return { props: { reports, stats } };
 }
