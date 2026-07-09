@@ -633,7 +633,7 @@ export default function PWADashboard({ latestReport }) {
         {/* [v11 IA] 주식 카테고리 서브탭 — 추천 · 보유 · 기록 */}
         {['recommend','portfolio','report'].includes(tab) && (
           <nav className="pwa-subtabs">
-            {[['recommend','추천'],['portfolio','보유'],['report','기록']].map(([t,label]) => (
+            {[['portfolio','보유'],['recommend','추천'],['report','기록']].map(([t,label]) => (
               <button key={t} className={`pwa-subtab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
                 {label}
               </button>
