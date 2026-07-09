@@ -49,6 +49,12 @@
     <priority>0.5</priority>
   </url>
   <url>
+    <loc>https://one-hub-content.vercel.app/daily/2026-07-09</loc>
+    <lastmod>2026-07-09</lastmod>
+    <changefreq>never</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://one-hub-content.vercel.app/daily/2026-07-08</loc>
     <lastmod>2026-07-08</lastmod>
     <changefreq>never</changefreq>
@@ -260,7 +266,7 @@
   </url>
   <url>
     <loc>https://one-hub-content.vercel.app/blog/ai-korean-stock-analysis</loc>
-    <lastmod>2026-07-03</lastmod>
+    <lastmod>2026-07-08</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
