@@ -15,14 +15,15 @@ export default function RealEstateDashboard() {
   const [brief, setBrief] = useState(null);
   const [rank, setRank] = useState(null);
   const [macro, setMacro] = useState(null);
+  const [feed, setFeed] = useState(null); // [v11 #16] 최근 실거래 피드
   const [err, setErr] = useState(null);
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/re/${fn}`).then((r) => r.json());
-    Promise.all([g("briefing"), g("ranking"), g("macro")])
-      .then(([b, r, m]) => {
+    Promise.all([g("briefing"), g("ranking"), g("macro"), g("feed")])
+      .then(([b, r, m, f]) => {
         if (b.error) setErr(b.error);
-        setBrief(b); setRank(r); setMacro(m);
+        setBrief(b); setRank(r); setMacro(m); setFeed(f);
       })
       .catch((e) => setErr(e.message));
   }, []);
@@ -76,6 +77,30 @@ export default function RealEstateDashboard() {
             </div>
           ))}
           <div className="note">업데이트 {rank.ranking[0]?.updated} · AVM=자동가치추정. ONE Score는 구성요소 종합이며 블랙박스가 아닙니다.</div>
+        </section>
+      )}
+
+      {/* 2.5) 최근 실거래 피드 (#16) — raw_transactions 기반, 동일 단지·평형 직전 대비 변동률 */}
+      {feed?.feed?.length > 0 && (
+        <section className="card">
+          <div className="label">📈 최근 실거래 <span className="sub">동일 단지·평형 직전 거래 대비</span></div>
+          {feed.feed.slice(0, 8).map((f, i) => (
+            <div className="frow" key={`${f.단지명}-${f.거래일}-${i}`}>
+              <div className="fmid">
+                <div className="fname">{f.단지명}</div>
+                <div className="fsub">{f.전용면적}㎡ · {f.층 ? `${f.층}층` : "-"} · {f.건축연도 ? `${f.건축연도}년` : "-"} · {f.거래일?.slice(5)}</div>
+              </div>
+              <div className="fright">
+                <div className="fprice">{f.거래금액_억}억</div>
+                {f.변동률 != null && (
+                  <div className={`fchg ${f.변동률 > 0 ? "up" : f.변동률 < 0 ? "dn" : "fl"}`}>
+                    {f.변동률 > 0 ? "▲" : f.변동률 < 0 ? "▼" : "−"}{Math.abs(f.변동률)}%
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+          <div className="note">{feed.note}{feed.updated ? ` · 업데이트 ${feed.updated}` : ""}</div>
         </section>
       )}
 
@@ -149,6 +174,18 @@ export default function RealEstateDashboard() {
         .jtag { font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 7px; }
         .jtag.buy { background: var(--color-primary-soft); color: var(--color-primary); }
         .jtag.watch { background: var(--color-card-soft); color: var(--color-ink-3); }
+        /* 최근 실거래 피드 (#16) */
+        .frow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--color-line); }
+        .frow:first-of-type { border-top: none; }
+        .fmid { min-width: 0; }
+        .fname { font-size: 13.5px; font-weight: 700; letter-spacing: -.2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fsub { font-size: 11px; color: var(--color-ink-3); font-weight: 500; margin-top: 3px; }
+        .fright { text-align: right; flex-shrink: 0; }
+        .fprice { font-size: 14px; font-weight: 800; color: var(--color-ink); line-height: 1.1; }
+        .fchg { font-size: 11px; font-weight: 800; margin-top: 2px; }
+        .fchg.up { color: var(--color-danger); }
+        .fchg.dn { color: var(--color-primary); }
+        .fchg.fl { color: var(--color-ink-3); }
         /* 저평가 후보 */
         .urow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 13px 0; border-top: 1px solid var(--color-line); }
         .urow:first-of-type { border-top: none; }
