@@ -127,6 +127,7 @@ export default function PWADashboard({ latestReport }) {
   const [pendingError, setPendingError] = useState(null);
   const [actingCode, setActingCode] = useState(null); // 승인/거절 처리 중인 종목코드
   const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
+  const [accuracy, setAccuracy] = useState(null); // [기록] AI 자기검증(차단 적중률) 누적 — ML 학습 현황
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
@@ -311,6 +312,11 @@ export default function PWADashboard({ latestReport }) {
     fetch(`/api/realestate/v2/ai-summary?trader_id=${trader}`)
       .then(r => r.json())
       .then(d => { if (d && Array.isArray(d.summary_items)) setAiRec(d); })
+      .catch(() => {});
+    // [기록] AI 자기검증(차단 적중률) — ML 누적 학습 현황 카드용
+    fetch(`/api/pwa/accuracy?trader_id=${trader}`)
+      .then(r => r.json())
+      .then(d => { if (d && d.ok) setAccuracy(d); })
       .catch(() => {});
   }, [mounted, trader]);
 
@@ -1528,6 +1534,48 @@ export default function PWADashboard({ latestReport }) {
               );
             })()}
 
+            {/* [기록] AI 학습 현황 — ML 자기검증 누적/적중률 (기록이 쌓여 AI가 발전함을 요약) */}
+            {accuracy && (() => {
+              const s = accuracy.summary || {};
+              const pct = s.accuracy_pct;
+              const ready = pct != null && (s.total_checked ?? 0) >= 5;
+              const pctColor = pct == null ? 'var(--text-secondary)'
+                : pct >= 70 ? 'var(--color-success)' : pct >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
+              const rColor = (p) => (p ?? 0) >= 70 ? 'var(--color-success)' : (p ?? 0) >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
+              const topReasons = (accuracy.by_reason || []).filter(r => (r.total ?? 0) > 0)
+                .sort((a, b) => (b.accuracy_pct ?? 0) - (a.accuracy_pct ?? 0)).slice(0, 3);
+              return (
+                <section className="pwa-card">
+                  <span className="pwa-card-label">🧠 AI 학습 현황 · ML 자기검증</span>
+                  <div className="ml-accum">
+                    <div className="ml-accum-item"><b>{s.total_blocked ?? 0}</b><span>누적 판단 기록</span></div>
+                    <div className="ml-accum-item"><b>{s.total_checked ?? 0}</b><span>검증 완료</span></div>
+                    <div className="ml-accum-item"><b style={{ color: pctColor }}>{pct != null ? `${pct}%` : '—'}</b><span>적중률</span></div>
+                  </div>
+                  {ready ? (
+                    <>
+                      <div className="ml-bar"><div style={{ width: `${pct}%`, background: pctColor }} /></div>
+                      <p className="ml-desc">AI는 매주 과거 차단 판단을 <b>실제 주가 결과와 대조</b>해 스스로 채점합니다. 누적 <b>{s.total_blocked}건</b>의 기록으로 사유별 정확도를 학습해 판단 로직을 지속 보정합니다.</p>
+                      {topReasons.length > 0 && (
+                        <div className="ml-reasons">
+                          <div className="ml-reasons-h">🔬 근거별 학습 정확도 (ML이 신뢰하는 신호)</div>
+                          {topReasons.map((r, i) => (
+                            <div className="ml-reason" key={i}>
+                              <span className="ml-reason-t">{r.reason || '(미분류)'}</span>
+                              <span className="ml-reason-v" style={{ color: rColor(r.accuracy_pct) }}>{r.accuracy_pct ?? 0}%<em>{r.success}/{r.total}건</em></span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="ml-desc">차단·판단 기록을 모으는 중입니다. 누적 <b>{s.total_blocked ?? 0}건</b> — 검증 <b>5건</b> 이상 쌓이면 학습 정확도가 표시됩니다. AI는 매주 판단을 실제 결과로 재검증하며 발전합니다.</p>
+                  )}
+                  <button className="ml-more" onClick={() => router.push('/pwa/accuracy')}>전체 자기검증 내역 · 사유별 적중 보기 →</button>
+                </section>
+              );
+            })()}
+
             {/* [v9.0] 이번 주 AI 요약 카드 */}
             <section className="pwa-card">
               <span className="pwa-card-label">📊 이번 주 AI 요약</span>
@@ -1690,28 +1738,20 @@ export default function PWADashboard({ latestReport }) {
               </section>
             )}
             <section className="pwa-card">
-              <span className="pwa-card-label">일간 / 주간 리포트</span>
-              <div className="report-cards">
-                <Link href="/daily" className="report-card">
-                  <span className="report-card-icon">📅</span>
-                  <span className="report-card-title">일간 리포트</span>
-                  <span className="report-card-desc">매일 장마감 요약</span>
-                </Link>
-                <Link href="/weekly" className="report-card">
-                  <span className="report-card-icon">📊</span>
-                  <span className="report-card-title">주간 리포트</span>
-                  <span className="report-card-desc">MDD·승률·손익비</span>
-                </Link>
-                <Link href="/history" className="report-card">
-                  <span className="report-card-icon">🤖</span>
-                  <span className="report-card-title">AI 히스토리</span>
-                  <span className="report-card-desc">AI 판단 기록</span>
-                </Link>
-                <Link href="/heat-history" className="report-card">
-                  <span className="report-card-icon">🌡</span>
-                  <span className="report-card-title">히트 히스토리</span>
-                  <span className="report-card-desc">시장 과열도 추이</span>
-                </Link>
+              <span className="pwa-card-label">📂 상세 리포트</span>
+              <div className="report-list">
+                {[
+                  ['/daily', '📅', '일간 리포트', '매일 장 마감 요약'],
+                  ['/weekly', '📊', '주간 리포트', 'MDD · 승률 · 손익비'],
+                  ['/history', '🤖', 'AI 히스토리', 'AI 판단 기록 전체'],
+                  ['/heat-history', '🌡️', '히트 히스토리', '시장 과열도 추이'],
+                ].map(([href, icon, title, desc]) => (
+                  <Link href={href} key={href} className="report-row">
+                    <span className="report-row-icon">{icon}</span>
+                    <span className="report-row-text"><b>{title}</b><span>{desc}</span></span>
+                    <span className="report-row-arrow">›</span>
+                  </Link>
+                ))}
               </div>
             </section>
             {data && (<>
@@ -2525,13 +2565,33 @@ export default function PWADashboard({ latestReport }) {
         .pwa-link-btn { width: 100%; background: none; border: none; padding: 10px 0 0; color: var(--accent-info); font-size: 0.75rem; font-weight: 700; cursor: pointer; text-align: center; }
 
         /* [v8.5] 리포트 카드 */
-        .report-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .report-card { display: flex; flex-direction: column; gap: 5px; background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px 14px; text-decoration: none; transition: border-color 0.15s, transform 0.1s; }
-        .report-card:hover { border-color: var(--accent-buy); }
-        .report-card:active { transform: scale(0.98); }
-        .report-card-icon { font-size: 1.4rem; }
-        .report-card-title { font-size: 0.85rem; color: var(--text-primary); font-weight: 700; }
-        .report-card-desc { font-size: 0.68rem; color: var(--text-tertiary); }
+        /* [기록] 상세 리포트 — 전체폭 리스트(라벨/설명 줄바꿈 깨짐 방지) */
+        .report-list { display: flex; flex-direction: column; gap: 8px; }
+        .report-row { display: flex; align-items: center; gap: 12px; background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; text-decoration: none; transition: border-color 0.15s, transform 0.1s; }
+        .report-row:hover { border-color: var(--accent-buy); }
+        .report-row:active { transform: scale(0.99); }
+        .report-row-icon { font-size: 1.2rem; width: 36px; height: 36px; display: grid; place-items: center; background: var(--card-bg); border-radius: 10px; flex-shrink: 0; }
+        .report-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .report-row-text b { font-size: 0.86rem; color: var(--text-primary); font-weight: 700; }
+        .report-row-text span { font-size: 0.72rem; color: var(--text-tertiary); word-break: keep-all; line-height: 1.4; }
+        .report-row-arrow { color: var(--text-tertiary); font-size: 1.1rem; font-weight: 700; flex-shrink: 0; }
+        /* [기록] AI 학습 현황(ML 자기검증) */
+        .ml-accum { display: flex; gap: 8px; margin: 12px 0 10px; }
+        .ml-accum-item { flex: 1; background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 6px; text-align: center; display: flex; flex-direction: column; gap: 3px; }
+        .ml-accum-item b { font-size: 1.15rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); }
+        .ml-accum-item span { font-size: 0.66rem; color: var(--text-secondary); }
+        .ml-bar { height: 8px; background: var(--inset-bg); border-radius: 4px; overflow: hidden; margin-bottom: 10px; }
+        .ml-bar > div { height: 100%; border-radius: 4px; transition: width 0.7s ease; }
+        .ml-desc { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.6; margin: 0 0 12px; }
+        .ml-desc b { color: var(--text-primary); font-weight: 700; }
+        .ml-reasons { background: var(--inset-bg); border-radius: var(--radius-md); padding: 12px 13px; }
+        .ml-reasons-h { font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 9px; }
+        .ml-reason { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; }
+        .ml-reason-t { font-size: 0.78rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ml-reason-v { font-size: 0.78rem; font-weight: 800; font-family: var(--font-mono); white-space: nowrap; flex-shrink: 0; }
+        .ml-reason-v em { font-style: normal; font-weight: 500; font-size: 0.68rem; color: var(--text-tertiary); margin-left: 4px; }
+        .ml-more { width: 100%; margin-top: 12px; padding: 11px; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--accent-buy); font-family: var(--font-body); font-size: 0.78rem; font-weight: 700; cursor: pointer; }
+        .ml-more:active { transform: scale(0.99); }
 
         /* 액션/차단 리스트 */
         .pwa-action-list, .pwa-blocked-list { display: flex; flex-direction: column; gap: 10px; }
