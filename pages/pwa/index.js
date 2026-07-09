@@ -872,6 +872,58 @@ export default function PWADashboard({ latestReport }) {
               <div className="rec-hero-upd"><LastUpdated timestamp={data?.ok ? new Date() : null} staleAfterSeconds={180} /></div>
               <p className="rec-hero-desc">AI 매수 선별 전 기술 스코어링 상위 후보입니다. 실제 매수 신호와는 별개입니다.</p>
             </section>
+
+            {/* [매매 승인] 추천 탭 상단 — AI 매매 제안 승인/거절 카드 (승인대기 있을 때만) */}
+            {pendingList.length > 0 && (
+              <section className="pwa-card approve-card">
+                <div className="approve-head">
+                  <span className="approve-title">🤝 AI 매매 제안 · 승인 대기 <b>{pendingList.length}건</b></span>
+                  {!isMarketHoursKST() && <span className="approve-off">장외 · 예약 승인</span>}
+                </div>
+                <div className="pending-list">
+                  {pendingList.map((p) => {
+                    const rr = (p.price > 0 && p.target > 0 && p.stop_loss > 0)
+                      ? (() => { const rw = (p.target / p.price - 1) * 100; const rk = (1 - p.stop_loss / p.price) * 100; return { rw, rk, r: rk > 0 ? rw / rk : null }; })()
+                      : null;
+                    const rrColor = !rr || rr.r == null ? 'var(--text-secondary)' : rr.r >= 2 ? 'var(--color-success)' : rr.r >= 1.5 ? 'var(--color-warning)' : 'var(--color-danger)';
+                    const queued = p.status === 'queued';
+                    return (
+                      <div key={p.code} className="pending-card">
+                        <div className="pending-top">
+                          <span className="pending-name">{p.name} <span className="dim mono">({p.code})</span></span>
+                          {p.regime && <span className={`pending-regime mono ${regimeClass(p.regime)}`}>{p.regime}</span>}
+                        </div>
+                        <div className="pending-price-grid mono">
+                          <div><span className="dim">목표가</span> <span className="bull">{Number(p.target || 0).toLocaleString()}원</span></div>
+                          <div><span className="dim">손절가</span> <span className="bear">{Number(p.stop_loss || 0).toLocaleString()}원</span></div>
+                        </div>
+                        {rr && (
+                          <div className="pending-price-grid rr-3col mono" style={{ marginTop: 2 }}>
+                            <div><span className="dim">예상수익</span> <span className="bull">+{rr.rw.toFixed(1)}%</span></div>
+                            <div><span className="dim">손절률</span> <span className="bear">-{rr.rk.toFixed(1)}%</span></div>
+                            <div><span className="dim">RR</span> <span style={{ color: rrColor, fontWeight: 700 }}>{rr.r != null ? rr.r.toFixed(1) : '-'}</span></div>
+                          </div>
+                        )}
+                        {p.reason && <div className="pending-reason">{p.reason}</div>}
+                        {queued ? (
+                          <div className="pending-queued">
+                            ⏰ {p.scheduled_at ? `${p.scheduled_at} 예약` : '다음장 09:00 예약'} · 자동 릴리스 대기
+                            <button className="pending-btn reject" style={{ marginTop: 8, width: '100%' }} disabled={actingCode === p.code} onClick={() => actOnPending(p.code, 'skip')}>{actingCode === p.code ? '처리 중...' : '❌ 예약 취소'}</button>
+                          </div>
+                        ) : (
+                          <div className="pending-actions">
+                            <button className="pending-btn approve" disabled={actingCode === p.code} onClick={() => actOnPending(p.code, 'approve')}>{actingCode === p.code ? '처리 중...' : (isMarketHoursKST() ? '✅ 승인' : '⏰ 예약 승인')}</button>
+                            <button className="pending-btn reject" disabled={actingCode === p.code} onClick={() => actOnPending(p.code, 'skip')}>{actingCode === p.code ? '처리 중...' : '❌ 거절'}</button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {pendingError && <div className="pwa-error" style={{ marginTop: 8 }}>{pendingError}</div>}
+              </section>
+            )}
+
             <section className="pwa-card">
               {!data && !error && (
                 <div className="pwa-loading"><div className="pwa-spinner" /><span>데이터 로딩 중...</span></div>
@@ -2313,6 +2365,12 @@ export default function PWADashboard({ latestReport }) {
         .mission-cell.hold { background: var(--inset-bg); }
         .mission-cell.hold .mission-num { color: var(--text-primary); }
 
+        /* [매매 승인] 추천 탭 승인 카드 헤더 */
+        .approve-card { border-color: color-mix(in srgb, var(--accent-buy) 30%, var(--border)); }
+        .approve-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+        .approve-title { font-size: 0.86rem; font-weight: 700; color: var(--text-primary); }
+        .approve-title b { color: var(--accent-buy); font-weight: 800; }
+        .approve-off { font-size: 0.66rem; font-weight: 800; color: var(--accent-warn); background: color-mix(in srgb, var(--accent-warn) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent-warn) 30%, var(--border)); padding: 3px 8px; border-radius: 7px; flex-shrink: 0; }
         /* 승인대기 카드 */
         .pending-panel { border-color: color-mix(in srgb, var(--accent-buy) 25%, var(--border)); }
         .pending-list { display: flex; flex-direction: column; gap: 10px; }
