@@ -32,6 +32,7 @@ export default function Settings() {
   const [pushMsg, setPushMsg] = useState("");
   const [trader, setTrader] = useState("A");
   const [opsView, setOpsView] = useState(false); // 운영자 뷰 표시 여부
+  const [traderStat, setTraderStat] = useState({}); // [v11 #18] 트레이더 A/B 엔진 상태 (기존 engine-status 재사용)
   const tick = useRef(null);
 
   const loadHealth = useCallback(async () => {
@@ -51,6 +52,12 @@ export default function Settings() {
     try { setTrader(localStorage.getItem("onehub_trader") || "A"); } catch {}
     try { setOpsView(localStorage.getItem("onehub_ops_view") === "1"); } catch {}
     loadHealth();
+    ["A", "B"].forEach((t) => {
+      fetch(`/api/pwa-engine-status?trader=${t}`)
+        .then((r) => r.json())
+        .then((d) => { if (d && d.ok) setTraderStat((prev) => ({ ...prev, [t]: d })); })
+        .catch(() => {});
+    });
     if (typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window) {
       navigator.serviceWorker.getRegistration().then((reg) =>
         reg?.pushManager.getSubscription().then((s) => setPushOn(!!s))).catch(() => {});
@@ -221,6 +228,53 @@ export default function Settings() {
                 <Link href="/pwa/system-health" className="detail">상세 로그·이벤트 →</Link>
               </>
             )}
+          </div>
+
+          {/* [v11 #18] 트레이더 A/B 관리 — 기존 engine-status 재사용(백엔드 무수정) */}
+          <div className="card">
+            <div className="k">트레이더 관리 · A / B</div>
+            {["A", "B"].map((t) => {
+              const st = traderStat[t];
+              const tok = (health?.tokens || []).find((x) => x.trader_id === t);
+              const active = !!(st && st.ok);
+              return (
+                <div key={t} style={{ padding: "10px 0", borderTop: t === "B" ? "1px solid var(--color-line)" : "none" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <span style={{ fontWeight: 800, fontSize: "0.9rem", display: "flex", alignItems: "center" }}>
+                      <span className="dot" style={{ width: 8, height: 8, borderRadius: "50%", marginRight: 6, background: active ? "var(--color-success)" : "var(--color-danger)" }} />
+                      Trader {t}
+                    </span>
+                    <span style={{ fontSize: "0.7rem", fontWeight: 700, padding: "2px 9px", borderRadius: 8, background: st?.aimode ? "var(--color-primary-soft)" : "var(--color-card-soft)", color: st?.aimode ? "var(--color-primary)" : "var(--color-ink-3)" }}>
+                      자율모드 {st?.aimode ? "ON" : "OFF"}
+                    </span>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8, fontSize: "0.74rem", color: "var(--color-ink-2)" }}>
+                    <div>엔진 <b style={{ color: "var(--color-ink)" }}>{active ? "가동" : "응답없음"}</b></div>
+                    <div>레짐 <b style={{ color: "var(--color-ink)" }}>{st?.regime_current ?? "-"}</b></div>
+                    <div>마지막 분석 <b style={{ color: "var(--color-ink)" }}>{st?.last_analysis_at ? st.last_analysis_at.slice(5, 16) : "-"}</b></div>
+                    <div>스캔 <b style={{ color: "var(--color-ink)" }}>{st?.last_scan_count ?? "-"}종목</b></div>
+                    <div>토큰 <b style={{ color: "var(--color-ink)", fontFamily: "ui-monospace, monospace" }}>{tok ? mmss(tok.remaining_sec) : "-"}</b></div>
+                    <div>분석중 <b style={{ color: "var(--color-ink)" }}>{st?.is_analyzing ? "예" : "아니오"}</b></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* [v11 #19] 리소스·사용 현황 — 실측 가능한 것만(비용 계측은 미구현이라 정직 표기) */}
+          <div className="card">
+            <div className="k">리소스 · 사용 현황</div>
+            <div className="row"><span className="l">서버</span><span style={{ fontWeight: 700 }}>Lightsail · ap-northeast-2</span></div>
+            {["A", "B"].map((t) => {
+              const tok = (health?.tokens || []).find((x) => x.trader_id === t);
+              return (
+                <div className="row" style={{ marginTop: 8 }} key={t}>
+                  <span className="l">KIS 토큰 {t}</span>
+                  <span style={{ fontWeight: 700, fontFamily: "ui-monospace, monospace" }}>{tok ? mmss(tok.remaining_sec) : "-"}</span>
+                </div>
+              );
+            })}
+            <div className="hint">⚠️ KIS 호출량 · Claude API 비용 · 월 사용액은 아직 계측(호출 카운터/토큰 로깅)이 없어 표기하지 않습니다. 실비용 표기는 계측 신설 후 제공됩니다.</div>
           </div>
 
           {/* 버전 */}
