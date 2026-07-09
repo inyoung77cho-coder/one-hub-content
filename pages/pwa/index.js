@@ -127,7 +127,7 @@ export default function PWADashboard({ latestReport }) {
   const [pendingError, setPendingError] = useState(null);
   const [actingCode, setActingCode] = useState(null); // 승인/거절 처리 중인 종목코드
   const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
-  const [accuracy, setAccuracy] = useState(null); // [기록] AI 자기검증(차단 적중률) 누적 — ML 학습 현황
+  const [accuracy, setAccuracy] = useState(null); // [기록] AI 자기검증(차단 적중률) 누적 — ML 학습 현황 카드
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
@@ -300,6 +300,10 @@ export default function PWADashboard({ latestReport }) {
     fetch(`/api/pwa-performance?trader=${trader}&days=30`)
       .then(r => r.json())
       .then(d => { if (d.ok) setPerf(d); })
+      .catch(() => {});
+    fetch(`/api/pwa/accuracy?trader_id=${trader}`)
+      .then(r => r.json())
+      .then(d => { if (d.ok) setAccuracy(d); })
       .catch(() => {});
     fetch(`/api/notifications?trader=${trader}`)
       .then(r => r.json())
@@ -1534,28 +1538,30 @@ export default function PWADashboard({ latestReport }) {
               );
             })()}
 
-            {/* [기록] AI 학습 현황 — ML 자기검증 누적/적중률 (기록이 쌓여 AI가 발전함을 요약) */}
-            {accuracy && (() => {
+            {/* [기록] AI 학습 현황 — ML 자기검증: 누적 기록 + 사유별 학습 정확도 + 최근 검증 결과(기록 누적·발전 스토리) */}
+            {accuracy?.ok && (() => {
               const s = accuracy.summary || {};
               const pct = s.accuracy_pct;
-              const ready = pct != null && (s.total_checked ?? 0) >= 5;
+              const checked = s.total_checked ?? 0;
+              const ready = pct != null && checked >= 5;
               const pctColor = pct == null ? 'var(--text-secondary)'
                 : pct >= 70 ? 'var(--color-success)' : pct >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
               const rColor = (p) => (p ?? 0) >= 70 ? 'var(--color-success)' : (p ?? 0) >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
               const topReasons = (accuracy.by_reason || []).filter(r => (r.total ?? 0) > 0)
                 .sort((a, b) => (b.accuracy_pct ?? 0) - (a.accuracy_pct ?? 0)).slice(0, 3);
+              const recent = (accuracy.recent || []).slice(0, 3);
               return (
                 <section className="pwa-card">
                   <span className="pwa-card-label">🧠 AI 학습 현황 · ML 자기검증</span>
                   <div className="ml-accum">
                     <div className="ml-accum-item"><b>{s.total_blocked ?? 0}</b><span>누적 판단 기록</span></div>
-                    <div className="ml-accum-item"><b>{s.total_checked ?? 0}</b><span>검증 완료</span></div>
+                    <div className="ml-accum-item"><b>{checked}</b><span>검증 완료</span></div>
                     <div className="ml-accum-item"><b style={{ color: pctColor }}>{pct != null ? `${pct}%` : '—'}</b><span>적중률</span></div>
                   </div>
                   {ready ? (
                     <>
                       <div className="ml-bar"><div style={{ width: `${pct}%`, background: pctColor }} /></div>
-                      <p className="ml-desc">AI는 매주 과거 차단 판단을 <b>실제 주가 결과와 대조</b>해 스스로 채점합니다. 누적 <b>{s.total_blocked}건</b>의 기록으로 사유별 정확도를 학습해 판단 로직을 지속 보정합니다.</p>
+                      <p className="ml-desc">AI는 매주 과거 판단을 <b>실제 주가 결과와 대조</b>해 스스로 채점합니다. 누적 <b>{s.total_blocked ?? 0}건</b>의 기록으로 사유별 정확도를 학습해 판단 로직을 지속 보정합니다.</p>
                       {topReasons.length > 0 && (
                         <div className="ml-reasons">
                           <div className="ml-reasons-h">🔬 근거별 학습 정확도 (ML이 신뢰하는 신호)</div>
@@ -1565,6 +1571,25 @@ export default function PWADashboard({ latestReport }) {
                               <span className="ml-reason-v" style={{ color: rColor(r.accuracy_pct) }}>{r.accuracy_pct ?? 0}%<em>{r.success}/{r.total}건</em></span>
                             </div>
                           ))}
+                        </div>
+                      )}
+                      {recent.length > 0 && (
+                        <div className="ml-recent">
+                          <div className="ml-reasons-h" style={{ marginBottom: 4 }}>🗂 최근 검증 결과 (기록)</div>
+                          {recent.map((r, i) => {
+                            const ok = r.result === 'SUCCESS';
+                            const neu = r.result === 'NEUTRAL' || !r.result;
+                            return (
+                              <div key={i} className="ml-rec-row">
+                                <div className="ml-rec-l"><span className="ml-rec-name">{r.stock}</span><span className="ml-rec-rsn">{(r.block_reason || '').split(' / ')[0]}</span></div>
+                                <div className="ml-rec-r">
+                                  {r.price_change_pct != null && <span className="mono ml-rec-chg">{r.price_change_pct > 0 ? '+' : ''}{r.price_change_pct.toFixed(1)}%</span>}
+                                  <span className="ml-rec-badge" style={{ color: neu ? 'var(--text-secondary)' : ok ? 'var(--color-success)' : 'var(--color-danger)' }}>{neu ? '― 보류' : ok ? '✓ 적중' : '✗ 오판'}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <p className="ml-foot">적중=차단 후 하락 · 오판=차단 후 상승 · 보류=보합. 차단 3거래일 후 실제가로 자동 검증.</p>
                         </div>
                       )}
                     </>
@@ -2592,6 +2617,15 @@ export default function PWADashboard({ latestReport }) {
         .ml-reason-v em { font-style: normal; font-weight: 500; font-size: 0.68rem; color: var(--text-tertiary); margin-left: 4px; }
         .ml-more { width: 100%; margin-top: 12px; padding: 11px; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--accent-buy); font-family: var(--font-body); font-size: 0.78rem; font-weight: 700; cursor: pointer; }
         .ml-more:active { transform: scale(0.99); }
+        .ml-recent { margin-top: 12px; }
+        .ml-rec-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 0; border-top: 1px solid var(--inset-bg); }
+        .ml-rec-l { min-width: 0; overflow: hidden; }
+        .ml-rec-name { font-size: 0.82rem; font-weight: 700; color: var(--text-primary); }
+        .ml-rec-rsn { font-size: 0.68rem; color: var(--text-tertiary); margin-left: 6px; }
+        .ml-rec-r { display: flex; align-items: center; gap: 8px; white-space: nowrap; flex-shrink: 0; }
+        .ml-rec-chg { font-size: 0.72rem; color: var(--text-secondary); }
+        .ml-rec-badge { font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: var(--inset-bg); }
+        .ml-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 8px; line-height: 1.5; }
 
         /* 액션/차단 리스트 */
         .pwa-action-list, .pwa-blocked-list { display: flex; flex-direction: column; gap: 10px; }

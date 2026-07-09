@@ -133,11 +133,11 @@ export default function TraderB() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.75rem", marginBottom: "1.25rem" }}>
                   {[
                     { label: "Regime", value: `${regimeEmoji(report.regime)} ${report.regime}`, color: regimeColor(report.regime) },
-                    { label: "Heat Score", value: `${report.heat_score}/100 (${report.heat_grade})`, color: "#1A1A1A" },
-                    { label: "체결 / 차단", value: `${report.trade_count}건 / ${report.block_count}건`, color: "#1A1A1A" },
+                    { label: "Heat Score", value: `${report.heat_score}/100 (${report.heat_grade})`, color: "#12213B" },
+                    { label: "체결 / 차단", value: `${report.trade_count}건 / ${report.block_count}건`, color: "#12213B" },
                   ].map(item => (
                     <div key={item.label} style={{
-                      background: "#F8F7F2", border: "1px solid var(--color-border)",
+                      background: "#F4F9FF", border: "1px solid var(--color-border)",
                       borderRadius: "8px", padding: "0.875rem", textAlign: "center"
                     }}>
                       <div style={{ fontSize: "11px", color: "var(--color-muted)", marginBottom: "4px", fontFamily: "Space Mono, monospace" }}>{item.label}</div>
@@ -223,11 +223,11 @@ export default function TraderB() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "0.75rem", marginBottom: "1.25rem" }}>
                   {[
                     { label: "누적 손익", value: `${history.total_pnl >= 0 ? "+" : ""}${history.total_pnl?.toLocaleString()}원`, color: pnlColor(history.total_pnl) },
-                    { label: "운영 일수", value: `${history.history.length}일`, color: "#1A1A1A" },
-                    { label: "총 거래", value: `${history.history.reduce((s, d) => s + d.trade_count, 0)}건`, color: "#1A1A1A" },
+                    { label: "운영 일수", value: `${history.history.length}일`, color: "#12213B" },
+                    { label: "총 거래", value: `${history.history.reduce((s, d) => s + d.trade_count, 0)}건`, color: "#12213B" },
                   ].map(item => (
                     <div key={item.label} style={{
-                      background: "#F8F7F2", border: "1px solid var(--color-border)",
+                      background: "#F4F9FF", border: "1px solid var(--color-border)",
                       borderRadius: "8px", padding: "0.875rem", textAlign: "center"
                     }}>
                       <div style={{ fontSize: "11px", color: "var(--color-muted)", marginBottom: "4px", fontFamily: "Space Mono, monospace" }}>{item.label}</div>
@@ -282,7 +282,7 @@ export default function TraderB() {
                 { step: "04", title: "자동매매 시작", desc: "AI가 매일 9시 5분부터 자동으로 매매를 실행합니다. 텔레그램으로 실시간 알림을 받습니다." },
               ].map(item => (
                 <div key={item.step} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
-                  <span style={{ fontFamily: "Space Mono, monospace", fontSize: "11px", fontWeight: 700, color: "#9A9690", minWidth: "24px", marginTop: "2px" }}>
+                  <span style={{ fontFamily: "Space Mono, monospace", fontSize: "11px", fontWeight: 700, color: "#94A3B8", minWidth: "24px", marginTop: "2px" }}>
                     {item.step}
                   </span>
                   <div>
@@ -298,7 +298,7 @@ export default function TraderB() {
             <Link href="/settings/api-key">
               <button style={{
                 padding: "14px 32px", borderRadius: "8px",
-                background: "#1A1A1A", color: "#F8F7F2",
+                background: "#12213B", color: "#F4F9FF",
                 border: "none", fontSize: "1rem", fontWeight: 600,
                 cursor: "pointer", fontFamily: "Syne, sans-serif"
               }}>

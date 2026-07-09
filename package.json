@@ -4,8 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node scripts/gen-sitemap.mjs",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "gen:sitemap": "node scripts/gen-sitemap.mjs"
   },
   "dependencies": {
     "gray-matter": "^4.0.3",

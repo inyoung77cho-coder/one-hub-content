@@ -18,8 +18,8 @@ export default function WeeklyIndex({ reports }) {
   // ② Regime 필터
   const filtered = selectedRegime === 'ALL' ? reports : reports.filter(r => r.dominant_regime === selectedRegime)
 
-  const regimeBg  = (r) => r === 'BULL' ? '#FDEAEA' : r === 'BEAR' ? '#EAF3FB' : '#F0EDE8'
-  const regimeClr = (r) => r === 'BULL' ? '#DD3333' : r === 'BEAR' ? '#3A8BD4' : '#6A6660'
+  const regimeBg  = (r) => r === 'BULL' ? '#FDEAEA' : r === 'BEAR' ? '#EAF3FB' : '#EEF3FB'
+  const regimeClr = (r) => r === 'BULL' ? '#DD3333' : r === 'BEAR' ? '#3A8BD4' : '#64748B'
 
   return (
     <>
@@ -36,16 +36,16 @@ export default function WeeklyIndex({ reports }) {
         <meta name="twitter:title" content="Weekly Reports — ONE-HUB" />
         <meta name="twitter:description" content="ONE-HUB 주간 운영 리포트. 매주 금요일 한 주간의 시장 분석과 운영 회고를 발행합니다." />
       </Head>
-      <div style={{ minHeight: "100vh", background: "#F8F7F2", color: "#1a202c", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
+      <div style={{ minHeight: "100vh", background: "#F4F9FF", color: "#1a202c", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
         <main style={{ maxWidth: "800px", margin: "0 auto", padding: "40px 24px" }}>
-          <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#9A9690", textTransform: "uppercase", marginBottom: "24px" }}>
+          <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#94A3B8", textTransform: "uppercase", marginBottom: "24px" }}>
             Weekly Reports
           </h1>
 
           {/* ① KPI 요약 카드 (최근 4주) */}
           {recent4.length > 0 && (
-            <div style={{ background: "#FFFFFF", border: "1px solid #E0DDD4", borderRadius: 12, padding: "18px 20px", marginBottom: 24 }}>
-              <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#9A9690", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 14 }}>
+            <div style={{ background: "#FFFFFF", border: "1px solid #E8EEF7", borderRadius: 12, padding: "18px 20px", marginBottom: 24 }}>
+              <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#94A3B8", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: 14 }}>
                 📊 주간 성과 요약 (최근 {recent4.length}주)
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
@@ -56,8 +56,8 @@ export default function WeeklyIndex({ reports }) {
                   { label: "최신",       val: reports[0]?.week ?? "-" },
                 ].map(({ label, val }) => (
                   <div key={label} style={{ textAlign: "center" }}>
-                    <div style={{ fontFamily: "monospace", fontSize: "14px", fontWeight: 800, color: "#1A1A1A", marginBottom: 4 }}>{val}</div>
-                    <div style={{ fontSize: "10px", color: "#9A9690" }}>{label}</div>
+                    <div style={{ fontFamily: "monospace", fontSize: "14px", fontWeight: 800, color: "#12213B", marginBottom: 4 }}>{val}</div>
+                    <div style={{ fontSize: "10px", color: "#94A3B8" }}>{label}</div>
                   </div>
                 ))}
               </div>
@@ -68,14 +68,14 @@ export default function WeeklyIndex({ reports }) {
           <div style={{ display: "flex", gap: 6, marginBottom: 20, flexWrap: "wrap" }}>
             {['ALL', 'BULL', 'BEAR', 'SIDEWAYS'].map(r => (
               <button key={r} onClick={() => setSelectedRegime(r)}
-                style={{ padding: "5px 14px", borderRadius: 6, border: "1px solid #E0DDD4",
-                  background: selectedRegime === r ? "#1A1A1A" : "#FFFFFF",
-                  color: selectedRegime === r ? "#F8F7F2" : "#6A6660",
+                style={{ padding: "5px 14px", borderRadius: 6, border: "1px solid #E8EEF7",
+                  background: selectedRegime === r ? "#12213B" : "#FFFFFF",
+                  color: selectedRegime === r ? "#F4F9FF" : "#64748B",
                   cursor: "pointer", fontFamily: "monospace", fontSize: "11px", fontWeight: selectedRegime === r ? 700 : 400 }}>
                 {r === 'ALL' ? '전체' : r}
               </button>
             ))}
-            <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#9A9690", alignSelf: "center", marginLeft: "auto" }}>
+            <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#94A3B8", alignSelf: "center", marginLeft: "auto" }}>
               {filtered.length}개 리포트
             </span>
           </div>
@@ -83,16 +83,16 @@ export default function WeeklyIndex({ reports }) {
           {/* 리포트 목록 */}
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             {filtered.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: "#9A9690", fontFamily: "monospace", fontSize: "12px" }}>
+              <div style={{ textAlign: "center", padding: "40px 0", color: "#94A3B8", fontFamily: "monospace", fontSize: "12px" }}>
                 해당 Regime의 리포트가 없습니다.
               </div>
             ) : filtered.map(r => (
               <Link key={r.week} href={`/weekly/${r.week}`} style={{ textDecoration: "none" }}>
-                <div style={{ background: "#FFFFFF", border: "1px solid #E0DDD4", borderRadius: "10px", padding: "18px 20px", cursor: "pointer" }}
+                <div style={{ background: "#FFFFFF", border: "1px solid #E8EEF7", borderRadius: "10px", padding: "18px 20px", cursor: "pointer" }}
                   onMouseEnter={e => e.currentTarget.style.borderColor = "#D0CCC4"}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = "#E0DDD4"}>
-                  <div style={{ fontFamily: "monospace", fontSize: "13px", fontWeight: 700, color: "#1A1A1A", marginBottom: "6px" }}>{r.week}</div>
-                  <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#6A6660", marginBottom: "10px" }}>
+                  onMouseLeave={e => e.currentTarget.style.borderColor = "#E8EEF7"}>
+                  <div style={{ fontFamily: "monospace", fontSize: "13px", fontWeight: 700, color: "#12213B", marginBottom: "6px" }}>{r.week}</div>
+                  <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#64748B", marginBottom: "10px" }}>
                     {r.monday && r.friday ? `${r.monday} ~ ${r.friday}` : r.monday || r.friday || ""}
                   </div>
                   <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
@@ -100,8 +100,8 @@ export default function WeeklyIndex({ reports }) {
                       background: regimeBg(r.dominant_regime), color: regimeClr(r.dominant_regime) }}>
                       {r.dominant_regime || "SIDEWAYS"}
                     </span>
-                    <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#9A9690" }}>Heat {r.avg_heat}/100</span>
-                    <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#9A9690" }}>매매 {r.total_trades}건</span>
+                    <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#94A3B8" }}>Heat {r.avg_heat}/100</span>
+                    <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#94A3B8" }}>매매 {r.total_trades}건</span>
                   </div>
                 </div>
               </Link>

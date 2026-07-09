@@ -1,9 +1,7 @@
-
 User-agent: *
-
 Allow: /
-
-
+Disallow: /api/
+Disallow: /pwa/
+Disallow: /dashboard
 
 Sitemap: https://one-hub-content.vercel.app/sitemap.xml
-

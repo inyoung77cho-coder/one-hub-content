@@ -161,7 +161,7 @@ export default function DecisionLog() {
               {[
                 { label: "총 차단", value: `${logs.length}건`, color: "#ef4444" },
                 { label: "ML SELL", value: `${logs.filter(l => l.ml_signal === "SELL").length}건`, color: "#f59e0b" },
-                { label: "평균 Score", value: `${Math.round(logs.reduce((s, l) => s + (l.final_score || 0), 0) / logs.length)}점`, color: "#1A1A1A" },
+                { label: "평균 Score", value: `${Math.round(logs.reduce((s, l) => s + (l.final_score || 0), 0) / logs.length)}점`, color: "#12213B" },
               ].map(item => (
                 <div key={item.label} style={{ background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "12px", padding: "0.875rem", textAlign: "center" }}>
                   <div style={{ fontSize: "11px", color: "var(--color-muted)", marginBottom: "4px", fontFamily: "Space Mono, monospace" }}>{item.label}</div>

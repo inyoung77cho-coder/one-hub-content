@@ -51,9 +51,9 @@ export default function AboutPage() {
           <div style={{ marginBottom: "48px" }}>
             <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#94a3b8", letterSpacing: "0.2em", textTransform: "uppercase", marginBottom: "16px" }}>About ONE-HUB</div>
             <h1 style={{ fontSize: "28px", fontWeight: 700, lineHeight: 1.4, color: "#0f172a", marginBottom: "16px" }}>
-              AI가 시장을 읽고,<br /><span style={{ color: "#00AA55" }}>사람이 판단하는</span> 자동매매
+              AI가 시장을 읽고,<br /><span style={{ color: "#16C784" }}>사람이 판단하는</span> 자동매매
             </h1>
-            <p style={{ fontSize: "14px", color: "#6A6660", lineHeight: 1.8, maxWidth: "580px" }}>
+            <p style={{ fontSize: "14px", color: "#64748B", lineHeight: 1.8, maxWidth: "580px" }}>
               ONE-HUB는 단순한 자동매매 봇이 아닙니다. AI의 데이터 분석과 사람의 맥락 판단이 결합되는 과정을 기록하고, 그 여정을 투명하게 공유하는 플랫폼입니다.
             </p>
           </div>
@@ -64,7 +64,7 @@ export default function AboutPage() {
                 <div key={v.title} style={{ background: "#FFFFFF", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "22px 20px" }}>
                   <div style={{ fontSize: "24px", marginBottom: "12px" }}>{v.icon}</div>
                   <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#0f172a", marginBottom: "8px" }}>{v.title}</div>
-                  <p style={{ fontSize: "12px", color: "#6A6660", lineHeight: 1.6, margin: 0 }}>{v.desc}</p>
+                  <p style={{ fontSize: "12px", color: "#64748B", lineHeight: 1.6, margin: 0 }}>{v.desc}</p>
                 </div>
               ))}
             </div>
@@ -76,7 +76,7 @@ export default function AboutPage() {
                 <span style={{ fontSize: "18px", flexShrink: 0 }}>{icon}</span>
                 <div>
                   <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#0f172a", marginBottom: "3px" }}>{title}</div>
-                  <div style={{ fontSize: "12px", color: "#6A6660" }}>{desc}</div>
+                  <div style={{ fontSize: "12px", color: "#64748B" }}>{desc}</div>
                 </div>
               </div>
             ))}
@@ -86,10 +86,10 @@ export default function AboutPage() {
             <div style={{ position: "relative", paddingLeft: "24px", borderLeft: "1px solid #e2e8f0" }}>
               {timeline.map((t, i) => (
                 <div key={i} style={{ position: "relative", paddingBottom: "24px" }}>
-                  <div style={{ position: "absolute", left: "-29px", top: "4px", width: "10px", height: "10px", borderRadius: "50%", background: i === 0 ? "#00AA55" : "#e2e8f0", border: "2px solid #e2e8f0" }} />
+                  <div style={{ position: "absolute", left: "-29px", top: "4px", width: "10px", height: "10px", borderRadius: "50%", background: i === 0 ? "#16C784" : "#e2e8f0", border: "2px solid #e2e8f0" }} />
                   <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#94a3b8", marginBottom: "4px" }}>{t.date}</div>
                   <div style={{ fontFamily: "monospace", fontSize: "12px", fontWeight: 700, color: "#0f172a", marginBottom: "4px" }}>{t.label}</div>
-                  <div style={{ fontSize: "12px", color: "#6A6660", lineHeight: 1.5 }}>{t.desc}</div>
+                  <div style={{ fontSize: "12px", color: "#64748B", lineHeight: 1.5 }}>{t.desc}</div>
                 </div>
               ))}
             </div>
@@ -97,10 +97,10 @@ export default function AboutPage() {
           <div style={{ background: "#FFFFFF", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div>
               <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#94a3b8", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "8px" }}>현재 운용 상태</div>
-              <div style={{ fontFamily: "monospace", fontSize: "16px", fontWeight: 700, color: "#00AA55" }}>LIVE · auto_trade {APP_VERSION}</div>
-              <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#6A6660", marginTop: "4px" }}>AWS Lightsail · 매일 15:30 KST 자동 리포트</div>
+              <div style={{ fontFamily: "monospace", fontSize: "16px", fontWeight: 700, color: "#16C784" }}>LIVE · auto_trade {APP_VERSION}</div>
+              <div style={{ fontFamily: "monospace", fontSize: "11px", color: "#64748B", marginTop: "4px" }}>AWS Lightsail · 매일 15:30 KST 자동 리포트</div>
             </div>
-            <Link href="/engines" style={{ fontFamily: "monospace", fontSize: "11px", color: "#00AA55", textDecoration: "none", padding: "10px 16px", border: "1px solid #E8F8EF", borderRadius: "8px" }}>
+            <Link href="/engines" style={{ fontFamily: "monospace", fontSize: "11px", color: "#16C784", textDecoration: "none", padding: "10px 16px", border: "1px solid #E8F8EF", borderRadius: "8px" }}>
               엔진 상태 보기 →
             </Link>
           </div>

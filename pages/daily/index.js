@@ -103,7 +103,7 @@ export default function DailyIndex({ posts, postsB }) {
 
       </Head>
 
-      <div style={{ minHeight: "100vh", background: "#F8F7F2", color: "#1a202c", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
+      <div style={{ minHeight: "100vh", background: "#F4F9FF", color: "#1a202c", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
 
         <main style={{ maxWidth: "800px", margin: "0 auto", padding: isMobile ? "24px 16px" : "40px 24px" }}>
 
