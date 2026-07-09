@@ -1,155 +1,377 @@
-// AI Advisor — 자산운영 AI 브레인 탭 (통합 자산 기반 종합 판단/리밸런싱)
+// AI자산 페이지 v11.0-ASSET-01 — 단일 소스(SSOT) 재설계. 목업 ai-assets-v4.html 정본.
+//   모든 섹션(총자산/유동점수/구조리스크/오늘할일/주식형균형/리밸런싱)을 computeSummary() 하나로 계산.
+//   백엔드(auto_trade) 미도달 환경 → 스냅샷·정책·점수·세금리밸런싱을 브라우저에서 계산(작업지시서 §2~§5).
+//   지역/섹터(§4 Sprint 4)는 실제 ETF/주식 메타 연결 전까지 '데모 데이터' 배지 유지(§6).
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import TopNav from "../../components/TopNav";
-import AssetSummaryBar from "../../components/AssetSummaryBar";
+import { computeSummary, toManwon } from "../../lib/aiAssets";
 
-const api = (fn) => `/api/realestate/v2/${fn}?trader_id=A`;
-const Stars = ({ n }) => <span className="st">{"★".repeat(n)}{"☆".repeat(5 - n)}</span>;
+const UK = 1e8; // 억 → 원
+
+// §6: 실제 메타 연결 전 데모(지역/섹터). 목업 값과 동일.
+const DEMO_EQUITY_META = {
+  demo: true,
+  region: { domestic: 100, overseas: 0 },
+  sectors: [
+    { theme: "반도체", pct: 37 },
+    { theme: "방산", pct: 22 },
+    { theme: "시장대표", pct: 21 },
+    { theme: "2차전지", pct: 18 },
+    { theme: "IT", pct: 2 },
+  ],
+};
+const SECTOR_COLOR = {
+  반도체: "var(--color-primary)", 방산: "var(--ob)", 시장대표: "var(--color-ink-3)",
+  "2차전지": "var(--color-etf)", IT: "var(--color-success)", 배당: "var(--color-success)", 채권: "var(--color-ink-3)",
+};
+const sColor = (t) => SECTOR_COLOR[t] || "var(--color-ink-3)";
+
+// 단일 소스 스냅샷: 홈 총자산과 동일(백엔드 집계 + 온보딩 입력 합산 + 주식계좌 예수금).
+function buildAssets(ta, dash, onb) {
+  const b = ta?.breakdown || {};
+  const won = (uk) => (uk != null ? Number(uk) * UK : 0);
+  const add = (bk, ok) => won(b[bk]) + (onb && onb[ok] != null ? Number(onb[ok]) * UK : 0);
+  const acctCash = dash?.balance?.cash != null ? Number(dash.balance.cash) : 0;
+  return {
+    stock: add("stock_uk", "stock_uk"),
+    etf: add("etf_uk", "etf_uk"),
+    realestate: add("realestate_uk", "realestate_uk"),
+    cash: (onb && onb.cash_uk != null ? Number(onb.cash_uk) * UK : 0) + acctCash,
+  };
+}
 
 export default function AIAdvisor() {
-  const [advisor, setAdvisor] = useState(null);
-  const [summary, setSummary] = useState(null);
-  const [rebal, setRebal] = useState(null);
+  const [s, setS] = useState(null); // computeSummary 결과(단일 소스)
   const [err, setErr] = useState(false);
-  const [targetAlloc, setTargetAlloc] = useState(null); // §5② 온보딩 성향→목표배분 소스
 
   useEffect(() => {
-    // §5② 온보딩에서 성향으로 산출한 목표 배분(%)을 "목표 %" 단일 소스로 사용
-    try {
-      const raw = localStorage.getItem("onehub_target_alloc");
-      if (raw) setTargetAlloc(JSON.parse(raw));
-    } catch (e) {}
+    let onb = null, goal = "";
+    try { onb = JSON.parse(localStorage.getItem("onehub_onboard_assets") || "null"); } catch (e) {}
+    try { goal = localStorage.getItem("onehub_profile_goal") || ""; } catch (e) {}
     Promise.all([
-      fetch(api("ai-advisor")).then((r) => r.json()),
-      fetch(api("ai-summary")).then((r) => r.json()),
-      fetch(api("rebalance-plan")).then((r) => r.json()),
-    ]).then(([a, s, rb]) => { setAdvisor(a); setSummary(s); setRebal(rb); })
-      .catch(() => setErr(true));
+      fetch("/api/realestate/v2/total-asset?trader_id=A").then((r) => r.json()).catch(() => null),
+      fetch("/api/pwa-dashboard?trader=A").then((r) => r.json()).catch(() => null),
+    ]).then(([ta, dash]) => {
+      const assets = buildAssets(ta, dash, onb);
+      setS(computeSummary({ as_of: ta?.as_of, assets, tendencyOrStyle: goal, equityMeta: DEMO_EQUITY_META }));
+    }).catch(() => setErr(true));
   }, []);
 
-  // [v10 UI §5③] 미측정(0점/null)은 위험(빨강)이 아니라 "측정 준비 중"(회색 중립)으로 표기.
-  const rawScore = advisor?.ai_score;
-  const measured = rawScore != null && Number(rawScore) > 0;
-  const score = measured ? Number(rawScore) : 0;
-  const scoreColor = !measured
-    ? "var(--color-ink-3)"
-    : score >= 80 ? "var(--color-success)"
-    : score >= 50 ? "var(--color-warning)"
-    : "var(--color-danger)";
+  const p = s?.policy;
+  const eq = s?.equity;
+  const risk = s?.structural_risk;
+  const measured = s?.measurable && s?.liquid_score != null;
+  // §3 유동 점수 색: 80+ 초록 / 50+ 앰버 / 미만 빨강 / 미측정 회색
+  const scoreColor = !measured ? "var(--color-ink-3)"
+    : s.liquid_score >= 80 ? "var(--color-success)"
+    : s.liquid_score >= 50 ? "var(--color-warning)" : "var(--color-danger)";
+
+  // 파생 표시값(§5 리밸런싱·오늘할일 금액 — equity + 데모 메타 기반)
+  const overseasSwapWon = p && eq?.region ? Math.max(0, s.equity_won * ((p.overseas - eq.region.overseas) / 100)) : 0;
+  const maxTheme = eq?.sectors?.[0];
+  const diluteWon = p && maxTheme && maxTheme.pct > p.theme_cap ? s.equity_won * ((maxTheme.pct - p.theme_cap) / 100) : 0;
+  const cashFloorTgtPct = p ? p.cash_floor : 0; // §5 현금 목표 = liquid × cash_floor (하한 유지)
+  const curCashPct = s && s.liquid > 0 ? (s.assets.cash / s.liquid) * 100 : 0;
+  const cashDeltaWon = s ? s.liquid * (cashFloorTgtPct / 100) - s.assets.cash : 0;
+  const pctOfTotal = (v) => (s && s.total > 0 ? Math.round((v / s.total) * 1000) / 10 : 0);
+
+  const CHIPS = s ? [
+    ["주식", "var(--color-primary)", s.assets.stock],
+    ["ETF", "var(--color-etf)", s.assets.etf],
+    ["부동산", "var(--color-success)", s.assets.realestate],
+    ["현금", "var(--color-warning)", s.assets.cash],
+  ] : [];
 
   return (
     <div className="m">
       <TopNav active="ai" />
 
-      {/* HERO — AI 자산운영 배분 점수 (다크 네이비 앵커). 미측정은 회색 "측정 준비 중" (§5③) */}
-      <section className="hero">
-        <div className="h-eyebrow">
-          <span className="h-lbl">🤖 AI 자산운영 · 통합 배분 점수</span>
-          <span className="h-live">LIVE</span>
-        </div>
-        {measured
-          ? <div className="h-score">{score}<span>점</span></div>
-          : <div className="h-pending">측정 준비 중</div>}
-        <div className="h-bar"><div className="h-fill" style={{ width: `${measured ? score : 0}%`, background: measured ? "var(--hero-accent)" : "var(--hero-ink-faint)" }} /></div>
-        <div className="h-note">{measured ? "자산 배분의 균형도를 100점 기준으로 평가합니다." : "자산 입력이 완료되면 배분 점수가 산출됩니다."}</div>
-      </section>
-
-      <AssetSummaryBar />
+      {/* §1 금액 단위 — 페이지 전역 1곳만 */}
+      <div className="unit-note">금액 단위 · <b>만원</b></div>
 
       {err && <div className="card err">AI 엔진 연결에 실패했습니다. 잠시 후 다시 시도하세요.</div>}
 
-      {/* 오늘의 AI 요약 */}
-      <div className="card">
-        <div className="k">📋 오늘 무엇을 하시겠습니까?</div>
-        {!summary && !err && <div className="none">분석 중…</div>}
-        {summary?.summary_items?.map((t, i) => <div className="sm" key={i}>{t}</div>)}
-      </div>
-
-      {/* 종합 AI 조언 */}
-      <div className="card">
-        <div className="k">🧠 종합 판단</div>
-        {!advisor && !err && <div className="none">분석 중…</div>}
-        {advisor && <p className="advice">{advisor.overall_advice}</p>}
-      </div>
-
-      {/* 자산별 판단 */}
-      {advisor?.asset_judgments && (
-        <div className="card">
-          <div className="k">자산별 판단</div>
-          {advisor.asset_judgments.map((j) => {
-            // §5② 온보딩 목표배분이 있으면 그 값을 목표%로, 갭도 재계산
-            const tgt = targetAlloc && targetAlloc[j.type] != null ? targetAlloc[j.type] : j.target;
-            const diff = targetAlloc && targetAlloc[j.type] != null ? Math.round((j.pct - tgt) * 10) / 10 : j.diff;
-            return (
-              <div className="jg" key={j.type}>
-                <span className="jg-ic">{j.icon}</span>
-                <div className="jg-mid">
-                  <div className="jg-t">{j.type} <Stars n={j.stars} /></div>
-                  <div className="jg-p">현재 {j.pct}% · 목표 {tgt}% <em className={diff > 0 ? "up" : diff < 0 ? "dn" : ""}>({diff > 0 ? "+" : ""}{diff}%p)</em></div>
-                </div>
-                <span className={`jg-ac ac-${j.action}`}>{j.action}</span>
-              </div>
-            );
-          })}
-          {targetAlloc && <div className="tgt-src">목표 %는 온보딩 투자성향 결과에서 산출됩니다.</div>}
-        </div>
-      )}
-
-      {/* 리밸런싱 플랜 */}
-      {rebal?.rebalance_needed && (
-        <div className="card">
-          <div className="k">⚖️ 리밸런싱 플랜</div>
-          {rebal.steps.map((s, i) => (
-            <div className="rb" key={i}>
-              <span className="rb-a">{s.asset}</span>
-              <span className="rb-mv">{s.current}% → {s.target}%</span>
-              <span className={`rb-ac ac-${s.action}`}>{s.action} {s.amount_uk}억</span>
+      {/* HERO — §3 유동자산 운영 점수 (부동산 제외) */}
+      <section className="hero">
+        <div className="hero-top"><span className="t">🤖 AI 유동자산 운영 점수</span><span className="live">LIVE</span></div>
+        <div className="hero-cap">부동산(실물) 제외 · 유동자산 <span className="num">{s ? toManwon(s.liquid) : "—"}</span> 기준</div>
+        {measured ? (
+          <>
+            <div className="score-row">
+              <div className="score" style={{ color: scoreColor }}>{s.liquid_score}<small>점</small></div>
+              {eq?.warnings?.length ? <div className="score-tag">국내·{maxTheme?.theme} 쏠림</div> : null}
             </div>
-          ))}
-          <div className="rb-note">{rebal.note}</div>
+            <div className="subscores">
+              <div className="sub">
+                <div className="k"><span>배분 적합도</span><b>{s.subscores.allocation}</b></div>
+                <div className="b"><i style={{ width: `${s.subscores.allocation}%`, background: "var(--color-warning)" }} /></div>
+              </div>
+              <div className="sub">
+                <div className="k"><span>분산도(쏠림)</span><b>{s.subscores.diversification}</b></div>
+                <div className="b"><i style={{ width: `${s.subscores.diversification}%`, background: "var(--color-danger)" }} /></div>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="hero-pending">{!s ? "측정 준비 중…" : !p ? "온보딩 미완료 → 목표 산출 불가" : "유동자산 없음 → 측정 불가"}</div>
+        )}
+      </section>
+
+      {/* §2 온보딩 기준 — 모든 목표의 단일 소스 */}
+      {p ? (
+        <div className="onboard">
+          <div className="ob-top">🧬 온보딩 투자성향 <span className="ob-tag">{p.tendency}</span></div>
+          <div className="ob-grid">
+            <div><span className="obk">자산배분</span>주식 {p.stock} · ETF {p.etf} · 부동산 {p.realestate} · 현금 {p.cash}</div>
+            <div><span className="obk">지역(주식형)</span>국내 {p.domestic} · 해외 {p.overseas}</div>
+            <div><span className="obk">단일 테마 상한</span>{p.theme_cap}%</div>
+            <div><span className="obk">현금 하한</span>{p.cash_floor}%</div>
+          </div>
+          <div className="ob-note">아래 모든 목표·상한은 이 결과에서 자동 산출됩니다. 성향 변경 시 설정 &gt; 온보딩 재실행.</div>
+        </div>
+      ) : (
+        <div className="onboard">
+          <div className="ob-top">🧬 온보딩 투자성향 <span className="ob-tag">미완료</span></div>
+          <div className="ob-note" style={{ borderTop: "none", paddingTop: 0, marginTop: 4 }}>투자성향을 입력하면 목표·상한이 자동 산출됩니다. <Link href="/pwa/onboarding" className="ob-link">온보딩 하기 →</Link></div>
         </div>
       )}
 
-      <div className="links">
-        <Link href="/pwa/portfolio" className="lk">💼 통합 포트폴리오</Link>
-        <Link href="/pwa/etf" className="lk">📊 ETF 상세</Link>
+      {/* §3 부동산 구조 리스크 (별도·앰버 좌측 보더) */}
+      {s && risk && (
+        <div className="risk">
+          <div className="risk-top"><span style={{ fontSize: 18 }}>🏠</span><div className="t">부동산 구조 리스크</div><div className={`risk-badge g-${risk.grade}`}>{risk.grade}</div></div>
+          <div className="risk-body">총자산의 <b>{(risk.ratio * 100).toFixed(1)}%(<span className="num">{toManwon(s.assets.realestate)}</span>)</b>가 실물 부동산. 즉시 조정 불가라 운영 점수에서 분리합니다. <b>신규 자금·매매 수익은 부동산 외 자산으로만.</b></div>
+          <div className="risk-bar"><div className="real" style={{ width: `${(risk.ratio * 100).toFixed(1)}%` }} /><div className="liq" style={{ width: `${(100 - risk.ratio * 100).toFixed(1)}%` }} /></div>
+          <div className="risk-legend"><span><i style={{ background: "var(--color-warning)" }} />부동산 {(risk.ratio * 100).toFixed(1)}%</span><span><i style={{ background: "var(--color-primary)" }} />유동자산 {(100 - risk.ratio * 100).toFixed(1)}%</span></div>
+        </div>
+      )}
+
+      {/* 총자산 — 단일 소스 */}
+      {s && (
+        <div className="card">
+          <div className="total-head"><div className="lbl">총자산</div><div className="val num">{toManwon(s.total)}</div></div>
+          <div className="grid4">
+            {CHIPS.map(([label, color, val]) => (
+              <div className="chip" key={label}>
+                <div className="k"><i style={{ background: color }} />{label}</div>
+                <div className="v num">{toManwon(val)}</div>
+                <div className="p">{pctOfTotal(val)}%</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 오늘 할 일 — §5 주식형 재구성·세금 고려 (단일 소스) */}
+      {s && p && (
+        <div className="card">
+          <div className="sec-title">📋 오늘 할 일 <span className="sec-sub">주식형 재구성 · 세금 고려</span></div>
+          <ul className="todo">
+            {overseasSwapWon > 0 && (
+              <li><div className="n">1</div>
+                <div className="body"><div className="act">해외 노출 추가 · 매수</div><div className="desc">국내 {eq.region.domestic}% → <b>해외 {p.overseas}%</b>(온보딩 기준). 해외상장 ETF, 양도세 분리과세</div></div>
+                <div className="amt buy">+{toManwon(overseasSwapWon)}</div></li>
+            )}
+            <li><div className="n tax">₩</div>
+              <div className="body"><div className="act ob-c">재원은 비과세부터</div><div className="desc">현금 <b>{toManwon(s.assets.cash)}</b> + 매매차익 <b>비과세</b>인 국내주식형 ETF 매도로 충당</div></div>
+              <div className="amt hold">세금 0</div></li>
+            {diluteWon > 0 && (
+              <li><div className="n warn">!</div>
+                <div className="body"><div className="act warn-c">{maxTheme.theme} 쏠림 완화</div><div className="desc">합산 {maxTheme.pct}% → <b>{p.theme_cap}% 이하</b>(상한). 매도 대신 신규 매수를 타섹터로 희석</div></div>
+                <div className="amt warn">−약 {toManwon(diluteWon)}</div></li>
+            )}
+            <li><div className="n tax">₩</div>
+              <div className="body"><div className="act ob-c">국내 기타 ETF 축소는 신중</div><div className="desc">배당소득세·<b>금융소득종합과세</b> 대상 — 실현 시점 분산</div></div>
+              <div className="amt hold">검토</div></li>
+            <li><div className="n warn">🔒</div>
+              <div className="body"><div className="act hold-c">부동산 추가 매입 금지</div><div className="desc">구조 리스크 '{risk?.grade}'</div></div>
+              <div className="amt hold">대기</div></li>
+          </ul>
+        </div>
+      )}
+
+      {/* 주식형 자산 균형 — §4 (데모) */}
+      {s && eq && (
+        <div className="card">
+          <div className="sec-title">🧭 주식형 자산 균형 {eq.demo && <span className="demo">데모 데이터</span>}</div>
+          <div className="eq-head"><div className="l">주식 + ETF 합산 (주식형)</div><div className="v num">{toManwon(s.equity_won)}</div></div>
+          <div className="eq-note">ETF도 주식형이라 개별주식과 합쳐 하나의 주식 노출로 봅니다. 축소가 아니라 <b>국내/해외·섹터 균형</b>이 목표.</div>
+
+          {eq.region && (
+            <>
+              <div className="mini-h">🌏 지역{p && <span className="goal">온보딩 · 국내{p.domestic} 해외{p.overseas}</span>}</div>
+              <div className="seg"><span style={{ width: `${eq.region.domestic}%`, background: "var(--color-primary)" }} /><span style={{ width: `${eq.region.overseas}%`, background: "var(--color-warning)" }} /></div>
+              <div className="legend"><span className="it"><i style={{ background: "var(--color-primary)" }} />국내 <b>{eq.region.domestic}%</b></span><span className="it"><i style={{ background: "var(--color-warning)" }} />해외 <b>{eq.region.overseas}%</b></span></div>
+              {eq.warnings.includes("region_concentration") && (
+                <div className="callout down"><div className="h">🚨 지역 쏠림</div>주식형 전액 국내. 원화·국내 경기 단일 리스크에 노출. 해외상장 ETF로 <b>{p ? p.overseas : 30}%p 분산</b> 필요.</div>
+              )}
+            </>
+          )}
+
+          {eq.sectors?.length > 0 && (
+            <>
+              <div className="mini-h">🎯 섹터 (합산){p && <span className="goal">온보딩 · 단일테마 ≤{p.theme_cap}%</span>}</div>
+              <div className="seg">{eq.sectors.map((x) => <span key={x.theme} style={{ width: `${x.pct}%`, background: sColor(x.theme) }} />)}</div>
+              <div className="legend">{eq.sectors.filter((x) => x.pct >= 5).map((x) => <span className="it" key={x.theme}><i style={{ background: sColor(x.theme) }} />{x.theme} <b>{x.pct}%</b></span>)}</div>
+              {maxTheme && p && maxTheme.pct > p.theme_cap && (
+                <div className="callout warn"><div className="h">⚠️ 섹터 쏠림</div>{maxTheme.theme} <b>{maxTheme.pct}%</b>가 상한({p.theme_cap}%) 초과. ETF와 개별주식이 {maxTheme.theme}에 겹쳐 실질 분산 낮음.</div>
+              )}
+            </>
+          )}
+
+          <div className="tax">
+            <div className="h">💡 세금 관점 밸런싱</div>
+            <div className="row"><span className="dot">·</span><span><span className="k">국내주식형 ETF</span> — 매매차익 <b>비과세</b>. 조정 재원 1순위.</span></div>
+            <div className="row"><span className="dot">·</span><span><span className="k">국내 기타 ETF</span>(해외지수·채권 등) — 배당소득세 15.4% + <b>금융소득종합과세</b>. 축소 신중.</span></div>
+            <div className="row"><span className="dot">·</span><span><span className="k">해외상장 ETF</span> — 양도세 22%, 연 <b>250만원 공제</b>, 분리과세. 지역 분산 + 손익통산.</span></div>
+          </div>
+          <div className="tax-foot">※ 실제 세액은 개인 금융소득 총액·연도에 따라 달라집니다. 세무 상담 권고.</div>
+        </div>
+      )}
+
+      {/* 리밸런싱 플랜 — §5 세금 고려 (매도 대신 희석) */}
+      {s && p && (
+        <div className="card">
+          <div className="sec-title">⚖️ 리밸런싱 플랜 <span className="sec-sub">세금 고려</span></div>
+          {s.rebalance?.cash_deploy < 0 && (
+            <div className="reb-row"><div className="a">💵 <b>현금 투입</b></div><div className="r buy">−{toManwon(-s.rebalance.cash_deploy)}</div></div>
+          )}
+          <div className="reb-row dashed"><div className="a">📊 <b>주식형 {toManwon(s.equity_won)}</b> — 총량 유지, 내부 재구성</div></div>
+          {overseasSwapWon > 0 && (
+            <div className="reb-row sub-row"><div className="a">국내 → 해외 스왑<span className="pill-tax free">비과세분 우선</span></div><div className="r swap">≈{toManwon(overseasSwapWon)}</div></div>
+          )}
+          {diluteWon > 0 && (
+            <div className="reb-row sub-row"><div className="a">{maxTheme.theme} → 방어·배당 희석</div><div className="r sell">≈{toManwon(diluteWon)}</div></div>
+          )}
+          <div className="reb-row sub-row"><div className="a">국내 기타 ETF 축소<span className="pill-tax watch">종합과세 주의</span></div><div className="r lock">시점 분산</div></div>
+          <div className="reb-row"><div className="a">💰 <b>현금 비중</b> {curCashPct.toFixed(1)}% → {cashFloorTgtPct.toFixed(1)}%</div><div className={`r ${cashDeltaWon >= 0 ? "buy" : "sell"}`}>{cashDeltaWon >= 0 ? "+" : "−"}{toManwon(Math.abs(cashDeltaWon))}</div></div>
+          <div className="reb-row"><div className="a">🏠 <b>부동산</b> 구조 리스크·실물</div><div className="r lock">🔒 장기</div></div>
+          <div className="foot-note">📌 <b>확장 예정:</b> ETF 룩스루(개별종목↔ETF 중복), 기초지수 중복, 손익통산 시뮬레이션(해외상장 250만원 공제·손실 종목 매칭)을 리밸런싱 엔진이 자동 산출. 목표·상한은 모두 온보딩 투자성향 기준.</div>
+        </div>
+      )}
+
+      <div className="cta-row">
+        <Link href="/pwa/portfolio" className="cta">💼 통합 포트폴리오</Link>
+        <Link href="/pwa/etf" className="cta">📊 ETF 상세</Link>
       </div>
 
       <style jsx>{`
         .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--color-bg); padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
-        .hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 20px 18px; box-shadow: var(--shadow-float); margin-bottom: 12px; }
-        .h-eyebrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
-        .h-lbl { font-size: 12px; font-weight: 700; color: var(--hero-ink-sub); }
-        .h-live { background: var(--color-success); color: #04351f; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 5px; letter-spacing: .5px; }
-        .h-score { font-size: 2.6rem; font-weight: 800; letter-spacing: -.02em; line-height: 1; color: var(--hero-accent); }
-        .h-score span { font-size: 1.1rem; font-weight: 700; margin-left: 3px; color: var(--hero-ink-soft); }
-        .h-pending { font-size: 1.3rem; font-weight: 800; color: var(--hero-ink-faint); }
-        .h-bar { height: 8px; background: var(--hero-fill-line); border-radius: 4px; overflow: hidden; margin-top: 12px; }
-        .h-fill { height: 100%; border-radius: 4px; transition: width .4s; }
-        .h-note { font-size: 11px; color: var(--hero-ink-faint); margin-top: 10px; line-height: 1.5; }
-        .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); }
+        .num { font-variant-numeric: tabular-nums; letter-spacing: -.2px; }
+        .unit-note { text-align: right; font-size: 11px; color: var(--color-ink-2); font-weight: 600; padding: 2px 6px 12px; }
+        .unit-note b { color: var(--color-ink); }
+        .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow-card); }
         .err { color: var(--color-danger); font-size: 0.85rem; }
-        .k { font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); margin-bottom: 10px; }
-        .none { color: var(--color-ink-3); font-size: 0.85rem; }
-        .sm { font-size: 0.9rem; padding: 7px 0; border-bottom: 1px solid var(--color-line); color: var(--color-ink); }
-        .sm:last-child { border-bottom: none; }
-        .advice { font-size: 0.9rem; line-height: 1.6; color: var(--color-ink); margin: 0; }
-        .jg { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--color-line); }
-        .jg:last-child { border-bottom: none; }
-        .jg-ic { font-size: 1.3rem; } .jg-mid { flex: 1; }
-        .jg-t { font-size: 0.9rem; font-weight: 700; } .st { color: var(--color-warning); font-size: 0.75rem; margin-left: 4px; }
-        .jg-p { font-size: 0.76rem; color: var(--color-ink-2); margin-top: 2px; } .jg-p em { font-style: normal; }
-        /* [v10 UI §1] 목표 초과=초록, 미달=빨강 */
-        .up { color: var(--color-success); } .dn { color: var(--color-danger); }
-        .jg-ac, .rb-ac { font-size: 0.76rem; font-weight: 700; padding: 4px 10px; border-radius: 8px; }
-        .ac-유지 { background: var(--color-card-soft); color: var(--color-ink-2); } .ac-축소 { background: var(--color-danger-soft); color: var(--color-danger); } .ac-확대 { background: var(--color-success-soft); color: var(--color-success-ink); }
-        .rb { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--color-line); }
-        .rb-a { font-weight: 700; font-size: 0.86rem; width: 54px; } .rb-mv { flex: 1; font-size: 0.8rem; color: var(--color-ink-2); }
-        .rb-note { font-size: 0.72rem; color: var(--color-ink-3); margin-top: 10px; }
-        .tgt-src { font-size: 0.68rem; color: var(--color-ink-3); margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--color-line); }
-        .links { display: flex; gap: 8px; margin-top: 4px; }
-        .lk { flex: 1; text-align: center; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 14px 8px; text-decoration: none; color: var(--color-ink); font-size: 0.84rem; font-weight: 700; }
+        .sec-title { font-size: 16px; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 7px; }
+        .sec-sub { font-size: 11.5px; color: var(--color-ink-2); font-weight: 600; background: var(--color-bg); padding: 3px 9px; border-radius: 8px; margin-left: auto; }
+        .demo { font-size: 10px; font-weight: 800; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 3px 8px; border-radius: 7px; margin-left: auto; letter-spacing: .3px; }
+
+        .hero { background: linear-gradient(160deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 22px; margin-bottom: 16px; box-shadow: var(--shadow-float); }
+        .hero-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+        .hero-top .t { font-size: 14px; font-weight: 600; opacity: .92; }
+        .live { background: var(--color-success); color: #04351f; font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 8px; letter-spacing: .4px; }
+        .hero-cap { font-size: 12px; opacity: .68; margin-bottom: 14px; }
+        .score-row { display: flex; align-items: baseline; gap: 8px; }
+        .score { font-size: 46px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
+        .score small { font-size: 18px; font-weight: 600; opacity: .8; margin-left: 3px; }
+        .score-tag { margin-left: auto; font-size: 13px; font-weight: 700; background: rgba(255,255,255,.14); padding: 6px 12px; border-radius: 10px; }
+        .subscores { display: flex; gap: 10px; margin-top: 16px; }
+        .sub { flex: 1; background: rgba(255,255,255,.08); border-radius: 12px; padding: 11px 12px; }
+        .sub .k { font-size: 11.5px; opacity: .85; display: flex; justify-content: space-between; margin-bottom: 7px; }
+        .sub .k b { font-weight: 800; opacity: 1; }
+        .sub .b { height: 6px; border-radius: 5px; background: rgba(255,255,255,.16); overflow: hidden; }
+        .sub .b > i { display: block; height: 100%; border-radius: 5px; }
+        .hero-pending { font-size: 1.15rem; font-weight: 800; color: var(--hero-ink); opacity: .8; margin-top: 4px; }
+
+        .onboard { background: var(--ob-soft); border-radius: var(--radius-card); padding: 16px 18px; margin-bottom: 16px; }
+        .ob-top { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14px; margin-bottom: 12px; color: var(--ob-ink); }
+        .ob-tag { margin-left: auto; font-size: 11px; font-weight: 800; color: #fff; background: var(--ob); padding: 4px 11px; border-radius: 8px; }
+        .ob-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 12px; }
+        .ob-grid > div { font-size: 12.5px; color: var(--color-ink); }
+        .obk { display: block; font-size: 11px; color: var(--ob); font-weight: 700; margin-bottom: 1px; }
+        .ob-note { font-size: 11.5px; color: var(--ob); margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--ob); }
+        .ob-link { color: var(--ob); font-weight: 800; text-decoration: none; }
+
+        .risk { background: var(--color-card); border: 1px solid var(--color-line); border-left: 5px solid var(--color-warning); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 18px 20px; margin-bottom: 16px; }
+        .risk-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .risk-top .t { font-weight: 800; font-size: 15px; }
+        .risk-badge { margin-left: auto; font-size: 11px; font-weight: 800; color: #fff; background: var(--color-warning); padding: 4px 10px; border-radius: 8px; }
+        .risk-badge.g-낮음 { background: var(--color-success); }
+        .risk-badge.g-중간 { background: var(--color-warning); }
+        .risk-badge.g-높음 { background: var(--color-danger); }
+        .risk-body { font-size: 13px; color: var(--color-ink-2); line-height: 1.6; }
+        .risk-body b { color: var(--color-ink); }
+        .risk-bar { height: 10px; border-radius: 6px; background: var(--color-bg); margin: 12px 0 6px; overflow: hidden; display: flex; }
+        .risk-bar .real { background: var(--color-warning); height: 100%; }
+        .risk-bar .liq { background: var(--color-primary); height: 100%; }
+        .risk-legend { display: flex; gap: 16px; font-size: 11.5px; color: var(--color-ink-2); }
+        .risk-legend i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 5px; vertical-align: middle; }
+
+        .total-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+        .total-head .lbl { color: var(--color-ink-2); font-weight: 600; font-size: 15px; }
+        .total-head .val { font-size: 30px; font-weight: 800; }
+        .grid4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+        .chip { background: var(--color-bg); border-radius: 14px; padding: 12px 6px; text-align: center; }
+        .chip .k { font-size: 12px; color: var(--color-ink-2); font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px; }
+        .chip .k i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+        .chip .v { font-size: 14px; font-weight: 800; margin-top: 6px; }
+        .chip .p { font-size: 11px; color: var(--color-ink-2); margin-top: 2px; }
+
+        .todo { list-style: none; padding: 0; margin: 0; }
+        .todo li { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--color-line); }
+        .todo li:last-child { border-bottom: 0; padding-bottom: 0; }
+        .todo .n { flex: 0 0 26px; height: 26px; border-radius: 9px; background: var(--color-primary-soft); color: var(--color-primary); font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+        .todo .n.warn { background: var(--color-warning-soft); color: var(--color-warning-ink); }
+        .todo .n.tax { background: var(--ob-soft); color: var(--ob); }
+        .todo .body { flex: 1; }
+        .todo .act { font-size: 15px; font-weight: 700; }
+        .todo .act.ob-c { color: var(--ob); } .todo .act.warn-c { color: var(--color-warning-ink); } .todo .act.hold-c { color: var(--color-ink-3); }
+        .todo .desc { font-size: 12.5px; color: var(--color-ink-2); margin-top: 3px; }
+        .todo .desc b { color: var(--color-ink); }
+        .todo .amt { font-weight: 800; font-size: 13px; white-space: nowrap; margin-top: 2px; }
+        .amt.buy { color: var(--color-success); } .amt.hold { color: var(--color-ink-3); } .amt.warn { color: var(--color-warning-ink); }
+
+        .eq-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 2px; }
+        .eq-head .l { font-weight: 700; font-size: 13px; color: var(--color-ink-2); }
+        .eq-head .v { font-weight: 800; font-size: 17px; }
+        .eq-note { font-size: 12px; color: var(--color-ink-2); margin-bottom: 14px; }
+        .eq-note b { color: var(--color-ink); }
+        .mini-h { font-size: 13px; font-weight: 800; margin: 16px 0 4px; display: flex; align-items: center; gap: 6px; }
+        .mini-h .goal { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--ob); background: var(--ob-soft); padding: 2px 9px; border-radius: 7px; }
+        .seg { height: 15px; border-radius: 7px; overflow: hidden; display: flex; margin: 7px 0 10px; }
+        .seg > span { height: 100%; }
+        .legend { display: flex; flex-wrap: wrap; gap: 9px 15px; font-size: 12px; color: var(--color-ink-2); }
+        .legend .it { display: flex; align-items: center; gap: 6px; }
+        .legend i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+        .legend b { color: var(--color-ink); font-weight: 700; }
+
+        .tax { font-size: 12px; color: var(--color-ink-2); background: var(--color-bg); border-radius: 12px; padding: 12px 14px; line-height: 1.65; margin-top: 14px; }
+        .tax .h { font-weight: 800; color: var(--color-ink); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+        .tax .row { display: flex; gap: 8px; padding: 3px 0; }
+        .tax .row .dot { flex: 0 0 auto; font-weight: 800; }
+        .tax .k { color: var(--color-ink); font-weight: 700; }
+        .tax-foot { font-size: 11px; color: var(--color-ink-3); margin-top: 8px; }
+        .callout { border-radius: 14px; padding: 13px 15px; margin-top: 14px; font-size: 12.5px; line-height: 1.6; }
+        .callout.warn { background: var(--color-warning-soft); } .callout.down { background: var(--color-danger-soft); }
+        .callout .h { font-weight: 800; display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+        .callout.warn .h { color: var(--color-warning-ink); } .callout.down .h { color: var(--color-danger); }
+        .foot-note { font-size: 12px; color: var(--color-ink-2); margin-top: 14px; padding-top: 14px; border-top: 1px dashed var(--color-line); }
+        .foot-note b { color: var(--color-ink); }
+
+        .reb-row { display: flex; align-items: center; padding: 13px 0; border-bottom: 1px solid var(--color-line); font-size: 13.5px; }
+        .reb-row.dashed { border-bottom: 1px dashed var(--color-line); }
+        .reb-row.sub-row { padding: 9px 0 9px 14px; font-size: 12.5px; border-bottom: 1px dashed var(--color-line); }
+        .reb-row:last-child { border-bottom: 0; padding-bottom: 2px; }
+        .reb-row .a { flex: 1; font-weight: 700; } .reb-row .a b { font-weight: 800; }
+        .reb-row .r { font-weight: 800; font-size: 12px; text-align: right; white-space: nowrap; flex: 0 0 auto; margin-left: 10px; }
+        .reb-row .r.buy { color: var(--color-success); } .reb-row .r.sell { color: var(--color-danger); } .reb-row .r.lock { color: var(--color-ink-3); } .reb-row .r.swap { color: var(--color-primary); }
+        .pill-tax { font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; margin-left: 6px; vertical-align: middle; }
+        .pill-tax.free { background: var(--color-success-soft); color: var(--color-success-ink); }
+        .pill-tax.watch { background: var(--color-warning-soft); color: var(--color-warning-ink); }
+
+        .cta-row { display: flex; gap: 10px; margin-top: 4px; }
+        .cta { flex: 1; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; box-shadow: var(--shadow-card); padding: 15px; text-align: center; font-weight: 700; font-size: 14px; text-decoration: none; color: var(--color-ink); }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>
