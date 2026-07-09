@@ -113,6 +113,7 @@ export default function PWADashboard({ latestReport }) {
   const [pendingError, setPendingError] = useState(null);
   const [actingCode, setActingCode] = useState(null); // 승인/거절 처리 중인 종목코드
   const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
+  const [accuracy, setAccuracy] = useState(null); // [v11 #10] AI 자기평가(block_accuracy 사후검증) — 기록탭 인라인 SelfReviewCard
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
@@ -285,6 +286,10 @@ export default function PWADashboard({ latestReport }) {
     fetch(`/api/pwa-performance?trader=${trader}&days=30`)
       .then(r => r.json())
       .then(d => { if (d.ok) setPerf(d); })
+      .catch(() => {});
+    fetch(`/api/pwa/accuracy?trader_id=${trader}`)
+      .then(r => r.json())
+      .then(d => { if (d.ok) setAccuracy(d); })
       .catch(() => {});
     fetch(`/api/notifications?trader=${trader}`)
       .then(r => r.json())
@@ -1509,6 +1514,58 @@ export default function PWADashboard({ latestReport }) {
                       </div>
                     ))}
                   </div>
+                </section>
+              );
+            })()}
+
+            {/* [v11 #10] 🧐 AI 자기평가 — 차단 판단 사후검증(block_accuracy 재사용). 링크 뒤 숨김 → 기록탭 상단 인라인 승격 */}
+            {accuracy?.ok && (accuracy.summary?.total_checked ?? 0) > 0 && (() => {
+              const s = accuracy.summary;
+              const p = s.accuracy_pct;
+              const pc = p == null ? 'var(--text-secondary)' : p >= 60 ? 'var(--accent-buy)' : p >= 40 ? 'var(--text-secondary)' : 'var(--accent-sell)';
+              const recent = (accuracy.recent || []).slice(0, 3);
+              return (
+                <section className="pwa-card">
+                  <span className="pwa-card-label">🧐 AI 자기평가 — 내 차단 판단이 맞았나?</span>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '2rem', fontWeight: 800, color: pc, lineHeight: 1 }}>{p != null ? `${p}%` : '-'}</span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>차단 적중률 · 검증 {s.total_checked}건 중 {s.success_count}건 적중 / {s.fail_count}건 오판</span>
+                  </div>
+                  <div style={{ height: 6, background: 'var(--inset-bg)', borderRadius: 3, overflow: 'hidden', margin: '10px 0 4px' }}>
+                    <div style={{ height: '100%', width: `${p || 0}%`, background: pc, borderRadius: 3, transition: 'width .6s ease' }} />
+                  </div>
+                  <div style={{ marginTop: 10 }}>
+                    {recent.map((r, i) => {
+                      const ok = r.result === 'SUCCESS';
+                      const neu = r.result === 'NEUTRAL' || !r.result;
+                      return (
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, padding: '7px 0', borderTop: '1px solid var(--inset-bg)' }}>
+                          <div style={{ minWidth: 0, overflow: 'hidden' }}>
+                            <span style={{ fontSize: '0.82rem', fontWeight: 700 }}>{r.stock}</span>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginLeft: 6 }}>{(r.block_reason || '').split(' / ')[0]}</span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, whiteSpace: 'nowrap' }}>
+                            {r.price_change_pct != null && (
+                              <span className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>{r.price_change_pct > 0 ? '+' : ''}{r.price_change_pct.toFixed(1)}%</span>
+                            )}
+                            <span style={{ fontSize: '0.68rem', fontWeight: 700, padding: '2px 8px', borderRadius: 20,
+                              background: 'var(--inset-bg)',
+                              color: neu ? 'var(--text-secondary)' : ok ? 'var(--accent-buy)' : 'var(--accent-sell)' }}>
+                              {neu ? '― 보류' : ok ? '✓ 적중' : '✗ 오판'}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <Link href="/pwa/accuracy" style={{ textDecoration: 'none' }}>
+                    <div style={{ marginTop: 12, textAlign: 'center', fontSize: '0.75rem', color: 'var(--accent-buy)', fontWeight: 600 }}>
+                      전체 자기평가 · 사유별 적중률 보기 →
+                    </div>
+                  </Link>
+                  <p style={{ fontSize: '0.66rem', color: 'var(--text-muted)', marginTop: 8, lineHeight: 1.5 }}>
+                    적중=차단 후 하락 · 오판=차단 후 상승 · 보류=보합. 차단 3거래일 후 실제가로 자동 검증.
+                  </p>
                 </section>
               );
             })()}
