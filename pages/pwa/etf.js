@@ -21,6 +21,7 @@ export default function EtfDashboard() {
   const [overlap, setOverlap] = useState(null);
   const [rebal, setRebal] = useState(null);
   const [err, setErr] = useState(null);
+  const [liveFx, setLiveFx] = useState(null); // 당일 USD/KRW 실시간 환율(매일 자동 갱신)
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/etf/${fn}?trader=A`).then((r) => r.json());
@@ -30,6 +31,8 @@ export default function EtfDashboard() {
         setReport(r); setTax(t); setOverlap(o); setRebal(rb);
       })
       .catch((e) => setErr(e.message));
+    // 오늘 환율 — 일일 캐시 소스에서 조회(실패 시 백엔드 종가로 폴백)
+    fetch("/api/fx/usdkrw").then((r) => r.json()).then((d) => { if (d?.ok) setLiveFx(d); }).catch(() => {});
   }, []);
 
   const s = report?.summary;
@@ -56,7 +59,14 @@ export default function EtfDashboard() {
           <span className="lbl">📊 ETF 자산{asof?.price_date ? ` · ${asof.price_date} 종가 기준` : ""}</span>
           <span className="live">LIVE</span>
         </div>
-        {asof?.fx != null && (
+        {liveFx?.ok ? (
+          <div className="fx-note">
+            <span className="fx-dot" />
+            환율 <b>{liveFx.rate.toLocaleString(undefined, { maximumFractionDigits: 2 })}원</b>
+            {liveFx.date === todayKST ? " · 오늘 기준 · 자동 갱신"
+              : liveFx.date ? ` · ${liveFx.date} 기준(최신) · 자동 갱신` : " · 최신 · 자동 갱신"}
+          </div>
+        ) : asof?.fx != null ? (
           <div className={`fx-note ${fxFresh === false ? "stale" : ""}`}>
             <span className="fx-dot" />
             환율 <b>{asof.fx.toLocaleString()}원</b>
@@ -64,7 +74,7 @@ export default function EtfDashboard() {
               : fxDaysAgo != null && fxDaysAgo > 0 ? ` · ${fxDaysAgo}일 전 종가 환율`
               : fxDate ? ` · ${fxDate} 종가 환율` : ""}
           </div>
-        )}
+        ) : null}
         {s ? (
           <>
             <div className="big">{won(s.value_krw)}<span>원</span></div>
