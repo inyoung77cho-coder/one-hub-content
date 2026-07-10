@@ -2,7 +2,6 @@
 // ETF 대시보드와 동일 패턴. ONE Score 랭킹/시장 브리핑/저평가/거시. 확정 데이터는 진한색.
 import { useEffect, useState } from "react";
 import TopNav from "../../components/TopNav";
-import AssetSummaryBar from "../../components/AssetSummaryBar";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -57,7 +56,7 @@ export default function RealEstateDashboard() {
       {/* slim CTA — 내 단지 등록 유도 (§5③ 미입력=회색 중립, 위험 아님) */}
       <div className="cta-slim">🏠 이 지역에 내 단지가 있나요? <b>등록하면 총자산·리밸런싱에 반영돼요</b><span className="arr">→</span></div>
 
-      <AssetSummaryBar />
+      {/* [§3-2 원칙1] 총자산 바 제거 — 총자산은 홈·AI자산 2곳에만. 부동산 페이지는 부동산 슬라이스만 표시 */}
 
       {/* 2) ONE Score 랭킹 */}
       {rank?.ranking?.length > 0 && (

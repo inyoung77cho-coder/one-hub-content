@@ -3,7 +3,6 @@
 // ★ 단일 점수 블랙박스 금지 — Portfolio Score는 구성요소를 펼쳐 보여준다(§11.2).
 import { useEffect, useState } from "react";
 import TopNav from "../../components/TopNav";
-import AssetSummaryBar from "../../components/AssetSummaryBar";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -100,7 +99,7 @@ export default function EtfDashboard() {
         )}
       </section>
 
-      <AssetSummaryBar />
+      {/* [§3-2 원칙1] 총자산 바 제거 — 총자산은 홈·AI자산 2곳에만. ETF 페이지는 ETF 슬라이스만 표시 */}
       {err && <div className="err">데이터 로드 오류: {err}</div>}
 
       {/* 2) Portfolio Score — 블랙박스 금지, 구성요소 공개 */}
