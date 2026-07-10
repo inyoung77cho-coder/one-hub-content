@@ -97,6 +97,35 @@ function deriveRecMeta(s) {
   return { reason, upside, stance, score };
 }
 
+// [§3-4 피드백8] 보유 종목 AI 스탠스(유지/추가/축소/매도) + 근거 1줄 — 목표가/손절가 기반.
+function deriveStance(p) {
+  const n = (x) => (x == null || isNaN(Number(x)) ? null : Number(x));
+  const cur = n(p.current_price) ?? 0, avg = n(p.avg_price) ?? 0, tgt = n(p.target) ?? 0, stp = n(p.stop_loss) ?? 0;
+  const pnl = p.pnl_rate ?? 0;
+  const won = (v) => `${Math.round(v).toLocaleString()}원`;
+  const upside = (tgt > 0 && cur > 0) ? (tgt / cur - 1) * 100 : null;
+  if (tgt > 0 && cur >= tgt)
+    return { label: "축소", color: "var(--color-success)", reason: `목표가 ${won(tgt)} 도달 — 차익 실현(익절) 검토` };
+  if (stp > 0 && cur > 0 && cur <= stp)
+    return { label: "매도", color: "var(--color-danger)", reason: `손절선 ${won(stp)} 도달 — 리스크 관리 매도 검토` };
+  if (pnl >= 5 && (upside == null || upside > 3))
+    return { label: "추가", color: "var(--color-primary)", reason: `추세 양호${upside != null ? ` · 목표가까지 +${upside.toFixed(0)}% 여력` : ""}${stp > 0 ? `, 손절선 ${won(stp)} 미접촉` : ""}` };
+  if (avg > 0 && cur > 0 && cur < avg * 0.95)
+    return { label: "유지", color: "var(--color-warning)", reason: `평단 대비 하락 · ${stp > 0 ? `손절선 ${won(stp)}까지 관찰` : "추세 관찰"}` };
+  return { label: "유지", color: "var(--color-ink-2)", reason: `${upside != null ? `목표가 ${won(tgt)}까지 +${upside.toFixed(0)}% 여력` : "추세 관찰 중"}${stp > 0 ? `, 손절선 ${won(stp)} 미접촉` : ""}` };
+}
+
+// [§3-4] 차단 사유 → 해제 조건(그래서 어떻게 되면 풀리나) 1줄
+function unblockCondition(reason, signal) {
+  const r = `${reason || ""} ${signal || ""}`.toLowerCase();
+  if (r.includes("거래량")) return "거래량이 평소 대비 1.2배 이상 회복되면 재검토";
+  if (r.includes("rsi") || r.includes("과열")) return "RSI 과열 해소(70 미만) 시 재평가";
+  if (r.includes("기술") || r.includes("score") || r.includes("점수")) return "기술 점수(MA·수급)가 기준선 위로 오르면 해제";
+  if (r.includes("macro") || r.includes("거시") || r.includes("regime")) return "시장 레짐이 BULL로 전환되면 재검토";
+  if (r.includes("ml") || r.includes("하락") || r.includes("sell")) return "ML 하락예측이 중립·매수로 전환되면 해제";
+  return "조건 충족 시 다음 스크리닝에서 자동 재평가";
+}
+
 // [Queue] KST 장중(평일 09:00~15:30) 여부 — 장외 승인은 예약으로 전환
 function isMarketHoursKST() {
   const kst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
@@ -1444,25 +1473,19 @@ export default function PWADashboard({ latestReport }) {
                             {p.ml_score != null && <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>AI {p.ml_score}</span>}
                           </div>
                         )}
+                        {/* [§3-4 피드백8] AI 스탠스 + 근거 1줄 인라인 */}
+                        {(() => { const st = deriveStance(p); return (
+                          <div className="pos-stance">
+                            <span className="pos-stance-badge" style={{ color: st.color, borderColor: st.color }}>🤖 {st.label}</span>
+                            <span className="pos-stance-reason">{st.reason}</span>
+                          </div>
+                        ); })()}
                         {(() => {
-                          const cur = safeNum(p.current_price) ?? 0;
-                          const avg = safeNum(p.avg_price) ?? 0;
-                          const tgt = safeNum(p.target) ?? 0;
-                          const stp = safeNum(p.stop_loss) ?? 0;
-                          const pnlR = p.pnl_rate ?? 0;
-                          let badge = null;
-                          if (tgt > 0 && cur >= tgt)        badge = { label: '손절', color: 'var(--color-danger)', icon: '🔴', bg: 'var(--color-danger-soft)' };
-                          else if (stp > 0 && cur <= stp)   badge = { label: '손절', color: 'var(--color-danger)', icon: '🔴', bg: 'var(--color-danger-soft)' };
-                          else if (pnlR >= 5)                badge = { label: '추가매수', color: 'var(--color-primary)', icon: '🔵', bg: 'var(--color-primary-soft)' };
-                          else if (avg > 0 && cur < avg * 0.97) badge = { label: '관망', color: 'var(--color-warning)', icon: '🟡', bg: 'var(--color-warning-soft)' };
-                          else                               badge = { label: '보유', color: 'var(--color-success)', icon: '🟢', bg: 'var(--color-success-soft)' };
+                          // [§3-4] 상태 배지는 위 AI 스탠스로 통합(중복 제거) — 여기선 액션 버튼만
                           const posKey = p.code || i;
                           return (
                             <div>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, gap: 6 }}>
-                                <span style={{ fontSize: '0.78rem', fontWeight: 700, padding: '3px 10px', borderRadius: 8, background: badge.bg, color: badge.color, flexShrink: 0 }}>
-                                  {badge.icon} {badge.label}
-                                </span>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: 8, gap: 5 }}>
                                 <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
                                   <button
                                     style={{ fontSize: '0.68rem', padding: '3px 9px', borderRadius: 8, background: 'var(--inset-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}
@@ -1519,13 +1542,19 @@ export default function PWADashboard({ latestReport }) {
                 <span className="pwa-card-label">🤖 AI 판단 — 매수 차단 종목</span>
                 {(!data.today_blocked || data.today_blocked.length===0)
                   ? <div className="pwa-empty">차단 종목 없음</div>
-                  : <div className="pwa-blocked-list">{[...new Map(data.today_blocked.map(b=>[b.stock,b])).values()].slice(0,5).map((b,i) => (
-                      <div key={i} className="pwa-blocked-row">
-                        <span className="pwa-blocked-stock">{b.stock}</span>
-                        <span className="pwa-blocked-signal mono dim">{blockedLabel(b.signal)}</span>
-                        <span className="pwa-blocked-reason">{b.reason}</span>
+                  : (<>
+                    <div className="blocked-list">{[...new Map(data.today_blocked.map(b=>[b.stock,b])).values()].slice(0,5).map((b,i) => (
+                      <div key={i} className="blocked-card">
+                        <div className="blocked-top">
+                          <span className="blocked-stock">{b.stock}</span>
+                          <span className="blocked-signal mono">{blockedLabel(b.signal)}</span>
+                        </div>
+                        {b.reason && <div className="blocked-reason">{b.reason}</div>}
+                        <div className="blocked-unblock">🔓 <b>해제 조건</b> · {unblockCondition(b.reason, b.signal)}</div>
                       </div>))}
-                    </div>}
+                    </div>
+                    <button className="blocked-acc" onClick={() => router.push('/pwa/accuracy')}>이 차단들이 맞았는지? 차단 정확도 보기 →</button>
+                  </>)}
               </section>
             </>)}
           </main>
@@ -2667,6 +2696,21 @@ export default function PWADashboard({ latestReport }) {
         .position-card-ai { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
         .position-card-ai-label { display: block; font-size: 0.62rem; letter-spacing: 0.04em; color: var(--accent-info); margin-bottom: 4px; font-weight: 700; }
         .position-card-ai-text { font-size: 0.76rem; line-height: 1.55; color: var(--text-secondary); }
+        /* [§3-4] 보유 AI 스탠스 + 근거 인라인 */
+        .pos-stance { display: flex; align-items: flex-start; gap: 8px; margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--border); }
+        .pos-stance-badge { flex-shrink: 0; font-size: 0.72rem; font-weight: 800; padding: 2px 9px; border-radius: 20px; border: 1.5px solid currentColor; }
+        .pos-stance-reason { font-size: 0.74rem; color: var(--text-secondary); line-height: 1.45; word-break: keep-all; }
+        /* [§3-4] 매수 차단 종목 강화 — 해제 조건 + 정확도 링크 */
+        .blocked-list { display: flex; flex-direction: column; gap: 8px; }
+        .blocked-card { background: var(--inset-bg); border: 1px solid var(--border); border-left: 3px solid var(--accent-sell); border-radius: var(--radius-md); padding: 11px 13px; }
+        .blocked-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .blocked-stock { font-size: 0.86rem; font-weight: 700; color: var(--text-primary); }
+        .blocked-signal { font-size: 0.66rem; color: var(--accent-sell); font-weight: 700; }
+        .blocked-reason { font-size: 0.74rem; color: var(--text-secondary); margin-top: 4px; line-height: 1.45; }
+        .blocked-unblock { font-size: 0.72rem; color: var(--text-secondary); margin-top: 7px; padding-top: 7px; border-top: 1px dashed var(--border); line-height: 1.45; word-break: keep-all; }
+        .blocked-unblock b { color: var(--accent-buy); font-weight: 700; }
+        .blocked-acc { width: 100%; margin-top: 10px; padding: 11px; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-md); color: var(--accent-buy); font-family: var(--font-body); font-size: 0.78rem; font-weight: 700; cursor: pointer; }
+        .blocked-acc:active { transform: scale(0.99); }
 
         /* [v8.6] 홈 화면 보유종목 미리보기 */
         .position-card-mini { display: flex; justify-content: space-between; align-items: center; background: var(--inset-bg); border-radius: var(--radius-sm); padding: 10px 14px; }
