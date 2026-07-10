@@ -72,6 +72,31 @@ function scoreGrade(fs) {
   return { label: '주의', color: 'var(--color-danger)' };
 }
 
+// [§3-3 피드백7] 추천 카드 인라인 메타 — 왜 후보인지(근거 1줄) + 스탠스 + 기대 여력(기술적 추정).
+//   백엔드 미도달 + 후보에 가격 필드 없음 → 목표가(원)는 상세(AI분석)에서, 리스트엔 종목 신호 기반 요약.
+function deriveRecMeta(s) {
+  const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
+  const rsi = s?.rsi != null ? Number(s.rsi) : null;
+  const vol = s?.vol_ratio != null ? Number(s.vol_ratio) : null;
+  const mom = s?.change_5d != null ? Number(s.change_5d) : null;
+  const score = Math.round(s?.score ?? 0);
+  // 근거 1줄: 가장 두드러진 신호 우선
+  let reason;
+  if (vol != null && vol >= 2.5) reason = `거래량 급증(${vol.toFixed(1)}배) · ${(mom ?? 0) >= 0 ? '상승' : '조정'} 모멘텀`;
+  else if (rsi != null && rsi <= 35) reason = `과매도 반등 구간 · 저가 매수 관심`;
+  else if (mom != null && mom >= 10) reason = `5일 +${mom}% 강세 · 추세 지속 관심`;
+  else if (rsi != null && rsi >= 45 && rsi <= 62) reason = `RSI 중립 · 수급 개선 관찰`;
+  else if (vol != null && vol >= 1.3) reason = `거래량 ${vol.toFixed(1)}배 · 관심 유입`;
+  else reason = `기술 지표 상위 관심 후보`;
+  // 기대 여력(기술적 추정): 변동성·모멘텀 기반 상단 여력 %
+  const upside = Math.round(clamp(6 + Math.max(0, mom ?? 0) * 0.15 + Math.max(0, (vol ?? 1) - 1) * 1.5, 5, 18));
+  // 스탠스(관심 강도)
+  const stance = score >= 12 ? { label: '강한 후보', color: 'var(--color-success)' }
+    : score >= 9 ? { label: '양호', color: 'var(--color-primary)' }
+    : { label: '보통', color: 'var(--text-secondary)' };
+  return { reason, upside, stance, score };
+}
+
 // [Queue] KST 장중(평일 09:00~15:30) 여부 — 장외 승인은 예약으로 전환
 function isMarketHoursKST() {
   const kst = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
@@ -1011,13 +1036,13 @@ export default function PWADashboard({ latestReport }) {
                 };
                 return (
                   <>
-                    {/* Top3 Hero 카드 */}
+                    {/* [§3-3] 관심도 정의 — 숫자가 뭘 뜻하는지 1줄 */}
+                    <div className="rec-def">💡 <b>관심도</b> = MA·RSI·볼린저·거래량·수급 기술점수 합산 <b>(0~15)</b> · 매수 선별 <b>전</b> 후보</div>
+                    {/* Top3 Hero 카드 — 관심도 + 스탠스 + 근거 1줄 + 기대 여력 인라인(원칙4) */}
                     <div className="top3-hero-row">
                       {top3.map((s, i) => {
-                        // [v9.0][11] 이 화면은 AI 매수 선별 "이전" 기술 스코어링 후보라서
-                        // (위 안내문 참고) score를 AI 확신도처럼 %+별점으로 보여주면
-                        // 실제보다 확신도가 높은 것처럼 오해를 줌 — 관심도(원점수)로 정직하게 표기.
                         const sc = Math.round(s.score ?? 0);
+                        const m = deriveRecMeta(s);
                         return (
                           <div key={s.code || i} className="top3-hero-card" onClick={() => openSheet(s)}>
                             <div className="top3-medal">{MEDALS[i]}</div>
@@ -1027,29 +1052,36 @@ export default function PWADashboard({ latestReport }) {
                               onClick={(e) => { e.stopPropagation(); setTab('analyze'); runAnalyze(s.code, s.name); }}
                             >{s.name}</button>
                             <div className="top3-ai-pct mono">관심도 {sc}</div>
-                            <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>AI 분석 보기</button>
+                            <span className="top3-stance" style={{ color: m.stance.color, borderColor: m.stance.color }}>{m.stance.label}</span>
+                            <div className="top3-reason">{m.reason}</div>
+                            <div className="top3-upside">기대 <b>~+{m.upside}%</b><span className="est">추정</span></div>
+                            <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>목표가·상세 →</button>
                           </div>
                         );
                       })}
                     </div>
 
-                    {/* 나머지 컴팩트 리스트 */}
+                    {/* 나머지 리스트 — 근거 1줄 + 스탠스 + 기대 여력 인라인 */}
                     {rest.length > 0 && (
                       <div style={{ marginTop: 12 }}>
-                        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>그 외 관심종목</div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div className="rec-rest-h">그 외 관심종목</div>
+                        <div className="rec-rest-list">
                           {rest.map((s, i) => {
                             const sc = Math.round(s.score ?? 0);
+                            const m = deriveRecMeta(s);
                             return (
-                              <div key={s.code || i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '7px 10px', background: 'var(--inset-bg)', borderRadius: 8 }}>
-                                <button style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: '0.82rem', color: 'var(--text-primary)', fontWeight: 600, padding: 0 }}
-                                  onClick={() => { setTab('analyze'); runAnalyze(s.code, s.name); }}>
-                                  {s.name} <span className="mono dim" style={{ fontSize: '0.68rem' }}>{s.code}</span>
-                                </button>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                  <span className="mono" style={{ fontSize: '0.7rem', color: 'var(--text-secondary)' }}>관심도 {sc}</span>
-                                  <button style={{ fontSize: '0.64rem', padding: '2px 7px', borderRadius: 6, background: 'var(--card-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}
-                                    onClick={() => openSheet(s)}>AI 분석 보기</button>
+                              <div key={s.code || i} className="rec-row">
+                                <div className="rec-row-l">
+                                  <button className="rec-name" onClick={() => { setTab('analyze'); runAnalyze(s.code, s.name); }}>
+                                    {s.name} <span className="mono dim rec-code">{s.code}</span>
+                                    <span className="rec-stance-inline" style={{ color: m.stance.color }}>{m.stance.label}</span>
+                                  </button>
+                                  <div className="rec-reason">{m.reason}</div>
+                                </div>
+                                <div className="rec-row-r">
+                                  <span className="rec-interest mono">관심도 {sc}</span>
+                                  <span className="rec-upside">기대 ~+{m.upside}%</span>
+                                  <button className="rec-detail" onClick={() => openSheet(s)}>상세 →</button>
                                 </div>
                               </div>
                             );
@@ -2381,7 +2413,27 @@ export default function PWADashboard({ latestReport }) {
         .top3-name { font-size: 0.8rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
         .top3-stars { font-size: 0.7rem; letter-spacing: -1px; color: var(--color-warning); }
         .top3-ai-pct { font-size: 0.78rem; font-weight: 800; color: var(--color-primary); }
-        .top3-why-btn { font-size: 0.62rem; padding: 3px 8px; border-radius: 6px; background: var(--inset-bg); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; }
+        .top3-why-btn { font-size: 0.62rem; padding: 3px 8px; border-radius: 6px; background: var(--inset-bg); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; margin-top: 2px; }
+        /* [§3-3] 추천 카드 인라인 근거·스탠스·기대여력 */
+        .rec-def { font-size: 0.72rem; color: var(--text-secondary); background: var(--inset-bg); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; margin-bottom: 12px; line-height: 1.5; }
+        .rec-def b { color: var(--text-primary); font-weight: 700; }
+        .top3-stance { font-size: 0.6rem; font-weight: 800; padding: 1px 7px; border-radius: 20px; border: 1px solid; line-height: 1.5; }
+        .top3-reason { font-size: 0.64rem; color: var(--text-secondary); line-height: 1.35; word-break: keep-all; min-height: 2.4em; display: flex; align-items: center; }
+        .top3-upside { font-size: 0.66rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
+        .top3-upside b { color: var(--color-success); font-weight: 800; }
+        .top3-upside .est { font-size: 0.54rem; color: var(--text-tertiary); border: 1px solid var(--border); border-radius: 4px; padding: 0 3px; }
+        .rec-rest-h { font-size: 0.68rem; font-weight: 700; color: var(--text-tertiary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .rec-rest-list { display: flex; flex-direction: column; gap: 6px; }
+        .rec-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: var(--inset-bg); border-radius: 10px; }
+        .rec-row-l { min-width: 0; flex: 1; }
+        .rec-name { background: none; border: none; cursor: pointer; font-family: var(--font-body); font-size: 0.84rem; color: var(--text-primary); font-weight: 700; padding: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; text-align: left; }
+        .rec-code { font-size: 0.66rem; font-weight: 400; }
+        .rec-stance-inline { font-size: 0.6rem; font-weight: 800; }
+        .rec-reason { font-size: 0.7rem; color: var(--text-secondary); margin-top: 3px; line-height: 1.4; word-break: keep-all; }
+        .rec-row-r { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
+        .rec-interest { font-size: 0.68rem; color: var(--text-secondary); }
+        .rec-upside { font-size: 0.68rem; font-weight: 700; color: var(--color-success); }
+        .rec-detail { font-size: 0.64rem; padding: 3px 9px; border-radius: 6px; background: var(--card-bg); color: var(--accent-buy); border: 1px solid var(--border); cursor: pointer; font-family: var(--font-body); font-weight: 700; white-space: nowrap; margin-top: 2px; }
 
         /* [v8.7] Action Summary Hero */
         .action-summary-hero { background: var(--card-bg); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 12px; border: 1px solid var(--border); }
