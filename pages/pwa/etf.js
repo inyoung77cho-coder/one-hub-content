@@ -1,5 +1,5 @@
 // ONE-HUB v10 — ETF / Asset Intelligence 대시보드 (P7, 작업지시서 §11.2)
-// 독립 라우트. 확정값(수익3단분해·세금·중복도)은 진한색/실선. 예측(Forecast)은 미구현(P6).
+// 독립 라우트. 확정값(수익3단분해·세금·중복도)은 진한색/실선. 예측(Forecast)은 시나리오 투영(참고용·확정 아님).
 // ★ 단일 점수 블랙박스 금지 — Portfolio Score는 구성요소를 펼쳐 보여준다(§11.2).
 import { useEffect, useState } from "react";
 import TopNav from "../../components/TopNav";
@@ -216,21 +216,72 @@ export default function EtfDashboard() {
         </section>
       )}
 
-      {/* [§3-6 피드백13] 시계열·예측(ForecastChart) — 항상 '참고용·확정 아님' 라벨 강제 */}
-      {s && (
-        <section className="card">
-          <div className="label">시계열 · 예측 <span className="sub forecast-tag">참고용 · 확정 아님</span></div>
-          {report?.timeseries?.length >= 2 ? (
-            <div className="forecast-body">{/* 백엔드 timeseries 연결 시 라인+예측선 렌더 */}</div>
-          ) : (
-            <div className="forecast-empty">
-              <div className="fe-ic">📈</div>
-              <div className="fe-t">일별 평가액 스냅샷 축적 중</div>
-              <div className="fe-s">매일 종가 기준 평가액이 쌓이면 <b>기간별 금액 변화 + 참고용 추정선</b>을 표시합니다. 예측은 확정 수익이 아닙니다.</div>
+      {/* [§3-6 피드백13] 시계열·예측(ForecastChart) — 실제 평가액을 기점으로 시나리오 투영. 항상 '참고용·확정 아님' */}
+      {s && s.value_krw > 0 && (() => {
+        // 가정(투명 공개): 연 기대수익 μ · 변동성 σ. 확정 예측이 아닌 통계적 시나리오.
+        const MU = 0.07, SIG = 0.16, MONTHS = 12;
+        const V0 = s.value_krw;
+        const hist = Array.isArray(report?.timeseries)
+          ? report.timeseries.filter((p) => p && p.value > 0).slice(-12) : [];
+        const hasHist = hist.length >= 2;
+        // 투영: t개월 후 중립/낙관/비관 (선형 확산 콘)
+        const proj = [];
+        for (let t = 0; t <= MONTHS; t++) {
+          const f = t / 12;
+          proj.push({
+            t,
+            med: V0 * (1 + MU * f),
+            up: V0 * (1 + (MU + SIG) * f),
+            lo: V0 * (1 + (MU - SIG) * f),
+          });
+        }
+        const W = 300, H = 132, PADL = 6, PADR = 6, PADT = 10, PADB = 18;
+        const nHist = hasHist ? hist.length : 0;
+        const totalPts = nHist + MONTHS; // 과거 점 + 미래 12
+        const xAt = (i) => PADL + (i / totalPts) * (W - PADL - PADR);
+        const allVals = [
+          ...proj.map((p) => p.up), ...proj.map((p) => p.lo),
+          ...(hasHist ? hist.map((h) => h.value) : [V0]),
+        ];
+        const vMin = Math.min(...allVals), vMax = Math.max(...allVals);
+        const span = vMax - vMin || 1;
+        const yAt = (v) => PADT + (1 - (v - vMin) / span) * (H - PADT - PADB);
+        // 미래 x는 과거 마지막 점(=현재, index nHist) 이후로 이어짐
+        const fx = (t) => xAt(nHist + t);
+        const upPath = proj.map((p, i) => `${i ? "L" : "M"}${fx(p.t).toFixed(1)},${yAt(p.up).toFixed(1)}`).join("");
+        const loPathRev = [...proj].reverse().map((p) => `L${fx(p.t).toFixed(1)},${yAt(p.lo).toFixed(1)}`).join("");
+        const areaPath = `${upPath}${loPathRev}Z`;
+        const medPath = proj.map((p, i) => `${i ? "L" : "M"}${fx(p.t).toFixed(1)},${yAt(p.med).toFixed(1)}`).join("");
+        const histPath = hasHist
+          ? hist.map((h, i) => `${i ? "L" : "M"}${xAt(i).toFixed(1)},${yAt(h.value).toFixed(1)}`).join("")
+          : "";
+        const nowX = xAt(nHist), nowY = yAt(V0);
+        const end = proj[proj.length - 1];
+        return (
+          <section className="card">
+            <div className="label">시계열 · 예측 <span className="sub forecast-tag">참고용 · 확정 아님</span></div>
+            <svg className="fc-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="ETF 평가액 시나리오 투영">
+              <path d={areaPath} className="fc-area" />
+              {hasHist && <path d={histPath} className="fc-hist" />}
+              <path d={medPath} className="fc-med" />
+              <line x1={nowX} y1={PADT} x2={nowX} y2={H - PADB} className="fc-now" />
+              <circle cx={nowX} cy={nowY} r="3.2" className="fc-dot" />
+              <text x={nowX} y={H - 5} className="fc-xlbl" textAnchor={hasHist ? "middle" : "start"}>오늘</text>
+              <text x={fx(MONTHS)} y={H - 5} className="fc-xlbl" textAnchor="end">+12개월</text>
+            </svg>
+            <div className="fc-legend">
+              <span><i className="fc-lg med" /> 중립</span>
+              <span><i className="fc-lg band" /> 낙관~비관 범위</span>
+              {hasHist && <span><i className="fc-lg hist" /> 실제 평가액</span>}
             </div>
-          )}
-        </section>
-      )}
+            <div className="fc-range">
+              12개월 후 참고 범위 <b className="pos">{won(end.up)}</b> ~ <b className="neg">{won(end.lo)}</b>
+              <span className="fc-mid"> · 중립 {won(end.med)}</span>
+            </div>
+            <div className="fc-assume">가정: 연 기대수익 <b>+{(MU * 100).toFixed(0)}%</b> · 변동성 <b>{(SIG * 100).toFixed(0)}%</b> (주식형 ETF 통상치). <b>확정 예측이 아닌 통계적 시나리오</b>이며 실제 수익은 시장 상황에 따라 달라집니다.{!hasHist && " 일별 평가액이 쌓이면 실제 추이선이 함께 표시됩니다."}</div>
+          </section>
+        );
+      })()}
 
       {/* 4) 절세 (확정 계산) */}
       {tax && (
@@ -284,7 +335,7 @@ export default function EtfDashboard() {
         </section>
       )}
 
-      <div className="foot">확정 계산(수익·세금·중복도)은 입력값 기반. 예측(Forecast)은 미탑재. · 세무자문 아님</div>
+      <div className="foot">확정 계산(수익·세금·중복도)은 입력값 기반. 예측(Forecast)은 통계적 시나리오(참고용·확정 아님). · 세무자문 아님</div>
 
       <style jsx>{`
         .etf { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
@@ -386,6 +437,24 @@ export default function EtfDashboard() {
         .fe-t { font-size: 0.86rem; font-weight: 700; color: var(--color-ink); }
         .fe-s { font-size: 0.74rem; color: var(--color-ink-2); margin-top: 6px; line-height: 1.55; word-break: keep-all; }
         .fe-s b { color: var(--color-ink); font-weight: 700; }
+        /* [#13] 시나리오 투영 차트 */
+        .fc-svg { width: 100%; height: 132px; display: block; margin: 4px 0 2px; overflow: visible; }
+        .fc-area { fill: var(--color-primary-soft); opacity: 0.55; stroke: none; }
+        .fc-med { fill: none; stroke: var(--color-primary); stroke-width: 2; stroke-dasharray: 5 3; }
+        .fc-hist { fill: none; stroke: var(--color-ink); stroke-width: 2; }
+        .fc-now { stroke: var(--color-ink-3); stroke-width: 1; stroke-dasharray: 2 2; }
+        .fc-dot { fill: var(--color-primary); stroke: var(--color-card); stroke-width: 1.5; }
+        .fc-xlbl { fill: var(--color-ink-3); font-size: 9px; font-weight: 700; }
+        .fc-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.7rem; color: var(--color-ink-2); margin-top: 4px; }
+        .fc-legend span { display: inline-flex; align-items: center; gap: 5px; }
+        .fc-lg { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+        .fc-lg.med { background: var(--color-primary); } .fc-lg.hist { background: var(--color-ink); }
+        .fc-lg.band { background: var(--color-primary-soft); height: 9px; border-radius: 2px; }
+        .fc-range { font-size: 0.82rem; color: var(--color-ink-2); margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--color-line); word-break: keep-all; }
+        .fc-range b.pos { color: var(--color-success); } .fc-range b.neg { color: var(--color-danger); }
+        .fc-mid { color: var(--color-ink-3); font-size: 0.76rem; }
+        .fc-assume { font-size: 0.7rem; color: var(--color-ink-3); margin-top: 8px; line-height: 1.55; word-break: keep-all; }
+        .fc-assume b { color: var(--color-ink-2); font-weight: 700; }
         .sample-badge { font-size: 10px; font-weight: 800; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 3px 8px; border-radius: 6px; margin-left: auto; }
         .foot { font-size: 0.68rem; color: var(--color-ink-3); text-align: center; margin-top: 16px; line-height: 1.5; }
       `}</style>
