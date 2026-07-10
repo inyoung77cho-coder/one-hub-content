@@ -4,7 +4,8 @@
 import { useRouter } from "next/router";
 
 const ITEMS = [
-  ["home", "홈", "/pwa"],
+  // 홈은 ?tab=dashboard로 진입 → 스플래시 재생 건너뜀(홈·주식 로고와 동일하게 즉시 홈 표시)
+  ["home", "홈", "/pwa?tab=dashboard"],
   ["ai", "AI자산", "/pwa/ai-advisor"],
   ["stock", "주식", "/pwa?tab=portfolio"],
   ["etf", "ETF", "/pwa/etf"],
@@ -17,7 +18,7 @@ export default function TopNav({ active }) {
   return (
     <div className="tn">
       <header className="tn-hd">
-        <button type="button" className="tn-logo" onClick={() => router.push("/pwa")} aria-label="홈으로">ONE<span className="tn-dot">·</span>HUB</button>
+        <button type="button" className="tn-logo" onClick={() => router.push("/pwa?tab=dashboard")} aria-label="홈으로">ONE<span className="tn-dot">·</span>HUB</button>
         <div className="tn-ic">
           <button aria-label="AI 종목 검색" onClick={() => router.push("/pwa?tab=analyze")}>🔍</button>
           <button aria-label="설정" onClick={() => router.push("/pwa/settings")}>⚙️</button>
