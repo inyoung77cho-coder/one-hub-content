@@ -109,7 +109,7 @@ export default function AIAdvisor() {
   ] : [];
 
   return (
-    <div className="m">
+    <div className="m pwa-shell">
       <TopNav active="ai" />
 
       {/* §1 금액 단위 — 페이지 전역 1곳만 */}

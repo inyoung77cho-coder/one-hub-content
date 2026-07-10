@@ -78,7 +78,7 @@ export default function EtfDashboard() {
   if (tax?.losses?.length) rebalReasons.push(`손실 종목(${tax.losses.map((l) => l.ticker).join("·")}) 손익통산 — 절세 매도 후 재매수 검토`);
 
   return (
-    <div className="etf">
+    <div className="etf pwa-shell">
       <TopNav active="etf" />
 
       {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해 (시안: 다크 네이비 히어로) */}
