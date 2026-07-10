@@ -1,9 +1,10 @@
 // ONE-HUB v10 — ETF / Asset Intelligence 대시보드 (P7, 작업지시서 §11.2)
 // 독립 라우트. 확정값(수익3단분해·세금·중복도)은 진한색/실선. 예측(Forecast)은 시나리오 투영(참고용·확정 아님).
 // ★ 단일 점수 블랙박스 금지 — Portfolio Score는 구성요소를 펼쳐 보여준다(§11.2).
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import TopNav from "../../components/TopNav";
 import { getTrader } from "../../lib/trader";
+import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket } from "../../lib/etfHoldings";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -22,6 +23,12 @@ export default function EtfDashboard() {
   const [rebal, setRebal] = useState(null);
   const [err, setErr] = useState(null);
   const [liveFx, setLiveFx] = useState(null); // 당일 USD/KRW 실시간 환율(매일 자동 갱신)
+  const [refreshedAt, setRefreshedAt] = useState(null); // 마지막 자동 갱신 시각
+  // [내 ETF] 사용자 직접 입력 보유 + 자동 시세
+  const [holdings, setHoldings] = useState([]);
+  const [quotes, setQuotes] = useState({}); // { TICKER: {price, currency, date} }
+  const [form, setForm] = useState({ side: "buy", ticker: "", shares: "", price: "", ccy: "USD" });
+  const [formMsg, setFormMsg] = useState("");
 
   useEffect(() => {
     const load = () => {
@@ -31,20 +38,77 @@ export default function EtfDashboard() {
         .then(([r, t, o, rb]) => {
           if (r.error || t.error) setErr(r.error || t.error);
           setReport(r); setTax(t); setOverlap(o); setRebal(rb);
+          setRefreshedAt(new Date());
         })
         .catch((e) => setErr(e.message));
     };
+    const loadFx = () => fetch("/api/fx/usdkrw").then((r) => r.json()).then((d) => { if (d?.ok) setLiveFx(d); }).catch(() => {});
     load();
-    // 오늘 환율 — 일일 캐시 소스에서 조회(실패 시 백엔드 종가로 폴백)
-    fetch("/api/fx/usdkrw").then((r) => r.json()).then((d) => { if (d?.ok) setLiveFx(d); }).catch(() => {});
+    loadFx();
+    // [자동 갱신] 등록된 ETF 가격을 주기적으로 재조회(백엔드 종가/평가 갱신). 60초.
+    const poll = setInterval(() => { load(); loadFx(); }, 60000);
     // [§3-8] 다른 페이지에서 계좌 전환 시 즉시 재조회
     const onTrader = () => load();
     window.addEventListener("onehub-trader-change", onTrader);
-    return () => window.removeEventListener("onehub-trader-change", onTrader);
+    return () => { clearInterval(poll); window.removeEventListener("onehub-trader-change", onTrader); };
   }, []);
+
+  // [내 ETF] 보유 로드 + 티커별 시세 자동 조회(60초 폴링)
+  const refreshQuotes = useCallback((list) => {
+    const uniq = [...new Set(list.map((h) => h.ticker))];
+    uniq.forEach((tk) => {
+      const mkt = inferMarket(tk, list.find((h) => h.ticker === tk)?.market);
+      fetch(`/api/etf/quote?ticker=${encodeURIComponent(tk)}&market=${mkt}`)
+        .then((r) => r.json())
+        .then((d) => { if (d?.ok) setQuotes((q) => ({ ...q, [tk]: { price: d.price, currency: d.currency, date: d.date } })); })
+        .catch(() => {});
+    });
+  }, []);
+
+  useEffect(() => {
+    const tr = getTrader();
+    const list = getHoldings(tr);
+    setHoldings(list);
+    if (list.length) refreshQuotes(list);
+    const poll = setInterval(() => { const l = getHoldings(getTrader()); setHoldings(l); if (l.length) refreshQuotes(l); }, 60000);
+    return () => clearInterval(poll);
+  }, [refreshQuotes]);
 
   const s = report?.summary;
   const positions = (report?.positions || []).filter((p) => !p.error);
+
+  // [내 ETF] 매수/매도 기록 + 티커 삭제
+  const submitTrade = () => {
+    const tr = getTrader();
+    const { side, ticker, shares, price, ccy } = form;
+    setFormMsg("");
+    const res = side === "buy"
+      ? buyEtf({ ticker, market: inferMarket(ticker), shares, avgPrice: price, avgCcy: ccy, trader: tr })
+      : sellEtf({ ticker, shares, trader: tr });
+    if (!res.ok) { setFormMsg("⚠️ " + (res.error || "입력 오류")); return; }
+    const tk = String(ticker).trim().toUpperCase();
+    setFormMsg(side === "buy" ? `✓ ${tk} 매수 기록됨` : (res.short > 0 ? `✓ ${tk} 매도(보유수량까지만 반영)` : `✓ ${tk} 매도 반영됨`));
+    const l = getHoldings(tr); setHoldings(l); refreshQuotes(l);
+    setForm((f) => ({ ...f, ticker: "", shares: "", price: "" }));
+  };
+  const delHolding = (tk) => { const tr = getTrader(); removeEtf({ ticker: tk, trader: tr }); setHoldings(getHoldings(tr)); };
+
+  // [내 ETF] 티커별 KRW 환산 평가·손익 (현재가 자동 시세 + 오늘 환율)
+  const fxRate = liveFx?.rate || report?.as_of?.fx || null;
+  const holdingMetrics = (h) => {
+    const q = quotes[h.ticker];
+    const toKrw = (v, ccy) => (ccy === "KRW" ? v : fxRate ? v * fxRate : null);
+    const curPx = q?.price != null ? q.price : null;
+    const curKrw = curPx != null ? toKrw(curPx, q.currency) : null;
+    const costKrw = toKrw(h.avgPrice, h.avgCcy);
+    const valueKrw = curKrw != null ? curKrw * h.shares : null;
+    const costTotal = costKrw != null ? costKrw * h.shares : null;
+    const pnlKrw = valueKrw != null && costTotal != null ? valueKrw - costTotal : null;
+    const pnlPct = curPx != null && q?.currency === h.avgCcy ? (curPx / h.avgPrice - 1) * 100
+      : valueKrw != null && costTotal ? (valueKrw / costTotal - 1) * 100 : null;
+    return { curPx, curCcy: q?.currency, valueKrw, pnlKrw, pnlPct, date: q?.date };
+  };
+  const myTotal = holdings.reduce((acc, h) => { const m = holdingMetrics(h); return acc + (m.valueKrw || 0); }, 0);
 
   // [환율 신선도] 기준일이 오늘(KST)인지 표시 — 오래된 종가 환율이면 사용자에게 명확히 알림
   const asof = report?.as_of;
@@ -84,7 +148,7 @@ export default function EtfDashboard() {
       {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해 (시안: 다크 네이비 히어로) */}
       <section className="hero">
         <div className="eyebrow">
-          <span className="lbl">📊 ETF 자산{priceDate ? ` · ${priceDate} 종가 기준` : ""}{priceDate ? <span className={`date-flag ${priceStale ? "stale" : "fresh"}`}>{priceStale ? `지연 ${priceDaysAgo}일` : "최신"}</span> : null}</span>
+          <span className="lbl">📊 ETF 자산{priceDate ? ` · ${priceDate} 종가 기준` : ""}{priceDate ? <span className={`date-flag ${priceStale ? "stale" : "fresh"}`}>{priceStale ? `지연 ${priceDaysAgo}일` : "최신"}</span> : null}{refreshedAt ? <span className="upd-flag">↻ {String(refreshedAt.getHours()).padStart(2, "0")}:{String(refreshedAt.getMinutes()).padStart(2, "0")} 자동갱신</span> : null}</span>
           <span className="live">LIVE</span>
         </div>
         {liveFx?.ok ? (
@@ -335,6 +399,60 @@ export default function EtfDashboard() {
         </section>
       )}
 
+      {/* 6) 내 ETF — 직접 매수/매도 입력 + 자동 시세 갱신 */}
+      <section className="card myetf">
+        <div className="label">🧾 내 ETF · 직접 입력 <span className="sub">시세 자동 갱신</span>
+          {myTotal > 0 && <span className="me-total">평가 {won(myTotal)}원</span>}
+        </div>
+        <div className="me-toggle">
+          <button className={form.side === "buy" ? "on buy" : ""} onClick={() => { setForm((f) => ({ ...f, side: "buy" })); setFormMsg(""); }}>매수</button>
+          <button className={form.side === "sell" ? "on sell" : ""} onClick={() => { setForm((f) => ({ ...f, side: "sell" })); setFormMsg(""); }}>매도</button>
+        </div>
+        <div className="me-form">
+          <input className="me-in tk" placeholder="티커 (SCHD / 069500)" value={form.ticker}
+            onChange={(e) => setForm((f) => ({ ...f, ticker: e.target.value }))} />
+          <input className="me-in num" type="number" inputMode="decimal" placeholder="수량" value={form.shares}
+            onChange={(e) => setForm((f) => ({ ...f, shares: e.target.value }))} />
+          {form.side === "buy" && (
+            <>
+              <input className="me-in num" type="number" inputMode="decimal" placeholder="평단가" value={form.price}
+                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} />
+              <select className="me-in ccy" value={form.ccy} onChange={(e) => setForm((f) => ({ ...f, ccy: e.target.value }))}>
+                <option value="USD">USD</option><option value="KRW">KRW</option>
+              </select>
+            </>
+          )}
+        </div>
+        <button className={`me-submit ${form.side}`} onClick={submitTrade}>{form.side === "buy" ? "＋ 매수 기록" : "－ 매도 기록"}</button>
+        {formMsg && <div className="me-msg">{formMsg}</div>}
+        {holdings.length > 0 ? (
+          <div className="me-list">
+            {holdings.map((h) => {
+              const m = holdingMetrics(h);
+              return (
+                <div className="me-row" key={h.id}>
+                  <div className="me-l">
+                    <span className="me-tk">{h.ticker}</span>
+                    <span className="me-qty">{h.shares}주 · 평단 {h.avgCcy === "USD" ? "$" : ""}{h.avgPrice.toLocaleString()}{h.avgCcy === "KRW" ? "원" : ""}</span>
+                  </div>
+                  <div className="me-r">
+                    <span className="me-px">{m.curPx != null ? `${m.curCcy === "USD" ? "$" : ""}${m.curPx.toLocaleString()}${m.curCcy === "KRW" ? "원" : ""}` : "시세 조회 중…"}</span>
+                    <span className="me-sub2">
+                      {m.valueKrw != null && <span className="me-val">{won(m.valueKrw)}원</span>}
+                      {m.pnlPct != null && <span className={`me-pnl ${sign(m.pnlPct)}`}>{pct(m.pnlPct)}</span>}
+                    </span>
+                  </div>
+                  <button className="me-del" onClick={() => delHolding(h.ticker)} aria-label={`${h.ticker} 삭제`}>✕</button>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="me-empty">보유 ETF를 추가하면 <b>현재가·평가액·손익</b>이 자동으로 갱신됩니다. 미국 ETF는 티커(<b>SCHD</b>), 국내는 숫자코드(<b>069500</b>)로 입력하세요.</div>
+        )}
+        <div className="me-foot">시세는 공개 소스(stooq)에서 5분 캐시로 자동 갱신 · USD는 오늘 환율({fxRate ? `${Math.round(fxRate).toLocaleString()}원` : "조회 중"})로 원화 환산 · 참고용</div>
+      </section>
+
       <div className="foot">확정 계산(수익·세금·중복도)은 입력값 기반. 예측(Forecast)은 통계적 시나리오(참고용·확정 아님). · 세무자문 아님</div>
 
       <style jsx>{`
@@ -352,6 +470,7 @@ export default function EtfDashboard() {
         .date-flag { display: inline-block; margin-left: 7px; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; letter-spacing: .2px; vertical-align: middle; }
         .date-flag.fresh { background: color-mix(in srgb, var(--color-success) 22%, transparent); color: var(--color-success); }
         .date-flag.stale { background: color-mix(in srgb, var(--color-warning) 22%, transparent); color: var(--color-warning); }
+        .upd-flag { display: inline-block; margin-left: 7px; font-size: 10px; font-weight: 700; color: var(--hero-ink-sub); vertical-align: middle; }
         .fx-note { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--hero-ink-soft); margin: -6px 0 4px; }
         .fx-note b { color: var(--hero-ink); font-weight: 700; }
         .fx-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); flex-shrink: 0; }
@@ -456,6 +575,35 @@ export default function EtfDashboard() {
         .fc-assume { font-size: 0.7rem; color: var(--color-ink-3); margin-top: 8px; line-height: 1.55; word-break: keep-all; }
         .fc-assume b { color: var(--color-ink-2); font-weight: 700; }
         .sample-badge { font-size: 10px; font-weight: 800; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 3px 8px; border-radius: 6px; margin-left: auto; }
+        /* [내 ETF] 직접 입력 + 자동 시세 */
+        .myetf .me-total { float: right; font-size: 0.72rem; font-weight: 800; color: var(--color-primary); }
+        .me-toggle { display: flex; gap: 4px; background: var(--color-card-soft); border-radius: 10px; padding: 3px; margin-bottom: 10px; }
+        .me-toggle button { flex: 1; border: none; background: none; padding: 8px 0; border-radius: 8px; font-family: var(--font-sans); font-size: 0.82rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
+        .me-toggle button.on.buy { background: var(--color-primary); color: #fff; }
+        .me-toggle button.on.sell { background: var(--color-danger); color: #fff; }
+        .me-form { display: flex; gap: 6px; flex-wrap: wrap; }
+        .me-in { flex: 1 1 70px; min-width: 0; border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 9px; padding: 9px 10px; font-size: 0.84rem; font-family: var(--font-sans); color: var(--color-ink); }
+        .me-in.tk { flex: 2 1 120px; text-transform: uppercase; }
+        .me-in.ccy { flex: 0 0 68px; }
+        .me-in:focus { outline: none; border-color: var(--color-primary); }
+        .me-submit { width: 100%; margin-top: 8px; border: none; border-radius: 10px; padding: 11px 0; font-size: 0.88rem; font-weight: 800; color: #fff; cursor: pointer; font-family: var(--font-sans); }
+        .me-submit.buy { background: var(--color-primary); } .me-submit.sell { background: var(--color-danger); }
+        .me-msg { font-size: 0.76rem; font-weight: 600; color: var(--color-ink-2); margin-top: 8px; text-align: center; }
+        .me-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+        .me-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--color-card-soft); border-radius: 11px; }
+        .me-l { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+        .me-tk { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); }
+        .me-qty { font-size: 0.68rem; color: var(--color-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .me-r { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+        .me-px { font-size: 0.82rem; font-weight: 700; color: var(--color-ink); font-family: ui-monospace, monospace; }
+        .me-sub2 { display: flex; align-items: center; gap: 8px; }
+        .me-val { font-size: 0.7rem; color: var(--color-ink-2); font-family: ui-monospace, monospace; }
+        .me-pnl { font-size: 0.76rem; font-weight: 800; font-family: ui-monospace, monospace; }
+        .me-pnl.pos { color: var(--color-success); } .me-pnl.neg { color: var(--color-danger); }
+        .me-del { flex-shrink: 0; width: 24px; height: 24px; border: none; background: var(--color-card); border-radius: 7px; color: var(--color-ink-3); font-size: 0.8rem; cursor: pointer; }
+        .me-empty { margin-top: 12px; font-size: 0.74rem; color: var(--color-ink-2); line-height: 1.6; background: var(--color-card-soft); border-radius: 11px; padding: 12px 14px; word-break: keep-all; }
+        .me-empty b { color: var(--color-ink); font-weight: 700; }
+        .me-foot { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 12px; line-height: 1.5; word-break: keep-all; }
         .foot { font-size: 0.68rem; color: var(--color-ink-3); text-align: center; margin-top: 16px; line-height: 1.5; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
