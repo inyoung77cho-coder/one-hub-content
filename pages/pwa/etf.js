@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback } from "react";
 import TopNav from "../../components/TopNav";
 import { getTrader } from "../../lib/trader";
-import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket } from "../../lib/etfHoldings";
+import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty } from "../../lib/etfHoldings";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -28,6 +28,7 @@ export default function EtfDashboard() {
   const [quotes, setQuotes] = useState({}); // { TICKER: {price, currency, date} }
   const [form, setForm] = useState({ side: "buy", ticker: "", shares: "", price: "", ccy: "USD" });
   const [formMsg, setFormMsg] = useState("");
+  const [posQty, setPosQtyState] = useState({}); // [등록 ETF] 티커별 사용자 입력 수량(백엔드 미제공 보완)
 
   useEffect(() => {
     const load = () => {
@@ -64,9 +65,9 @@ export default function EtfDashboard() {
     });
   }, []);
 
-  // [내 ETF] 로컬 보유 로드(60초 폴링) — 시세는 아래 통합 시세 효과가 담당
+  // [내 ETF] 로컬 보유 + 등록ETF 수량 로드(60초 폴링) — 시세는 아래 통합 시세 효과가 담당
   useEffect(() => {
-    const load = () => setHoldings(getHoldings(getTrader()));
+    const load = () => { const tr = getTrader(); setHoldings(getHoldings(tr)); setPosQtyState(getPosQtyMap(tr)); };
     load();
     const poll = setInterval(load, 60000);
     window.addEventListener("onehub-trader-change", load);
@@ -111,6 +112,13 @@ export default function EtfDashboard() {
   };
   const delHolding = (tk) => { const tr = getTrader(); removeEtf({ ticker: tk, trader: tr }); setHoldings(getHoldings(tr)); };
 
+  // [등록 ETF] 수량 입력 → 실측 종가로 실시간 평가액 재계산
+  const onQtyChange = (ticker, val) => {
+    const tr = getTrader();
+    setPosQty(ticker, val, tr);
+    setPosQtyState((m) => { const n = { ...m }; if (Number(val) > 0) n[ticker.toUpperCase()] = Number(val); else delete n[ticker.toUpperCase()]; return n; });
+  };
+
   // [내 ETF] 티커별 KRW 환산 평가·손익 (현재가 자동 시세 + 오늘 환율)
   const fxRate = liveFx?.rate || report?.as_of?.fx || null;
   const holdingMetrics = (h) => {
@@ -127,6 +135,26 @@ export default function EtfDashboard() {
     return { curPx, curCcy: q?.currency, valueKrw, pnlKrw, pnlPct, date: q?.date };
   };
   const myTotal = holdings.reduce((acc, h) => { const m = holdingMetrics(h); return acc + (m.valueKrw || 0); }, 0);
+
+  // [등록 ETF] 수량(백엔드 제공 우선, 없으면 사용자 입력) + 실측 종가 기반 실시간 평가액
+  const posLive = (p) => {
+    const qty = p.qty ?? p.shares ?? p.quantity ?? posQty[String(p.ticker).toUpperCase()] ?? null;
+    const q = quotes[p.ticker];
+    if (!(qty > 0) || !q?.price) return { qty: qty || null, valueKrw: null, pnlPct: null };
+    const px = q.currency === "USD" ? (fxRate ? q.price * fxRate : null) : q.price;
+    if (px == null) return { qty, valueKrw: null, pnlPct: null };
+    const valueKrw = qty * px;
+    const invest = p.krw_cost ?? p.invested_krw ?? p.cost_krw ?? null;
+    const pnlPct = invest ? (valueKrw / invest - 1) * 100 : null;
+    return { qty, valueKrw, pnlPct };
+  };
+  // 실시간 총평가액 = (수량 아는 등록 포지션) + (내 보유). 하나라도 있으면 표기.
+  const liveTotal = (() => {
+    let sum = 0, any = false;
+    positions.forEach((p) => { const l = posLive(p); if (l.valueKrw != null) { sum += l.valueKrw; any = true; } });
+    holdings.forEach((h) => { const v = holdingMetrics(h).valueKrw; if (v != null) { sum += v; any = true; } });
+    return any ? sum : null;
+  })();
 
   // [환율 신선도] 기준일이 오늘(KST)인지 표시 — 오래된 종가 환율이면 사용자에게 명확히 알림
   const asof = report?.as_of;
@@ -189,6 +217,9 @@ export default function EtfDashboard() {
           <>
             <div className="big">{won(s.value_krw)}<span>원</span></div>
             <div className="hsub">취득 {won(s.krw_cost)} → 평가손익 <b>{won(s.value_krw - s.krw_cost)}원</b> · <b>{pct(s.total_pnl_pct)}</b></div>
+            {liveTotal != null && (
+              <div className="live-total">⚡ 실시간 평가 <b>{won(liveTotal)}원</b> <span className="lt-note">· 수량×실측종가({liveCloseDate ? liveCloseDate.slice(5) : "최근"}) 기준</span></div>
+            )}
             <div className="decomp">
               <div className="drow"><span className="dk">ETF 자체수익 ($)</span><span className={`dv ${sign(s.etf_self_pct)}`}>{pct(s.etf_self_pct)}</span></div>
               <div className="drow"><span className="dk">환차손익</span><span className={`dv ${sign(s.fx_pure_pct)}`}>{pct(s.fx_pure_pct)}</span></div>
@@ -393,30 +424,50 @@ export default function EtfDashboard() {
             const invest = p.krw_cost ?? p.invested_krw ?? p.cost_krw ?? null;
             const profit = p.pnl_krw ?? p.profit_krw ?? (p.value_krw != null && invest != null ? p.value_krw - invest : null);
             const tot = p.total_pnl_pct ?? p.usd_pnl_pct;
+            const live = posLive(p);
+            const qtyFromBackend = p.qty ?? p.shares ?? p.quantity ?? null;
+            const tkU = String(p.ticker).toUpperCase();
             return (
-              <div className="erow" key={p.ticker}>
-                <span className="eleft">
-                  <span className="etk">{p.ticker}</span>
-                  {invest != null && <span className="einv">{won(invest)}</span>}
-                  {(() => { const q = quotes[p.ticker]; return q ? (
-                    <span className="ecur">종가 {q.currency === "USD" ? "$" : ""}{q.price.toLocaleString()}{q.currency === "KRW" ? "원" : ""}{q.date ? ` · ${q.date.slice(5)}` : ""}</span>
-                  ) : null; })()}
-                </span>
-                <span className="emid">
-                  {p.mode === "full" ? (
-                    <><span className="eself">{pct(p.etf_self_pct)}</span><span className="echa">환차 {pct(p.fx_pure_pct)}</span></>
+              <div className="epos" key={p.ticker}>
+                <div className="erow">
+                  <span className="eleft">
+                    <span className="etk">{p.ticker}</span>
+                    {invest != null && <span className="einv">{won(invest)}</span>}
+                    {(() => { const q = quotes[p.ticker]; return q ? (
+                      <span className="ecur">종가 {q.currency === "USD" ? "$" : ""}{q.price.toLocaleString()}{q.currency === "KRW" ? "원" : ""}{q.date ? ` · ${q.date.slice(5)}` : ""}</span>
+                    ) : null; })()}
+                  </span>
+                  <span className="emid">
+                    {p.mode === "full" ? (
+                      <><span className="eself">{pct(p.etf_self_pct)}</span><span className="echa">환차 {pct(p.fx_pure_pct)}</span></>
+                    ) : (
+                      <span className="eself sub">USD only</span>
+                    )}
+                  </span>
+                  <span className="eright">
+                    <span className={`ett ${sign(tot)}`}>{pct(tot)}</span>
+                    {profit != null && <span className={`eprofit ${sign(profit)}`}>{profit >= 0 ? "+" : ""}{won(profit)}</span>}
+                  </span>
+                </div>
+                {/* [실시간 재계산] 수량(백엔드 제공 or 직접 입력) × 실측 종가 → 실시간 평가액 */}
+                <div className="eqty">
+                  <span className="eqty-lbl">수량</span>
+                  {qtyFromBackend != null ? (
+                    <span className="eqty-fixed">{qtyFromBackend}주</span>
                   ) : (
-                    <span className="eself sub">USD only</span>
+                    <input className="eqty-in" type="number" inputMode="decimal" placeholder="입력"
+                      value={posQty[tkU] ?? ""} onChange={(e) => onQtyChange(p.ticker, e.target.value)} />
                   )}
-                </span>
-                <span className="eright">
-                  <span className={`ett ${sign(tot)}`}>{pct(tot)}</span>
-                  {profit != null && <span className={`eprofit ${sign(profit)}`}>{profit >= 0 ? "+" : ""}{won(profit)}</span>}
-                </span>
+                  {live.valueKrw != null ? (
+                    <span className="eqty-live">⚡ 실시간 <b>{won(live.valueKrw)}원</b>{live.pnlPct != null && <em className={sign(live.pnlPct)}>{pct(live.pnlPct)}</em>}</span>
+                  ) : (
+                    <span className="eqty-hint">{quotes[p.ticker] ? "수량 입력 시 실측 평가" : "시세 조회 중"}</span>
+                  )}
+                </div>
               </div>
             );
           })}
-          <div className="ebd-note">왼쪽은 투자액, 가운데는 자체수익(달러)·환차손익, 오른쪽은 원화 실질수익률과 이익금입니다.</div>
+          <div className="ebd-note">왼쪽은 투자액, 가운데는 자체수익(달러)·환차손익, 오른쪽은 원화 실질수익률과 이익금입니다. 수량을 입력하면 실측 종가로 <b>실시간 평가액</b>이 계산됩니다.</div>
         </section>
       )}
 
@@ -541,6 +592,22 @@ export default function EtfDashboard() {
         .eleft .etk { font-size: 0.9rem; font-weight: 800; }
         .eleft .einv { font-size: 0.68rem; color: var(--color-ink-3); font-weight: 500; }
         .eleft .ecur { font-size: 0.66rem; color: var(--color-success); font-weight: 700; font-family: ui-monospace, monospace; }
+        /* [실시간 평가] 히어로 라인 + 포지션 수량 입력 */
+        .live-total { margin-top: 8px; font-size: 0.82rem; color: var(--hero-ink); font-weight: 700; }
+        .live-total b { color: var(--hero-accent); font-weight: 800; }
+        .live-total .lt-note { font-size: 0.66rem; color: var(--hero-ink-sub); font-weight: 500; }
+        .epos { border-bottom: 1px solid var(--color-line); padding-bottom: 8px; margin-bottom: 8px; }
+        .epos:last-of-type { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+        .eqty { display: flex; align-items: center; gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+        .eqty-lbl { font-size: 0.66rem; color: var(--color-ink-3); font-weight: 700; }
+        .eqty-fixed { font-size: 0.72rem; font-weight: 700; color: var(--color-ink); }
+        .eqty-in { width: 74px; border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 8px; padding: 5px 8px; font-size: 0.76rem; color: var(--color-ink); font-family: var(--font-sans); }
+        .eqty-in:focus { outline: none; border-color: var(--color-primary); }
+        .eqty-live { font-size: 0.72rem; color: var(--color-ink-2); font-weight: 600; display: inline-flex; align-items: center; gap: 6px; }
+        .eqty-live b { color: var(--color-ink); font-weight: 800; }
+        .eqty-live em { font-style: normal; font-weight: 800; font-family: ui-monospace, monospace; }
+        .eqty-live em.pos { color: var(--color-success); } .eqty-live em.neg { color: var(--color-danger); }
+        .eqty-hint { font-size: 0.66rem; color: var(--color-ink-3); }
         .emid { display: flex; flex-direction: column; gap: 3px; text-align: right; }
         .emid .eself { font-size: 0.74rem; color: var(--color-ink-2); font-weight: 600; }
         .emid .eself.sub { color: var(--color-ink-3); }
