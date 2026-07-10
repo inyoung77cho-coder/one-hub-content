@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getLatestDailyReport } from '../../lib/reports';
 import LastUpdated from '../../components/LastUpdated';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
-import { recordDecision, matureLedger, computeShowdown } from '../../lib/verdictLedger';
+import { recordDecision, matureLedger, computeShowdown, getTodayDecision } from '../../lib/verdictLedger';
 
 // [v9.0] 안전 숫자 포맷 — INVALID_PRICE/STOP/NaN/undefined → '-'
 function safeLocale(v, suffix = '') {
@@ -185,6 +185,7 @@ export default function PWADashboard({ latestReport }) {
   const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
   const [accuracy, setAccuracy] = useState(null); // [기록] AI 자기검증(차단 적중률) 누적 — ML 학습 현황 카드
   const [ledger, setLedger] = useState([]); // [나 vs AI] 내 판단(매매/관망) 원장 + 3·7일 성과
+  const [decTick, setDecTick] = useState(0); // [나 vs AI] 추천 카드 판단 버튼 상태 리렌더 트리거
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
@@ -455,6 +456,21 @@ export default function PWADashboard({ latestReport }) {
     } catch (e) { setPendingError(String(e)); }
     finally { setActingCode(null); }
   }, [trader, pendingList]);
+
+  // [나 vs AI] 추천 카드에서 직접 판단 기록 — 후보엔 가격 필드가 없으므로 현재가를 조회해 진입가로 저장
+  const logDecision = useCallback(async (code, name, decision, priceHint) => {
+    // 즉시 기록(버튼 상태 바로 반영) → 진입가는 조회 후 백필
+    recordDecision({ code, name, entry: Number(priceHint) || null, decision, trader });
+    setDecTick((t) => t + 1);
+    if (!Number(priceHint)) {
+      try {
+        const r = await fetch(`/api/analyze-stock?code=${code}`);
+        const d = await r.json();
+        const entry = Number(d?.current_price ?? d?.price) || null;
+        if (entry) { recordDecision({ code, name, entry, decision, trader }); setDecTick((t) => t + 1); }
+      } catch {}
+    }
+  }, [trader]);
 
   const searchStocks = useCallback(async (q) => {
     if (!q || q.length < 1) { setSearchResults([]); return; }
@@ -1209,6 +1225,13 @@ export default function PWADashboard({ latestReport }) {
                             <div className="top3-reason">{m.reason}</div>
                             <div className="top3-upside">기대 <b>~+{m.upside}%</b><span className="est">추정</span></div>
                             <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>목표가·상세 →</button>
+                            {/* [나 vs AI] 내 판단 기록 — 샀어요/안 샀어요 */}
+                            {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (
+                              <div className="dec-mini" onClick={(e) => e.stopPropagation()}>
+                                <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>{dec === 'take' ? '✓ 샀어요' : '샀어요'}</button>
+                                <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>{dec === 'pass' ? '✓ 관망' : '관망'}</button>
+                              </div>
+                            ); })()}
                           </div>
                         );
                       })}
@@ -1230,6 +1253,13 @@ export default function PWADashboard({ latestReport }) {
                                     <span className="rec-stance-inline" style={{ color: m.stance.color }}>{m.stance.label}</span>
                                   </button>
                                   <div className="rec-reason">{m.reason}</div>
+                                  {/* [나 vs AI] 내 판단 기록 */}
+                                  {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (
+                                    <div className="dec-mini">
+                                      <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>{dec === 'take' ? '✓ 샀어요' : '샀어요'}</button>
+                                      <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>{dec === 'pass' ? '✓ 관망' : '관망'}</button>
+                                    </div>
+                                  ); })()}
                                 </div>
                                 <div className="rec-row-r">
                                   <span className="rec-interest mono">관심도 {sc}</span>
@@ -2475,6 +2505,20 @@ export default function PWADashboard({ latestReport }) {
                 </span>
               </div>
             )}
+            {/* [나 vs AI] 상세 시트에서 바로 내 판단 기록 (기록 탭에서 3·7일 뒤 AI와 승부) */}
+            {bottomSheet.code && (() => {
+              const dec = (decTick, getTodayDecision(bottomSheet.code, trader));
+              const hint = bottomSheet.priceMeta?.cur || null;
+              return (
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>🥊 내 판단 기록 <span style={{ fontWeight: 400, color: 'var(--text-tertiary)' }}>· 기록 탭에서 3·7일 뒤 AI와 승부</span></div>
+                  <div className="dec-mini lg">
+                    <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(bottomSheet.code, bottomSheet.name, 'take', hint)}>{dec === 'take' ? '✓ 샀어요' : '🙋 샀어요'}</button>
+                    <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(bottomSheet.code, bottomSheet.name, 'pass', hint)}>{dec === 'pass' ? '✓ 관망함' : '🤔 관망'}</button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </>)}
       </div>
@@ -2736,6 +2780,14 @@ export default function PWADashboard({ latestReport }) {
         .top3-ai-pct { font-size: 0.78rem; font-weight: 800; color: var(--color-primary); }
         .top3-why-btn { font-size: 0.62rem; padding: 3px 8px; border-radius: 6px; background: var(--inset-bg); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; margin-top: 2px; }
         /* [§3-3] 추천 카드 인라인 근거·스탠스·기대여력 */
+        /* [나 vs AI] 추천 카드 판단 버튼 */
+        .dec-mini { display: flex; gap: 4px; margin-top: 6px; width: 100%; }
+        .dec-mini.lg { gap: 8px; }
+        .dec-b { flex: 1; font-size: 0.64rem; font-weight: 700; padding: 5px 4px; border-radius: 7px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; transition: background .12s, color .12s, border-color .12s; }
+        .dec-mini.lg .dec-b { font-size: 0.8rem; padding: 9px 6px; border-radius: 9px; }
+        .dec-b.take.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+        .dec-b.pass.on { background: var(--color-ink-2, var(--text-secondary)); color: #fff; border-color: var(--color-ink-2, var(--text-secondary)); }
+        .dec-b:active { transform: scale(0.97); }
         .rec-def { font-size: 0.72rem; color: var(--text-secondary); background: var(--inset-bg); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; margin-bottom: 12px; line-height: 1.5; }
         .rec-def b { color: var(--text-primary); font-weight: 700; }
         .top3-stance { font-size: 0.6rem; font-weight: 800; padding: 1px 7px; border-radius: 20px; border: 1px solid; line-height: 1.5; }
