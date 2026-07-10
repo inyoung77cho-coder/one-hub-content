@@ -23,7 +23,6 @@ export default function EtfDashboard() {
   const [rebal, setRebal] = useState(null);
   const [err, setErr] = useState(null);
   const [liveFx, setLiveFx] = useState(null); // 당일 USD/KRW 실시간 환율(매일 자동 갱신)
-  const [refreshedAt, setRefreshedAt] = useState(null); // 마지막 자동 갱신 시각
   // [내 ETF] 사용자 직접 입력 보유 + 자동 시세
   const [holdings, setHoldings] = useState([]);
   const [quotes, setQuotes] = useState({}); // { TICKER: {price, currency, date} }
@@ -38,14 +37,13 @@ export default function EtfDashboard() {
         .then(([r, t, o, rb]) => {
           if (r.error || t.error) setErr(r.error || t.error);
           setReport(r); setTax(t); setOverlap(o); setRebal(rb);
-          setRefreshedAt(new Date());
         })
         .catch((e) => setErr(e.message));
     };
     const loadFx = () => fetch("/api/fx/usdkrw").then((r) => r.json()).then((d) => { if (d?.ok) setLiveFx(d); }).catch(() => {});
     load();
     loadFx();
-    // [자동 갱신] 등록된 ETF 가격을 주기적으로 재조회(백엔드 종가/평가 갱신). 60초.
+    // 백엔드 리포트·환율 주기 재조회(60초). 종목별 실제 최근 종가는 별도 시세 효과가 티커 기준으로 갱신.
     const poll = setInterval(() => { load(); loadFx(); }, 60000);
     // [§3-8] 다른 페이지에서 계좌 전환 시 즉시 재조회
     const onTrader = () => load();
@@ -53,9 +51,10 @@ export default function EtfDashboard() {
     return () => { clearInterval(poll); window.removeEventListener("onehub-trader-change", onTrader); };
   }, []);
 
-  // [내 ETF] 보유 로드 + 티커별 시세 자동 조회(60초 폴링)
+  // [ETF 시세] 티커 기준 최근 종가 조회(공개 소스). 등록 ETF(백엔드 포지션)와 내 보유 모두 대상.
+  //   백엔드 평가 종가가 지연되어도, 티커별 '실제 최근 종가'를 여기서 직접 확인해 표기한다.
   const refreshQuotes = useCallback((list) => {
-    const uniq = [...new Set(list.map((h) => h.ticker))];
+    const uniq = [...new Set(list.map((h) => h.ticker).filter(Boolean))];
     uniq.forEach((tk) => {
       const mkt = inferMarket(tk, list.find((h) => h.ticker === tk)?.market);
       fetch(`/api/etf/quote?ticker=${encodeURIComponent(tk)}&market=${mkt}`)
@@ -65,17 +64,36 @@ export default function EtfDashboard() {
     });
   }, []);
 
+  // [내 ETF] 로컬 보유 로드(60초 폴링) — 시세는 아래 통합 시세 효과가 담당
   useEffect(() => {
-    const tr = getTrader();
-    const list = getHoldings(tr);
-    setHoldings(list);
-    if (list.length) refreshQuotes(list);
-    const poll = setInterval(() => { const l = getHoldings(getTrader()); setHoldings(l); if (l.length) refreshQuotes(l); }, 60000);
-    return () => clearInterval(poll);
-  }, [refreshQuotes]);
+    const load = () => setHoldings(getHoldings(getTrader()));
+    load();
+    const poll = setInterval(load, 60000);
+    window.addEventListener("onehub-trader-change", load);
+    return () => { clearInterval(poll); window.removeEventListener("onehub-trader-change", load); };
+  }, []);
 
   const s = report?.summary;
   const positions = (report?.positions || []).filter((p) => !p.error);
+
+  // [ETF 시세] 등록 종목 + 내 보유 티커의 최근 종가를 티커 기준으로 자동 조회(60초). 티커셋 바뀌면 재구독.
+  const posTickers = positions.map((p) => p.ticker).filter(Boolean).join(",");
+  const holdTickers = holdings.map((h) => h.ticker).filter(Boolean).join(",");
+  useEffect(() => {
+    const all = [...positions, ...holdings];
+    if (!all.length) return;
+    refreshQuotes(all);
+    const poll = setInterval(() => refreshQuotes([...positions, ...holdings]), 60000);
+    return () => clearInterval(poll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posTickers, holdTickers, refreshQuotes]);
+
+  // 등록 티커들의 실제 최근 종가 중 가장 최신 날짜 — 히어로 '실시간 종가' 신선도 표기용
+  const liveCloseDate = positions
+    .map((p) => quotes[p.ticker]?.date)
+    .filter(Boolean)
+    .sort()
+    .pop() || null;
 
   // [내 ETF] 매수/매도 기록 + 티커 삭제
   const submitTrade = () => {
@@ -148,7 +166,7 @@ export default function EtfDashboard() {
       {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해 (시안: 다크 네이비 히어로) */}
       <section className="hero">
         <div className="eyebrow">
-          <span className="lbl">📊 ETF 자산{priceDate ? ` · ${priceDate} 종가 기준` : ""}{priceDate ? <span className={`date-flag ${priceStale ? "stale" : "fresh"}`}>{priceStale ? `지연 ${priceDaysAgo}일` : "최신"}</span> : null}{refreshedAt ? <span className="upd-flag">↻ {String(refreshedAt.getHours()).padStart(2, "0")}:{String(refreshedAt.getMinutes()).padStart(2, "0")} 자동갱신</span> : null}</span>
+          <span className="lbl">📊 ETF 평가 기준{priceDate ? ` · ${priceDate}` : ""}{priceDate ? <span className={`date-flag ${priceStale ? "stale" : "fresh"}`}>{priceStale ? `지연 ${priceDaysAgo}일` : "최신"}</span> : null}{liveCloseDate ? <span className="date-flag fresh">실시간 종가 {liveCloseDate.slice(5)}</span> : null}</span>
           <span className="live">LIVE</span>
         </div>
         {liveFx?.ok ? (
@@ -380,6 +398,9 @@ export default function EtfDashboard() {
                 <span className="eleft">
                   <span className="etk">{p.ticker}</span>
                   {invest != null && <span className="einv">{won(invest)}</span>}
+                  {(() => { const q = quotes[p.ticker]; return q ? (
+                    <span className="ecur">종가 {q.currency === "USD" ? "$" : ""}{q.price.toLocaleString()}{q.currency === "KRW" ? "원" : ""}{q.date ? ` · ${q.date.slice(5)}` : ""}</span>
+                  ) : null; })()}
                 </span>
                 <span className="emid">
                   {p.mode === "full" ? (
@@ -470,7 +491,6 @@ export default function EtfDashboard() {
         .date-flag { display: inline-block; margin-left: 7px; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; letter-spacing: .2px; vertical-align: middle; }
         .date-flag.fresh { background: color-mix(in srgb, var(--color-success) 22%, transparent); color: var(--color-success); }
         .date-flag.stale { background: color-mix(in srgb, var(--color-warning) 22%, transparent); color: var(--color-warning); }
-        .upd-flag { display: inline-block; margin-left: 7px; font-size: 10px; font-weight: 700; color: var(--hero-ink-sub); vertical-align: middle; }
         .fx-note { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--hero-ink-soft); margin: -6px 0 4px; }
         .fx-note b { color: var(--hero-ink); font-weight: 700; }
         .fx-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); flex-shrink: 0; }
@@ -520,6 +540,7 @@ export default function EtfDashboard() {
         .eleft { display: flex; flex-direction: column; gap: 3px; }
         .eleft .etk { font-size: 0.9rem; font-weight: 800; }
         .eleft .einv { font-size: 0.68rem; color: var(--color-ink-3); font-weight: 500; }
+        .eleft .ecur { font-size: 0.66rem; color: var(--color-success); font-weight: 700; font-family: ui-monospace, monospace; }
         .emid { display: flex; flex-direction: column; gap: 3px; text-align: right; }
         .emid .eself { font-size: 0.74rem; color: var(--color-ink-2); font-weight: 600; }
         .emid .eself.sub { color: var(--color-ink-3); }
