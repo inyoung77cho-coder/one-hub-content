@@ -1685,6 +1685,33 @@ export default function PWADashboard({ latestReport }) {
               );
             })()}
 
+            {/* [§3-5 피드백10] AI 개선노트 — 자기검증 결과로 규칙을 어떻게 조정했나(사람 언어) */}
+            {accuracy?.ok && accuracy.by_reason?.length > 0 && (() => {
+              const reasons = accuracy.by_reason.filter(r => (r.total ?? 0) >= 2);
+              const strong = reasons.filter(r => (r.accuracy_pct ?? 0) >= 65).sort((a, b) => (b.accuracy_pct ?? 0) - (a.accuracy_pct ?? 0));
+              const weak = reasons.filter(r => (r.accuracy_pct ?? 0) < 50).sort((a, b) => (a.accuracy_pct ?? 0) - (b.accuracy_pct ?? 0));
+              const notes = [];
+              strong.slice(0, 2).forEach(r => notes.push({ icon: '✅', kind: '유지·강화', text: `${r.reason} 필터 정확도 ${r.accuracy_pct}% — 신뢰도 높아 가중치 유지` }));
+              weak.slice(0, 2).forEach(r => notes.push({ icon: '🔧', kind: '재조정 검토', text: `${r.reason} 필터 정확도 ${r.accuracy_pct}% — 오판 줄이도록 임계값 재조정 검토` }));
+              if (notes.length === 0) notes.push({ icon: '🧭', kind: '관찰', text: `검증 데이터 축적 중 — 사유별 정확도가 안정되면 필터 가중치를 조정합니다` });
+              const total = accuracy.summary?.total_checked ?? 0;
+              return (
+                <section className="pwa-card">
+                  <span className="pwa-card-label">📝 AI 개선노트 · 이번 주 조정</span>
+                  <p className="chlog-intro">누적 검증 <b>{total}건</b>을 반영해 AI가 스스로 판단 규칙을 이렇게 조정하고 있습니다.</p>
+                  <div className="chlog-list">
+                    {notes.map((n, i) => (
+                      <div className="chlog-row" key={i}>
+                        <span className="chlog-ic">{n.icon}</span>
+                        <div className="chlog-body"><span className="chlog-kind">{n.kind}</span><span className="chlog-text">{n.text}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="chlog-foot">※ 규칙·가중치 변경을 사람 언어로 요약. 실제 파라미터는 매주 자동 재학습 시 반영됩니다.</p>
+                </section>
+              );
+            })()}
+
             {/* [v9.0] 이번 주 AI 요약 카드 */}
             <section className="pwa-card">
               <span className="pwa-card-label">📊 이번 주 AI 요약</span>
@@ -2755,6 +2782,16 @@ export default function PWADashboard({ latestReport }) {
         .ml-rec-chg { font-size: 0.72rem; color: var(--text-secondary); }
         .ml-rec-badge { font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: var(--inset-bg); }
         .ml-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 8px; line-height: 1.5; }
+        /* [§3-5] AI 개선노트(changelog) */
+        .chlog-intro { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.55; margin: 10px 0 12px; }
+        .chlog-intro b { color: var(--text-primary); font-weight: 700; }
+        .chlog-list { display: flex; flex-direction: column; gap: 8px; }
+        .chlog-row { display: flex; gap: 10px; align-items: flex-start; background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 11px 13px; }
+        .chlog-ic { font-size: 1rem; flex-shrink: 0; line-height: 1.4; }
+        .chlog-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+        .chlog-kind { font-size: 0.62rem; font-weight: 800; color: var(--accent-buy); background: color-mix(in srgb, var(--accent-buy) 12%, transparent); padding: 1px 7px; border-radius: 5px; align-self: flex-start; }
+        .chlog-text { font-size: 0.76rem; color: var(--text-secondary); line-height: 1.5; word-break: keep-all; }
+        .chlog-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 10px; line-height: 1.5; }
 
         /* 액션/차단 리스트 */
         .pwa-action-list, .pwa-blocked-list { display: flex; flex-direction: column; gap: 10px; }
