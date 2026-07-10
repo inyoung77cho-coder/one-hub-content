@@ -134,6 +134,7 @@ export default function PWADashboard({ latestReport }) {
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
   const [basisOpen, setBasisOpen] = useState(false); // [v10 UI] 홈 'AI 판단 근거' 접기
+  const [heroWhyOpen, setHeroWhyOpen] = useState(false); // [v11-ux] 홈 통합 판단 '왜?' 인라인 펼치기(근거 버튼 제거)
   const [logOpen, setLogOpen] = useState(false);     // [v10 UI] 홈 '최근 활동' 접기
   const [sellConfirm, setSellConfirm] = useState({}); // [v8.7] 매도 1단계 확인 상태: { [code]: true }
   const [sellLoading, setSellLoading] = useState({}); // [v8.7] 매도 처리 중 상태
@@ -710,35 +711,57 @@ export default function PWADashboard({ latestReport }) {
             )}
             {data && (<>
 
-              {/* [v10 UI] 홈 히어로 — "오늘 AI 판단" 결론 한 줄(재방문 훅). 시안 순서상 최상단 앵커 */}
+              {/* [v11-ux] 홈 히어로 — 오늘의 '통합' AI 판단(cross-asset). 근거는 버튼 대신 인라인 '왜?' 아코디언 */}
               {(() => {
-                const aiConf = data?.ai_confidence ?? heat;
-                const verb = buyCount > 0 ? `${buyCount}종목 샀습니다.` : '사지 않았습니다.';
-                const reason = buyCount > 0
-                  ? <>조건을 충족한 <b>{buyCount}종목</b>에 매수 신호가 나왔습니다. 시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> 기준.</>
-                  : blockCount > 0
-                    ? <>시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b>로 투자 열기가 낮아 <b>선별 관망</b>이 낫다고 판단했습니다. 후보는 매수 기준 미달로 {blockCount}건을 걸렀습니다.</>
-                    : <>시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> 기준, 매수 조건을 충족한 종목이 없어 <b>선별 관망</b>했습니다.</>;
+                // 총자산 스냅샷(홈 = 총자산 소유 페이지). 부동산 비중이 최상위 판단 축.
+                const acctCashUk = data?.balance?.cash != null ? Math.round((data.balance.cash / 1e8) * 100) / 100 : 0;
+                const b = assetSum?.breakdown || {};
+                const totalUk = assetSum?.total_uk != null ? Math.round((assetSum.total_uk + acctCashUk) * 100) / 100 : null;
+                const reUk = b.realestate_uk;
+                const rePct = (totalUk && reUk != null) ? Math.round((reUk / totalUk) * 1000) / 10 : null;
+                const riskGrade = rePct == null ? null : rePct > 70 ? '높음' : rePct >= 40 ? '중간' : '낮음';
+                const stance = buyCount > 0 ? `${buyCount}종목 매수` : '선별 관망';
+                // 크로스에셋 결론: 부동산 구조 쏠림 > 시장 스탠스 순으로 한 줄 결론 산출
+                let concl, why;
+                if (rePct != null && rePct > 70) {
+                  concl = <>오늘은 <em>{stance}</em>. 자산의 <b>{rePct}%가 부동산</b> — 쏠림을 줄일 때입니다.</>;
+                  why = <>부동산 구조 리스크 <b>{riskGrade}</b>. 실물이라 즉시 조정은 어렵지만, 오늘 들어오는 <b>현금·매매 수익은 부동산 외 자산</b>(주식·ETF·현금)으로만 배분하세요. 신규 부동산 매입은 보류가 낫습니다.{buyCount === 0 ? ` 주식은 시장 온도 Heat ${heat ?? '-'}로 선별 관망 중입니다.` : ` 주식은 조건 충족 ${buyCount}종목에 매수 신호가 있습니다.`}</>;
+                } else if (rePct != null) {
+                  concl = <>오늘은 <em>{stance}</em>. 자산 배분 균형은 <b>{riskGrade === '낮음' ? '양호' : '보통'}</b>합니다.</>;
+                  why = <>부동산 {rePct}%로 구조 리스크 <b>{riskGrade}</b>. 시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> · Regime <b>{regime || '-'}</b>. {buyCount > 0 ? `주식 ${buyCount}종목 매수 신호.` : `매수 조건 미달로 ${blockCount || 0}건을 걸렀습니다.`}</>;
+                } else {
+                  concl = <>오늘은 <em>{stance}</em>. {buyCount > 0 ? `조건 충족 ${buyCount}종목 매수 신호.` : '매수 조건 미달, 선별 관망.'}</>;
+                  why = <>시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> · Regime <b>{regime || '-'}</b>. {blockCount > 0 ? `후보 ${blockCount}건은 기준 미달로 걸렀습니다. ` : ''}부동산·현금을 입력하면 자산 전체 기준 판단으로 넓혀집니다.</>;
+                }
                 return (
                   <section className="home-hero">
                     <div className="hh-eyebrow">
                       <div className="hh-eyebrow-top">
-                        <span className="hh-label">📊 오늘의 AI 판단</span>
+                        <span className="hh-label">🧭 오늘의 통합 AI 판단</span>
                         <span className="hh-live">LIVE</span>
                       </div>
-                      {regimeDays !== null && <div className="hh-date">Regime {regimeKo(regime)} · {regimeDays}일째</div>}
+                      <span className="hh-scope">주식 · ETF · 부동산 · 현금 통합</span>
                     </div>
-                    <h1 className="hh-h1">오늘, AI는<br /><em>{verb}</em></h1>
-                    <div className="hh-reason">{reason}</div>
-                    <div className="hh-foot">
-                      <span className="hh-chip">Regime <span className="v">{regime || '-'}</span></span>
-                      <span className="hh-chip">매수 예측 신뢰도 <span className="v">{aiConf !== null ? `${aiConf}%` : '-'}</span></span>
-                      {fearGreed !== null && <span className="hh-chip">Fear&amp;Greed <span className="v">{fearGreed}</span></span>}
-                    </div>
-                    <button className="hh-cta" onClick={() => {
-                      setTab('dashboard');
-                      setTimeout(() => document.querySelector('.ai-basis-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
-                    }}>오늘의 판단 근거 자세히 보기 →</button>
+                    <h1 className="hh-h1">{concl}</h1>
+                    {totalUk != null && (
+                      <div className="hh-total">총자산 <b>{totalUk}억</b>{rePct != null && <span className="hh-total-sub"> · 부동산 {rePct}%</span>}</div>
+                    )}
+                    {/* 근거: 버튼/이탈 없이 카드 안 '왜?' 인라인 펼치기 (원칙4) */}
+                    <button className="hh-why" onClick={() => setHeroWhyOpen(o => !o)} aria-expanded={heroWhyOpen}>
+                      <span>왜 이렇게 판단했나?</span><span className={`hh-why-caret ${heroWhyOpen ? 'open' : ''}`}>▾</span>
+                    </button>
+                    {heroWhyOpen && (
+                      <div className="hh-why-body">
+                        <div className="hh-reason">{why}</div>
+                        <div className="hh-foot">
+                          <span className="hh-chip">Regime <span className="v">{regime || '-'}</span></span>
+                          <span className="hh-chip">Heat <span className="v">{heat ?? '-'}</span></span>
+                          {fearGreed !== null && <span className="hh-chip">Fear&amp;Greed <span className="v">{fearGreed}</span></span>}
+                          {rePct != null && <span className="hh-chip">부동산 <span className="v">{rePct}%</span></span>}
+                        </div>
+                        <a className="hh-detail" onClick={() => { window.location.href = '/pwa/ai-advisor'; }}>자산 전체 상세 판단(AI자산) →</a>
+                      </div>
+                    )}
                   </section>
                 );
               })()}
@@ -2181,11 +2204,21 @@ export default function PWADashboard({ latestReport }) {
         .hh-label { font-size: 0.8rem; font-weight: 700; color: var(--hero-ink-sub); display: flex; align-items: center; gap: 6px; }
         .hh-live { background: var(--color-success); color: #04351f; font-size: 0.56rem; font-weight: 800; padding: 2px 6px; border-radius: 5px; letter-spacing: .5px; }
         .hh-date { font-size: 0.72rem; color: var(--hero-ink-faint); font-weight: 500; margin-top: 5px; }
-        .hh-h1 { font-size: 1.6rem; font-weight: 800; letter-spacing: -.03em; line-height: 1.25; margin-bottom: 10px; color: var(--hero-ink); font-family: var(--font-body); }
+        /* [v11-ux] 통합 판단 스코프 배지 + 총자산 + 인라인 왜? */
+        .hh-scope { display: inline-block; margin-top: 7px; font-size: 0.64rem; font-weight: 700; color: var(--hero-ink-soft); background: var(--hero-fill); border: 1px solid var(--hero-fill-line); padding: 3px 9px; border-radius: 20px; letter-spacing: .2px; }
+        .hh-h1 { font-size: 1.35rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.35; margin-bottom: 10px; color: var(--hero-ink); font-family: var(--font-body); }
         .hh-h1 em { font-style: normal; color: var(--hero-accent); }
-        .hh-reason { font-size: 0.86rem; line-height: 1.55; color: var(--hero-ink-soft); }
+        .hh-total { font-size: 0.82rem; color: var(--hero-ink-soft); margin-bottom: 4px; }
+        .hh-total b { color: var(--hero-ink); font-weight: 800; font-size: 0.95rem; }
+        .hh-total-sub { color: var(--hero-ink-faint); }
+        .hh-why { margin-top: 12px; width: 100%; display: flex; align-items: center; justify-content: space-between; background: var(--hero-fill); border: 1px solid var(--hero-fill-line); color: var(--hero-ink-soft); font-family: var(--font-body); font-weight: 700; font-size: 0.8rem; padding: 11px 14px; border-radius: 12px; cursor: pointer; }
+        .hh-why-caret { transition: transform .2s; font-size: 0.7rem; }
+        .hh-why-caret.open { transform: rotate(180deg); }
+        .hh-why-body { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--hero-fill-line); }
+        .hh-reason { font-size: 0.84rem; line-height: 1.6; color: var(--hero-ink-soft); }
         .hh-reason b { color: var(--hero-ink); font-weight: 700; }
-        .hh-foot { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+        .hh-detail { display: inline-block; margin-top: 12px; font-size: 0.78rem; font-weight: 700; color: var(--hero-accent); cursor: pointer; }
+        .hh-foot { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
         .hh-chip { background: var(--hero-fill); border: 1px solid var(--hero-fill-line); padding: 6px 11px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; color: var(--hero-ink-soft); display: flex; align-items: center; gap: 5px; }
         .hh-chip .v { color: var(--hero-accent); font-weight: 700; }
         .hh-cta { margin-top: 14px; width: 100%; background: #fff; color: var(--hero-grad-1); border: none; font-family: var(--font-body); font-weight: 700; font-size: 0.86rem; padding: 13px; border-radius: 14px; cursor: pointer; }
