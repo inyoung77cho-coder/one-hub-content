@@ -477,6 +477,26 @@ export default function PWADashboard({ latestReport }) {
     finally { setAnalyzing(false); }
   }, []);
 
+  // [#7 목표가] 추천 바텀시트가 열리면 실제 목표가·손절가(analyze-stock)를 비동기 병합.
+  //   스크리닝 후보엔 가격 필드가 없으므로, 상세 시트에서만 백엔드 확정 목표가를 노출한다.
+  useEffect(() => {
+    const code = bottomSheet?.code;
+    if (!code || bottomSheet.priceMeta !== undefined) return;
+    let alive = true;
+    const merge = (pm) => setBottomSheet((s) => (s && s.code === code ? { ...s, priceMeta: pm } : s));
+    fetch(`/api/analyze-stock?code=${code}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive) return;
+        const cur = Number(d?.current_price ?? d?.price) || null;
+        const tgt = Number(d?.target) || null;
+        const stp = Number(d?.stop_loss) || null;
+        merge({ cur, tgt, stp, ok: !!tgt });
+      })
+      .catch(() => { if (alive) merge({ ok: false }); });
+    return () => { alive = false; };
+  }, [bottomSheet?.code]);
+
   const regimeClass = (r) => r === 'BULL' ? 'bull' : r === 'BEAR' ? 'bear' : 'side';
   const regimeIcon = (r) => r === 'BULL' ? '☀️' : r === 'BEAR' ? '🌧️' : '☁️';
   const regimeMarket = (r) => r === 'BULL' ? 'BULL MARKET' : r === 'BEAR' ? 'BEAR MARKET' : 'SIDEWAYS MARKET';
@@ -2213,6 +2233,47 @@ export default function PWADashboard({ latestReport }) {
               <button onClick={() => setBottomSheet(null)}
                 style={{ background: 'none', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: 'var(--text-secondary)', lineHeight: 1, padding: '0 4px' }}>✕</button>
             </div>
+
+            {/* [#7 목표가] 백엔드 확정 목표가·손절가 — 상세 시트 최상단 노출 */}
+            {(() => {
+              const pm = bottomSheet.priceMeta;
+              const box = { padding: '12px 14px', background: 'var(--inset-bg)', borderRadius: 12, marginBottom: 14 };
+              if (pm === undefined) return (
+                <div style={{ ...box, fontSize: '0.78rem', color: 'var(--text-secondary)' }}>🎯 목표가 불러오는 중…</div>
+              );
+              if (!pm.ok || !pm.tgt) return (
+                <div style={{ ...box, fontSize: '0.76rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
+                  🎯 이 종목은 <b style={{ color: 'var(--text-primary)' }}>확정 목표가가 아직 없습니다</b> — 아래 기술 점수·기대 여력(추정)을 참고하세요.
+                </div>
+              );
+              const upside = pm.cur ? (pm.tgt / pm.cur - 1) * 100 : null;
+              const risk = (pm.cur && pm.stp) ? (1 - pm.stp / pm.cur) * 100 : null;
+              const rr = (upside != null && risk != null && risk > 0) ? upside / risk : null;
+              const rrColor = rr == null ? 'var(--text-secondary)' : rr >= 2 ? 'var(--color-success)' : rr >= 1.5 ? 'var(--color-warning)' : 'var(--color-danger)';
+              const cell = (label, val, color) => (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                  <span style={{ fontSize: '0.66rem', color: 'var(--text-secondary)', fontWeight: 700 }}>{label}</span>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 800, color, fontFamily: 'var(--font-mono)' }}>{val}</span>
+                </div>
+              );
+              return (
+                <div style={box}>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 10 }}>🎯 목표가 · 손절가 <span style={{ fontWeight: 600, fontSize: '0.64rem', color: 'var(--text-secondary)' }}>· AI 산출</span></div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                    {cell('현재가', pm.cur ? `${pm.cur.toLocaleString()}원` : '-', 'var(--text-primary)')}
+                    {cell('목표가', `${pm.tgt.toLocaleString()}원`, 'var(--color-success)')}
+                    {cell('손절가', pm.stp ? `${pm.stp.toLocaleString()}원` : '-', 'var(--color-danger)')}
+                  </div>
+                  {(upside != null || rr != null) && (
+                    <div style={{ display: 'flex', gap: 14, marginTop: 11, paddingTop: 10, borderTop: '1px solid var(--border)', fontSize: '0.74rem', flexWrap: 'wrap' }}>
+                      {upside != null && <span style={{ color: 'var(--text-secondary)' }}>상승 여력 <b style={{ color: 'var(--color-success)', fontFamily: 'var(--font-mono)' }}>+{upside.toFixed(1)}%</b></span>}
+                      {risk != null && <span style={{ color: 'var(--text-secondary)' }}>손절 위험 <b style={{ color: 'var(--color-danger)', fontFamily: 'var(--font-mono)' }}>-{risk.toFixed(1)}%</b></span>}
+                      {rr != null && <span style={{ color: 'var(--text-secondary)' }}>손익비 RR <b style={{ color: rrColor, fontFamily: 'var(--font-mono)' }}>{rr.toFixed(1)}</b></span>}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* 점수 바 4개 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
