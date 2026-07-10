@@ -1712,42 +1712,43 @@ export default function PWADashboard({ latestReport }) {
               );
             })()}
 
-            {/* [v9.0] 이번 주 AI 요약 카드 */}
+            {/* [§3-5 item3] AI 성적표 — 이번주 요약을 성적표로 격상(승률·차단적중률·손익비·MDD) */}
             <section className="pwa-card">
-              <span className="pwa-card-label">📊 이번 주 AI 요약</span>
+              <span className="pwa-card-label">🏆 AI 성적표 · 이번 주</span>
               {!perf ? (
                 <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
                   이번 주 데이터 수집 중...
                 </div>
-              ) : (
-                <div style={{ marginTop: 10 }}>
-                  <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginBottom: 12, lineHeight: 1.6 }}>
-                    AI는 이번 주<br/>
-                    <strong style={{ color: 'var(--accent-sell)' }}>🚫 {perf.losses ?? 0}종목 차단</strong>
-                    {'  '}
-                    <strong style={{ color: 'var(--accent-buy)' }}>✅ {perf.wins ?? 0}종목 매수</strong>
-                    {'  '}
-                    <strong style={{ color: 'var(--text-secondary)' }}>📉 손절 {perf.losses ?? 0}건</strong>
-                  </p>
-                  {/* 승률 바 */}
-                  {perf.win_rate != null && (
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: 4 }}>
-                        <span style={{ color: 'var(--text-secondary)' }}>승률</span>
-                        <span className="mono" style={{ color: 'var(--accent-buy)', fontWeight: 700 }}>{perf.win_rate}%</span>
-                      </div>
-                      <div style={{ height: 8, background: 'var(--inset-bg)', borderRadius: 4, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${perf.win_rate}%`, background: 'var(--accent-buy)', borderRadius: 4 }} />
-                      </div>
+              ) : (() => {
+                const accPct = accuracy?.summary?.accuracy_pct;
+                const accChecked = accuracy?.summary?.total_checked;
+                const winColor = (perf.win_rate ?? 0) >= 60 ? 'var(--color-success)' : (perf.win_rate ?? 0) >= 45 ? 'var(--color-warning)' : 'var(--color-danger)';
+                const accColor = accPct == null ? 'var(--text-secondary)' : accPct >= 60 ? 'var(--color-success)' : accPct >= 45 ? 'var(--color-warning)' : 'var(--color-danger)';
+                const rr = perf.rr_ratio;
+                const rrColor = rr == null ? 'var(--text-secondary)' : rr >= 1.5 ? 'var(--color-success)' : rr >= 1 ? 'var(--color-warning)' : 'var(--color-danger)';
+                const tiles = [
+                  { k: '승률', v: perf.win_rate != null ? `${perf.win_rate}%` : '-', sub: `${perf.wins ?? 0}승 ${perf.losses ?? 0}패`, c: winColor },
+                  { k: '차단 적중률', v: accPct != null ? `${accPct}%` : '수집중', sub: accChecked != null ? `검증 ${accChecked}건` : '누적 필요', c: accColor },
+                  { k: '손익비 (R:R)', v: rr != null ? `${rr}` : '-', sub: '이익/손실', c: rrColor },
+                  { k: 'MDD', v: perf.mdd != null ? `-${perf.mdd}%` : '-', sub: '최대낙폭', c: 'var(--color-danger)' },
+                ];
+                return (
+                  <>
+                    <div className="scorecard">
+                      {tiles.map((t) => (
+                        <div className="sc-tile" key={t.k}>
+                          <span className="sc-k">{t.k}</span>
+                          <span className="sc-v" style={{ color: t.c }}>{t.v}</span>
+                          <span className="sc-sub">{t.sub}</span>
+                        </div>
+                      ))}
                     </div>
-                  )}
-                  {perf.avg_pnl_pct != null && (
-                    <div style={{ fontSize: '0.82rem', color: perf.avg_pnl_pct >= 0 ? 'var(--accent-buy)' : 'var(--accent-sell)', fontWeight: 700 }}>
-                      수익률 {perf.avg_pnl_pct >= 0 ? '+' : ''}{perf.avg_pnl_pct}%
+                    <div className="sc-summary">
+                      이번 주 수익률 <b style={{ color: (perf.avg_pnl_pct ?? 0) >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>{(perf.avg_pnl_pct ?? 0) >= 0 ? '+' : ''}{perf.avg_pnl_pct ?? 0}%</b> · AI는 <b>{perf.wins ?? 0}종목 매수</b>, <b>{perf.losses ?? 0}건 손절</b>했습니다.
                     </div>
-                  )}
-                </div>
-              )}
+                  </>
+                );
+              })()}
             </section>
 
             {latestReport && latestReport.insight && (
@@ -1761,7 +1762,7 @@ export default function PWADashboard({ latestReport }) {
             )}
             {perf && (
               <section className="pwa-card">
-                <span className="pwa-card-label">📅 최근 30일 성과</span>
+                <span className="pwa-card-label">📊 AI 성적표 · 최근 30일</span>
                 {perf.total < 5 ? (
                   <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-secondary)' }}>
                     <div style={{ fontSize: '1.5rem', marginBottom: 6 }}>📊</div>
@@ -2792,6 +2793,14 @@ export default function PWADashboard({ latestReport }) {
         .chlog-kind { font-size: 0.62rem; font-weight: 800; color: var(--accent-buy); background: color-mix(in srgb, var(--accent-buy) 12%, transparent); padding: 1px 7px; border-radius: 5px; align-self: flex-start; }
         .chlog-text { font-size: 0.76rem; color: var(--text-secondary); line-height: 1.5; word-break: keep-all; }
         .chlog-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 10px; line-height: 1.5; }
+        /* [§3-5 item3] AI 성적표 타일 */
+        .scorecard { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .sc-tile { background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 13px; display: flex; flex-direction: column; gap: 3px; }
+        .sc-k { font-size: 0.68rem; color: var(--text-secondary); font-weight: 600; }
+        .sc-v { font-size: 1.25rem; font-weight: 800; font-family: var(--font-mono); line-height: 1.1; }
+        .sc-sub { font-size: 0.64rem; color: var(--text-tertiary); }
+        .sc-summary { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.6; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+        .sc-summary b { font-weight: 700; color: var(--text-primary); }
 
         /* 액션/차단 리스트 */
         .pwa-action-list, .pwa-blocked-list { display: flex; flex-direction: column; gap: 10px; }
