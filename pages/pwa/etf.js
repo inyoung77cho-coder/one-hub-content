@@ -3,6 +3,7 @@
 // ★ 단일 점수 블랙박스 금지 — Portfolio Score는 구성요소를 펼쳐 보여준다(§11.2).
 import { useEffect, useState } from "react";
 import TopNav from "../../components/TopNav";
+import { getTrader } from "../../lib/trader";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -23,15 +24,23 @@ export default function EtfDashboard() {
   const [liveFx, setLiveFx] = useState(null); // 당일 USD/KRW 실시간 환율(매일 자동 갱신)
 
   useEffect(() => {
-    const g = (fn) => fetch(`/api/pwa/etf/${fn}?trader=A`).then((r) => r.json());
-    Promise.all([g("report"), g("tax"), g("overlap"), g("rebalance")])
-      .then(([r, t, o, rb]) => {
-        if (r.error || t.error) setErr(r.error || t.error);
-        setReport(r); setTax(t); setOverlap(o); setRebal(rb);
-      })
-      .catch((e) => setErr(e.message));
+    const load = () => {
+      const tr = getTrader(); // [§3-8] 선택된 계좌(A/B) 반영
+      const g = (fn) => fetch(`/api/pwa/etf/${fn}?trader=${tr}`).then((r) => r.json());
+      Promise.all([g("report"), g("tax"), g("overlap"), g("rebalance")])
+        .then(([r, t, o, rb]) => {
+          if (r.error || t.error) setErr(r.error || t.error);
+          setReport(r); setTax(t); setOverlap(o); setRebal(rb);
+        })
+        .catch((e) => setErr(e.message));
+    };
+    load();
     // 오늘 환율 — 일일 캐시 소스에서 조회(실패 시 백엔드 종가로 폴백)
     fetch("/api/fx/usdkrw").then((r) => r.json()).then((d) => { if (d?.ok) setLiveFx(d); }).catch(() => {});
+    // [§3-8] 다른 페이지에서 계좌 전환 시 즉시 재조회
+    const onTrader = () => load();
+    window.addEventListener("onehub-trader-change", onTrader);
+    return () => window.removeEventListener("onehub-trader-change", onTrader);
   }, []);
 
   const s = report?.summary;

@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import TopNav from "../../components/TopNav";
 import { computeSummary, toManwon } from "../../lib/aiAssets";
+import { getTrader } from "../../lib/trader";
 
 const UK = 1e8; // 억 → 원
 
@@ -46,16 +47,24 @@ export default function AIAdvisor() {
   const [err, setErr] = useState(false);
 
   useEffect(() => {
-    let onb = null, goal = "";
-    try { onb = JSON.parse(localStorage.getItem("onehub_onboard_assets") || "null"); } catch (e) {}
-    try { goal = localStorage.getItem("onehub_profile_goal") || ""; } catch (e) {}
-    Promise.all([
-      fetch("/api/realestate/v2/total-asset?trader_id=A").then((r) => r.json()).catch(() => null),
-      fetch("/api/pwa-dashboard?trader=A").then((r) => r.json()).catch(() => null),
-    ]).then(([ta, dash]) => {
-      const assets = buildAssets(ta, dash, onb);
-      setS(computeSummary({ as_of: ta?.as_of, assets, tendencyOrStyle: goal, equityMeta: DEMO_EQUITY_META }));
-    }).catch(() => setErr(true));
+    const load = () => {
+      let onb = null, goal = "";
+      try { onb = JSON.parse(localStorage.getItem("onehub_onboard_assets") || "null"); } catch (e) {}
+      try { goal = localStorage.getItem("onehub_profile_goal") || ""; } catch (e) {}
+      const tr = getTrader(); // [§3-8] 선택된 계좌(A/B) 반영
+      Promise.all([
+        fetch(`/api/realestate/v2/total-asset?trader_id=${tr}`).then((r) => r.json()).catch(() => null),
+        fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => null),
+      ]).then(([ta, dash]) => {
+        const assets = buildAssets(ta, dash, onb);
+        setS(computeSummary({ as_of: ta?.as_of, assets, tendencyOrStyle: goal, equityMeta: DEMO_EQUITY_META }));
+      }).catch(() => setErr(true));
+    };
+    load();
+    // [§3-8] 다른 페이지에서 계좌 전환 시 즉시 재계산
+    const onTrader = () => load();
+    window.addEventListener("onehub-trader-change", onTrader);
+    return () => window.removeEventListener("onehub-trader-change", onTrader);
   }, []);
 
   const p = s?.policy;

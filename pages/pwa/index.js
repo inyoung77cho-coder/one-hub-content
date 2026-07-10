@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useState, useEffect, useCallback } from 'react';
 import { getLatestDailyReport } from '../../lib/reports';
 import LastUpdated from '../../components/LastUpdated';
+import { setTraderGlobal, getTrader } from '../../lib/trader';
 
 // [v9.0] 안전 숫자 포맷 — INVALID_PRICE/STOP/NaN/undefined → '-'
 function safeLocale(v, suffix = '') {
@@ -227,7 +228,7 @@ export default function PWADashboard({ latestReport }) {
         setTab('analyze');
         setAnalyzeResult(null);
         setAnalyzing(true);
-        fetch(`/api/pwa/analyze?code=${code}&name=${encodeURIComponent(name)}&trader_id=A`)
+        fetch(`/api/pwa/analyze?code=${code}&name=${encodeURIComponent(name)}&trader_id=${getTrader()}`)
           .then(r => r.json())
           .then(d => { setAnalyzeResult(d); setAnalyzing(false); })
           .catch(() => setAnalyzing(false));
@@ -261,6 +262,11 @@ export default function PWADashboard({ latestReport }) {
       const savedTheme = window.localStorage.getItem('onehub_theme');
       if (savedTheme === 'light' || savedTheme === 'dark') setTheme(savedTheme);
     } catch (e) { /* 무시 */ }
+    // [§3-8] 저장된 트레이더 계좌 불러오기 (설정·타 페이지와 단일 소스 공유)
+    try {
+      const savedTrader = window.localStorage.getItem('onehub_trader');
+      if (savedTrader === 'A' || savedTrader === 'B') setTrader(savedTrader);
+    } catch (e) { /* 무시 */ }
     // [v9.0] PWA Web Push 지원여부 + 기존 구독상태 확인
     if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window) {
       setPushSupported(true);
@@ -274,7 +280,10 @@ export default function PWADashboard({ latestReport }) {
         setPushBannerDismissed(true);
       }
     } catch (e) { /* 무시 */ }
-    return () => clearTimeout(splashTimer);
+    // [§3-8] 다른 페이지(설정 등)에서 계좌 전환 시 즉시 동기화 → 데이터 자동 재요청
+    const onTrader = (e) => setTrader(e?.detail === 'B' ? 'B' : 'A');
+    window.addEventListener('onehub-trader-change', onTrader);
+    return () => { clearTimeout(splashTimer); window.removeEventListener('onehub-trader-change', onTrader); };
   }, []);
 
   const saveProfile = useCallback((updates, closeOnboarding = false) => {
@@ -2085,8 +2094,8 @@ export default function PWADashboard({ latestReport }) {
               <div className="profile-app-row">
                 <span>Trader 계정</span>
                 <div className="pwa-trader-toggle" style={{ margin:0 }}>
-                  <button className={trader==='A'?'active':''} onClick={()=>setTrader('A')}>A</button>
-                  <button className={trader==='B'?'active':''} onClick={()=>setTrader('B')}>B</button>
+                  <button className={trader==='A'?'active':''} onClick={()=>{ setTrader('A'); setTraderGlobal('A'); }}>A</button>
+                  <button className={trader==='B'?'active':''} onClick={()=>{ setTrader('B'); setTraderGlobal('B'); }}>B</button>
                 </div>
               </div>
               <div className="profile-app-row" style={{ marginTop:10 }}>
