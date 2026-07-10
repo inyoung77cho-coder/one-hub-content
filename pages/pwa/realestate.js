@@ -53,8 +53,22 @@ export default function RealEstateDashboard() {
         )}
       </section>
 
+      {/* [§3-7 피드백15] #1 결론 한 줄 — 국면 + 저평가 1위(위계 확립) */}
+      {brief && !brief.error && (() => {
+        const topU = brief.under?.[0];
+        return (
+          <div className="re-verdict">
+            <div className="rv-h"><span className="rv-lbl">📌 이 지역 한 줄 결론</span><span className={`rv-phase ${jtag(brief.phase)}`}>{brief.phase} 국면</span></div>
+            <div className="rv-sub">
+              대장 <b>{brief.leader}</b> {uk(brief.leader_price)} · 분기 <b>{pct(brief.chg_q)}</b>
+              {topU && <> · 저평가 1위 <b className="rv-under">{topU.단지명} +{Number(topU.gap).toFixed(1)}%</b></>}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* slim CTA — 내 단지 등록 유도 (§5③ 미입력=회색 중립, 위험 아님) */}
-      <div className="cta-slim">🏠 이 지역에 내 단지가 있나요? <b>등록하면 총자산·리밸런싱에 반영돼요</b><span className="arr">→</span></div>
+      <div className="cta-slim" onClick={() => { window.location.href = '/pwa/onboarding'; }}><span className="cta-txt">🏠 내 단지를 등록하면 <b>국면·저평가·리밸런싱에 반영</b>됩니다</span><span className="arr">→</span></div>
 
       {/* [§3-2 원칙1] 총자산 바 제거 — 총자산은 홈·AI자산 2곳에만. 부동산 페이지는 부동산 슬라이스만 표시 */}
 
@@ -62,20 +76,27 @@ export default function RealEstateDashboard() {
       {rank?.ranking?.length > 0 && (
         <section className="card">
           <div className="label">🏆 ONE Score 랭킹 <span className="sub">단지별 종합점수</span></div>
-          {rank.ranking.map((c, i) => (
-            <div className="rrow" key={c.단지명}>
-              <span className="rk">{i + 1}</span>
-              <span className="rmid">
-                <span className="rname">{c.단지명} <span className={`vtag ${vtag(c.valuation)}`}>{c.valuation}</span></span>
-                <span className="rsub">{uk(c.avm_total_uk)}</span>
-              </span>
-              <span className="rright">
-                <span className="rscore">{c.one_score}</span>
-                <span className={`jtag ${jtag(c.decision)}`}>{c.decision}</span>
-              </span>
-            </div>
-          ))}
-          <div className="note">업데이트 {rank.ranking[0]?.updated} · AVM=자동가치추정. ONE Score는 구성요소 종합이며 블랙박스가 아닙니다.</div>
+          {/* [§3-7] 순위 중복 버그 수정 — one_score 내림차순 정렬 + 단지명 중복 제거 후 순번 부여 */}
+          {(() => {
+            const seen = new Set();
+            const ranking = [...rank.ranking]
+              .sort((a, b) => (b.one_score ?? 0) - (a.one_score ?? 0))
+              .filter((c) => { if (seen.has(c.단지명)) return false; seen.add(c.단지명); return true; });
+            return ranking.map((c, i) => (
+              <div className="rrow" key={`${c.단지명}-${i}`}>
+                <span className="rk">{i + 1}</span>
+                <span className="rmid">
+                  <span className="rname">{c.단지명} <span className={`vtag ${vtag(c.valuation)}`}>{c.valuation}</span></span>
+                  <span className="rsub">{uk(c.avm_total_uk)}</span>
+                </span>
+                <span className="rright">
+                  <span className="rscore">{c.one_score}</span>
+                  <span className={`jtag ${jtag(c.decision)}`}>{c.decision}</span>
+                </span>
+              </div>
+            ));
+          })()}
+          <div className="note">업데이트 {rank.ranking[0]?.updated} · AVM=자동가치추정 · <b>lag=0 상대가치 기준(전파모델 미사용·확정 아님)</b>. ONE Score는 구성요소 종합이며 블랙박스가 아닙니다.</div>
         </section>
       )}
 
@@ -116,7 +137,7 @@ export default function RealEstateDashboard() {
               <div className="ugap">+{Number(u.gap).toFixed(1)}%</div>
             </div>
           ))}
-          <div className="note">gap = 예측 대비 상승여력(회귀 근사·확정 아님). R² = 적합도.</div>
+          <div className="note">gap = 예측 대비 상승여력 · <b>회귀 근사 · lag=0 상대가치</b> · 전파모델(lag_map) 미사용 · 확정 아님. R² = 적합도.</div>
         </section>
       )}
 
@@ -151,10 +172,21 @@ export default function RealEstateDashboard() {
         .bstat { flex: 1; background: var(--hero-fill); border: 1px solid var(--hero-fill-line); border-radius: 13px; padding: 11px 13px; }
         .bstat span { display: block; font-size: 11px; color: var(--hero-ink-sub); font-weight: 600; margin-bottom: 4px; }
         .bstat b { font-size: 15px; font-weight: 800; color: var(--hero-accent); }
+        /* [§3-7] #1 결론 strip */
+        .re-verdict { background: var(--color-card); border: 1px solid var(--color-line); border-left: 4px solid var(--color-primary); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 14px 16px; margin-bottom: 12px; }
+        .rv-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .rv-lbl { font-size: 0.74rem; font-weight: 700; color: var(--color-ink-2); }
+        .rv-phase { font-size: 0.8rem; font-weight: 800; padding: 3px 10px; border-radius: 8px; }
+        .rv-phase.watch { background: var(--color-card-soft); color: var(--color-ink-2); }
+        .rv-phase.buy { background: var(--color-primary-soft); color: var(--color-primary); }
+        .rv-sub { font-size: 0.82rem; color: var(--color-ink-2); margin-top: 8px; line-height: 1.5; word-break: keep-all; }
+        .rv-sub b { color: var(--color-ink); font-weight: 700; }
+        .rv-under { color: var(--color-success) !important; }
         /* slim CTA */
-        .cta-slim { display: flex; align-items: center; gap: 8px; background: var(--color-primary-soft); border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; font-size: 12.5px; color: var(--color-ink-2); font-weight: 600; cursor: pointer; line-height: 1.45; }
+        .cta-slim { display: flex; align-items: center; gap: 10px; background: var(--color-primary-soft); border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; font-size: 12.5px; color: var(--color-ink-2); font-weight: 600; cursor: pointer; line-height: 1.5; }
+        .cta-txt { flex: 1; word-break: keep-all; }
         .cta-slim b { color: var(--color-primary); font-weight: 700; }
-        .cta-slim .arr { margin-left: auto; color: var(--color-primary); font-weight: 800; flex-shrink: 0; }
+        .cta-slim .arr { color: var(--color-primary); font-weight: 800; flex-shrink: 0; }
         .label { font-size: 0.9rem; font-weight: 700; color: var(--color-ink); margin-bottom: 12px; }
         .sub { font-weight: 600; color: var(--color-ink-3); font-size: 0.68rem; margin-left: 6px; }
         /* ONE Score 랭킹 */
