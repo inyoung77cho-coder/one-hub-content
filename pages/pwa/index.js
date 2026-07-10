@@ -681,7 +681,7 @@ export default function PWADashboard({ latestReport }) {
         </div>
       )}
 
-      <div className={`pwa-wrapper theme-${theme}`} style={{ display: splash ? 'none' : undefined }}>
+      <div className={`pwa-wrapper pwa-shell theme-${theme}`} style={{ display: splash ? 'none' : undefined }}>
         <header className="pwa-header">
           <button className="pwa-brand" onClick={() => setTab('dashboard')} aria-label="홈으로">
             <span className="pwa-logo">ONE<span className="pwa-logo-dot">·</span>HUB</span>
@@ -2384,7 +2384,7 @@ export default function PWADashboard({ latestReport }) {
         /* [v8.6] 라이트(기본) — Apple Finance / Toss / Notion 톤. */
         /* [v10 UI] 레거시 로컬 변수 → 디자인 토큰 브리지는 globals.css 로 이전(전역·비스코프)해
            styled-jsx 스코프 문제로 다크모드가 안 먹던 버그를 해결. 여기서는 레이아웃만. */
-        .pwa-wrapper { min-height: 100vh; background: var(--bg); color: var(--text-primary); font-family: var(--font-body); padding-bottom: 40px; transition: background 0.2s ease, color 0.2s ease; }
+        .pwa-wrapper { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--bg); color: var(--text-primary); font-family: var(--font-body); padding-bottom: 40px; transition: background 0.2s ease, color 0.2s ease; }
         button, input { font-family: inherit; }
         button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-info); outline-offset: 2px; }
         :global(.pwa-wrapper a:focus-visible) { outline: 2px solid var(--accent-info); outline-offset: 2px; }
@@ -2572,7 +2572,8 @@ export default function PWADashboard({ latestReport }) {
 
         /* [v9.0] Splash Screen */
         /* [색상 통일] 스플래시 배경 = 카드 표면색(--color-card)으로 → 대시보드 전환 톤 단절 제거. 색상만 교체(레이아웃/타이밍 유지) */
-        .splash-screen { position: fixed; inset: 0; z-index: 9999; background: var(--color-card); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+        .splash-screen { position: fixed; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; z-index: 9999; background: var(--color-card); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+        @media (min-width: 520px) { .splash-screen { box-shadow: 0 0 0 1px var(--color-line), 0 24px 70px rgba(10, 22, 44, 0.22); } }
         /* [브랜드 시안] 워드마크 = 디스플레이 폰트(Syne) + 블루→퍼플 그라디언트 텍스트 */
         .splash-logo { font-family: var(--font-display); font-size: 2.4rem; font-weight: 800; letter-spacing: 0.05em; background: linear-gradient(90deg, var(--color-primary) 0%, var(--purple) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: transparent; }
         .splash-sub { font-size: 0.9rem; color: var(--color-ink-2); font-family: 'Pretendard', sans-serif; }

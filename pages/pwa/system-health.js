@@ -63,7 +63,7 @@ export default function SystemHealth() {
     (e) => (!filter.job || e.job_name === filter.job) && (!filter.status || e.status === filter.status));
 
   return (
-    <div className="m">
+    <div className="m pwa-shell">
       <TopNav active="settings" />
       <header className="hd">
         <div><h1>System Health</h1><span className="ts">{data?.timestamp} · {data?.app_version}</span></div>

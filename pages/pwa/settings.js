@@ -154,7 +154,7 @@ export default function Settings() {
   const teleConnected = health?.telegram?.status === "connected";
 
   return (
-    <div className="m">
+    <div className="m pwa-shell">
       <TopNav active="settings" />
       <div className="hd"><h1>⚙️ 설정</h1></div>
 

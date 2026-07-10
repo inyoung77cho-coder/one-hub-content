@@ -30,7 +30,7 @@ export default function RealEstateDashboard() {
   const mac = macro?.latest;
 
   return (
-    <div className="re">
+    <div className="re pwa-shell">
       <TopNav active="realestate" />
 
       {/* 1) HERO — 시장 브리핑 (다크 네이비 히어로) */}
