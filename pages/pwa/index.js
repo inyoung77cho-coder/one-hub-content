@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getLatestDailyReport } from '../../lib/reports';
 import LastUpdated from '../../components/LastUpdated';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
+import { recordDecision, matureLedger, computeShowdown } from '../../lib/verdictLedger';
 
 // [v9.0] 안전 숫자 포맷 — INVALID_PRICE/STOP/NaN/undefined → '-'
 function safeLocale(v, suffix = '') {
@@ -183,6 +184,7 @@ export default function PWADashboard({ latestReport }) {
   const [actingCode, setActingCode] = useState(null); // 승인/거절 처리 중인 종목코드
   const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
   const [accuracy, setAccuracy] = useState(null); // [기록] AI 자기검증(차단 적중률) 누적 — ML 학습 현황 카드
+  const [ledger, setLedger] = useState([]); // [나 vs AI] 내 판단(매매/관망) 원장 + 3·7일 성과
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
@@ -407,6 +409,14 @@ export default function PWADashboard({ latestReport }) {
   }, [mounted, loadPending]);
 
   const actOnPending = useCallback(async (code, action) => {
+    // [나 vs AI] AI 제안에 대한 내 판단 기록 — 승인/예약=매매(take), 거절/스킵=관망(pass)
+    const _p = pendingList.find((x) => x.code === code);
+    if (_p) recordDecision({
+      code, name: _p.name,
+      entry: Number(_p.current_price ?? _p.price) || null,
+      decision: action === 'skip' ? 'pass' : 'take',
+      trader,
+    });
     // [Queue] 장외 승인 → 다음장 09:00 예약 승인으로 전환
     if (action === 'approve' && !isMarketHoursKST()) {
       const ok = window.confirm(
@@ -444,7 +454,7 @@ export default function PWADashboard({ latestReport }) {
       }
     } catch (e) { setPendingError(String(e)); }
     finally { setActingCode(null); }
-  }, [trader]);
+  }, [trader, pendingList]);
 
   const searchStocks = useCallback(async (q) => {
     if (!q || q.length < 1) { setSearchResults([]); return; }
@@ -496,6 +506,21 @@ export default function PWADashboard({ latestReport }) {
       .catch(() => { if (alive) merge({ ok: false }); });
     return () => { alive = false; };
   }, [bottomSheet?.code]);
+
+  // [나 vs AI] 기록 탭 진입 시 원장 성숙(현재가 스냅샷 축적) 후 승부 계산
+  useEffect(() => {
+    if (tab !== 'report') return;
+    let alive = true;
+    const fetchPrice = async (code) => {
+      try {
+        const r = await fetch(`/api/analyze-stock?code=${code}`);
+        const d = await r.json();
+        return Number(d?.current_price ?? d?.price) || null;
+      } catch { return null; }
+    };
+    matureLedger(trader, fetchPrice).then((list) => { if (alive) setLedger(list); });
+    return () => { alive = false; };
+  }, [tab, trader]);
 
   const regimeClass = (r) => r === 'BULL' ? 'bull' : r === 'BEAR' ? 'bear' : 'side';
   const regimeIcon = (r) => r === 'BULL' ? '☀️' : r === 'BEAR' ? '🌧️' : '☁️';
@@ -1662,6 +1687,82 @@ export default function PWADashboard({ latestReport }) {
         {/* ── Report Tab ── */}
         {tab === 'report' && (
           <main className="pwa-main">
+
+            {/* [나 vs AI 대결] AI 추천 중 내가 산 것 vs AI 단독매매, 3일·7일 수익 승부 */}
+            {(() => {
+              const w3 = computeShowdown(ledger, 3);
+              const w7 = computeShowdown(ledger, 7);
+              const anyReady = w3.ready || w7.ready;
+              const recorded = ledger.length;
+              const winLabel = (w) => w.winner === 'me' ? '내 판단 승' : w.winner === 'ai' ? 'AI 승' : '무승부';
+              const winColor = (w) => w.winner === 'me' ? 'var(--color-success)' : w.winner === 'ai' ? 'var(--purple)' : 'var(--color-ink-3)';
+              // 종합 승부(3·7일 합산)
+              const tally = [w3, w7].filter(w => w.ready);
+              const meWins = tally.filter(w => w.winner === 'me').length;
+              const aiWins = tally.filter(w => w.winner === 'ai').length;
+              const overall = !tally.length ? null : meWins > aiWins ? 'me' : aiWins > meWins ? 'ai' : 'tie';
+              const Row = ({ label, w }) => (
+                <div className="vs-row">
+                  <div className="vs-row-h"><span className="vs-win">{label}</span>{w.ready
+                    ? <span className="vs-badge" style={{ color: winColor(w), borderColor: winColor(w) }}>{winLabel(w)}</span>
+                    : <span className="vs-pending">집계 중</span>}</div>
+                  {w.ready ? (
+                    <div className="vs-bars">
+                      <div className="vs-side">
+                        <span className="vs-name">🙋 내 판단</span>
+                        <span className="vs-ret" style={{ color: w.myRet >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>{w.myRet >= 0 ? '+' : ''}{w.myRet}%</span>
+                      </div>
+                      <span className="vs-mid">vs</span>
+                      <div className="vs-side">
+                        <span className="vs-name">🤖 AI 단독</span>
+                        <span className="vs-ret" style={{ color: w.aiRet >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>{w.aiRet >= 0 ? '+' : ''}{w.aiRet}%</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="vs-pending-txt">판단 후 {label.replace('일','')}일이 지나면 실제 수익으로 채점됩니다.</div>
+                  )}
+                </div>
+              );
+              return (
+                <section className="pwa-card vs-card">
+                  <div className="vs-top">
+                    <span className="pwa-card-label" style={{ margin: 0 }}>🥊 나 vs AI 대결 · 누구 판단이 옳았나</span>
+                    {overall && <span className="vs-overall" style={{ background: overall === 'me' ? 'var(--color-success-soft)' : overall === 'ai' ? 'var(--purple-soft, var(--color-primary-soft))' : 'var(--color-card-soft)', color: overall === 'me' ? 'var(--color-success-ink, var(--color-success))' : overall === 'ai' ? 'var(--purple)' : 'var(--color-ink-2)' }}>{overall === 'me' ? '🏆 내 판단 우세' : overall === 'ai' ? '🏆 AI 우세' : '⚖️ 접전'}</span>}
+                  </div>
+                  <div className="vs-def">AI 추천 종목 중 <b>내가 산 것</b>(내 판단)과 <b>AI가 전부 매매</b>했을 때(AI 단독)의 수익을 3일·7일로 비교합니다. 승인=매매 · 거절=관망으로 기록됩니다.</div>
+                  {anyReady ? (
+                    <>
+                      <Row label="3일" w={w3} />
+                      <Row label="7일" w={w7} />
+                      {(w7.ready ? w7 : w3).details?.length > 0 && (() => {
+                        const w = w7.ready ? w7 : w3;
+                        return (
+                          <div className="vs-detail">
+                            <div className="vs-detail-h">종목별 판단 결과 ({w7.ready ? '7일' : '3일'})</div>
+                            {w.details.slice(0, 6).map((d, i) => (
+                              <div className="vs-drow" key={i}>
+                                <span className="vs-dname">{d.name}</span>
+                                <span className={`vs-dtag ${d.decision === 'take' ? 'take' : 'pass'}`}>{d.decision === 'take' ? '내가 삼' : '지나침'}</span>
+                                <span className="vs-dret mono" style={{ color: d.ret >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>{d.ret >= 0 ? '+' : ''}{d.ret}%</span>
+                                <span className="vs-dok">{d.correct ? '✓' : '✗'}</span>
+                              </div>
+                            ))}
+                            <p className="vs-foot">✓ = 판단 적중(산 게 오르거나 · 지나친 게 내림) · ✗ = 오판. AI 단독은 추천 전부를 매매했다고 가정합니다.</p>
+                          </div>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <div className="vs-empty">
+                      <div className="vs-empty-ic">🥊</div>
+                      <div className="vs-empty-t">{recorded > 0 ? `판단 ${recorded}건 기록됨 · 성과 집계 중` : '아직 기록된 판단이 없습니다'}</div>
+                      <div className="vs-empty-s">추천 탭에서 AI 매매 제안을 <b>승인(매매)</b> 또는 <b>거절(관망)</b>하면 판단이 기록되고, <b>3일·7일 뒤</b> 실제 수익으로 나 vs AI 승부가 자동 채점됩니다.</div>
+                      <button className="vs-empty-btn" onClick={() => setTab('recommend')}>추천 보러 가기 →</button>
+                    </div>
+                  )}
+                </section>
+              );
+            })()}
 
             {/* [v9.0] 🎬 오늘 AI 분석 흐름 타임라인 */}
             {data && (() => {
@@ -2946,6 +3047,39 @@ export default function PWADashboard({ latestReport }) {
         .ml-rec-chg { font-size: 0.72rem; color: var(--text-secondary); }
         .ml-rec-badge { font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: var(--inset-bg); }
         .ml-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 8px; line-height: 1.5; }
+        /* [나 vs AI 대결] */
+        .vs-card { border: 1px solid var(--color-line); }
+        .vs-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+        .vs-overall { font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+        .vs-def { font-size: 0.74rem; color: var(--text-secondary); line-height: 1.55; margin: 10px 0 4px; word-break: keep-all; }
+        .vs-def b { color: var(--text-primary); font-weight: 700; }
+        .vs-row { margin-top: 12px; padding: 12px; background: var(--color-card-soft); border-radius: 14px; }
+        .vs-row-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .vs-win { font-size: 0.86rem; font-weight: 800; color: var(--text-primary); }
+        .vs-badge { font-size: 0.72rem; font-weight: 800; border: 1px solid; border-radius: 8px; padding: 2px 9px; }
+        .vs-pending { font-size: 0.68rem; font-weight: 700; color: var(--text-tertiary); }
+        .vs-bars { display: flex; align-items: center; gap: 8px; }
+        .vs-side { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; background: var(--card-bg); border-radius: 10px; padding: 10px 6px; }
+        .vs-name { font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap; }
+        .vs-ret { font-size: 1.15rem; font-weight: 800; font-family: var(--font-mono); }
+        .vs-mid { font-size: 0.7rem; font-weight: 800; color: var(--text-tertiary); flex-shrink: 0; }
+        .vs-pending-txt { font-size: 0.72rem; color: var(--text-tertiary); line-height: 1.5; }
+        .vs-detail { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-line); }
+        .vs-detail-h { font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); margin-bottom: 6px; }
+        .vs-drow { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border); }
+        .vs-dname { flex: 1; font-size: 0.8rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .vs-dtag { font-size: 0.64rem; font-weight: 800; padding: 2px 7px; border-radius: 6px; flex-shrink: 0; }
+        .vs-dtag.take { background: var(--color-primary-soft); color: var(--color-primary); }
+        .vs-dtag.pass { background: var(--color-card-soft); color: var(--text-tertiary); }
+        .vs-dret { font-size: 0.8rem; font-weight: 800; flex-shrink: 0; min-width: 52px; text-align: right; }
+        .vs-dok { font-size: 0.82rem; flex-shrink: 0; width: 16px; text-align: center; }
+        .vs-foot { font-size: 0.64rem; color: var(--text-tertiary); margin-top: 8px; line-height: 1.5; word-break: keep-all; }
+        .vs-empty { text-align: center; padding: 16px 8px 6px; }
+        .vs-empty-ic { font-size: 1.7rem; margin-bottom: 6px; }
+        .vs-empty-t { font-size: 0.86rem; font-weight: 700; color: var(--text-primary); }
+        .vs-empty-s { font-size: 0.74rem; color: var(--text-secondary); margin-top: 6px; line-height: 1.55; word-break: keep-all; }
+        .vs-empty-s b { color: var(--text-primary); font-weight: 700; }
+        .vs-empty-btn { margin-top: 12px; background: var(--color-primary); color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
         /* [§3-5] AI 개선노트(changelog) */
         .chlog-intro { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.55; margin: 10px 0 12px; }
         .chlog-intro b { color: var(--text-primary); font-weight: 700; }
