@@ -76,6 +76,22 @@ export default function AIAdvisor() {
   const cashDeltaWon = s ? s.liquid * (cashFloorTgtPct / 100) - s.assets.cash : 0;
   const pctOfTotal = (v) => (s && s.total > 0 ? Math.round((v / s.total) * 1000) / 10 : 0);
 
+  // [§3-2 피드백6] 지금 가장 큰 문제 한 줄(top_issue) — 점수 바로 아래 최상단 노출
+  const curCashPctR = Math.round(curCashPct * 10) / 10;
+  const topIssue = (() => {
+    if (!measured || !p) return null;
+    if (maxTheme && maxTheme.pct > p.theme_cap)
+      return { txt: `${maxTheme.theme} ${maxTheme.pct}% 쏠림`, sub: `단일 테마 상한 ${p.theme_cap}% 초과 — 신규 매수를 타섹터로 희석하세요.`, color: "var(--color-danger)" };
+    if (eq?.region && eq.region.domestic >= 100)
+      return { txt: `주식형 국내 100% 쏠림`, sub: `목표 국내 ${p.domestic}% — 해외상장 ETF로 지역 분산이 필요합니다.`, color: "var(--color-danger)" };
+    if (Math.abs(curCashPctR - p.cash_floor) > 3)
+      return { txt: `현금 비중 ${curCashPctR}%`, sub: `현금 하한 ${p.cash_floor}% 대비 ${curCashPctR > p.cash_floor ? "초과 — 저노출 자산에 배치" : "부족 — 확보 권장"}.`, color: "var(--color-warning)" };
+    return { txt: `배분 균형 양호`, sub: `유동자산 배분이 목표 범위 안에 있습니다.`, color: "var(--color-success)" };
+  })();
+  // [§3-2] 부동산 입력/미입력 상태 — 점수 스코프 오해(이미지1↔6) 방지 배너
+  const realtyEntered = !!(s && s.assets.realestate > 0);
+  const realtyPct = risk ? Math.round(risk.ratio * 1000) / 10 : null;
+
   const CHIPS = s ? [
     ["주식", "var(--color-primary)", s.assets.stock],
     ["ETF", "var(--color-etf)", s.assets.etf],
@@ -92,23 +108,23 @@ export default function AIAdvisor() {
 
       {err && <div className="card err">AI 엔진 연결에 실패했습니다. 잠시 후 다시 시도하세요.</div>}
 
-      {/* HERO — §3 유동자산 운영 점수 (부동산 제외) */}
+      {/* HERO — §3-2 AI 유동자산 배분 건강도 (부동산 제외). 점수 정의·스코프 상시 노출 */}
       <section className="hero">
-        <div className="hero-top"><span className="t">🤖 AI 유동자산 운영 점수</span><span className="live">LIVE</span></div>
-        <div className="hero-cap">부동산(실물) 제외 · 유동자산 <span className="num">{s ? toManwon(s.liquid) : "—"}</span> 기준</div>
+        <div className="hero-top"><span className="t">🩺 AI 유동자산 배분 건강도</span><span className="live">LIVE</span></div>
+        <div className="hero-cap">부동산(실물) 제외 · 유동자산 <span className="num">{s ? toManwon(s.liquid) : "—"}</span> 만원 기준 · 내 배분이 건강한지 진단합니다</div>
         {measured ? (
           <>
             <div className="score-row">
               <div className="score" style={{ color: scoreColor }}>{s.liquid_score}<small>점</small></div>
-              {eq?.warnings?.length ? <div className="score-tag">국내·{maxTheme?.theme} 쏠림</div> : null}
+              <div className="score-def">배분적합도 <b>{s.subscores.allocation}</b> × 분산도 <b>{s.subscores.diversification}</b> 결합</div>
             </div>
             <div className="subscores">
               <div className="sub">
-                <div className="k"><span>배분 적합도</span><b>{s.subscores.allocation}</b></div>
+                <div className="k"><span>배분 적합도 <em>목표 대비</em></span><b>{s.subscores.allocation}</b></div>
                 <div className="b"><i style={{ width: `${s.subscores.allocation}%`, background: "var(--color-warning)" }} /></div>
               </div>
               <div className="sub">
-                <div className="k"><span>분산도(쏠림)</span><b>{s.subscores.diversification}</b></div>
+                <div className="k"><span>분산도 <em>쏠림 없음</em></span><b>{s.subscores.diversification}</b></div>
                 <div className="b"><i style={{ width: `${s.subscores.diversification}%`, background: "var(--color-danger)" }} /></div>
               </div>
             </div>
@@ -117,6 +133,28 @@ export default function AIAdvisor() {
           <div className="hero-pending">{!s ? "측정 준비 중…" : !p ? "온보딩 미완료 → 목표 산출 불가" : "유동자산 없음 → 측정 불가"}</div>
         )}
       </section>
+
+      {/* [§3-2 피드백6] 지금 가장 큰 문제 — 점수 바로 아래 최상단 결론(VerdictCard) */}
+      {topIssue && (
+        <div className="verdict" style={{ borderLeftColor: topIssue.color }}>
+          <div className="verdict-h"><span className="verdict-lbl">🎯 지금 가장 큰 문제</span><span className="verdict-key" style={{ color: topIssue.color }}>{topIssue.txt}</span></div>
+          <div className="verdict-sub">{topIssue.sub}</div>
+        </div>
+      )}
+
+      {/* [§3-2] 부동산 입력/미입력 상태 배너 — 점수 스코프 오해 방지 */}
+      {s && (
+        realtyEntered ? (
+          <div className="realty-banner entered">
+            🏠 부동산 실물 <b>{realtyPct}%</b> 보유 — AI 배분 점수는 <b>유동자산(주식·ETF·현금)만</b> 평가합니다. 부동산은 아래 구조 리스크로 별도 진단합니다.
+          </div>
+        ) : (
+          <div className="realty-banner none">
+            <div>🏠 <b>부동산 미입력</b> — 총자산·리밸런싱에서 제외 중입니다. 등록하면 자산 전체 진단에 반영됩니다.</div>
+            <button className="realty-cta" onClick={() => { window.location.href = "/pwa/onboarding"; }}>부동산 등록 →</button>
+          </div>
+        )
+      )}
 
       {/* §2 온보딩 기준 — 모든 목표의 단일 소스 */}
       {p ? (
@@ -276,10 +314,26 @@ export default function AIAdvisor() {
         .score { font-size: 46px; font-weight: 800; letter-spacing: -1px; line-height: 1; }
         .score small { font-size: 18px; font-weight: 600; opacity: .8; margin-left: 3px; }
         .score-tag { margin-left: auto; font-size: 13px; font-weight: 700; background: rgba(255,255,255,.14); padding: 6px 12px; border-radius: 10px; }
+        .score-def { margin-left: auto; font-size: 11.5px; font-weight: 600; color: var(--hero-ink-soft); text-align: right; line-height: 1.4; }
+        .score-def b { color: var(--hero-ink); font-weight: 800; }
         .subscores { display: flex; gap: 10px; margin-top: 16px; }
         .sub { flex: 1; background: rgba(255,255,255,.08); border-radius: 12px; padding: 11px 12px; }
-        .sub .k { font-size: 11.5px; opacity: .85; display: flex; justify-content: space-between; margin-bottom: 7px; }
+        .sub .k { font-size: 11.5px; opacity: .85; display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; gap: 6px; }
+        .sub .k em { font-style: normal; font-size: 9.5px; opacity: .7; font-weight: 500; }
         .sub .k b { font-weight: 800; opacity: 1; }
+        /* [§3-2] top_issue VerdictCard */
+        .verdict { background: var(--color-card); border: 1px solid var(--color-line); border-left: 4px solid var(--color-danger); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 14px 16px; margin-bottom: 14px; }
+        .verdict-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .verdict-lbl { font-size: 0.74rem; font-weight: 700; color: var(--color-ink-2); }
+        .verdict-key { font-size: 0.95rem; font-weight: 800; }
+        .verdict-sub { font-size: 0.8rem; color: var(--color-ink-2); line-height: 1.55; margin-top: 6px; }
+        /* [§3-2] 부동산 상태 배너 */
+        .realty-banner { border-radius: var(--radius-card); padding: 12px 15px; margin-bottom: 14px; font-size: 0.8rem; line-height: 1.6; }
+        .realty-banner b { font-weight: 800; }
+        .realty-banner.entered { background: var(--color-card-soft); border: 1px solid var(--color-line); color: var(--color-ink-2); }
+        .realty-banner.entered b { color: var(--color-ink); }
+        .realty-banner.none { background: var(--color-warning-soft); border: 1px solid var(--color-warning); color: var(--color-warning-ink); display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+        .realty-cta { flex-shrink: 0; background: var(--color-warning); color: #fff; border: none; border-radius: 10px; padding: 9px 12px; font-family: var(--font-sans); font-size: 0.76rem; font-weight: 800; cursor: pointer; }
         .sub .b { height: 6px; border-radius: 5px; background: rgba(255,255,255,.16); overflow: hidden; }
         .sub .b > i { display: block; height: 100%; border-radius: 5px; }
         .hero-pending { font-size: 1.15rem; font-weight: 800; color: var(--hero-ink); opacity: .8; margin-top: 4px; }
