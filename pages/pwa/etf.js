@@ -56,6 +56,18 @@ export default function EtfDashboard() {
     return Number.isFinite(diff) ? Math.max(0, diff) : null;
   })();
 
+  // [§3-6 피드백11·12] 핵심 리스크 한 줄 + 리밸런싱 이유(왜) — overlap/tax 데이터에서 산출
+  const maxSector = overlap?.sectors?.[0];
+  const overlapWarn = overlap?.warnings?.length ? overlap.warnings[0] : null;
+  const riskParts = [];
+  if (maxSector) riskParts.push(`${maxSector.sector} ${(maxSector.weight * 100).toFixed(0)}% 집중`);
+  if (overlapWarn) riskParts.push(overlapWarn);
+  const topRisk = riskParts.length ? riskParts.join(" · ") : null;
+  const rebalReasons = [];
+  if (maxSector && maxSector.weight * 100 >= 25) rebalReasons.push(`${maxSector.sector} ${(maxSector.weight * 100).toFixed(0)}% 집중 — 상한 초과분 축소`);
+  if (overlapWarn) rebalReasons.push(`${overlapWarn} — 중복 종목 통합으로 실질 분산 확보`);
+  if (tax?.losses?.length) rebalReasons.push(`손실 종목(${tax.losses.map((l) => l.ticker).join("·")}) 손익통산 — 절세 매도 후 재매수 검토`);
+
   return (
     <div className="etf">
       <TopNav active="etf" />
@@ -98,6 +110,18 @@ export default function EtfDashboard() {
           <div className="hsub">{err ? "데이터 로드 오류" : "불러오는 중…"}</div>
         )}
       </section>
+
+      {/* [§3-6 피드백11] #1 결론 VerdictCard — 대표지표(실질 원화수익)를 못박고 핵심 리스크 노출 */}
+      {s && (
+        <div className="etf-verdict">
+          <div className="ev-lead">
+            <span className="ev-lbl">📌 이 포트폴리오의 결론</span>
+            <span className={`ev-metric ${sign(s.total_pnl_pct)}`}>실질 원화수익 {pct(s.total_pnl_pct)}</span>
+          </div>
+          <div className="ev-decomp">ETF <b>{pct(s.etf_self_pct)}</b> + 환 <b>{pct(s.fx_pure_pct)}</b> + 교차 <b>{pct(s.cross_pct)}</b></div>
+          {topRisk && <div className="ev-risk">⚠️ 핵심 리스크 · {topRisk}</div>}
+        </div>
+      )}
 
       {/* [§3-2 원칙1] 총자산 바 제거 — 총자산은 홈·AI자산 2곳에만. ETF 페이지는 ETF 슬라이스만 표시 */}
       {err && <div className="err">데이터 로드 오류: {err}</div>}
@@ -143,12 +167,20 @@ export default function EtfDashboard() {
         </section>
       )}
 
-      {/* 3.5) 자산 배분 / 리밸런싱 (P4) */}
+      {/* 3.5) 자산 배분 / 리밸런싱 (P4) — [§3-6 피드백12] 왜(조정 이유) 명시 */}
       {rebal && (
         <section className="card">
           <div className="label">자산 배분 · 리밸런싱
-            <span className="sub">{rebal.actions ? "목표 대비" : "현재 비중"}</span>
+            <span className="sub">{rebal.actions ? "현재 → 목표" : "현재 비중"}</span>
           </div>
+          {rebalReasons.length > 0 && (
+            <div className="rb-why">
+              <div className="rb-why-h">🎯 왜 조정하나</div>
+              {rebalReasons.map((r, i) => (
+                <div className="rb-why-row" key={i}><span className="rb-why-n">{i + 1}</span><span className="rb-why-t">{r}</span></div>
+              ))}
+            </div>
+          )}
           {rebal.actions ? (
             <>
               {rebal.actions.filter((a) => a.action !== "HOLD").map((a) => (
@@ -171,6 +203,22 @@ export default function EtfDashboard() {
               ))}
               <div className="rb-tax sub">상위 종목 집중도 확인용. 목표비중 설정 시 실행 가능한 리밸런싱(세금 포함) 제안이 표시됩니다.</div>
             </>
+          )}
+        </section>
+      )}
+
+      {/* [§3-6 피드백13] 시계열·예측(ForecastChart) — 항상 '참고용·확정 아님' 라벨 강제 */}
+      {s && (
+        <section className="card">
+          <div className="label">시계열 · 예측 <span className="sub forecast-tag">참고용 · 확정 아님</span></div>
+          {report?.timeseries?.length >= 2 ? (
+            <div className="forecast-body">{/* 백엔드 timeseries 연결 시 라인+예측선 렌더 */}</div>
+          ) : (
+            <div className="forecast-empty">
+              <div className="fe-ic">📈</div>
+              <div className="fe-t">일별 평가액 스냅샷 축적 중</div>
+              <div className="fe-s">매일 종가 기준 평가액이 쌓이면 <b>기간별 금액 변화 + 참고용 추정선</b>을 표시합니다. 예측은 확정 수익이 아닙니다.</div>
+            </div>
           )}
         </section>
       )}
@@ -307,6 +355,28 @@ export default function EtfDashboard() {
         .rb .rt { width: 56px; font-weight: 700; font-family: ui-monospace, monospace; }
         .rb .rw { flex: 1; color: var(--color-ink-2); font-size: 0.74rem; }
         .rb-tax { font-size: 0.72rem; color: var(--color-ink-2); margin-top: 10px; background: var(--color-card-soft); padding: 7px 9px; border-radius: 8px; }
+        /* [§3-6] #1 결론 VerdictCard */
+        .etf-verdict { background: var(--color-card); border: 1px solid var(--color-line); border-left: 4px solid var(--color-primary); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 15px 17px; margin-bottom: 14px; }
+        .ev-lead { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+        .ev-lbl { font-size: 0.74rem; font-weight: 700; color: var(--color-ink-2); }
+        .ev-metric { font-size: 1.05rem; font-weight: 800; }
+        .ev-metric.pos { color: var(--color-success); } .ev-metric.neg { color: var(--color-danger); }
+        .ev-decomp { font-size: 0.8rem; color: var(--color-ink-2); margin-top: 6px; }
+        .ev-decomp b { color: var(--color-ink); font-weight: 700; }
+        .ev-risk { font-size: 0.8rem; color: var(--color-warning-ink); background: var(--color-warning-soft); border-radius: 10px; padding: 9px 12px; margin-top: 11px; line-height: 1.45; word-break: keep-all; }
+        /* [§3-6] 리밸런싱 왜(조정 이유) */
+        .rb-why { background: var(--color-card-soft); border-radius: 12px; padding: 12px 13px; margin-bottom: 12px; }
+        .rb-why-h { font-size: 0.74rem; font-weight: 800; color: var(--color-ink-2); margin-bottom: 8px; }
+        .rb-why-row { display: flex; gap: 9px; align-items: flex-start; padding: 4px 0; }
+        .rb-why-n { flex-shrink: 0; width: 18px; height: 18px; border-radius: 6px; background: var(--color-primary-soft); color: var(--color-primary); font-size: 0.68rem; font-weight: 800; display: grid; place-items: center; margin-top: 1px; }
+        .rb-why-t { font-size: 0.78rem; color: var(--color-ink); line-height: 1.5; word-break: keep-all; }
+        /* [§3-6] ForecastChart 참고용 */
+        .forecast-tag { color: var(--color-warning-ink) !important; background: var(--color-warning-soft); padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; }
+        .forecast-empty { text-align: center; padding: 18px 10px; }
+        .fe-ic { font-size: 1.5rem; margin-bottom: 6px; }
+        .fe-t { font-size: 0.86rem; font-weight: 700; color: var(--color-ink); }
+        .fe-s { font-size: 0.74rem; color: var(--color-ink-2); margin-top: 6px; line-height: 1.55; word-break: keep-all; }
+        .fe-s b { color: var(--color-ink); font-weight: 700; }
         .sample-badge { font-size: 10px; font-weight: 800; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 3px 8px; border-radius: 6px; margin-left: auto; }
         .foot { font-size: 0.68rem; color: var(--color-ink-3); text-align: center; margin-top: 16px; line-height: 1.5; }
       `}</style>
