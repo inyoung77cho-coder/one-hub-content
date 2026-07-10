@@ -829,6 +829,52 @@ export default function PWADashboard({ latestReport }) {
                 );
               })()}
 
+              {/* [#4 MarketPulse] 시장 맥박 — 뉴스·변화를 lively하게. 실측 지표만(허위 헤드라인 금지) */}
+              {(() => {
+                if (!data?.market) return null;
+                const ht = heatTier(heat);
+                const htLabel = heatLabel(heat);
+                const htColor = heatColor(heat);
+                const rc = regimeClass(regime);
+                const candCnt = (data.screening_candidates || []).length;
+                // 한 줄 시장 읽기 — regime × heat × 공포탐욕 조합에서 파생
+                const pulseRead = (() => {
+                  if (regime === 'BEAR') return `하락 국면 · 위험선호 위축${fearGreed != null && fearGreed < 45 ? ' — 공포 구간, 무리한 매수 자제' : ''}`;
+                  if (regime === 'BULL') return ht === 'hot'
+                    ? '상승세 과열 — 추격보다 눌림목 대기'
+                    : '상승 우호 — 선별 매수 유효';
+                  return `방향성 탐색 · 변동성 관리 우선${fearGreed != null && fearGreed >= 56 ? ' — 탐욕 구간 경계' : ''}`;
+                })();
+                return (
+                  <section className="card mp">
+                    <div className="mp-head">
+                      <span className="mp-title"><span className="mp-live" /> 📡 시장 맥박</span>
+                      {regimeDays != null && <span className="mp-days">{regimeKo(regime)} {regimeDays}일째</span>}
+                    </div>
+                    <div className="mp-chips">
+                      <div className={`mp-chip ${rc}`}>
+                        <span className="mp-ck">{regimeIcon(regime)} 국면</span>
+                        <span className="mp-cv">{regimeKo(regime) || '-'}</span>
+                      </div>
+                      <div className="mp-chip">
+                        <span className="mp-ck">🌡️ 시장온도</span>
+                        <span className="mp-cv" style={{ color: htColor }}>{heat ?? '-'} {htLabel ? `· ${htLabel}` : ''}</span>
+                      </div>
+                      <div className="mp-chip">
+                        <span className="mp-ck">😨 공포·탐욕</span>
+                        <span className="mp-cv">{fearGreed ?? '-'} {fearGreed != null ? `· ${fgLabel(fearGreed)}` : ''}</span>
+                      </div>
+                    </div>
+                    <div className="mp-read">{pulseRead}</div>
+                    <div className="mp-foot">
+                      {vix != null && <span className="mp-tag">VIX {vix}</span>}
+                      <span className="mp-tag">오늘 후보 {candCnt}종목 감지</span>
+                      <span className="mp-tag">매수 {buyCount} · 차단 {blockCount}</span>
+                    </div>
+                  </section>
+                );
+              })()}
+
               {/* [v10 UI 시안] ② 총자산 — 라벨/금액 + 자산별 행(부동산 미입력 CTA) */}
               {(() => {
                 // 현금 = 주식계좌 예수금(원→억) + 온보딩 입력 보유 현금(억)
@@ -877,6 +923,30 @@ export default function PWADashboard({ latestReport }) {
                   ))}
                 </div>
                 <div className="v10-act-note">AI는 오늘 {buyCount > 0 ? <><b>{buyCount}종목을 매수</b>했습니다.</> : blockCount > 0 ? <>매수 없이 <b>{blockCount}건을 신중히 차단</b>했습니다.</> : <><b>선별 관망</b>했습니다.</>} 승인 대기 <b>{pendingList.length}건</b>.</div>
+
+                {/* [#3 알림 피드] 텔레그램·리포트·큐 동기화 알림을 액션 카드 안에 인라인 노출 */}
+                {notis.length > 0 && (
+                  <div className="v10-noti">
+                    <div className="v10-noti-h">🔔 최근 알림</div>
+                    {notis.slice(0, 4).map((n, i) => {
+                      const title = n.title || n.message || n.body || n.text || '알림';
+                      const t = n.type || n.category || '';
+                      const ic = /buy|매수|signal|신호/i.test(t + title) ? '📈'
+                        : /sell|매도|손절|익절/i.test(t + title) ? '📉'
+                        : /report|리포트/i.test(t + title) ? '📄'
+                        : /error|오류|실패|circuit/i.test(t + title) ? '⚠️' : '🔔';
+                      const ts = n.created_at || n.timestamp || n.time || n.date || null;
+                      const when = ts ? String(ts).replace('T', ' ').slice(5, 16) : null;
+                      return (
+                        <div className="v10-noti-row" key={i}>
+                          <span className="v10-noti-ic">{ic}</span>
+                          <span className="v10-noti-tx">{title}</span>
+                          {when && <span className="v10-noti-ts mono">{when}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </section>
 
               {/* [v10 UI 시안] ④ AI 판단 근거 — 접기(요약 한 줄 → 지표/확률바) */}
@@ -2342,6 +2412,28 @@ export default function PWADashboard({ latestReport }) {
         .v10-act-k { font-size: 11px; font-weight: 600; color: var(--color-ink-3); margin-top: 5px; letter-spacing: .3px; }
         .v10-act-note { margin-top: 13px; font-size: 12.5px; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 12px; padding: 11px 13px; line-height: 1.5; }
         .v10-act-note b { color: var(--color-ink); }
+        /* [#3 알림 피드] */
+        .v10-noti { margin-top: 13px; border-top: 1px solid var(--color-line); padding-top: 12px; }
+        .v10-noti-h { font-size: 12px; font-weight: 700; color: var(--color-ink-2); margin-bottom: 8px; }
+        .v10-noti-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+        .v10-noti-ic { flex-shrink: 0; font-size: 14px; }
+        .v10-noti-tx { flex: 1; font-size: 12.5px; color: var(--color-ink); line-height: 1.4; word-break: keep-all; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .v10-noti-ts { flex-shrink: 0; font-size: 10.5px; color: var(--color-ink-3); }
+        /* [#4 MarketPulse] */
+        .mp { padding: 15px 16px; }
+        .mp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .mp-title { display: flex; align-items: center; gap: 7px; font-size: 14px; font-weight: 800; color: var(--color-ink); }
+        .mp-live { width: 8px; height: 8px; border-radius: 50%; background: var(--color-success); animation: pulse-live 1.8s ease-in-out infinite; }
+        .mp-days { font-size: 11px; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 999px; padding: 3px 10px; }
+        .mp-chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+        .mp-chip { display: flex; flex-direction: column; gap: 4px; background: var(--color-card-soft); border-radius: 12px; padding: 9px 8px; border: 1px solid var(--color-line); }
+        .mp-chip.bull { border-color: color-mix(in srgb, var(--color-success) 40%, transparent); }
+        .mp-chip.bear { border-color: color-mix(in srgb, var(--color-danger) 40%, transparent); }
+        .mp-ck { font-size: 10.5px; color: var(--color-ink-3); font-weight: 700; white-space: nowrap; }
+        .mp-cv { font-size: 13px; font-weight: 800; color: var(--color-ink); word-break: keep-all; }
+        .mp-read { margin-top: 11px; font-size: 12.5px; font-weight: 600; background: var(--color-primary-soft); color: var(--color-primary); border-radius: 10px; padding: 9px 12px; line-height: 1.45; word-break: keep-all; }
+        .mp-foot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+        .mp-tag { font-size: 10.5px; font-weight: 700; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 999px; padding: 3px 9px; }
         .v10-collap-head { display: flex; align-items: center; justify-content: space-between; cursor: pointer; }
         .v10-basis-txt h3 { font-size: 15px; font-weight: 700; margin-bottom: 5px; color: var(--color-ink); }
         .v10-basis-sum { font-size: 12.5px; color: var(--color-ink-2); font-weight: 500; }
