@@ -757,9 +757,9 @@ export default function PWADashboard({ latestReport }) {
             ['stock','주식'],
             ['etf','ETF'],
             ['realestate','부동산'],
-            ['settings','설정'],
+            // [설정] 탭 제거 — 헤더 ⚙️ 아이콘과 중복. 설정은 아이콘으로만 진입.
           ].map(([t,label]) => {
-            const routes = { etf: '/pwa/etf', realestate: '/pwa/realestate', ai: '/pwa/ai-advisor', settings: '/pwa/settings' };
+            const routes = { etf: '/pwa/etf', realestate: '/pwa/realestate', ai: '/pwa/ai-advisor' };
             const stockTabs = ['recommend','portfolio','report','analyze'];
             const isActive = t === 'stock' ? stockTabs.includes(tab) : tab === t;
             const go = () => {

@@ -10,7 +10,7 @@ const ITEMS = [
   ["stock", "주식", "/pwa?tab=portfolio"],
   ["etf", "ETF", "/pwa/etf"],
   ["realestate", "부동산", "/pwa/realestate"],
-  ["settings", "설정", "/pwa/settings"],
+  // [설정] 탭 제거 — 헤더 ⚙️ 아이콘과 중복. 설정은 아이콘으로만 진입.
 ];
 
 export default function TopNav({ active }) {
