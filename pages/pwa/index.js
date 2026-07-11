@@ -784,7 +784,7 @@ export default function PWADashboard({ latestReport }) {
             ['stock','주식'],
             ['etf','ETF'],
             ['realestate','부동산'],
-            ['trust','AI 트러스트'],
+            ['trust','AI 신뢰도'],
           ].map(([t,label]) => {
             const routes = { etf: '/pwa/etf', realestate: '/pwa/realestate' };
             const stockTabs = ['recommend','portfolio','analyze'];   // 기록(report)은 트러스트로 이동
@@ -1800,7 +1800,7 @@ export default function PWADashboard({ latestReport }) {
 
             {/* [S2 IA] 트러스트 허브 인트로 — 나vsAI·자기검증·성적표·차단정확도가 여기 모임 */}
             <section className="trust-hero">
-              <div className="trust-hero-lbl">🛡️ AI 트러스트</div>
+              <div className="trust-hero-lbl">🛡️ AI 신뢰도</div>
               <div className="trust-hero-sub">이 AI를 왜 믿나 — 판단 흐름 · 나 vs AI · 자기검증 · 성적표를 한 곳에서 투명하게 공개합니다.</div>
             </section>
 
@@ -2212,10 +2212,10 @@ export default function PWADashboard({ latestReport }) {
               <span className="pwa-card-label">📂 상세 리포트</span>
               <div className="report-list">
                 {[
-                  ['/daily', '📅', '일간 리포트', '매일 장 마감 요약'],
-                  ['/weekly', '📊', '주간 리포트', 'MDD · 승률 · 손익비'],
-                  ['/history', '🤖', 'AI 히스토리', 'AI 판단 기록 전체'],
-                  ['/heat-history', '🌡️', '히트 히스토리', '시장 과열도 추이'],
+                  ['/pwa/daily', '📅', '일간 리포트', '매일 장 마감 요약'],
+                  ['/pwa/weekly', '📊', '주간 리포트', '국면 · 과열도 · 매매'],
+                  ['/pwa/history', '🤖', 'AI 히스토리', 'AI 판단 기록 전체'],
+                  ['/pwa/heat-history', '🌡️', '히트 히스토리', '시장 과열도 추이'],
                 ].map(([href, icon, title, desc]) => (
                   <Link href={href} key={href} className="report-row">
                     <span className="report-row-icon">{icon}</span>
