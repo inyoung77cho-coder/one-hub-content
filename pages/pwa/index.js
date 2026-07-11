@@ -1182,7 +1182,9 @@ export default function PWADashboard({ latestReport }) {
                   if (profile.style === 'conservative') return base - Math.abs((s.vol_ratio ?? 1) - 1) * 3;
                   return base;
                 };
-                const sorted = [...data.screening_candidates].sort((a, b) => personalScore(b) - personalScore(a));
+                // [S1] 종목코드 기준 dedup(중복 렌더 방지) 후 정렬
+                const uniqCands = [...new Map(data.screening_candidates.map((c) => [c.code || c.name, c])).values()];
+                const sorted = uniqCands.sort((a, b) => personalScore(b) - personalScore(a));
                 const top3 = sorted.slice(0, 3);
                 const rest = sorted.slice(3);
                 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -1582,7 +1584,8 @@ export default function PWADashboard({ latestReport }) {
                         <div className="position-card-grid mono">
                           <div className="position-card-cell">
                             <span className="dim">매수가</span>
-                            <span>{Number(p.avg_price||0).toLocaleString()}원</span>
+                            {/* [S1] 국내주식 원 단위 정수 통일(정확 평단은 title 툴팁) */}
+                            <span title={`정확 평단 ${Number(p.avg_price||0).toLocaleString()}원`}>{Math.round(Number(p.avg_price||0)).toLocaleString()}원</span>
                           </div>
                           <div className="position-card-cell">
                             <span className="dim">현재가</span>

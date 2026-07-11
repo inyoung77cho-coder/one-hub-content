@@ -127,10 +127,28 @@ export default function AccuracyPage() {
                 <div style={{ fontWeight:700, fontSize:14, marginBottom:14 }}>
                   최근 차단 내역 (최근 20건)
                 </div>
-                {data.recent.map((r, i) => (
-                  <div key={i} style={{
+                {/* [S1] 종목코드+차단일 기준 dedup(중복 렌더 방지) + 부호 단일 채점 */}
+                {(() => {
+                  const seen = new Set();
+                  const list = (data.recent || []).filter((r) => {
+                    const k = `${r.code || r.stock}-${r.block_date || ""}`;
+                    if (seen.has(k)) return false; seen.add(k); return true;
+                  });
+                  // 채점은 검증가-차단가 부호로 통일: 하락=적중 / 상승=오판 / 보합=보합
+                  const verdict = (r) => {
+                    if (r.price_change_pct == null) return "unchecked";
+                    if (r.price_change_pct < 0) return "hit";
+                    if (r.price_change_pct > 0) return "miss";
+                    return "flat";
+                  };
+                  const V = { hit:  { t:"✓ 적중", bg:"var(--color-success-soft)", c:"var(--color-success-ink)" },
+                              miss: { t:"✗ 오판", bg:"var(--color-danger-soft)",  c:"var(--color-danger)" },
+                              flat: { t:"― 보합", bg:"var(--color-card-soft)",     c:"var(--color-ink-2)" },
+                              unchecked: { t:"미검증", bg:"var(--color-bg)",       c:"var(--color-ink-2)" } };
+                  return list.map((r, i) => { const v = V[verdict(r)]; return (
+                  <div key={`${r.code || r.stock}-${r.block_date || i}`} style={{
                     padding:'12px 0',
-                    borderBottom: i < data.recent.length-1 ? '1px solid var(--color-line)' : 'none'
+                    borderBottom: i < list.length-1 ? '1px solid var(--color-line)' : 'none'
                   }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
                       <div>
@@ -139,20 +157,10 @@ export default function AccuracyPage() {
                           {r.code}
                         </span>
                       </div>
-                      {r.result ? (
-                        <span style={{
-                          fontSize:11, fontWeight:700, padding:'2px 10px', borderRadius:20,
-                          background: r.result === 'SUCCESS' ? 'var(--color-success-soft)' : 'var(--color-danger-soft)',
-                          color:       r.result === 'SUCCESS' ? 'var(--color-success-ink)' : 'var(--color-danger)'
-                        }}>
-                          {r.result === 'SUCCESS' ? '✓ 적중' : '✗ 오판'}
-                        </span>
-                      ) : (
-                        <span style={{
-                          fontSize:11, padding:'2px 10px', borderRadius:20,
-                          background:'var(--color-bg)', color:'var(--color-ink-2)'
-                        }}>미검증</span>
-                      )}
+                      <span style={{
+                        fontSize:11, fontWeight:700, padding:'2px 10px', borderRadius:20,
+                        background: v.bg, color: v.c
+                      }}>{v.t}</span>
                     </div>
                     <div style={{ fontSize:11, color:'var(--color-ink-2)', marginTop:3 }}>
                       {r.block_reason}
@@ -165,7 +173,7 @@ export default function AccuracyPage() {
                       {r.price_change_pct != null && (
                         <span style={{
                           fontWeight:700,
-                          color: r.price_change_pct < 0 ? 'var(--color-primary)' : 'var(--color-danger)'
+                          color: r.price_change_pct < 0 ? 'var(--color-primary)' : r.price_change_pct > 0 ? 'var(--color-danger)' : 'var(--color-ink-2)'
                         }}>
                           {r.price_change_pct > 0 ? '+' : ''}{r.price_change_pct?.toFixed(2)}%
                         </span>
@@ -175,7 +183,7 @@ export default function AccuracyPage() {
                       {r.block_date?.slice(0,10)} → {r.check_date || '미검증'}
                     </div>
                   </div>
-                ))}
+                ); }); })()}
               </div>
 
               {/* 안내 문구 */}
@@ -184,7 +192,8 @@ export default function AccuracyPage() {
                             lineHeight:1.6 }}>
                 * 적중: AI가 차단한 종목이 이후 하락한 경우<br/>
                 * 오판: AI가 차단했으나 이후 상승한 경우<br/>
-                * 매주 월요일 자동 검증 (차단 후 3거래일 기준)
+                * 보합: 변동 0.00% (적중·오판 어느 쪽도 아님, 별도 집계)<br/>
+                * 채점은 검증가−차단가 부호로 통일 · 매주 월요일 자동 검증(차단 후 3거래일 기준)
               </div>
             </>
           );
