@@ -8,6 +8,7 @@ import { setTraderGlobal, getTrader } from '../../lib/trader';
 import { recordDecision, matureLedger, computeShowdown, getTodayDecision } from '../../lib/verdictLedger';
 import { fetchAssetsTotal } from '../../lib/assetsTotal';
 import { dedupBy } from '../../lib/useDedup';
+import QuickAddSheet from '../../components/shared/QuickAddSheet';
 
 // [v9.0] 안전 숫자 포맷 — INVALID_PRICE/STOP/NaN/undefined → '-'
 function safeLocale(v, suffix = '') {
@@ -195,7 +196,7 @@ export default function PWADashboard({ latestReport }) {
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
-  const [quickAdd, setQuickAdd] = useState(null); // [S3] 빠른입력 시트: null | { asset, amount }
+  const [qaOpen, setQaOpen] = useState(false); // [S3] 빠른입력 시트(공용 QuickAddSheet) 열림
   const [basisOpen, setBasisOpen] = useState(false); // [v10 UI] 홈 'AI 판단 근거' 접기
   const [heroWhyOpen, setHeroWhyOpen] = useState(false); // [v11-ux] 홈 통합 판단 '왜?' 인라인 펼치기(근거 버튼 제거)
   const [logOpen, setLogOpen] = useState(false);     // [v10 UI] 홈 '최근 활동' 접기
@@ -304,19 +305,16 @@ export default function PWADashboard({ latestReport }) {
   }, []);
 
   // [S3] 빠른입력 저장 — 자산군 금액(억)을 온보딩 자산에 반영 → 총자산 즉시 갱신
-  const saveQuickAdd = useCallback(() => {
-    if (!quickAdd) return;
-    const amt = Number(quickAdd.amount);
-    if (quickAdd.amount === '' || !(amt >= 0)) return;
-    let onb = {};
-    try { onb = JSON.parse(window.localStorage.getItem('onehub_onboard_assets') || '{}') || {}; } catch (e) {}
-    onb[quickAdd.asset] = amt;
-    try { window.localStorage.setItem('onehub_onboard_assets', JSON.stringify(onb)); } catch (e) {}
-    fetchAssetsTotal(trader)
-      .then(a => setAssetSum(a?.total_uk != null ? { total_uk: a.total_uk, breakdown: a.breakdown, realty_state: a.realty_state, source: a.source } : null))
-      .catch(() => {});
-    setQuickAdd(null);
-  }, [quickAdd, trader]);
+  // [S3] 빠른입력(QuickAddSheet) 저장 시 총자산 즉시 재조회(낙관적 갱신 이벤트 수신)
+  useEffect(() => {
+    const onAssets = () => {
+      fetchAssetsTotal(trader)
+        .then(a => setAssetSum(a?.total_uk != null ? { total_uk: a.total_uk, breakdown: a.breakdown, realty_state: a.realty_state, source: a.source } : null))
+        .catch(() => {});
+    };
+    window.addEventListener('onehub-assets-change', onAssets);
+    return () => window.removeEventListener('onehub-assets-change', onAssets);
+  }, [trader]);
 
   const toggleTheme = useCallback(() => {
     setTheme(prev => {
@@ -753,7 +751,7 @@ export default function PWADashboard({ latestReport }) {
             {/* [S3] 빠른입력 — 어디서나 자산(주식/ETF/부동산/현금) 금액 빠르게 반영 */}
             <button
               className="pwa-quickadd-toggle"
-              onClick={() => setQuickAdd({ asset: 'stock_uk', amount: '' })}
+              onClick={() => setQaOpen(true)}
               aria-label="자산 빠른입력"
               title="자산 빠른입력"
             >
@@ -2630,26 +2628,8 @@ export default function PWADashboard({ latestReport }) {
           </div>
         </>)}
 
-        {/* [S3] 빠른입력 시트 — 자산군 선택 + 금액(억) → 총자산 즉시 반영 */}
-        {quickAdd && (<>
-          <div className="qa-dim" onClick={() => setQuickAdd(null)} />
-          <div className="qa-sheet">
-            <div className="qa-head"><span>＋ 자산 빠른입력</span><button className="qa-x" onClick={() => setQuickAdd(null)} aria-label="닫기">✕</button></div>
-            <div className="qa-chips">
-              {[['stock_uk','📈','주식'],['etf_uk','📊','ETF'],['realestate_uk','🏢','부동산'],['cash_uk','💵','현금']].map(([k,ic,lb]) => (
-                <button key={k} className={`qa-chip ${quickAdd.asset===k?'on':''}`} onClick={() => setQuickAdd(q => ({ ...q, asset: k }))}>{ic} {lb}</button>
-              ))}
-            </div>
-            <div className="qa-input-row">
-              <input className="qa-input" type="number" inputMode="decimal" autoFocus placeholder="금액" value={quickAdd.amount}
-                onChange={(e) => setQuickAdd(q => ({ ...q, amount: e.target.value }))}
-                onKeyDown={(e) => { if (e.key === 'Enter') saveQuickAdd(); }} />
-              <span className="qa-unit">억</span>
-            </div>
-            <div className="qa-hint">입력하면 총자산에 즉시 반영됩니다. (해당 자산군 보유액 = 입력값으로 설정)</div>
-            <button className="qa-save" onClick={saveQuickAdd}>저장</button>
-          </div>
-        </>)}
+        {/* [S3] 빠른입력 — 공용 QuickAddSheet(자산군별 맞춤 폼). 대시보드·서브페이지 동일 사용 */}
+        {qaOpen && <QuickAddSheet initialAsset="stock" onClose={() => setQaOpen(false)} />}
       </div>
 
       <style jsx>{`

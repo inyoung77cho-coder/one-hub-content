@@ -64,10 +64,16 @@ export default function QuickAddSheet({ initialAsset = "stock", onClose, onSaved
       if (!(amt >= 0) || amount === "") { setMsg("금액을 입력하세요"); return; }
       const onb = readOnb(); onb.cash_uk = amt; writeOnb(onb); broadcast();
     } else if (asset === "stock") {
-      const amt = Number(amount);
-      if (!(amt >= 0) || amount === "") { setMsg("평가액(억)을 입력하세요"); return; }
-      const onb = readOnb(); onb.stock_uk = amt; writeOnb(onb);
-      try { if (name.trim()) localStorage.setItem("onehub_stock_last", name.trim()); } catch (e) {}
+      // 정확 입력: 종목 + 수량 + 평단(원) → 평가액 = 수량×평단(억 환산). 국내주식 원화 기준.
+      const q = Number(shares), px = Number(price);
+      if (!(q > 0) || !(px > 0)) { setMsg("수량과 평단(원)을 입력하세요"); return; }
+      const amtUk = (q * px) / 1e8;
+      const onb = readOnb(); onb.stock_uk = Number((amtUk).toFixed(4)); writeOnb(onb);
+      try {
+        if (name.trim()) localStorage.setItem("onehub_stock_last", name.trim());
+        // 최근 수동 종목 1건 기록(참고용)
+        localStorage.setItem("onehub_stock_manual", JSON.stringify({ name: name.trim(), shares: q, price: px, at: new Date().toISOString().slice(0,10) }));
+      } catch (e) {}
       broadcast();
     } else if (asset === "etf") {
       const tk = String(name || "").trim().toUpperCase();
@@ -120,6 +126,16 @@ export default function QuickAddSheet({ initialAsset = "stock", onClose, onSaved
                 <select value={account} onChange={(e) => setAccount(e.target.value)}>{ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}</select></label>
             </div>
           </>
+        ) : asset === "stock" ? (
+          <>
+            <div className="qa-row">
+              <label className="qa-f"><span>수량(주)</span><input type="number" inputMode="numeric" value={shares} onChange={(e) => setShares(e.target.value)} placeholder="10" /></label>
+              <label className="qa-f"><span>평단(원)</span><input type="number" inputMode="numeric" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="70000" /></label>
+            </div>
+            {Number(shares) > 0 && Number(price) > 0 && (
+              <div className="qa-calc">평가액 ≈ <b>{((Number(shares) * Number(price)) / 1e8).toFixed(2)}억</b> <span>(수량 × 평단)</span></div>
+            )}
+          </>
         ) : asset === "realestate" ? (
           <div className="qa-row">
             <label className="qa-f"><span>평형(평)</span><input type="number" inputMode="numeric" value={pyeong} onChange={(e) => setPyeong(e.target.value)} placeholder="34" /></label>
@@ -127,8 +143,8 @@ export default function QuickAddSheet({ initialAsset = "stock", onClose, onSaved
           </div>
         ) : null}
 
-        {asset !== "etf" && (
-          <label className="qa-f"><span>{asset === "cash" ? "금액(억)" : asset === "realestate" ? "매수가(억)" : "평가액(억)"}</span>
+        {(asset === "cash" || asset === "realestate") && (
+          <label className="qa-f"><span>{asset === "cash" ? "금액(억)" : "매수가(억)"}</span>
             <input type="number" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="예: 1.5" /></label>
         )}
 
@@ -149,6 +165,9 @@ export default function QuickAddSheet({ initialAsset = "stock", onClose, onSaved
         .qa-f input, .qa-f select { border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 10px; padding: 11px 12px; font-size: 0.9rem; font-family: var(--font-sans); color: var(--color-ink); }
         .qa-f input:focus, .qa-f select:focus { outline: none; border-color: var(--color-primary); }
         .qa-row { display: flex; gap: 10px; }
+        .qa-calc { font-size: 0.74rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 9px; padding: 8px 11px; margin-bottom: 11px; }
+        .qa-calc b { color: var(--color-primary); font-weight: 800; }
+        .qa-calc span { color: var(--color-ink-3); font-size: 0.66rem; }
         .qa-msg { font-size: 0.76rem; color: var(--color-danger); font-weight: 600; margin-bottom: 8px; }
         .qa-save { width: 100%; margin-top: 4px; border: none; border-radius: 12px; padding: 13px 0; font-size: 0.92rem; font-weight: 800; color: #fff; background: var(--color-primary); cursor: pointer; font-family: var(--font-sans); }
         .qa-note { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 11px; line-height: 1.5; word-break: keep-all; text-align: center; }
