@@ -246,19 +246,31 @@ export default function RealEstateDashboard() {
             const ranking = [...rank.ranking]
               .sort((a, b) => (b.one_score ?? 0) - (a.one_score ?? 0))
               .filter((c) => { if (seen.has(c.단지명)) return false; seen.add(c.단지명); return true; });
-            return ranking.map((c, i) => (
+            // [S7.5] 한 줄 근거용 룩업 — 저평가 gap(회귀 대비) + 최근 실거래 변동
+            const underMap = new Map((brief?.under || []).map((u) => [u.단지명, u]));
+            const feedMap = new Map();
+            (feed?.feed || []).forEach((f) => { if (!feedMap.has(f.단지명)) feedMap.set(f.단지명, f); });
+            return ranking.map((c, i) => {
+              // 카드 간 연결감: 최근 실거래 변동 · 회귀 대비 상승여력을 한 줄로
+              const fd = feedMap.get(c.단지명);
+              const ud = underMap.get(c.단지명);
+              const bits = [];
+              if (fd?.거래일 && fd?.변동률 != null) bits.push(`${String(fd.거래일).slice(5)} ${fd.변동률 > 0 ? "+" : ""}${fd.변동률}%`);
+              if (ud?.gap != null) bits.push(`회귀 대비 +${Number(ud.gap).toFixed(1)}%`);
+              return (
               <div className="rrow" key={`${c.단지명}-${i}`}>
                 <span className="rk">{i + 1}</span>
                 <span className="rmid">
                   <span className="rname">{c.단지명} <span className={`vtag ${vtag(c.valuation)}`}>{c.valuation}</span></span>
-                  <span className="rsub">{uk(c.avm_total_uk)}</span>
+                  <span className="rsub">{uk(c.avm_total_uk)}{bits.length > 0 && <span className="rreason"> · {bits.join(" · ")}</span>}</span>
                 </span>
                 <span className="rright">
                   <span className="rscore">{c.one_score}</span>
                   <span className={`jtag ${jtag(c.decision)}`}>{c.decision}</span>
                 </span>
               </div>
-            ));
+              );
+            });
           })()}
           <div className="note">업데이트 {rank.ranking[0]?.updated} · AVM=자동가치추정 · <b>lag=0 상대가치 기준(전파모델 미사용·확정 아님)</b>. ONE Score는 구성요소 종합이며 블랙박스가 아닙니다.</div>
         </section>
@@ -463,6 +475,7 @@ export default function RealEstateDashboard() {
         .vtag.under { background: var(--color-success-soft); color: var(--color-success-ink); }
         .vtag.over { background: var(--color-danger-soft); color: var(--color-danger); }
         .rsub { font-size: 11.5px; color: var(--color-ink-3); font-weight: 500; margin-top: 3px; }
+        .rreason { color: var(--color-ink-2); font-weight: 600; }
         .rright { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
         .rscore { font-size: 16px; font-weight: 800; color: var(--color-primary); line-height: 1; }
         .jtag { font-size: 10.5px; font-weight: 800; padding: 3px 9px; border-radius: 7px; }

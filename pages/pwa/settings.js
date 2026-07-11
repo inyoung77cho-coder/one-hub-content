@@ -302,6 +302,12 @@ export default function Settings() {
                     {chBadge("텔레그램", tg)}
                     {chBadge("카카오톡", kakao)}
                   </div>
+                  {/* [S7.7] Trader B 카카오 OAuth CTA — 미연동 시 연결 버튼 직접 노출 */}
+                  {t === "B" && kakao !== "on" && (
+                    <button className="kakao-cta" onClick={() => { window.location.href = "/api/oauth/kakao/start?trader=B"; }}>
+                      💬 Trader B 카카오 연결 · 친구 앱 OAuth →
+                    </button>
+                  )}
                 </div>
               );
             })}
@@ -384,6 +390,8 @@ export default function Settings() {
         .ubreak { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; }
         .ub { display: flex; flex-direction: column; gap: 3px; background: var(--color-card-soft); border-radius: var(--radius-sm); padding: 8px 10px; }
         .ub span { font-size: 0.66rem; color: var(--color-ink-3); font-weight: 700; } .ub b { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); }
+        /* [S7.7] 카카오 B 연결 CTA */
+        .kakao-cta { width: 100%; margin-top: 10px; border: none; border-radius: 10px; padding: 10px 0; font-size: 0.78rem; font-weight: 800; color: var(--color-ink); background: var(--color-warning); cursor: pointer; font-family: var(--font-sans); }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
       {editAsset && <QuickAddSheet initialAsset={editAsset} onClose={() => setEditAsset(null)} />}

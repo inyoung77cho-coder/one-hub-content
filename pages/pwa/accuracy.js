@@ -86,7 +86,47 @@ export default function AccuracyPage() {
                     </div>
                   ))}
                 </div>
+
+                {/* [S7.6] 회피손실 합계 — 적중률만의 오해 방지(차단 적중이 실제로 막은 손실) */}
+                {(() => {
+                  const recent = data.recent || [];
+                  const hits = recent.filter((r) => r.price_change_pct != null && r.price_change_pct < 0);
+                  const avoidedPct = s.avoided_loss_pct != null ? s.avoided_loss_pct
+                    : (hits.length ? hits.reduce((a, r) => a + Math.abs(r.price_change_pct), 0) : null);
+                  const est = s.avoided_loss_pct == null;
+                  if (avoidedPct == null) return null;
+                  return (
+                    <div style={{ marginTop:16, paddingTop:14, borderTop:'1px solid var(--color-line)',
+                                  fontSize:12.5, color:'var(--color-ink-2)', lineHeight:1.55, textAlign:'left' }}>
+                      🛡️ 차단 적중 <b style={{ color:'var(--color-ink)' }}>{s.success_count}건</b>으로 약{' '}
+                      <b style={{ color:'var(--color-primary)' }}>-{Number(avoidedPct).toFixed(1)}%</b> 손실을 회피했습니다.
+                      {est && <span style={{ fontSize:10.5, fontWeight:800, color:'var(--color-warning-ink)',
+                        background:'var(--color-warning-soft)', padding:'1px 6px', borderRadius:5, marginLeft:6 }}>추정</span>}
+                      <div style={{ fontSize:11, color:'var(--color-ink-3)', marginTop:4 }}>적중률뿐 아니라 <b>막아낸 손실 크기</b>로 차단의 실효를 봅니다{est ? ' (검증 하락분 합산 추정)' : ''}.</div>
+                    </div>
+                  );
+                })()}
               </div>
+
+              {/* [S7.6] 큰 오판 → 개선노트 링크 — 실패의 투명한 서사화 */}
+              {(() => {
+                const recent = data.recent || [];
+                const bigMiss = recent.filter((r) => r.price_change_pct != null && r.price_change_pct > 0)
+                  .sort((a, b) => b.price_change_pct - a.price_change_pct)[0];
+                if (!bigMiss) return null;
+                return (
+                  <button onClick={() => router.push('/pwa?tab=report')} style={{ width:'100%', textAlign:'left',
+                    background:'var(--color-danger-soft)', border:'1px solid var(--color-danger)', borderRadius:14,
+                    padding:'13px 15px', marginBottom:16, cursor:'pointer', fontFamily:'var(--font-sans)' }}>
+                    <div style={{ fontSize:13, fontWeight:800, color:'var(--color-danger)' }}>
+                      🔧 큰 오판 · {bigMiss.stock} +{bigMiss.price_change_pct.toFixed(1)}%
+                    </div>
+                    <div style={{ fontSize:11.5, color:'var(--color-ink-2)', marginTop:4 }}>
+                      차단 후 상승한 종목입니다. AI가 이 오판을 어떻게 보정 중인지 개선노트에서 확인 →
+                    </div>
+                  </button>
+                );
+              })()}
 
               {/* 사유별 정확도 */}
               <div style={{ background:'var(--color-card)', borderRadius:16, padding:20,

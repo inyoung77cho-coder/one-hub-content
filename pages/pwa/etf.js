@@ -37,6 +37,7 @@ export default function EtfDashboard() {
   const [formMsg, setFormMsg] = useState("");
   const [posQty, setPosQtyState] = useState({}); // [등록 ETF] 티커별 사용자 입력 수량(백엔드 미제공 보완)
   const [acctFilter, setAcctFilter] = useState("전체"); // [S4] 계좌 유형 필터([전체][일반][연금][ISA])
+  const [fcOpen, setFcOpen] = useState(false); // [S7.4] 예측 섹션 기본 접기
   const [pensionContrib, setPensionContrib] = useState(""); // [S4] 올해 연금 납입액(원, 세액공제 진행률)
 
   // [S4] 계좌 필터·연금 납입액·마지막 사용 계좌 기억(localStorage)
@@ -302,11 +303,11 @@ export default function EtfDashboard() {
         </section>
       )}
 
-      {/* 3) Overlap Heat Map (확정, SAMPLE holdings) */}
-      {overlap && !overlap.error && (
+      {/* 3) Overlap Heat Map — [S7.4] 실 주간수급 전까지 SAMPLE 섹션 숨김(오해 방지) */}
+      {overlap && !overlap.error && !overlap.note?.includes("SAMPLE") && (
         <section className="card">
           <div className="label">종목 중복 노출 (Heat Map)
-            <span className="sub">{overlap.note?.includes("SAMPLE") ? "SAMPLE·주간수집 축적중" : ""}</span>
+            <span className="sub">실 보유 기반</span>
           </div>
           <div className="heat">
             {overlap.stocks?.slice(0, 8).map((st) => (
@@ -411,7 +412,12 @@ export default function EtfDashboard() {
         const end = proj[proj.length - 1];
         return (
           <section className="card">
-            <div className="label">시계열 · 예측 <span className="sub forecast-tag">참고용 · 확정 아님</span></div>
+            {/* [S7.4] 예측 기본 접기 — 접힘 시 한 줄 요약(중립 시나리오)만, 경고문은 배지 1개 */}
+            <button className="fc-head" onClick={() => setFcOpen((v) => !v)} aria-expanded={fcOpen}>
+              <span className="label" style={{ margin: 0 }}>시계열 · 예측 <span className="sub forecast-tag">참고 시나리오</span></span>
+              <span className="fc-summary">중립 {won(end.med)}<span className="fc-caret">{fcOpen ? "▾" : "▸"}</span></span>
+            </button>
+            {fcOpen && (<>
             <svg className="fc-svg" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" role="img" aria-label="ETF 평가액 시나리오 투영">
               <path d={areaPath} className="fc-area" />
               {hasHist && <path d={histPath} className="fc-hist" />}
@@ -431,6 +437,7 @@ export default function EtfDashboard() {
               <span className="fc-mid"> · 중립 {won(end.med)}</span>
             </div>
             <div className="fc-assume">가정: 연 기대수익 <b>+{(MU * 100).toFixed(0)}%</b> · 변동성 <b>{(SIG * 100).toFixed(0)}%</b> (주식형 ETF 통상치). <b>확정 예측이 아닌 통계적 시나리오</b>이며 실제 수익은 시장 상황에 따라 달라집니다.{!hasHist && " 일별 평가액이 쌓이면 실제 추이선이 함께 표시됩니다."}</div>
+            </>)}
           </section>
         );
       })()}
@@ -727,6 +734,10 @@ export default function EtfDashboard() {
         .rb-why-t { font-size: 0.78rem; color: var(--color-ink); line-height: 1.5; word-break: keep-all; }
         /* [§3-6] ForecastChart 참고용 */
         .forecast-tag { color: var(--color-warning-ink) !important; background: var(--color-warning-soft); padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; }
+        /* [S7.4] 예측 접기 헤더 */
+        .fc-head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
+        .fc-summary { font-size: 0.82rem; font-weight: 800; color: var(--color-ink-2); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+        .fc-caret { color: var(--color-ink-3); font-size: 0.8rem; }
         .forecast-empty { text-align: center; padding: 18px 10px; }
         .fe-ic { font-size: 1.5rem; margin-bottom: 6px; }
         .fe-t { font-size: 0.86rem; font-weight: 700; color: var(--color-ink); }

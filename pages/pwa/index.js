@@ -189,6 +189,7 @@ export default function PWADashboard({ latestReport }) {
   const [ledger, setLedger] = useState([]); // [나 vs AI] 내 판단(매매/관망) 원장 + 3·7일 성과
   const [decTick, setDecTick] = useState(0); // [나 vs AI] 추천 카드 판단 버튼 상태 리렌더 트리거
   const [trustSec, setTrustSec] = useState('vs'); // [S2.2] AI 트러스트 3섹션 서브내비(vs/verify/archive)
+  const [recSort, setRecSort] = useState('interest'); // [S7.2] 추천 정렬(interest/upside)
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
@@ -1218,7 +1219,22 @@ export default function PWADashboard({ latestReport }) {
                 };
                 // [S1.4] 종목코드 기준 공용 dedup(이중 방어) 후 정렬
                 const uniqCands = dedupBy(data.screening_candidates, (c) => c.code || c.name);
-                const sorted = uniqCands.sort((a, b) => personalScore(b) - personalScore(a));
+                // [S7.2] 정렬 칩: 관심도순(개인화 점수) / 기대수익순
+                const sorted = [...uniqCands].sort((a, b) => recSort === 'upside'
+                  ? (deriveRecMeta(b).upside - deriveRecMeta(a).upside)
+                  : (personalScore(b) - personalScore(a)));
+                // [S7.2] 관심도 5신호 점등(MA·RSI·볼린저·거래량·수급) — 백엔드 s.signals 우선, 없으면 근사
+                const sig5 = (s) => {
+                  if (Array.isArray(s.signals) && s.signals.length >= 5) return s.signals.slice(0, 5).map(Boolean);
+                  return [
+                    s.change_5d != null ? s.change_5d >= 0 : null,               // MA(추세) 근사
+                    s.rsi != null ? (s.rsi > 30 && s.rsi < 70) : null,           // RSI 중립대
+                    s.bollinger != null ? !!s.bollinger : null,                  // 볼린저(있으면)
+                    s.vol_ratio != null ? s.vol_ratio >= 1 : null,               // 거래량
+                    s.supply != null ? !!s.supply : (s.net_buy != null ? s.net_buy >= 0 : null), // 수급
+                  ];
+                };
+                const SIG_LBL = ['MA', 'RSI', '볼', '량', '수급'];
                 const top3 = sorted.slice(0, 3);
                 const rest = sorted.slice(3);
                 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -1244,6 +1260,14 @@ export default function PWADashboard({ latestReport }) {
                   <>
                     {/* [§3-3] 관심도 정의 — 숫자가 뭘 뜻하는지 1줄 */}
                     <div className="rec-def">💡 <b>관심도</b> = MA·RSI·볼린저·거래량·수급 기술점수 합산 <b>(0~15)</b> · 매수 선별 <b>전</b> 후보</div>
+                    {/* [S7.2] 정렬 칩 */}
+                    <div className="rec-sort">
+                      {[['interest','관심도순'],['upside','기대수익순']].map(([k,l]) => (
+                        <button key={k} className={`rec-sort-chip ${recSort===k?'on':''}`} onClick={() => setRecSort(k)}>{l}</button>
+                      ))}
+                    </div>
+                    {/* [S7.2] 샀어요 마이크로카피 — 채점 등록 안내 + 기록 탭 딥링크 */}
+                    <div className="rec-micro">🥊 <b>샀어요</b>를 누르면 <b>나 vs AI 채점</b>에 등록되고 <b>3일·7일 뒤</b> 실제 수익으로 자동 비교됩니다 <button className="rec-micro-link" onClick={() => setTab('report')}>기록 보기 →</button></div>
                     {/* Top3 Hero 카드 — 관심도 + 스탠스 + 근거 1줄 + 기대 여력 인라인(원칙4) */}
                     <div className="top3-hero-row">
                       {top3.map((s, i) => {
@@ -1258,6 +1282,10 @@ export default function PWADashboard({ latestReport }) {
                               onClick={(e) => { e.stopPropagation(); setTab('analyze'); runAnalyze(s.code, s.name); }}
                             >{s.name}</button>
                             <div className="top3-ai-pct mono">관심도 {sc}</div>
+                            {/* [S7.2] 관심도 5신호 점등 */}
+                            <div className="sig5" title="MA·RSI·볼린저·거래량·수급">
+                              {sig5(s).map((on, k) => <span key={k} className={`sig-dot ${on === true ? 'on' : on === false ? 'off' : 'na'}`}>{SIG_LBL[k]}</span>)}
+                            </div>
                             <span className="top3-stance" style={{ color: m.stance.color, borderColor: m.stance.color }}>{m.stance.label}</span>
                             <div className="top3-reason">{m.reason}</div>
                             <div className="top3-upside">기대 <b>~+{m.upside}%</b><span className="est">추정</span></div>
@@ -1672,6 +1700,22 @@ export default function PWADashboard({ latestReport }) {
                             <span className="pos-stance-reason">{st.reason}</span>
                           </div>
                         ); })()}
+                        {/* [S7.1] 종목별 다음 트리거 — 조건부 다음 행동 1줄(손절·익절 레벨) */}
+                        {(() => {
+                          const avg = Number(p.avg_price || 0), cur = Number(p.current_price || 0);
+                          if (!(avg > 0)) return null;
+                          const stop = safeNum(p.stop_loss) > 0 ? Number(p.stop_loss) : Math.round(avg * 0.92);
+                          const tgt = safeNum(p.target) > 0 ? Number(p.target) : Math.round(avg * 1.15);
+                          const toStop = cur > 0 ? ((stop / cur - 1) * 100) : null;
+                          const parts = [];
+                          parts.push(`손절 ${stop.toLocaleString()}${toStop != null ? ` (${toStop >= 0 ? '+' : ''}${toStop.toFixed(1)}%)` : ''}`);
+                          parts.push(`목표 ${tgt.toLocaleString()} 도달 시 절반 익절 제안`);
+                          return (
+                            <div className="pos-trigger">⏭ <b>다음 트리거</b> · 유지 · {parts.join(' · ')}
+                              {!(safeNum(p.stop_loss) > 0 && safeNum(p.target) > 0) && <span className="pt-est">추정 레벨</span>}
+                            </div>
+                          );
+                        })()}
                         {(() => {
                           // [§3-4] 상태 배지는 위 AI 스탠스로 통합(중복 제거) — 여기선 액션 버튼만
                           const posKey = p.code || i;
@@ -2891,6 +2935,18 @@ export default function PWADashboard({ latestReport }) {
         .dec-b.pass.on { background: var(--color-ink-2, var(--text-secondary)); color: #fff; border-color: var(--color-ink-2, var(--text-secondary)); }
         .dec-b:active { transform: scale(0.97); }
         .rec-def { font-size: 0.72rem; color: var(--text-secondary); background: var(--inset-bg); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; margin-bottom: 12px; line-height: 1.5; }
+        /* [S7.2] 추천 정렬 칩 · 샀어요 마이크로카피 · 5신호 점등 */
+        .rec-sort { display: flex; gap: 6px; margin-bottom: 10px; }
+        .rec-sort-chip { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 999px; padding: 6px 13px; font-size: 0.74rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .rec-sort-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .rec-micro { font-size: 0.68rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 9px; padding: 8px 11px; margin-bottom: 12px; line-height: 1.5; word-break: keep-all; }
+        .rec-micro b { color: var(--color-ink); font-weight: 700; }
+        .rec-micro-link { border: none; background: none; color: var(--color-primary); font-weight: 800; font-size: 0.68rem; cursor: pointer; font-family: var(--font-sans); padding: 0 0 0 3px; }
+        .sig5 { display: flex; gap: 3px; justify-content: center; margin: 5px 0; }
+        .sig-dot { font-size: 0.5rem; font-weight: 800; padding: 2px 4px; border-radius: 4px; line-height: 1; }
+        .sig-dot.on { background: var(--color-success-soft); color: var(--color-success-ink, var(--color-success)); }
+        .sig-dot.off { background: var(--color-card-soft); color: var(--color-ink-3); }
+        .sig-dot.na { background: var(--color-card-soft); color: var(--color-ink-3); opacity: 0.5; }
         .rec-def b { color: var(--text-primary); font-weight: 700; }
         .top3-stance { font-size: 0.6rem; font-weight: 800; padding: 1px 7px; border-radius: 20px; border: 1px solid; line-height: 1.5; }
         .top3-reason { font-size: 0.64rem; color: var(--text-secondary); line-height: 1.35; word-break: keep-all; min-height: 2.4em; display: flex; align-items: center; }
@@ -3144,6 +3200,10 @@ export default function PWADashboard({ latestReport }) {
         .position-card-ai-text { font-size: 0.76rem; line-height: 1.55; color: var(--text-secondary); }
         /* [§3-4] 보유 AI 스탠스 + 근거 인라인 */
         .pos-stance { display: flex; align-items: flex-start; gap: 8px; margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--border); }
+        /* [S7.1] 종목별 다음 트리거 */
+        .pos-trigger { font-size: 0.68rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 8px; padding: 7px 10px; margin-top: 8px; line-height: 1.5; word-break: keep-all; }
+        .pos-trigger b { color: var(--color-ink); font-weight: 800; }
+        .pt-est { font-size: 0.56rem; font-weight: 800; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 1px 5px; border-radius: 4px; margin-left: 5px; }
         .pos-stance-badge { flex-shrink: 0; font-size: 0.72rem; font-weight: 800; padding: 2px 9px; border-radius: 20px; border: 1.5px solid currentColor; }
         .pos-stance-reason { font-size: 0.74rem; color: var(--text-secondary); line-height: 1.45; word-break: keep-all; }
         /* [§3-4] 매수 차단 종목 강화 — 해제 조건 + 정확도 링크 */
