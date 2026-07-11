@@ -19,6 +19,11 @@ export default function RealEstateDashboard() {
   const [err, setErr] = useState(null);
   const [myC, setMyC] = useState("");   // [S5] 내 단지
   const [tgtC, setTgtC] = useState(""); // [S5] 갈아탈 목표 단지
+  const [myProp, setMyProp] = useState(null); // [S5] 내 단지 상세(위저드 등록: 평형·동층·매수가·시점)
+  const [wizOpen, setWizOpen] = useState(false); // [S5] 등록 위저드 열림
+  const [wiz, setWiz] = useState({ name: "", pyeong: "", dongfloor: "", buyUk: "", buyMonth: "" });
+  const [budget, setBudget] = useState("");     // [S5] 스크리너 예산(억)
+  const [jeonseRate, setJeonseRate] = useState("60"); // [S5] 전세가율(%) 가정
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/re/${fn}`).then((r) => r.json());
@@ -28,10 +33,28 @@ export default function RealEstateDashboard() {
         setBrief(b); setRank(r); setMacro(m); setFeed(f);
       })
       .catch((e) => setErr(e.message));
-    try { setMyC(localStorage.getItem("onehub_re_my") || ""); setTgtC(localStorage.getItem("onehub_re_target") || ""); } catch (e) {}
+    try {
+      setMyC(localStorage.getItem("onehub_re_my") || "");
+      setTgtC(localStorage.getItem("onehub_re_target") || "");
+      const mp = localStorage.getItem("onehub_re_my_property");
+      if (mp) { const o = JSON.parse(mp); setMyProp(o); if (o?.name && !localStorage.getItem("onehub_re_my")) setMyC(o.name); }
+      const bg = localStorage.getItem("onehub_re_budget"); if (bg != null) setBudget(bg);
+      const jr = localStorage.getItem("onehub_re_jeonse"); if (jr != null) setJeonseRate(jr);
+    } catch (e) {}
   }, []);
   const pickMy = (v) => { setMyC(v); try { localStorage.setItem("onehub_re_my", v); } catch (e) {} };
   const pickTgt = (v) => { setTgtC(v); try { localStorage.setItem("onehub_re_target", v); } catch (e) {} };
+  const changeBudget = (v) => { setBudget(v); try { localStorage.setItem("onehub_re_budget", v); } catch (e) {} };
+  const changeJeonse = (v) => { setJeonseRate(v); try { localStorage.setItem("onehub_re_jeonse", v); } catch (e) {} };
+  const openWiz = () => { setWiz(myProp ? { name: myProp.name || "", pyeong: myProp.pyeong || "", dongfloor: myProp.dongfloor || "", buyUk: myProp.buyUk || "", buyMonth: myProp.buyMonth || "" } : { name: myC || "", pyeong: "", dongfloor: "", buyUk: "", buyMonth: "" }); setWizOpen(true); };
+  const saveWiz = () => {
+    const name = String(wiz.name || "").trim();
+    if (!name) return;
+    const obj = { name, pyeong: wiz.pyeong, dongfloor: wiz.dongfloor, buyUk: wiz.buyUk, buyMonth: wiz.buyMonth };
+    setMyProp(obj); setMyC(name);
+    try { localStorage.setItem("onehub_re_my_property", JSON.stringify(obj)); localStorage.setItem("onehub_re_my", name); } catch (e) {}
+    setWizOpen(false);
+  };
 
   const mac = macro?.latest;
 
@@ -73,8 +96,41 @@ export default function RealEstateDashboard() {
         );
       })()}
 
-      {/* slim CTA — 내 단지 등록 유도 (§5③ 미입력=회색 중립, 위험 아님) */}
-      <div className="cta-slim" onClick={() => { window.location.href = '/pwa/onboarding'; }}><span className="cta-txt">🏠 내 단지를 등록하면 <b>국면·저평가·리밸런싱에 반영</b>됩니다</span><span className="arr">→</span></div>
+      {/* [S5] 내 단지 — 미등록: 위저드 CTA / 등록됨: 상세 요약(매수가 vs 현재 AVM) */}
+      {!myProp ? (
+        <div className="cta-slim" onClick={openWiz}><span className="cta-txt">🏠 내 단지를 등록하면 <b>갈아타기 갭·평가손익·스크리너</b>에 반영됩니다</span><span className="arr">→</span></div>
+      ) : (() => {
+        const cur = rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명).find((o) => o.단지명 === myProp.name) : null;
+        const curUk = cur ? Number(cur.avm_total_uk || 0) : null;
+        const buyUk = Number(myProp.buyUk || 0) || null;
+        const pnl = curUk != null && buyUk != null ? curUk - buyUk : null;
+        const pnlPct = pnl != null && buyUk ? (pnl / buyUk) * 100 : null;
+        return (
+          <section className="card myprop-card">
+            <div className="mp-h">
+              <div className="mp-title">🏠 내 단지 <b>{myProp.name}</b></div>
+              <button className="mp-edit" onClick={openWiz}>수정</button>
+            </div>
+            <div className="mp-meta">
+              {myProp.pyeong && <span>{myProp.pyeong}평</span>}
+              {myProp.dongfloor && <span>{myProp.dongfloor}</span>}
+              {myProp.buyMonth && <span>{myProp.buyMonth} 매수</span>}
+              {buyUk != null && <span>매수 {uk(buyUk)}</span>}
+            </div>
+            {curUk != null ? (
+              <div className="mp-pnl">
+                <div className="mp-now"><span>현재 AVM</span><b>{uk(curUk)}</b></div>
+                <div className={`mp-diff ${pnl >= 0 ? "pos" : "neg"}`}>
+                  <span>평가손익<em>추정</em></span><b>{pnl >= 0 ? "+" : ""}{uk(pnl)}{pnlPct != null ? ` · ${pct(pnlPct)}` : ""}</b>
+                </div>
+              </div>
+            ) : (
+              <div className="mp-nomatch">랭킹에 없는 단지입니다 — 갭·스크리너는 목록 단지 기준으로 계산됩니다. (AVM 매칭은 실거래 축적 시)</div>
+            )}
+            <div className="mp-note">매수가·시점은 로컬에만 저장되며, 평가손익은 현재 AVM 기준 <b>추정</b>(확정 아님)입니다.</div>
+          </section>
+        );
+      })()}
 
       {/* [S5] 갈아타기 갭 트래커 — 내 단지 vs 목표 단지 갭(핵심 기능 3종) */}
       {rank?.ranking?.length > 0 && (() => {
@@ -104,10 +160,63 @@ export default function RealEstateDashboard() {
                   <div className="gap-row"><span>{my.단지명}</span><b>{uk(my.avm_total_uk)}</b></div>
                   <div className="gap-row"><span>{tgt.단지명}</span><b>{uk(tgt.avm_total_uk)}</b></div>
                 </div>
-                <div className="gap-note">현재 시점 AVM 기준 갭입니다. 갭 <b>추이·축소 알림</b>은 단지별 실거래 이력이 축적되면 제공됩니다 (회귀 근사·lag=0·확정 아님).</div>
+                {/* [S5] 갭 밴드 — 현재 갭 ± 상대가치 변동폭(추정·점예측 아님·lag=0) */}
+                {(() => {
+                  const g = Math.abs(gap);
+                  const band = g * 0.15; // 상대가치 변동폭 근사(±15%) — 확정 아님
+                  const lo = Math.max(0, g - band), hi = g + band;
+                  return (
+                    <div className="gap-band">
+                      <div className="gb-h"><span className="gb-lbl">갭 밴드</span><span className="gb-tag">추정 · 상대가치</span></div>
+                      <div className="gb-track"><div className="gb-fill" style={{ left: "15%", right: "15%" }} /><div className="gb-mid" style={{ left: "50%" }} /></div>
+                      <div className="gb-scale"><span>{uk(lo)}</span><span>현재 {uk(g)}</span><span>{uk(hi)}</span></div>
+                    </div>
+                  );
+                })()}
+                <div className="gap-note">현재 시점 AVM 기준 갭입니다. 밴드는 <b>상대가치 변동폭 근사(±)</b>이며 <b>단일 시점 예측이 아닙니다</b>. 갭 <b>추이·축소 알림</b>은 단지별 실거래 이력이 축적되면 제공됩니다 (회귀 근사·lag=0·확정 아님).</div>
               </div>
             ) : (
               <div className="gap-empty">내 단지와 목표 단지를 고르면 <b>갈아타기에 필요한 자금(갭)</b>이 계산됩니다.</div>
+            )}
+          </section>
+        );
+      })()}
+
+      {/* [S5] 투자아파트 스크리너 — 예산·전세가율 → 갭투자금 후보(상대가치·추정) */}
+      {rank?.ranking?.length > 0 && (() => {
+        const opts = dedupBy(rank.ranking, (c) => c.단지ID || c.단지명);
+        const jr = Math.max(0, Math.min(100, Number(jeonseRate) || 0)) / 100;
+        const bg = Number(budget) || 0;
+        const scored = opts.map((o) => {
+          const avm = Number(o.avm_total_uk || 0);
+          const gapInvest = avm * (1 - jr); // 갭투자금 = 매매 − 전세(전세가율 가정)
+          return { ...o, gapInvest };
+        }).filter((o) => o.gapInvest > 0);
+        const matched = (bg > 0 ? scored.filter((o) => o.gapInvest <= bg) : scored)
+          .sort((a, b) => (b.one_score ?? 0) - (a.one_score ?? 0)).slice(0, 6);
+        return (
+          <section className="card scr-card">
+            <div className="label">🔎 투자아파트 스크리너 <span className="sub">예산·전세가율 → 갭투자금</span></div>
+            <div className="scr-inputs">
+              <label className="scr-in"><span>예산(억)</span>
+                <input type="number" inputMode="decimal" placeholder="예: 3" value={budget} onChange={(e) => changeBudget(e.target.value)} /></label>
+              <label className="scr-in"><span>전세가율(%)</span>
+                <input type="number" inputMode="numeric" placeholder="60" value={jeonseRate} onChange={(e) => changeJeonse(e.target.value)} /></label>
+            </div>
+            {matched.length > 0 ? (
+              <>
+                <div className="scr-head"><span>단지</span><span>매매(AVM)</span><span>갭투자금</span></div>
+                {matched.map((o, i) => (
+                  <div className="scr-row" key={`${o.단지ID || o.단지명}-${i}`}>
+                    <span className="scr-name">{o.단지명} <span className={`vtag ${vtag(o.valuation)}`}>{o.valuation}</span></span>
+                    <span className="scr-avm">{uk(o.avm_total_uk)}</span>
+                    <span className={`scr-gap ${bg > 0 && o.gapInvest <= bg ? "ok" : ""}`}>{uk(o.gapInvest)}</span>
+                  </div>
+                ))}
+                <div className="note">갭투자금 = 매매(AVM) × (1 − 전세가율{Math.round(jr * 100)}%). 전세가율은 <b>사용자 가정치</b>이며 단지·평형별 실제 전세가와 다릅니다 (상대가치·추정·확정 아님).</div>
+              </>
+            ) : (
+              <div className="gap-empty">예산 범위에 맞는 단지가 없습니다. 예산을 높이거나 전세가율을 조정해 보세요.</div>
             )}
           </section>
         );
@@ -197,6 +306,35 @@ export default function RealEstateDashboard() {
         </section>
       )}
 
+      {/* [S5] 내 단지 등록 위저드 — 자동완성·평형·동층·매수가·시점 */}
+      {wizOpen && (
+        <div className="wiz-scrim" onClick={() => setWizOpen(false)}>
+          <div className="wiz" onClick={(e) => e.stopPropagation()}>
+            <div className="wiz-h">🏠 내 단지 등록<button className="wiz-x" onClick={() => setWizOpen(false)} aria-label="닫기">✕</button></div>
+            <label className="wiz-f"><span>단지명</span>
+              <input list="re-complex-list" value={wiz.name} onChange={(e) => setWiz((w) => ({ ...w, name: e.target.value }))} placeholder="단지명 입력·선택" />
+              <datalist id="re-complex-list">
+                {(rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명) : []).map((o) => <option key={o.단지ID || o.단지명} value={o.단지명} />)}
+              </datalist>
+            </label>
+            <div className="wiz-row">
+              <label className="wiz-f"><span>평형(평)</span>
+                <input type="number" inputMode="numeric" value={wiz.pyeong} onChange={(e) => setWiz((w) => ({ ...w, pyeong: e.target.value }))} placeholder="34" /></label>
+              <label className="wiz-f"><span>동/층</span>
+                <input value={wiz.dongfloor} onChange={(e) => setWiz((w) => ({ ...w, dongfloor: e.target.value }))} placeholder="101동 15층" /></label>
+            </div>
+            <div className="wiz-row">
+              <label className="wiz-f"><span>매수가(억)</span>
+                <input type="number" inputMode="decimal" value={wiz.buyUk} onChange={(e) => setWiz((w) => ({ ...w, buyUk: e.target.value }))} placeholder="8.5" /></label>
+              <label className="wiz-f"><span>매수 시점</span>
+                <input type="month" value={wiz.buyMonth} onChange={(e) => setWiz((w) => ({ ...w, buyMonth: e.target.value }))} /></label>
+            </div>
+            <button className="wiz-save" onClick={saveWiz} disabled={!String(wiz.name || "").trim()}>저장</button>
+            <div className="wiz-note">입력값은 이 기기에만 저장됩니다(localStorage). 평가손익·갭은 현재 AVM 기준 <b>추정</b>입니다.</div>
+          </div>
+        </div>
+      )}
+
       <div className="foot">실거래 기반 확정 지표 + 회귀 예측(근사). 예측치는 참고용이며 투자판단은 본인 책임.</div>
 
       <style jsx>{`
@@ -248,6 +386,57 @@ export default function RealEstateDashboard() {
         .gap-note b { color: var(--color-ink-2); font-weight: 700; }
         .gap-empty { margin-top: 12px; font-size: 0.76rem; color: var(--color-ink-2); line-height: 1.6; word-break: keep-all; }
         .gap-empty b { color: var(--color-ink); font-weight: 700; }
+        /* [S5] 갭 밴드(상대가치·추정) */
+        .gap-band { margin-top: 14px; }
+        .gb-h { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+        .gb-lbl { font-size: 0.72rem; font-weight: 800; color: var(--color-ink-2); }
+        .gb-tag { font-size: 0.6rem; font-weight: 800; padding: 2px 7px; border-radius: 5px; background: var(--color-warning-soft); color: var(--color-warning-ink); }
+        .gb-track { position: relative; height: 10px; background: var(--color-card-soft); border-radius: 999px; overflow: hidden; }
+        .gb-fill { position: absolute; top: 0; bottom: 0; background: var(--color-primary-soft); }
+        .gb-mid { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--color-primary); transform: translateX(-1px); }
+        .gb-scale { display: flex; justify-content: space-between; font-size: 0.64rem; color: var(--color-ink-3); font-weight: 600; margin-top: 5px; }
+        .gb-scale span:nth-child(2) { color: var(--color-primary); font-weight: 800; }
+        /* [S5] 내 단지 요약 카드 */
+        .myprop-card .mp-h { display: flex; align-items: center; justify-content: space-between; }
+        .mp-title { font-size: 0.86rem; font-weight: 700; color: var(--color-ink-2); }
+        .mp-title b { color: var(--color-ink); font-weight: 800; margin-left: 4px; }
+        .mp-edit { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 8px; padding: 5px 12px; font-size: 0.72rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .mp-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+        .mp-meta span { font-size: 0.68rem; font-weight: 700; background: var(--color-card-soft); color: var(--color-ink-2); border-radius: 7px; padding: 4px 9px; }
+        .mp-pnl { display: flex; gap: 10px; margin-top: 12px; }
+        .mp-now, .mp-diff { flex: 1; background: var(--color-card-soft); border-radius: 11px; padding: 11px 13px; }
+        .mp-now span, .mp-diff span { display: block; font-size: 0.66rem; color: var(--color-ink-3); font-weight: 600; margin-bottom: 4px; }
+        .mp-now b, .mp-diff b { font-size: 1.05rem; font-weight: 800; }
+        .mp-diff em { font-style: normal; font-size: 0.56rem; font-weight: 800; background: var(--color-warning-soft); color: var(--color-warning-ink); padding: 1px 5px; border-radius: 4px; margin-left: 5px; vertical-align: middle; }
+        .mp-diff.pos b { color: var(--color-success); } .mp-diff.neg b { color: var(--color-danger); }
+        .mp-nomatch { font-size: 0.72rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 10px; padding: 10px 12px; margin-top: 11px; line-height: 1.5; word-break: keep-all; }
+        .mp-note { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 10px; line-height: 1.5; word-break: keep-all; }
+        .mp-note b { color: var(--color-ink-2); font-weight: 700; }
+        /* [S5] 투자아파트 스크리너 */
+        .scr-inputs { display: flex; gap: 8px; margin-bottom: 12px; }
+        .scr-in { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 0.68rem; color: var(--color-ink-3); font-weight: 700; }
+        .scr-in input { border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 9px; padding: 9px 10px; font-size: 0.84rem; font-family: var(--font-sans); color: var(--color-ink); }
+        .scr-in input:focus { outline: none; border-color: var(--color-primary); }
+        .scr-head { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; font-size: 0.64rem; color: var(--color-ink-3); font-weight: 700; padding-bottom: 6px; border-bottom: 1px solid var(--color-line); }
+        .scr-head span:nth-child(2), .scr-head span:nth-child(3) { text-align: right; min-width: 56px; }
+        .scr-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--color-line); }
+        .scr-name { font-size: 0.82rem; font-weight: 700; color: var(--color-ink); display: flex; align-items: center; gap: 6px; min-width: 0; }
+        .scr-avm { font-size: 0.8rem; font-weight: 700; color: var(--color-ink-2); font-family: ui-monospace, monospace; text-align: right; min-width: 56px; }
+        .scr-gap { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; text-align: right; min-width: 56px; }
+        .scr-gap.ok { color: var(--color-success); }
+        /* [S5] 등록 위저드 바텀시트 */
+        .wiz-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
+        .wiz { width: 100%; max-width: 480px; background: var(--color-card); border-radius: 20px 20px 0 0; padding: 20px 18px calc(env(safe-area-inset-bottom, 0px) + 20px); box-shadow: var(--shadow-float); }
+        .wiz-h { display: flex; align-items: center; justify-content: space-between; font-size: 1rem; font-weight: 800; color: var(--color-ink); margin-bottom: 16px; }
+        .wiz-x { border: none; background: var(--color-card-soft); color: var(--color-ink-2); width: 30px; height: 30px; border-radius: 50%; font-size: 0.9rem; cursor: pointer; }
+        .wiz-f { display: flex; flex-direction: column; gap: 5px; font-size: 0.7rem; color: var(--color-ink-3); font-weight: 700; margin-bottom: 11px; flex: 1; }
+        .wiz-f input { border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 10px; padding: 11px 12px; font-size: 0.9rem; font-family: var(--font-sans); color: var(--color-ink); }
+        .wiz-f input:focus { outline: none; border-color: var(--color-primary); }
+        .wiz-row { display: flex; gap: 10px; }
+        .wiz-save { width: 100%; margin-top: 6px; border: none; border-radius: 12px; padding: 13px 0; font-size: 0.92rem; font-weight: 800; color: #fff; background: var(--color-primary); cursor: pointer; font-family: var(--font-sans); }
+        .wiz-save:disabled { opacity: 0.5; cursor: not-allowed; }
+        .wiz-note { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 11px; line-height: 1.5; word-break: keep-all; text-align: center; }
+        .wiz-note b { color: var(--color-ink-2); font-weight: 700; }
         .label { font-size: 0.9rem; font-weight: 700; color: var(--color-ink); margin-bottom: 12px; }
         .sub { font-weight: 600; color: var(--color-ink-3); font-size: 0.68rem; margin-left: 6px; }
         /* ONE Score 랭킹 */
