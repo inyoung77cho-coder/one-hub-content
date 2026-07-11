@@ -1,5 +1,6 @@
 ﻿import Head from 'next/head';
 import Link from 'next/link';
+import PageHero from '../components/PageHero';
 
 export default function PwaGuide() {
   return (
@@ -8,15 +9,9 @@ export default function PwaGuide() {
         <title>PWA 설치 가이드 | ONE-HUB</title>
         <meta name="description" content="ONE-HUB PWA를 홈 화면에 추가하는 방법" />
       </Head>
-      <div style={{ minHeight: '100vh', background: '#f0f6ff', fontFamily: 'Pretendard, sans-serif', paddingBottom: 60 }}>
-
-        {/* 헤더 */}
-        <div style={{ background: '#fff', borderBottom: '1px solid #e2eaf4', padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 12, position: 'sticky', top: 0, zIndex: 10 }}>
-          <Link href="/" style={{ textDecoration: 'none', color: '#64748b', fontSize: 20 }}>←</Link>
-          <span style={{ fontWeight: 700, fontSize: 17, color: '#1e293b' }}>📱 PWA 설치 가이드</span>
-        </div>
-
-        <div style={{ maxWidth: 520, margin: '0 auto', padding: '24px 16px' }}>
+      <div style={{ minHeight: '100vh', background: '#F4F9FF', fontFamily: 'Pretendard, sans-serif' }}>
+        <PageHero eyebrow="Install Guide" title="📱 PWA 설치 가이드" subtitle="ONE-HUB를 홈 화면에 추가하고 실시간 AI 추천 알림을 받아보세요." />
+        <div className="oh-main" style={{ maxWidth: 560 }}>
 
           {/* 소개 카드 */}
           <div style={{ background: '#fff', borderRadius: 16, padding: 24, marginBottom: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>

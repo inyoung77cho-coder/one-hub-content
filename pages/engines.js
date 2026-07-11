@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Head from "next/head";
+import PageHero from '../components/PageHero';
 import { APP_VERSION } from '../lib/version';
 import CTABar from '../components/CTABar';
 import LastUpdated from '../components/LastUpdated';
@@ -784,6 +785,7 @@ export default function EnginePage() {
 
       <style>{STYLES}</style>
 
+      <PageHero eyebrow="Engine Hub" title="⚙ 엔진 허브" subtitle="자동매매 엔진 현황 — 엔진 상태·보유 종목·스케줄·전략을 30초마다 실시간 갱신합니다." />
       <div className="page">
         {/* 상태바 */}
         <div className="eng-status-bar">

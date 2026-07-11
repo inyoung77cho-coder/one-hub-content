@@ -1,6 +1,7 @@
 ﻿// pages/heat-history.js
 import Head from 'next/head';
 import Link from 'next/link';
+import PageHero from '../components/PageHero';
 import { useState, useEffect } from 'react';
 import {
   LineChart,
@@ -14,10 +15,10 @@ import {
 } from 'recharts';
 
 const GRADE_COLORS = {
-  HOT: '#ff4d4f',
+  HOT: '#F04452',
   WARM: '#faad14',
-  COOL: '#1890ff',
-  COLD: '#597ef7',
+  COOL: '#2F6BFF',
+  COLD: '#2F6BFF',
 };
 
 const REGIME_LABELS = {
@@ -90,20 +91,14 @@ export default function HeatHistory() {
     : null;
 
   return (
-    <div style={{ minHeight: '100vh', background: '#0a0a0f', color: '#e0e0e8' }}>
+    <div style={{ minHeight: '100vh', background: '#F4F9FF', color: '#1E293B' }}>
       <Head>
         <title>Heat Score History | ONE-HUB</title>
       </Head>
 
-      <main style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px' }}>
-        <div style={{ marginBottom: 12 }}>
-          <Link href="/dashboard" style={{ color: '#39ff88', fontSize: 13, textDecoration: 'none' }}>
-            ← Dashboard
-          </Link>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, margin: 0 }}>🌡 Heat Score History</h1>
+      <PageHero eyebrow="Heat History" title="🌡 히트 스코어 히스토리" subtitle="시장 과열도(Heat Score)의 시계열 추이를 추적합니다." />
+      <main className="oh-main" style={{ maxWidth: 900 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginBottom: 20 }}>
           <div style={{ display: 'flex', gap: 8 }}>
             {['A', 'B'].map((t) => (
               <button
@@ -112,9 +107,9 @@ export default function HeatHistory() {
                 style={{
                   padding: '6px 16px',
                   borderRadius: 8,
-                  border: '1px solid #2a2a35',
-                  background: trader === t ? '#39ff88' : 'transparent',
-                  color: trader === t ? '#0a0a0f' : '#e0e0e8',
+                  border: '1px solid #E8EEF7',
+                  background: trader === t ? '#16C784' : 'transparent',
+                  color: trader === t ? '#F4F9FF' : '#1E293B',
                   fontWeight: 600,
                   cursor: 'pointer',
                 }}
@@ -126,7 +121,7 @@ export default function HeatHistory() {
         </div>
 
         {error && (
-          <div style={{ padding: 16, background: '#2a1a1a', borderRadius: 8, marginBottom: 16, color: '#ff8080' }}>
+          <div style={{ padding: 16, background: '#FDECEE', borderRadius: 8, marginBottom: 16, color: '#ff8080' }}>
             데이터를 불러오지 못했습니다: {error}
           </div>
         )}
@@ -137,27 +132,27 @@ export default function HeatHistory() {
 
         {!loading && !error && current && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 12, marginBottom: 24 }}>
-            <StatCard label="현재 점수" value={current.heat_score} color="#39ff88" />
-            <StatCard label="등급" value={current.heat_grade} color={GRADE_COLORS[current.heat_grade] || '#e0e0e8'} />
+            <StatCard label="현재 점수" value={current.heat_score} color="#16C784" />
+            <StatCard label="등급" value={current.heat_grade} color={GRADE_COLORS[current.heat_grade] || '#1E293B'} />
             <StatCard label="시장 상태" value={REGIME_LABELS[current.regime] || current.regime} />
             <StatCard label="마지막 업데이트" value={formatTime(current.date)} small />
           </div>
         )}
 
         {!loading && !error && chartData.length > 0 && (
-          <div style={{ background: '#15151f', borderRadius: 12, padding: '16px 8px', marginBottom: 24, border: '1px solid #2a2a35' }}>
+          <div style={{ background: '#FFFFFF', borderRadius: 12, padding: '16px 8px', marginBottom: 24, border: '1px solid #E8EEF7' }}>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={chartData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a35" />
+                <CartesianGrid strokeDasharray="3 3" stroke="#E8EEF7" />
                 <XAxis dataKey="label" stroke="#888" fontSize={11} />
                 <YAxis domain={[0, 100]} stroke="#888" fontSize={11} />
                 <Tooltip
-                  contentStyle={{ background: '#1f1f2b', border: '1px solid #2a2a35', borderRadius: 8 }}
-                  labelStyle={{ color: '#e0e0e8' }}
+                  contentStyle={{ background: '#FFFFFF', border: '1px solid #E8EEF7', borderRadius: 8 }}
+                  labelStyle={{ color: '#1E293B' }}
                 />
-                <ReferenceLine y={70} stroke="#ff4d4f" strokeDasharray="4 4" label={{ value: 'HOT', position: 'right', fill: '#ff4d4f', fontSize: 11 }} />
-                <ReferenceLine y={30} stroke="#597ef7" strokeDasharray="4 4" label={{ value: 'COLD', position: 'right', fill: '#597ef7', fontSize: 11 }} />
-                <Line type="monotone" dataKey="heat_score" stroke="#39ff88" strokeWidth={2} dot={false} name="Heat Score" />
+                <ReferenceLine y={70} stroke="#F04452" strokeDasharray="4 4" label={{ value: 'HOT', position: 'right', fill: '#F04452', fontSize: 11 }} />
+                <ReferenceLine y={30} stroke="#2F6BFF" strokeDasharray="4 4" label={{ value: 'COLD', position: 'right', fill: '#2F6BFF', fontSize: 11 }} />
+                <Line type="monotone" dataKey="heat_score" stroke="#16C784" strokeWidth={2} dot={false} name="Heat Score" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -167,7 +162,7 @@ export default function HeatHistory() {
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr style={{ borderBottom: '1px solid #2a2a35', textAlign: 'left' }}>
+                <tr style={{ borderBottom: '1px solid #E8EEF7', textAlign: 'left' }}>
                   <th style={thStyle}>시간</th>
                   <th style={thStyle}>Heat</th>
                   <th style={thStyle}>등급</th>
@@ -181,10 +176,10 @@ export default function HeatHistory() {
               </thead>
               <tbody>
                 {sortedHistory.map((item, idx) => (
-                  <tr key={idx} style={{ borderBottom: '1px solid #1f1f2b' }}>
+                  <tr key={idx} style={{ borderBottom: '1px solid #FFFFFF' }}>
                     <td style={tdStyle}>{formatTime(item.date)}</td>
                     <td style={{ ...tdStyle, fontWeight: 700 }}>{item.heat_score}</td>
-                    <td style={{ ...tdStyle, color: GRADE_COLORS[item.heat_grade] || '#e0e0e8' }}>{item.heat_grade}</td>
+                    <td style={{ ...tdStyle, color: GRADE_COLORS[item.heat_grade] || '#1E293B' }}>{item.heat_grade}</td>
                     <td style={tdStyle}>{REGIME_LABELS[item.regime] || item.regime}</td>
                     <td style={tdStyle}>{item.usdkrw}</td>
                     <td style={tdStyle}>{formatPct(item.nasdaq_chg)}</td>
@@ -214,9 +209,9 @@ function formatPct(val) {
 
 function StatCard({ label, value, color, small }) {
   return (
-    <div style={{ background: '#15151f', border: '1px solid #2a2a35', borderRadius: 10, padding: '12px 14px' }}>
+    <div style={{ background: '#FFFFFF', border: '1px solid #E8EEF7', borderRadius: 10, padding: '12px 14px' }}>
       <div style={{ fontSize: 11, color: '#888', marginBottom: 4 }}>{label}</div>
-      <div style={{ fontSize: small ? 13 : 20, fontWeight: 700, color: color || '#e0e0e8' }}>{value}</div>
+      <div style={{ fontSize: small ? 13 : 20, fontWeight: 700, color: color || '#1E293B' }}>{value}</div>
     </div>
   );
 }

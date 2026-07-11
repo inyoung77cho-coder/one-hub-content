@@ -1,5 +1,6 @@
 ﻿import Head from "next/head";
 import Link from "next/link";
+import PageHero from "../components/PageHero";
 import { useState, useEffect } from "react";
 import LastUpdated from "../components/LastUpdated";
 
@@ -135,15 +136,10 @@ export default function Dashboard() {
         <meta name="description" content="ONE-HUB 트레이더 실시간 현황 대시보드" />
         <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700&display=swap" rel="stylesheet" />
       </Head>
+      <PageHero eyebrow="Dashboard" title="📊 대시보드" subtitle="실시간 포지션과 AI 결정 현황." />
       <div className="page-wrapper">
         <main className="main">
-          <div style={{ marginBottom: "1.5rem" }}>
-            <h1 style={{ fontFamily: "Syne, sans-serif", fontSize: "1.75rem", fontWeight: 700, marginBottom: "0.5rem" }}>
-              ONE-HUB Dashboard
-            </h1>
-            <p style={muted}>실시간, 포지션과 AI 결정 현황</p>
-            <LastUpdated timestamp={dashTs} />
-          </div>
+          <div style={{ marginBottom: "1rem" }}><LastUpdated timestamp={dashTs} /></div>
 
           <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
             {["A", "B"].map(t => (
