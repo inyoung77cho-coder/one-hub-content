@@ -188,6 +188,7 @@ export default function PWADashboard({ latestReport }) {
   const [accuracy, setAccuracy] = useState(null); // [기록] AI 자기검증(차단 적중률) 누적 — ML 학습 현황 카드
   const [ledger, setLedger] = useState([]); // [나 vs AI] 내 판단(매매/관망) 원장 + 3·7일 성과
   const [decTick, setDecTick] = useState(0); // [나 vs AI] 추천 카드 판단 버튼 상태 리렌더 트리거
+  const [trustSec, setTrustSec] = useState('vs'); // [S2.2] AI 트러스트 3섹션 서브내비(vs/verify/archive)
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
@@ -784,7 +785,7 @@ export default function PWADashboard({ latestReport }) {
             ['stock','주식'],
             ['etf','ETF'],
             ['realestate','부동산'],
-            ['trust','트러스트'],
+            ['trust','AI 트러스트'],
           ].map(([t,label]) => {
             const routes = { etf: '/pwa/etf', realestate: '/pwa/realestate' };
             const stockTabs = ['recommend','portfolio','analyze'];   // 기록(report)은 트러스트로 이동
@@ -1761,7 +1762,15 @@ export default function PWADashboard({ latestReport }) {
               <div className="trust-hero-sub">이 AI를 왜 믿나 — 판단 흐름 · 나 vs AI · 자기검증 · 성적표를 한 곳에서 투명하게 공개합니다.</div>
             </section>
 
+            {/* [S2.2] AI 트러스트 3섹션 서브내비 — 나vsAI 승부 / 자기검증 / 리포트 아카이브 */}
+            <div className="trust-nav" role="tablist" aria-label="AI 트러스트 섹션">
+              {[['vs','🥊 나 vs AI'],['verify','🔬 자기검증'],['archive','🗂 리포트 아카이브']].map(([k,l]) => (
+                <button key={k} role="tab" aria-selected={trustSec===k} className={`trust-nav-btn ${trustSec===k?'on':''}`} onClick={() => setTrustSec(k)}>{l}</button>
+              ))}
+            </div>
+
             {/* [나 vs AI 대결] AI 추천 중 내가 산 것 vs AI 단독매매, 3일·7일 수익 승부 */}
+            {trustSec === 'vs' && (<>
             {(() => {
               const w3 = computeShowdown(ledger, 3);
               const w7 = computeShowdown(ledger, 7);
@@ -1836,6 +1845,11 @@ export default function PWADashboard({ latestReport }) {
                 </section>
               );
             })()}
+
+            </>)}
+
+            {/* [S2.2 G2] AI 자기검증 — 판단 흐름 · 학습 현황 · 개선노트 */}
+            {trustSec === 'verify' && (<>
 
             {/* [v9.0] 🎬 오늘 AI 분석 흐름 타임라인 */}
             {data && (() => {
@@ -1984,6 +1998,11 @@ export default function PWADashboard({ latestReport }) {
                 </section>
               );
             })()}
+
+            </>)}
+
+            {/* [S2.2 G3] 리포트 아카이브 — 성적표 · 일간/주간/히스토리 */}
+            {trustSec === 'archive' && (<>
 
             {/* [§3-5 item3] AI 성적표 — 이번주 요약을 성적표로 격상(승률·차단적중률·손익비·MDD) */}
             <section className="pwa-card">
@@ -2198,6 +2217,8 @@ export default function PWADashboard({ latestReport }) {
                   </div>
                 </section>
               </Link>
+            </>)}
+
             </>)}
           </main>
         )}
@@ -3185,6 +3206,11 @@ export default function PWADashboard({ latestReport }) {
         .trust-hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 16px 18px; box-shadow: var(--shadow-float); margin-bottom: 4px; }
         .trust-hero-lbl { font-size: 1rem; font-weight: 800; }
         .trust-hero-sub { font-size: 0.76rem; color: var(--hero-ink-soft); line-height: 1.55; margin-top: 6px; word-break: keep-all; }
+        /* [S2.2] AI 트러스트 3섹션 서브내비 */
+        .trust-nav { display: flex; gap: 6px; margin: 12px 0 14px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 4px; box-shadow: var(--shadow-card); }
+        .trust-nav-btn { flex: 1 1 0; min-width: 0; white-space: nowrap; border: none; background: none; color: var(--color-ink-3); font-family: var(--font-sans); font-size: 12px; font-weight: 700; padding: 9px 4px; border-radius: 10px; cursor: pointer; transition: background .15s, color .15s; }
+        .trust-nav-btn.on { background: var(--hero-grad-1); color: #fff; }
+        :global([data-theme="dark"]) .trust-nav-btn.on { background: var(--color-primary); }
         .vs-card { border: 1px solid var(--color-line); }
         .vs-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
         .vs-overall { font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
