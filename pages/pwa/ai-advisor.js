@@ -203,14 +203,25 @@ export default function AIAdvisor() {
       {s && (
         <div className="card">
           <div className="total-head"><div className="lbl">총자산</div><div className="val num">{toManwon(s.total)}</div></div>
+          {!realtyEntered && <div className="total-note">🏠 부동산 미입력 · 총자산 = <b>주식+ETF+현금 확정합</b></div>}
           <div className="grid4">
-            {CHIPS.map(([label, color, val]) => (
-              <div className="chip" key={label}>
-                <div className="k"><i style={{ background: color }} />{label}</div>
-                <div className="v num">{toManwon(val)}</div>
-                <div className="p">{pctOfTotal(val)}%</div>
-              </div>
-            ))}
+            {CHIPS.map(([label, color, val]) => {
+              // [B10] 부동산 미입력 → 회색 placeholder + 지금 등록 CTA
+              const missing = label === "부동산" && !realtyEntered;
+              return (
+                <div className={`chip ${missing ? "missing" : ""}`} key={label}>
+                  <div className="k"><i style={{ background: missing ? "var(--color-ink-3)" : color }} />{label}</div>
+                  {missing ? (
+                    <button className="chip-cta" onClick={() => { window.location.href = "/pwa/realestate"; }}>미입력 · 지금 등록 →</button>
+                  ) : (
+                    <>
+                      <div className="v num">{toManwon(val)}</div>
+                      <div className="p">{pctOfTotal(val)}%</div>
+                    </>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -383,6 +394,11 @@ export default function AIAdvisor() {
         .chip { background: var(--color-bg); border-radius: 14px; padding: 12px 6px; text-align: center; }
         .chip .k { font-size: 12px; color: var(--color-ink-2); font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 4px; }
         .chip .k i { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+        /* [B10] 부동산 미입력 placeholder */
+        .total-note { font-size: 11px; color: var(--color-ink-3); margin: -6px 0 12px; }
+        .total-note b { color: var(--color-ink-2); font-weight: 700; }
+        .chip.missing { background: var(--color-card-soft); border: 1px dashed var(--color-line); }
+        .chip-cta { margin-top: 6px; background: none; border: none; color: var(--color-primary); font-size: 10.5px; font-weight: 700; cursor: pointer; font-family: var(--font-sans); padding: 0; line-height: 1.3; }
         .chip .v { font-size: 14px; font-weight: 800; margin-top: 6px; }
         .chip .p { font-size: 11px; color: var(--color-ink-2); margin-top: 2px; }
 

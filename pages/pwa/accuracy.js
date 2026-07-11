@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { dedupBy } from '../../lib/useDedup';
 
 export default function AccuracyPage() {
   const router = useRouter();
@@ -127,13 +128,9 @@ export default function AccuracyPage() {
                 <div style={{ fontWeight:700, fontSize:14, marginBottom:14 }}>
                   최근 차단 내역 (최근 20건)
                 </div>
-                {/* [S1] 종목코드+차단일 기준 dedup(중복 렌더 방지) + 부호 단일 채점 */}
+                {/* [S1.4] 종목코드+차단일 기준 공용 dedup(이중 방어) + 부호 단일 채점 */}
                 {(() => {
-                  const seen = new Set();
-                  const list = (data.recent || []).filter((r) => {
-                    const k = `${r.code || r.stock}-${r.block_date || ""}`;
-                    if (seen.has(k)) return false; seen.add(k); return true;
-                  });
+                  const list = dedupBy(data.recent, (r) => `${r.code || r.stock}-${r.block_date || ""}`);
                   // 채점은 검증가-차단가 부호로 통일: 하락=적중 / 상승=오판 / 보합=보합
                   const verdict = (r) => {
                     if (r.price_change_pct == null) return "unchecked";
