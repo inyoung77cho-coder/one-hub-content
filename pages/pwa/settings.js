@@ -7,6 +7,7 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import TopNav from "../../components/TopNav";
 import { setTraderGlobal } from "../../lib/trader";
+import QuickAddSheet from "../../components/shared/QuickAddSheet";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -33,6 +34,7 @@ export default function Settings() {
   const [pushMsg, setPushMsg] = useState("");
   const [trader, setTrader] = useState("A");
   const [opsView, setOpsView] = useState(false); // 운영자 뷰 표시 여부
+  const [editAsset, setEditAsset] = useState(null); // [S3.5] 온보딩 항목별 빠른 편집 시트
   const [traderStat, setTraderStat] = useState({}); // [v11 #18] 트레이더 A/B 엔진 상태 (기존 engine-status 재사용)
   const [ops, setOps] = useState(null);   // [§3-9 #18] /api/ops/traders (매수/차단/에러/채널/자율)
   const [usage, setUsage] = useState(null); // [§3-9 #19] /api/ops/usage (KIS/Claude/서버 비용)
@@ -198,11 +200,22 @@ export default function Settings() {
               </div>
             </div>
             <div className="hint">선택한 계좌가 자산·주문 화면의 기본 계좌로 사용됩니다.</div>
-            <div className="row" style={{ marginTop: 12 }}>
-              <span className="l">온보딩 설정</span>
-              <button className="tbtn" onClick={() => { try { localStorage.removeItem("onehub_onboarded"); } catch {} router.push("/pwa/onboarding"); }}>🧭 다시 하기</button>
+          </div>
+
+          {/* [S3.5] 온보딩 항목별 편집 — 전체 재입력 폐기, 항목마다 독립 수정(동일 빠른입력 폼 재사용) */}
+          <div className="card">
+            <div className="k">온보딩 · 자산 편집</div>
+            <div className="row">
+              <span className="l">투자 성향</span>
+              <button className="tbtn" onClick={() => router.push("/pwa/onboarding")}>수정</button>
             </div>
-            <div className="hint">투자 성향·보유 자산 입력을 다시 진행합니다.</div>
+            {[["stock", "보유 주식"], ["etf", "보유 ETF"], ["realestate", "부동산"], ["cash", "현금"]].map(([k, l]) => (
+              <div className="row" key={k} style={{ marginTop: 8 }}>
+                <span className="l">{l}</span>
+                <button className="tbtn" onClick={() => setEditAsset(k)}>수정</button>
+              </div>
+            ))}
+            <div className="hint">항목별로 독립 편집합니다. 투자 성향을 바꾸면 목표 비중(AI자산 리밸런싱)이 자동 재파생됩니다.</div>
           </div>
 
           {/* 연동 */}
@@ -373,6 +386,7 @@ export default function Settings() {
         .ub span { font-size: 0.66rem; color: var(--color-ink-3); font-weight: 700; } .ub b { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
+      {editAsset && <QuickAddSheet initialAsset={editAsset} onClose={() => setEditAsset(null)} />}
     </div>
   );
 }

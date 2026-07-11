@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import TopNav from "../../components/TopNav";
 import { dedupBy } from "../../lib/useDedup";
+import QuickAddFab from "../../components/shared/QuickAddFab";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -41,6 +42,17 @@ export default function RealEstateDashboard() {
       const bg = localStorage.getItem("onehub_re_budget"); if (bg != null) setBudget(bg);
       const jr = localStorage.getItem("onehub_re_jeonse"); if (jr != null) setJeonseRate(jr);
     } catch (e) {}
+  }, []);
+  // [S3] 빠른입력(FAB) 저장 시 내 단지 즉시 재로드
+  useEffect(() => {
+    const reload = () => {
+      try {
+        const mp = localStorage.getItem("onehub_re_my_property");
+        if (mp) { const o = JSON.parse(mp); setMyProp(o); if (o?.name) setMyC(o.name); }
+      } catch (e) {}
+    };
+    window.addEventListener("onehub-assets-change", reload);
+    return () => window.removeEventListener("onehub-assets-change", reload);
   }, []);
   const pickMy = (v) => { setMyC(v); try { localStorage.setItem("onehub_re_my", v); } catch (e) {} };
   const pickTgt = (v) => { setTgtC(v); try { localStorage.setItem("onehub_re_target", v); } catch (e) {} };
@@ -336,6 +348,7 @@ export default function RealEstateDashboard() {
       )}
 
       <div className="foot">실거래 기반 확정 지표 + 회귀 예측(근사). 예측치는 참고용이며 투자판단은 본인 책임.</div>
+      <QuickAddFab initialAsset="realestate" />
 
       <style jsx>{`
         .re { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
