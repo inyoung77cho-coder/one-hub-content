@@ -24,6 +24,7 @@ export default function RealEstateDashboard() {
   const [wiz, setWiz] = useState({ name: "", pyeong: "", dongfloor: "", buyUk: "", buyMonth: "" });
   const [budget, setBudget] = useState("");     // [S5] 스크리너 예산(억)
   const [jeonseRate, setJeonseRate] = useState("60"); // [S5] 전세가율(%) 가정
+  const [moveScope, setMoveScope] = useState("region"); // [S5+] 이동 범위: complex/dong/region
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/re/${fn}`).then((r) => r.json());
@@ -40,6 +41,7 @@ export default function RealEstateDashboard() {
       if (mp) { const o = JSON.parse(mp); setMyProp(o); if (o?.name && !localStorage.getItem("onehub_re_my")) setMyC(o.name); }
       const bg = localStorage.getItem("onehub_re_budget"); if (bg != null) setBudget(bg);
       const jr = localStorage.getItem("onehub_re_jeonse"); if (jr != null) setJeonseRate(jr);
+      const sc = localStorage.getItem("onehub_re_scope"); if (sc) setMoveScope(sc);
     } catch (e) {}
   }, []);
   // [S3] 빠른입력(FAB) 저장 시 내 단지 즉시 재로드
@@ -68,6 +70,30 @@ export default function RealEstateDashboard() {
   };
 
   const mac = macro?.latest;
+
+  // [S5+] DB(raw_transactions 기반 feed)에서 단지별 전용면적(㎡)·평형 옵션 로딩
+  const areaMap = (() => {
+    const m = {};
+    (feed?.feed || []).forEach((f) => {
+      const nm = f.단지명, a = Math.round(Number(f.전용면적));
+      if (!nm || !(a > 0)) return;
+      (m[nm] = m[nm] || new Map()).set(a, { m2: a, priceUk: Number(f.거래금액_억) || null, floor: f.층 });
+    });
+    // 값 배열로 변환(면적 오름차순)
+    const out = {};
+    Object.keys(m).forEach((nm) => { out[nm] = [...m[nm].values()].sort((x, y) => x.m2 - y.m2); });
+    return out;
+  })();
+  const areaOptsFor = (name) => areaMap[name] || [];
+  // 전용㎡ → 대략 평(공급 관례 근사): 전용㎡ ÷ 3.3058 후 전용률 0.74 역산 ≈ ㎡/2.45
+  const m2ToPyeong = (m2) => Math.round(Number(m2) / 3.3058 / 0.74);
+  // 내 단지의 법정동(있으면) — 없으면 브리핑 지역으로 대체
+  const dongOf = (name) => {
+    const row = (rank?.ranking || []).find((r) => r.단지명 === name);
+    return row?.법정동 || row?.법정동명 || brief?.region || null;
+  };
+  const myDong = myProp?.name ? dongOf(myProp.name) : (brief?.region || null);
+  const changeScope = (s) => { setMoveScope(s); try { localStorage.setItem("onehub_re_scope", s); } catch (e) {} };
 
   return (
     <div className="re pwa-shell">
@@ -193,42 +219,102 @@ export default function RealEstateDashboard() {
         );
       })()}
 
-      {/* [S5] 투자아파트 스크리너 — 예산·전세가율 → 갭투자금 후보(상대가치·추정) */}
+      {/* [S5+] 갈아타기·투자 스크리너 — 이동 범위(같은 단지/같은 동/지역 변경)별 최적화 */}
       {rank?.ranking?.length > 0 && (() => {
         const opts = dedupBy(rank.ranking, (c) => c.단지ID || c.단지명);
-        const jr = Math.max(0, Math.min(100, Number(jeonseRate) || 0)) / 100;
-        const bg = Number(budget) || 0;
-        const scored = opts.map((o) => {
-          const avm = Number(o.avm_total_uk || 0);
-          const gapInvest = avm * (1 - jr); // 갭투자금 = 매매 − 전세(전세가율 가정)
-          return { ...o, gapInvest };
-        }).filter((o) => o.gapInvest > 0);
-        const matched = (bg > 0 ? scored.filter((o) => o.gapInvest <= bg) : scored)
-          .sort((a, b) => (b.one_score ?? 0) - (a.one_score ?? 0)).slice(0, 6);
+        const myRow = myProp?.name ? opts.find((o) => o.단지명 === myProp.name) : null;
+        const myAvm = myRow ? Number(myRow.avm_total_uk || 0) : null;
+        const needMy = (moveScope === "complex" || moveScope === "dong") && !myProp?.name;
+        const SCOPES = [
+          ["complex", "같은 단지", "평형 갈아타기"],
+          ["dong", "같은 동", myDong ? `${myDong} 내 이동` : "동 내 이동"],
+          ["region", "지역 변경", "타 지역·투자"],
+        ];
+        const gapCell = (v) => (v == null ? "-" : v > 0 ? `+${uk(v)}` : v < 0 ? `−${uk(-v)}` : "동일");
         return (
           <section className="card scr-card">
-            <div className="label">🔎 투자아파트 스크리너 <span className="sub">예산·전세가율 → 갭투자금</span></div>
-            <div className="scr-inputs">
-              <label className="scr-in"><span>예산(억)</span>
-                <input type="number" inputMode="decimal" placeholder="예: 3" value={budget} onChange={(e) => changeBudget(e.target.value)} /></label>
-              <label className="scr-in"><span>전세가율(%)</span>
-                <input type="number" inputMode="numeric" placeholder="60" value={jeonseRate} onChange={(e) => changeJeonse(e.target.value)} /></label>
+            <div className="label">🔎 갈아타기·투자 스크리너 <span className="sub">이동 범위별</span></div>
+            <div className="scope-chips">
+              {SCOPES.map(([k, l, d]) => (
+                <button key={k} className={`scope-chip ${moveScope === k ? "on" : ""}`} onClick={() => changeScope(k)}>
+                  <b>{l}</b><span>{d}</span>
+                </button>
+              ))}
             </div>
-            {matched.length > 0 ? (
-              <>
-                <div className="scr-head"><span>단지</span><span>매매(AVM)</span><span>갭투자금</span></div>
-                {matched.map((o, i) => (
-                  <div className="scr-row" key={`${o.단지ID || o.단지명}-${i}`}>
-                    <span className="scr-name">{o.단지명} <span className={`vtag ${vtag(o.valuation)}`}>{o.valuation}</span></span>
-                    <span className="scr-avm">{uk(o.avm_total_uk)}</span>
-                    <span className={`scr-gap ${bg > 0 && o.gapInvest <= bg ? "ok" : ""}`}>{uk(o.gapInvest)}</span>
+
+            {needMy ? (
+              <div className="gap-empty">이 범위는 <b>내 단지</b> 기준으로 계산됩니다. 먼저 내 단지를 등록하세요.
+                <button className="scr-reg" onClick={openWiz}>내 단지 등록 →</button>
+              </div>
+            ) : moveScope === "complex" ? (() => {
+              const areas = areaOptsFor(myProp?.name);
+              const myArea = areas.find((a) => String(a.m2) === String(myProp?.pyeong));
+              const myPrice = myArea?.priceUk ?? myAvm ?? null;
+              if (!areas.length) return <div className="gap-empty"><b>{myProp?.name}</b>의 평형별 실거래가 아직 부족합니다(최근 거래 축적 시 표시). ‘같은 동·지역 변경’을 이용해 보세요.</div>;
+              return (
+                <>
+                  <div className="scr-head"><span>평형(전용)</span><span>실거래</span><span>갈아타기 자금</span></div>
+                  {areas.map((a) => {
+                    const diff = myPrice != null && a.priceUk != null ? a.priceUk - myPrice : null;
+                    const mine = String(a.m2) === String(myProp?.pyeong);
+                    return (
+                      <div className="scr-row" key={a.m2}>
+                        <span className="scr-name">전용 {a.m2}㎡ <span className="scr-py">약 {m2ToPyeong(a.m2)}평</span>{mine && <span className="scr-mine">내 평형</span>}</span>
+                        <span className="scr-avm">{a.priceUk != null ? uk(a.priceUk) : "-"}</span>
+                        <span className={`scr-gap ${diff != null && diff <= 0 ? "ok" : ""}`}>{mine ? "—" : gapCell(diff)}</span>
+                      </div>
+                    );
+                  })}
+                  <div className="note"><b>{myProp?.name}</b> 평형별 최근 실거래(raw_transactions) 기준. 갈아타기 자금 = 목표 평형 − 내 평형 실거래. 층·향·수리에 따라 실제가는 다릅니다(확정 아님).</div>
+                </>
+              );
+            })() : moveScope === "dong" ? (() => {
+              const cands = opts.filter((o) => o.단지명 !== myProp?.name && dongOf(o.단지명) === myDong)
+                .map((o) => ({ ...o, need: myAvm != null ? Number(o.avm_total_uk || 0) - myAvm : null }))
+                .sort((a, b) => (b.one_score ?? 0) - (a.one_score ?? 0)).slice(0, 8);
+              if (!cands.length) return <div className="gap-empty">{myDong ? <><b>{myDong}</b> 내 다른 단지 데이터가 부족합니다.</> : "동 정보를 불러오지 못했습니다."} ‘지역 변경’을 이용해 보세요.</div>;
+              return (
+                <>
+                  <div className="scr-head"><span>단지</span><span>매매(AVM)</span><span>갈아타기 자금</span></div>
+                  {cands.map((o, i) => (
+                    <div className="scr-row" key={`${o.단지ID || o.단지명}-${i}`}>
+                      <span className="scr-name">{o.단지명} <span className={`vtag ${vtag(o.valuation)}`}>{o.valuation}</span></span>
+                      <span className="scr-avm">{uk(o.avm_total_uk)}</span>
+                      <span className={`scr-gap ${o.need != null && o.need <= 0 ? "ok" : ""}`}>{gapCell(o.need)}</span>
+                    </div>
+                  ))}
+                  <div className="note">{myDong ? <><b>{myDong}</b> 내 이동 기준. </> : null}갈아타기 자금 = 목표 매매(AVM) − 내 단지 매매. 회귀 근사·lag=0·확정 아님.</div>
+                </>
+              );
+            })() : (() => {
+              const jr = Math.max(0, Math.min(100, Number(jeonseRate) || 0)) / 100;
+              const bg = Number(budget) || 0;
+              const scored = opts.map((o) => ({ ...o, gapInvest: Number(o.avm_total_uk || 0) * (1 - jr) })).filter((o) => o.gapInvest > 0);
+              const matched = (bg > 0 ? scored.filter((o) => o.gapInvest <= bg) : scored).sort((a, b) => (b.one_score ?? 0) - (a.one_score ?? 0)).slice(0, 6);
+              return (
+                <>
+                  <div className="scr-inputs">
+                    <label className="scr-in"><span>예산(억)</span><input type="number" inputMode="decimal" placeholder="예: 3" value={budget} onChange={(e) => changeBudget(e.target.value)} /></label>
+                    <label className="scr-in"><span>전세가율(%)</span><input type="number" inputMode="numeric" placeholder="60" value={jeonseRate} onChange={(e) => changeJeonse(e.target.value)} /></label>
                   </div>
-                ))}
-                <div className="note">갭투자금 = 매매(AVM) × (1 − 전세가율{Math.round(jr * 100)}%). 전세가율은 <b>사용자 가정치</b>이며 단지·평형별 실제 전세가와 다릅니다 (상대가치·추정·확정 아님).</div>
-              </>
-            ) : (
-              <div className="gap-empty">예산 범위에 맞는 단지가 없습니다. 예산을 높이거나 전세가율을 조정해 보세요.</div>
-            )}
+                  {matched.length > 0 ? (
+                    <>
+                      <div className="scr-head"><span>단지</span><span>매매(AVM)</span><span>갭투자금</span></div>
+                      {matched.map((o, i) => (
+                        <div className="scr-row" key={`${o.단지ID || o.단지명}-${i}`}>
+                          <span className="scr-name">{o.단지명} <span className={`vtag ${vtag(o.valuation)}`}>{o.valuation}</span></span>
+                          <span className="scr-avm">{uk(o.avm_total_uk)}</span>
+                          <span className={`scr-gap ${bg > 0 && o.gapInvest <= bg ? "ok" : ""}`}>{uk(o.gapInvest)}</span>
+                        </div>
+                      ))}
+                      <div className="note">갭투자금 = 매매(AVM) × (1 − 전세가율{Math.round(jr * 100)}%). 전세가율은 <b>사용자 가정치</b>(상대가치·추정·확정 아님).</div>
+                    </>
+                  ) : (
+                    <div className="gap-empty">예산 범위에 맞는 단지가 없습니다. 예산·전세가율을 조정해 보세요.</div>
+                  )}
+                </>
+              );
+            })()}
           </section>
         );
       })()}
@@ -334,15 +420,25 @@ export default function RealEstateDashboard() {
         <div className="wiz-scrim" onClick={() => setWizOpen(false)}>
           <div className="wiz" onClick={(e) => e.stopPropagation()}>
             <div className="wiz-h">🏠 내 단지 등록<button className="wiz-x" onClick={() => setWizOpen(false)} aria-label="닫기">✕</button></div>
-            <label className="wiz-f"><span>단지명</span>
-              <input list="re-complex-list" value={wiz.name} onChange={(e) => setWiz((w) => ({ ...w, name: e.target.value }))} placeholder="단지명 입력·선택" />
-              <datalist id="re-complex-list">
-                {(rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명) : []).map((o) => <option key={o.단지ID || o.단지명} value={o.단지명} />)}
-              </datalist>
+            {/* [S5+] 단지명 = DB(랭킹) 로딩 select */}
+            <label className="wiz-f"><span>단지명 <em>실거래 DB</em></span>
+              <select value={wiz.name} onChange={(e) => setWiz((w) => ({ ...w, name: e.target.value, pyeong: "" }))}>
+                <option value="">단지 선택</option>
+                {(rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명) : []).map((o) => <option key={o.단지ID || o.단지명} value={o.단지명}>{o.단지명}</option>)}
+              </select>
             </label>
             <div className="wiz-row">
-              <label className="wiz-f"><span>평형(평)</span>
-                <input type="number" inputMode="numeric" value={wiz.pyeong} onChange={(e) => setWiz((w) => ({ ...w, pyeong: e.target.value }))} placeholder="34" /></label>
+              {/* [S5+] 평형 = 선택 단지의 실거래 전용면적 옵션 로딩(없으면 직접입력) */}
+              <label className="wiz-f"><span>평형 <em>{areaOptsFor(wiz.name).length ? "실거래 DB" : "직접입력"}</em></span>
+                {areaOptsFor(wiz.name).length ? (
+                  <select value={wiz.pyeong} onChange={(e) => setWiz((w) => ({ ...w, pyeong: e.target.value }))}>
+                    <option value="">평형 선택</option>
+                    {areaOptsFor(wiz.name).map((a) => <option key={a.m2} value={a.m2}>전용 {a.m2}㎡ (약 {m2ToPyeong(a.m2)}평){a.priceUk ? ` · ${a.priceUk}억` : ""}</option>)}
+                  </select>
+                ) : (
+                  <input type="number" inputMode="numeric" value={wiz.pyeong} onChange={(e) => setWiz((w) => ({ ...w, pyeong: e.target.value }))} placeholder="전용㎡ 또는 평" />
+                )}
+              </label>
               <label className="wiz-f"><span>동/층</span>
                 <input value={wiz.dongfloor} onChange={(e) => setWiz((w) => ({ ...w, dongfloor: e.target.value }))} placeholder="101동 15층" /></label>
             </div>
@@ -436,6 +532,16 @@ export default function RealEstateDashboard() {
         .mp-note { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 10px; line-height: 1.5; word-break: keep-all; }
         .mp-note b { color: var(--color-ink-2); font-weight: 700; }
         /* [S5] 투자아파트 스크리너 */
+        /* [S5+] 이동 범위 칩 */
+        .scope-chips { display: flex; gap: 6px; margin-bottom: 14px; }
+        .scope-chip { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; border: 1px solid var(--color-line); background: var(--color-card); border-radius: 12px; padding: 9px 4px; cursor: pointer; font-family: var(--font-sans); }
+        .scope-chip b { font-size: 0.8rem; font-weight: 800; color: var(--color-ink-2); }
+        .scope-chip span { font-size: 0.6rem; font-weight: 600; color: var(--color-ink-3); white-space: nowrap; }
+        .scope-chip.on { background: var(--color-primary); border-color: var(--color-primary); }
+        .scope-chip.on b, .scope-chip.on span { color: #fff; }
+        .scr-py { font-size: 0.66rem; font-weight: 600; color: var(--color-ink-3); }
+        .scr-mine { font-size: 0.58rem; font-weight: 800; background: var(--color-primary-soft); color: var(--color-primary); padding: 1px 6px; border-radius: 5px; }
+        .scr-reg { display: block; margin-top: 10px; border: none; background: var(--color-primary); color: #fff; border-radius: 10px; padding: 9px 14px; font-size: 0.78rem; font-weight: 800; font-family: var(--font-sans); cursor: pointer; }
         .scr-inputs { display: flex; gap: 8px; margin-bottom: 12px; }
         .scr-in { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 0.68rem; color: var(--color-ink-3); font-weight: 700; }
         .scr-in input { border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 9px; padding: 9px 10px; font-size: 0.84rem; font-family: var(--font-sans); color: var(--color-ink); }
@@ -453,7 +559,9 @@ export default function RealEstateDashboard() {
         .wiz-h { display: flex; align-items: center; justify-content: space-between; font-size: 1rem; font-weight: 800; color: var(--color-ink); margin-bottom: 16px; }
         .wiz-x { border: none; background: var(--color-card-soft); color: var(--color-ink-2); width: 30px; height: 30px; border-radius: 50%; font-size: 0.9rem; cursor: pointer; }
         .wiz-f { display: flex; flex-direction: column; gap: 5px; font-size: 0.7rem; color: var(--color-ink-3); font-weight: 700; margin-bottom: 11px; flex: 1; }
-        .wiz-f input { border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 10px; padding: 11px 12px; font-size: 0.9rem; font-family: var(--font-sans); color: var(--color-ink); }
+        .wiz-f em { font-style: normal; font-size: 0.6rem; font-weight: 700; color: var(--color-primary); margin-left: 5px; }
+        .wiz-f input, .wiz-f select { border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 10px; padding: 11px 12px; font-size: 0.9rem; font-family: var(--font-sans); color: var(--color-ink); }
+        .wiz-f select:focus { outline: none; border-color: var(--color-primary); }
         .wiz-f input:focus { outline: none; border-color: var(--color-primary); }
         .wiz-row { display: flex; gap: 10px; }
         .wiz-save { width: 100%; margin-top: 6px; border: none; border-radius: 12px; padding: 13px 0; font-size: 0.92rem; font-weight: 800; color: #fff; background: var(--color-primary); cursor: pointer; font-family: var(--font-sans); }
