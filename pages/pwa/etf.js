@@ -155,9 +155,9 @@ export default function EtfDashboard() {
     return `${min}분 전 갱신`;
   })();
 
-  // 등록 티커들의 실제 최근 종가 중 가장 최신 날짜 — 히어로 '실시간 종가' 신선도 표기용
-  const liveCloseDate = positions
-    .map((p) => quotes[p.ticker]?.date)
+  // 등록 종목 + 내 보유의 실측 최근 종가 중 가장 최신 날짜 — 평가 기준일·실시간 표기용
+  const liveCloseDate = [...positions, ...holdings]
+    .map((x) => quotes[x.ticker]?.date)
     .filter(Boolean)
     .sort()
     .pop() || null;
@@ -228,8 +228,11 @@ export default function EtfDashboard() {
   const todayKST = (() => { try { return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }); } catch (e) { return null; } })();
   const fxDate = asof?.fx_date || asof?.price_date || null;
   const fxFresh = fxDate && todayKST ? fxDate === todayKST : null;
-  // [종가 신선도] ETF 평가 기준일(백엔드 종가)이 최근 거래일인지 표기 — 백엔드가 갱신되면 자동으로 '최신'.
-  const priceDate = asof?.price_date || null;
+  // [종가 신선도] 평가 기준일 = 백엔드 종가일과 실측 시세일 중 '더 최신'(YYYY-MM-DD 정렬).
+  //   → 실시간 시세가 갱신되면 헤더 날짜가 오늘로 이동하고 '지연 N일'이 자동으로 사라진다.
+  const backendPriceDate = asof?.price_date || null;
+  const priceDate = [backendPriceDate, liveCloseDate].filter(Boolean).sort().pop() || null;
+  const priceFromLive = !!liveCloseDate && (!backendPriceDate || liveCloseDate >= backendPriceDate); // 실측 시세가 기준일 결정
   const priceDaysAgo = (() => {
     if (!priceDate || !todayKST) return null;
     const diff = Math.round((new Date(todayKST).getTime() - new Date(priceDate).getTime()) / 86400000);
@@ -261,7 +264,7 @@ export default function EtfDashboard() {
       {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해 (시안: 다크 네이비 히어로) */}
       <section className="hero">
         <div className="eyebrow">
-          <span className="lbl">📊 ETF 평가 기준{priceDate ? ` · ${priceDate}` : ""}{priceDate ? <span className={`date-flag ${priceStale ? "stale" : "fresh"}`}>{priceStale ? `지연 ${priceDaysAgo}일` : "최신"}</span> : null}{liveCloseDate ? <span className="date-flag fresh">실시간 종가 {liveCloseDate.slice(5)}</span> : null}</span>
+          <span className="lbl">📊 ETF 평가 기준{priceDate ? ` · ${priceDate}` : ""}{priceDate ? <span className={`date-flag ${priceStale ? "stale" : "fresh"}`}>{priceStale ? `지연 ${priceDaysAgo}일` : (priceFromLive ? "실시간" : "최신")}</span> : null}</span>
           <span className="live-wrap">
             {freshLabel && <span className="fresh-ago">{freshLabel}</span>}
             <button className={`refresh-btn ${refreshing ? "spin" : ""}`} onClick={refreshAll} aria-label="시세 새로고침" title="지금 시세 새로고침">↻</button>
