@@ -6,6 +6,7 @@ import { getLatestDailyReport } from '../../lib/reports';
 import LastUpdated from '../../components/LastUpdated';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
 import { recordDecision, matureLedger, computeShowdown, getTodayDecision } from '../../lib/verdictLedger';
+import { fetchAssetsTotal } from '../../lib/assetsTotal';
 
 // [v9.0] 안전 숫자 포맷 — INVALID_PRICE/STOP/NaN/undefined → '-'
 function safeLocale(v, suffix = '') {
@@ -376,10 +377,10 @@ export default function PWADashboard({ latestReport }) {
       .then(r => r.json())
       .then(d => { if (d.ok && Array.isArray(d.items)) setNotis(d.items); })
       .catch(() => {});
-    fetch(`/api/realestate/v2/total-asset?trader_id=${trader}`)
-      .then(r => r.json())
-      .then(d => setAssetSum(mergeOnboardAssets(d)))
-      .catch(() => setAssetSum(mergeOnboardAssets(null)));
+    // [S1.1] 총자산 단일 소스(/api/assets/total, 미배포 시 기존 total-asset+온보딩 폴백)
+    fetchAssetsTotal(trader)
+      .then(a => setAssetSum(a?.total_uk != null ? { total_uk: a.total_uk, breakdown: a.breakdown, realty_state: a.realty_state, source: a.source } : null))
+      .catch(() => setAssetSum(null));
     fetch(`/api/realestate/v2/ai-summary?trader_id=${trader}`)
       .then(r => r.json())
       .then(d => { if (d && Array.isArray(d.summary_items)) setAiRec(d); })
@@ -1181,7 +1182,9 @@ export default function PWADashboard({ latestReport }) {
                   if (profile.style === 'conservative') return base - Math.abs((s.vol_ratio ?? 1) - 1) * 3;
                   return base;
                 };
-                const sorted = [...data.screening_candidates].sort((a, b) => personalScore(b) - personalScore(a));
+                // [S1] 종목코드 기준 dedup(중복 렌더 방지) 후 정렬
+                const uniqCands = [...new Map(data.screening_candidates.map((c) => [c.code || c.name, c])).values()];
+                const sorted = uniqCands.sort((a, b) => personalScore(b) - personalScore(a));
                 const top3 = sorted.slice(0, 3);
                 const rest = sorted.slice(3);
                 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -1581,7 +1584,8 @@ export default function PWADashboard({ latestReport }) {
                         <div className="position-card-grid mono">
                           <div className="position-card-cell">
                             <span className="dim">매수가</span>
-                            <span>{Number(p.avg_price||0).toLocaleString()}원</span>
+                            {/* [S1] 국내주식 원 단위 정수 통일(정확 평단은 title 툴팁) */}
+                            <span title={`정확 평단 ${Number(p.avg_price||0).toLocaleString()}원`}>{Math.round(Number(p.avg_price||0)).toLocaleString()}원</span>
                           </div>
                           <div className="position-card-cell">
                             <span className="dim">현재가</span>

@@ -7,6 +7,7 @@ import Link from "next/link";
 import TopNav from "../../components/TopNav";
 import { computeSummary, toManwon } from "../../lib/aiAssets";
 import { getTrader } from "../../lib/trader";
+import { fetchAssetsTotal } from "../../lib/assetsTotal";
 
 const UK = 1e8; // 억 → 원
 
@@ -45,6 +46,7 @@ function buildAssets(ta, dash, onb) {
 export default function AIAdvisor() {
   const [s, setS] = useState(null); // computeSummary 결과(단일 소스)
   const [err, setErr] = useState(false);
+  const [realtyState, setRealtyState] = useState(null); // [S1.1] 단일소스 부동산 입력상태
 
   useEffect(() => {
     const load = () => {
@@ -52,6 +54,8 @@ export default function AIAdvisor() {
       try { onb = JSON.parse(localStorage.getItem("onehub_onboard_assets") || "null"); } catch (e) {}
       try { goal = localStorage.getItem("onehub_profile_goal") || ""; } catch (e) {}
       const tr = getTrader(); // [§3-8] 선택된 계좌(A/B) 반영
+      // [S1.1] 부동산 입력상태는 총자산 단일소스에서 (배너·총자산 100% 일치)
+      fetchAssetsTotal(tr).then((a) => setRealtyState(a?.realty_state || null)).catch(() => {});
       Promise.all([
         fetch(`/api/realestate/v2/total-asset?trader_id=${tr}`).then((r) => r.json()).catch(() => null),
         fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => null),
@@ -98,7 +102,8 @@ export default function AIAdvisor() {
     return { txt: `배분 균형 양호`, sub: `유동자산 배분이 목표 범위 안에 있습니다.`, color: "var(--color-success)" };
   })();
   // [§3-2] 부동산 입력/미입력 상태 — 점수 스코프 오해(이미지1↔6) 방지 배너
-  const realtyEntered = !!(s && s.assets.realestate > 0);
+  // [S1.1] 단일소스 realty_state 우선, 없으면 계산값 폴백 → 배너·총자산 일치
+  const realtyEntered = realtyState ? realtyState === "entered" : !!(s && s.assets.realestate > 0);
   const realtyPct = risk ? Math.round(risk.ratio * 1000) / 10 : null;
 
   const CHIPS = s ? [
