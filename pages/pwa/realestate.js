@@ -165,7 +165,7 @@ export default function RealEstateDashboard() {
 
       {/* [S5] 내 단지 — 미등록: 위저드 CTA / 등록됨: 상세 요약(매수가 vs 현재 AVM) */}
       {!myProp ? (
-        <div className="cta-slim" onClick={openWiz}><span className="cta-txt">🏠 내 단지를 등록하면 <b>갈아타기 갭·평가손익·스크리너</b>에 반영됩니다</span><span className="arr">→</span></div>
+        <div className="cta-slim" onClick={openWiz}><span className="cta-txt">🏠 내 단지를 등록하면 <b>평가손익·갈아타기·스크리너</b>에 반영됩니다</span><span className="arr">→</span></div>
       ) : (() => {
         const cur = rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명).find((o) => o.단지명 === myProp.name) : null;
         const curUk = cur ? Number(cur.avm_total_uk || 0) : null;
@@ -199,55 +199,8 @@ export default function RealEstateDashboard() {
         );
       })()}
 
-      {/* [S5] 갈아타기 갭 트래커 — 내 단지 vs 목표 단지 갭(핵심 기능 3종) */}
-      {rank?.ranking?.length > 0 && (() => {
-        const opts = dedupBy(rank.ranking, (c) => c.단지ID || c.단지명);
-        const find = (n) => opts.find((o) => o.단지명 === n);
-        const my = find(myC), tgt = find(tgtC);
-        const gap = my && tgt ? Number(tgt.avm_total_uk || 0) - Number(my.avm_total_uk || 0) : null;
-        return (
-          <section className="card gap-card">
-            <div className="label">🔀 갈아타기 갭 <span className="sub">내 단지 → 목표 단지 소요 자금</span></div>
-            <div className="gap-selects">
-              <label className="gap-sel"><span>내 단지</span>
-                <select value={myC} onChange={(e) => pickMy(e.target.value)}>
-                  <option value="">선택</option>{opts.map((o) => <option key={o.단지명} value={o.단지명}>{o.단지명}</option>)}
-                </select></label>
-              <span className="gap-arrow">→</span>
-              <label className="gap-sel"><span>목표 단지</span>
-                <select value={tgtC} onChange={(e) => pickTgt(e.target.value)}>
-                  <option value="">선택</option>{opts.map((o) => <option key={o.단지명} value={o.단지명}>{o.단지명}</option>)}
-                </select></label>
-            </div>
-            {gap != null ? (
-              <div className="gap-result">
-                <div className="gap-amt">필요 자금 <b className={gap > 0 ? "pos" : "neg"}>{uk(Math.abs(gap))}</b>
-                  <span className="gap-dir">{gap > 0 ? "목표가 더 비쌈 — 이만큼 추가 필요" : gap < 0 ? "내 단지가 더 비쌈 — 차익 실현 여지" : "동일가"}</span></div>
-                <div className="gap-rows">
-                  <div className="gap-row"><span>{my.단지명}</span><b>{uk(my.avm_total_uk)}</b></div>
-                  <div className="gap-row"><span>{tgt.단지명}</span><b>{uk(tgt.avm_total_uk)}</b></div>
-                </div>
-                {/* [S5] 갭 밴드 — 현재 갭 ± 상대가치 변동폭(추정·점예측 아님·lag=0) */}
-                {(() => {
-                  const g = Math.abs(gap);
-                  const band = g * 0.15; // 상대가치 변동폭 근사(±15%) — 확정 아님
-                  const lo = Math.max(0, g - band), hi = g + band;
-                  return (
-                    <div className="gap-band">
-                      <div className="gb-h"><span className="gb-lbl">갭 밴드</span><span className="gb-tag">추정 · 상대가치</span></div>
-                      <div className="gb-track"><div className="gb-fill" style={{ left: "15%", right: "15%" }} /><div className="gb-mid" style={{ left: "50%" }} /></div>
-                      <div className="gb-scale"><span>{uk(lo)}</span><span>현재 {uk(g)}</span><span>{uk(hi)}</span></div>
-                    </div>
-                  );
-                })()}
-                <div className="gap-note">현재 시점 AVM 기준 갭입니다. 밴드는 <b>상대가치 변동폭 근사(±)</b>이며 <b>단일 시점 예측이 아닙니다</b>. 갭 <b>추이·축소 알림</b>은 단지별 실거래 이력이 축적되면 제공됩니다 (회귀 근사·lag=0·확정 아님).</div>
-              </div>
-            ) : (
-              <div className="gap-empty">내 단지와 목표 단지를 고르면 <b>갈아타기에 필요한 자금(갭)</b>이 계산됩니다.</div>
-            )}
-          </section>
-        );
-      })()}
+      {/* [정리] 기존 '갈아타기 갭' 카드는 아래 스크리너의 '같은 동/같은 단지'와 중복되어 제거.
+          갈아타기 소요자금은 스크리너에서 이동 범위별로 계산한다. */}
 
       {/* [S5+] 갈아타기·투자 스크리너 — 이동 범위(같은 단지/같은 동/지역 변경)별 최적화 */}
       {rank?.ranking?.length > 0 && (() => {

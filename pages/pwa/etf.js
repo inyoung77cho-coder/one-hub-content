@@ -221,6 +221,13 @@ export default function EtfDashboard() {
     holdings.forEach((h) => { const v = holdingMetrics(h).valueKrw; if (v != null) { sum += v; any = true; } });
     return any ? sum : null;
   })();
+  // [히어로 일원화] 실시간 평가(수량×실측종가)가 있으면 그걸 대표값으로, 없으면 백엔드 평가액.
+  //   평가손익·수익률도 같은 base로 재계산해 상단 큰 숫자와 일치시킨다(중복 라인 제거).
+  const heroLive = liveTotal != null;
+  const heroVal = heroLive ? liveTotal : (s?.value_krw ?? 0);
+  const heroCost = s?.krw_cost ?? 0;
+  const heroPnl = heroVal - heroCost;
+  const heroPnlPct = heroCost > 0 ? (heroVal / heroCost - 1) * 100 : (s?.total_pnl_pct ?? 0);
 
   // [환율 신선도] 기준일이 오늘(KST)인지 표시 — 오래된 종가 환율이면 사용자에게 명확히 알림
   const asof = report?.as_of;
@@ -289,11 +296,8 @@ export default function EtfDashboard() {
         ) : null}
         {s ? (
           <>
-            <div className="big">{won(s.value_krw)}<span>원</span></div>
-            <div className="hsub">취득 {won(s.krw_cost)} → 평가손익 <b>{won(s.value_krw - s.krw_cost)}원</b> · <b>{pct(s.total_pnl_pct)}</b></div>
-            {liveTotal != null && (
-              <div className="live-total">⚡ 실시간 평가 <b>{won(liveTotal)}원</b> <span className="lt-note">· 수량×실측종가({liveCloseDate ? liveCloseDate.slice(5) : "최근"}) 기준</span></div>
-            )}
+            <div className="big">{won(heroVal)}<span>원</span>{heroLive && <span className="big-live">⚡실시간</span>}</div>
+            <div className="hsub">취득 {won(heroCost)} → 평가손익 <b>{won(heroPnl)}원</b> · <b>{pct(heroPnlPct)}</b>{heroLive && <span className="hsub-note"> · 수량×실측종가({liveCloseDate ? liveCloseDate.slice(5) : "최근"})</span>}</div>
             <div className="decomp">
               <div className="drow"><span className="dk">ETF 자체수익 ($)</span><span className={`dv ${sign(s.etf_self_pct)}`}>{pct(s.etf_self_pct)}</span></div>
               <div className="drow"><span className="dk">환차손익</span><span className={`dv ${sign(s.fx_pure_pct)}`}>{pct(s.fx_pure_pct)}</span></div>
@@ -688,6 +692,8 @@ export default function EtfDashboard() {
         .live-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: etf-pulse 1.4s ease-in-out infinite; }
         @keyframes etf-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
         .hero .big { font-size: 32px; font-weight: 800; letter-spacing: -.8px; line-height: 1; }
+        .big-live { font-size: 11px; font-weight: 800; color: var(--color-success); background: color-mix(in srgb, var(--color-success) 20%, transparent); padding: 3px 8px; border-radius: 6px; margin-left: 9px; vertical-align: middle; letter-spacing: 0; }
+        .hsub-note { color: var(--hero-ink-sub); font-weight: 500; }
         .hero .big span { font-size: 19px; font-weight: 700; }
         .date-flag { display: inline-block; margin-left: 7px; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; letter-spacing: .2px; vertical-align: middle; }
         .date-flag.fresh { background: color-mix(in srgb, var(--color-success) 22%, transparent); color: var(--color-success); }

@@ -15,7 +15,7 @@ const ITEMS = [
   ["stock", "주식", "/pwa?tab=portfolio"],
   ["etf", "ETF", "/pwa/etf"],
   ["realestate", "부동산", "/pwa/realestate"],
-  ["trust", "AI 트러스트", "/pwa?tab=report"],
+  ["trust", "AI 신뢰도", "/pwa?tab=report"],
 ];
 
 export default function TopNav({ active }) {
