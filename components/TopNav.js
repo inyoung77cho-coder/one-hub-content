@@ -2,6 +2,11 @@
 //   로고 헤더(🔍/⚙️) + 흰 라운드 탭 컨테이너(활성 탭 = 네이비 pill).
 //   워크오더 §2·§4.2: 하단 탭 제거, 상단 탭으로 일원화. 색은 디자인 토큰만 사용.
 import { useRouter } from "next/router";
+import { useState } from "react";
+import QuickAddSheet from "./shared/QuickAddSheet";
+
+// [빠른입력] 현재 탭 → 시트 기본 선택 자산
+const QA_ASSET = { etf: "etf", realestate: "realestate" };
 
 const ITEMS = [
   // [S2 IA] 대시보드 · 주식 · ETF · 부동산 · 트러스트
@@ -15,15 +20,18 @@ const ITEMS = [
 
 export default function TopNav({ active }) {
   const router = useRouter();
+  const [qaOpen, setQaOpen] = useState(false); // [빠른입력] 상단 헤더 ＋ → 공용 시트
   return (
     <div className="tn">
       <header className="tn-hd">
         <button type="button" className="tn-logo" onClick={() => router.push("/pwa?tab=dashboard")} aria-label="홈으로">ONE<span className="tn-dot">·</span>HUB</button>
         <div className="tn-ic">
+          <button className="tn-add" aria-label="자산 빠른입력" title="자산 빠른입력" onClick={() => setQaOpen(true)}>＋</button>
           <button aria-label="AI 종목 검색" onClick={() => router.push("/pwa?tab=analyze")}>🔍</button>
           <button aria-label="설정" onClick={() => router.push("/pwa/settings")}>⚙️</button>
         </div>
       </header>
+      {qaOpen && <QuickAddSheet initialAsset={QA_ASSET[active] || "stock"} onClose={() => setQaOpen(false)} />}
       <nav className="tn-tabs" aria-label="주요 자산 카테고리">
         {ITEMS.map(([key, label, href]) => (
           <button
@@ -53,6 +61,8 @@ export default function TopNav({ active }) {
           border: none; display: grid; place-items: center; font-size: 15px; cursor: pointer;
           box-shadow: var(--shadow-card);
         }
+        /* [빠른입력] 상단 ＋ 는 주요 액션 — 네이비 채움으로 눈에 띄게 */
+        .tn-ic button.tn-add { background: var(--color-primary); color: #fff; font-size: 20px; font-weight: 300; line-height: 1; }
         .tn-tabs {
           display: flex; gap: 2px; background: var(--color-card); border-radius: 16px;
           padding: 4px; box-shadow: var(--shadow-card);

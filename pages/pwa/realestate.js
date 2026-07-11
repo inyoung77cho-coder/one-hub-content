@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import TopNav from "../../components/TopNav";
 import { dedupBy } from "../../lib/useDedup";
-import QuickAddFab from "../../components/shared/QuickAddFab";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -360,7 +359,6 @@ export default function RealEstateDashboard() {
       )}
 
       <div className="foot">실거래 기반 확정 지표 + 회귀 예측(근사). 예측치는 참고용이며 투자판단은 본인 책임.</div>
-      <QuickAddFab initialAsset="realestate" />
 
       <style jsx>{`
         .re { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
