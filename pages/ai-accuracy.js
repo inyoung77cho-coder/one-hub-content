@@ -1,5 +1,6 @@
 ﻿import Head from "next/head";
 import Link from "next/link";
+import PageHero from "../components/PageHero";
 import { useState, useEffect } from "react";
 
 export default function AiAccuracy() {
@@ -48,14 +49,9 @@ export default function AiAccuracy() {
         <meta name="description" content="ONE-HUB AI 추천 신호 현황 및 통계" />
         <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700&display=swap" rel="stylesheet" />
       </Head>
+      <PageHero eyebrow="AI Accuracy" title="🎯 AI 정확도 대시보드" subtitle="AI 추천 신호 현황 및 통계 — 예측이 얼마나 맞았는지 투명하게 집계합니다." />
       <div className="page-wrapper">
         <main className="main">
-          <div style={{ marginBottom: "2rem" }}>
-            <h1 style={{ fontFamily: "Syne, sans-serif", fontSize: "1.75rem", fontWeight: 700, marginBottom: "0.5rem" }}>
-              AI Accuracy Dashboard
-            </h1>
-            <p style={{ color: "var(--color-muted)", fontSize: "0.9rem" }}>AI 추천 신호 현황 및 통계</p>
-          </div>
 
           {/* Trader 전환 */}
           <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>

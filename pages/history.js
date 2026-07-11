@@ -1,5 +1,6 @@
 import Head from "next/head";
 import Link from "next/link";
+import PageHero from "../components/PageHero";
 import { useState, useEffect } from "react";
 
 export default function History() {
@@ -59,14 +60,9 @@ export default function History() {
         <meta name="description" content="ONE-HUB AI 분석 기록" />
         <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700&display=swap" rel="stylesheet" />
       </Head>
+      <PageHero eyebrow="Analysis History" title="🕘 AI 분석 히스토리" subtitle="AI가 언제, 무엇을, 왜 분석했는지 기록입니다." />
       <div className="page-wrapper">
         <main className="main">
-          <div style={{ marginBottom: "1.5rem" }}>
-            <h1 style={{ fontFamily: "Syne, sans-serif", fontSize: "1.75rem", fontWeight: 700, marginBottom: "0.5rem" }}>
-              AI 분석 히스토리
-            </h1>
-            <p style={muted}>AI가 언제, 무엇을, 왜 분석했는지 기록입니다</p>
-          </div>
 
           <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem" }}>
             {["A", "B"].map(t => (

@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import PageHero from '../components/PageHero';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import CTABar from '../components/CTABar';
@@ -52,14 +53,9 @@ export default function RecommendTrend() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet" />
       </Head>
-      <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'Pretendard, sans-serif', paddingBottom: 80 }}>
-        <main style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
-          <Link href="/" style={{ color: '#64748b', fontSize: 13, textDecoration: 'none' }}>← ONE-HUB</Link>
-
-          <div style={{ marginTop: 20, marginBottom: 24 }}>
-            <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', margin: '0 0 4px' }}>📊 추천 트렌드</h1>
-            <p style={{ fontSize: '0.9rem', color: '#64748b', margin: 0 }}>AI가 최근 3일 연속 추천한 종목 분석</p>
-          </div>
+      <div style={{ minHeight: '100vh', background: '#F4F9FF', fontFamily: 'Pretendard, sans-serif' }}>
+        <PageHero eyebrow="Recommend Trend" title="📊 추천 트렌드" subtitle="AI가 최근 3일 연속 추천한 종목 분석" />
+        <main className="oh-main" style={{ maxWidth: 760 }}>
 
           {loading ? (
             <div style={{ textAlign: 'center', padding: '60px 0', color: '#94a3b8' }}>데이터 조회 중...</div>

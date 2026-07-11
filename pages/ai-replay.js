@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import PageHero from '../components/PageHero';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import CTABar from '../components/CTABar';
@@ -112,14 +113,9 @@ export default function AiReplay() {
         <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet" />
       </Head>
 
-      <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'Pretendard, sans-serif', paddingBottom: 80 }}>
-        <main style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
-          <Link href="/" style={{ color: '#64748b', fontSize: 13, textDecoration: 'none' }}>← ONE-HUB</Link>
-
-          <div style={{ marginTop: 20, marginBottom: 28 }}>
-            <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', margin: '0 0 6px' }}>🎬 AI Replay</h1>
-            <p style={{ fontSize: '0.9rem', color: '#64748b', margin: 0 }}>ONE-HUB AI 의사결정 재생기</p>
-          </div>
+      <div style={{ minHeight: '100vh', background: '#F4F9FF', fontFamily: 'Pretendard, sans-serif' }}>
+        <PageHero eyebrow="AI Replay" title="🎬 AI 리플레이" subtitle="ONE-HUB AI 의사결정 재생기 — 그날 AI가 무엇을 왜 판단했는지 되돌려봅니다." />
+        <main className="oh-main" style={{ maxWidth: 760 }}>
 
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '20px', marginBottom: 20, boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
             <div style={{ fontFamily: 'monospace', fontSize: 11, color: '#94a3b8', marginBottom: 10 }}>날짜 선택</div>

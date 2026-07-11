@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import PageHero from '../components/PageHero';
 import { useState, useEffect } from 'react';
 import CTABar from '../components/CTABar';
 
@@ -87,13 +88,10 @@ export default function Leaderboard() {
         <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet" />
       </Head>
 
-      <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'Pretendard, sans-serif', paddingBottom: 80 }}>
-        <main style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
-          <Link href="/" style={{ color: '#64748b', fontSize: 13, textDecoration: 'none' }}>← ONE-HUB</Link>
-
-          <div style={{ marginTop: 20, marginBottom: 24 }}>
-            <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', margin: '0 0 6px' }}>🏆 Leaderboard</h1>
-            <p style={{ fontSize: '0.9rem', color: '#64748b', margin: '0 0 16px' }}>ONE-HUB AI 전략 성과 랭킹</p>
+      <div style={{ minHeight: '100vh', background: '#F4F9FF', fontFamily: 'Pretendard, sans-serif' }}>
+        <PageHero eyebrow="Leaderboard" title="🏆 리더보드" subtitle="ONE-HUB AI 전략 성과 랭킹" />
+        <main className="oh-main" style={{ maxWidth: 760 }}>
+          <div style={{ marginBottom: 24 }}>
             <div style={{ display: 'flex', gap: 6 }}>
               {PERIODS.map(p => (
                 <button key={p} onClick={() => setPeriod(p)}

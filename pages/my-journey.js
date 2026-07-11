@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import PageHero from '../components/PageHero';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import CTABar from '../components/CTABar';
@@ -105,13 +106,10 @@ export default function MyJourney() {
         <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet" />
       </Head>
 
-      <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'Pretendard, sans-serif', paddingBottom: 80 }}>
-        <main style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
-          <Link href="/" style={{ color: '#64748b', fontSize: 13, textDecoration: 'none' }}>← ONE-HUB</Link>
-
-          <div style={{ marginTop: 20, marginBottom: 28 }}>
-            <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', margin: '0 0 6px' }}>🗺️ My Journey</h1>
-            <p style={{ fontSize: '0.9rem', color: '#64748b', margin: '0 0 16px' }}>ONE-HUB와 함께한 AI 투자 여정</p>
+      <div style={{ minHeight: '100vh', background: '#F4F9FF', fontFamily: 'Pretendard, sans-serif' }}>
+        <PageHero eyebrow="My Journey" title="🗺️ 마이 저니" subtitle="ONE-HUB와 함께한 AI 투자 여정" />
+        <main className="oh-main" style={{ maxWidth: 760 }}>
+          <div style={{ marginBottom: 28 }}>
             <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
               {[
                 { label: '운영 시작', val: '2026-04-01' },

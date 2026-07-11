@@ -1,5 +1,6 @@
 import Head from "next/head";
 import Link from "next/link";
+import PageHero from "../components/PageHero";
 import { useState, useEffect } from "react";
 
 export default function DecisionLog() {
@@ -90,18 +91,9 @@ export default function DecisionLog() {
         <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700&display=swap" rel="stylesheet" />
       </Head>
 
+      <PageHero eyebrow="Decision Log" title="🧠 디시전 로그" subtitle="AI가 왜 매수하지 않았는가 — 모든 차단 결정을 투명하게 기록합니다." />
       <div className="page-wrapper">
         <main className="main">
-
-          {/* 헤더 */}
-          <div style={{ marginBottom: "1.5rem" }}>
-            <h1 style={{ fontFamily: "Syne, sans-serif", fontSize: "1.75rem", fontWeight: 700, marginBottom: "0.5rem" }}>
-              Decision Log
-            </h1>
-            <p style={{ fontSize: "0.875rem", color: "var(--color-muted)", lineHeight: 1.7 }}>
-              AI가 왜 매수하지 않았는가 — 모든 차단 결정을 투명하게 기록합니다.
-            </p>
-          </div>
 
           {/* ① 오늘 AI 의사결정 요약 카드 */}
           {dashboard && (
