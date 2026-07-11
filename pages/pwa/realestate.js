@@ -25,6 +25,8 @@ export default function RealEstateDashboard() {
   const [budget, setBudget] = useState("");     // [S5] 스크리너 예산(억)
   const [jeonseRate, setJeonseRate] = useState("60"); // [S5] 전세가율(%) 가정
   const [moveScope, setMoveScope] = useState("region"); // [S5+] 이동 범위: complex/dong/region
+  const [dbAreas, setDbAreas] = useState({}); // [S5+] 단지→평형(전용면적) 백엔드 로딩(complex-areas)
+  const [dongMap, setDongMap] = useState({}); // [S5+] 단지→법정동 백엔드 로딩(complex-dongs)
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/re/${fn}`).then((r) => r.json());
@@ -34,6 +36,11 @@ export default function RealEstateDashboard() {
         setBrief(b); setRank(r); setMacro(m); setFeed(f);
       })
       .catch((e) => setErr(e.message));
+    // [S5+] 단지→법정동 매핑(같은 동 필터). 미배포 시 조용히 폴백.
+    g("complexDongs").then((d) => {
+      const map = d?.map || (Array.isArray(d?.items) ? Object.fromEntries(d.items.map((x) => [x.단지명, x.법정동])) : null);
+      if (map && typeof map === "object") setDongMap(map);
+    }).catch(() => {});
     try {
       setMyC(localStorage.getItem("onehub_re_my") || "");
       setTgtC(localStorage.getItem("onehub_re_target") || "");
@@ -55,6 +62,27 @@ export default function RealEstateDashboard() {
     window.addEventListener("onehub-assets-change", reload);
     return () => window.removeEventListener("onehub-assets-change", reload);
   }, []);
+  // [S5+] 선택/보유 단지의 실거래 평형(전용면적)을 백엔드에서 로딩(complex-areas). 미배포 시 feed 폴백.
+  useEffect(() => {
+    const names = [wizOpen ? wiz.name : null, myProp?.name].filter(Boolean);
+    names.forEach((nm) => {
+      if (!nm || dbAreas[nm] !== undefined) return;
+      setDbAreas((m) => ({ ...m, [nm]: null })); // in-flight 마킹(중복 요청 방지)
+      fetch(`/api/pwa/re/complexAreas?complex=${encodeURIComponent(nm)}`)
+        .then((r) => r.json())
+        .then((d) => {
+          const areas = Array.isArray(d?.areas) ? d.areas.map((a) => ({
+            m2: Math.round(Number(a.m2 ?? a.전용면적)),
+            priceUk: a.rep_price_uk != null ? Number(a.rep_price_uk) : (a.rep_price_manwon != null ? Number(a.rep_price_manwon) / 10000 : null),
+            n: a.n ?? null,
+          })).filter((a) => a.m2 > 0) : null;
+          setDbAreas((m) => ({ ...m, [nm]: areas && areas.length ? areas : null }));
+          if (d?.법정동) setDongMap((m) => (m[nm] ? m : { ...m, [nm]: d.법정동 }));
+        })
+        .catch(() => setDbAreas((m) => ({ ...m, [nm]: null })));
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wizOpen, wiz.name, myProp?.name]);
   const pickMy = (v) => { setMyC(v); try { localStorage.setItem("onehub_re_my", v); } catch (e) {} };
   const pickTgt = (v) => { setTgtC(v); try { localStorage.setItem("onehub_re_target", v); } catch (e) {} };
   const changeBudget = (v) => { setBudget(v); try { localStorage.setItem("onehub_re_budget", v); } catch (e) {} };
@@ -84,11 +112,13 @@ export default function RealEstateDashboard() {
     Object.keys(m).forEach((nm) => { out[nm] = [...m[nm].values()].sort((x, y) => x.m2 - y.m2); });
     return out;
   })();
-  const areaOptsFor = (name) => areaMap[name] || [];
+  // 평형 옵션: 백엔드(complex-areas) 우선 → 없으면 feed 유도치
+  const areaOptsFor = (name) => (Array.isArray(dbAreas[name]) && dbAreas[name].length ? dbAreas[name] : (areaMap[name] || []));
   // 전용㎡ → 대략 평(공급 관례 근사): 전용㎡ ÷ 3.3058 후 전용률 0.74 역산 ≈ ㎡/2.45
   const m2ToPyeong = (m2) => Math.round(Number(m2) / 3.3058 / 0.74);
-  // 내 단지의 법정동(있으면) — 없으면 브리핑 지역으로 대체
+  // 법정동: 백엔드(complex-dongs) 우선 → 랭킹 필드 → 브리핑 지역
   const dongOf = (name) => {
+    if (dongMap[name]) return dongMap[name];
     const row = (rank?.ranking || []).find((r) => r.단지명 === name);
     return row?.법정동 || row?.법정동명 || brief?.region || null;
   };

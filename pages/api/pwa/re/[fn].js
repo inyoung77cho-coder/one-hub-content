@@ -14,13 +14,28 @@ const ENDPOINTS = {
   stats: "/api/db/stats",
   holdings: "/api/v2/holdings",
   feed: "/api/feed", // [v11 #16] 최근 실거래 변동 피드
+  complexAreas: "/api/v2/complex-areas", // [S5+] 단지별 실거래 전용면적·평형·대표시세
+  complexDongs: "/api/v2/complex-dongs", // [S5+] 단지→법정동 매핑(같은 동 필터)
 };
+
+// fn·key 외 추가 쿼리(complex 등)는 백엔드로 그대로 전달
+function passThroughQuery(query) {
+  const p = new URLSearchParams();
+  for (const [k, v] of Object.entries(query)) {
+    if (k === "fn" || k === "key" || v == null) continue;
+    p.set(k, Array.isArray(v) ? v[0] : String(v));
+  }
+  return p;
+}
 
 export default async function handler(req, res) {
   const path = ENDPOINTS[req.query.fn];
   if (!path) return res.status(404).json({ error: "unknown endpoint" });
   try {
-    const url = `${RE_API}${path}${RE_KEY ? `?key=${encodeURIComponent(RE_KEY)}` : ""}`;
+    const p = passThroughQuery(req.query);
+    if (RE_KEY) p.set("key", RE_KEY);
+    const qs = p.toString();
+    const url = `${RE_API}${path}${qs ? `?${qs}` : ""}`;
     const resp = await fetch(url);
     const data = await resp.json();
     res.status(resp.status).json(data);
