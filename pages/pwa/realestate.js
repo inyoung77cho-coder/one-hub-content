@@ -2,6 +2,7 @@
 // ETF 대시보드와 동일 패턴. ONE Score 랭킹/시장 브리핑/저평가/거시. 확정 데이터는 진한색.
 import { useEffect, useState } from "react";
 import TopNav from "../../components/TopNav";
+import { dedupBy } from "../../lib/useDedup";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -77,7 +78,7 @@ export default function RealEstateDashboard() {
 
       {/* [S5] 갈아타기 갭 트래커 — 내 단지 vs 목표 단지 갭(핵심 기능 3종) */}
       {rank?.ranking?.length > 0 && (() => {
-        const opts = [...new Map(rank.ranking.map((c) => [c.단지명, c])).values()];
+        const opts = dedupBy(rank.ranking, (c) => c.단지ID || c.단지명);
         const find = (n) => opts.find((o) => o.단지명 === n);
         const my = find(myC), tgt = find(tgtC);
         const gap = my && tgt ? Number(tgt.avm_total_uk || 0) - Number(my.avm_total_uk || 0) : null;

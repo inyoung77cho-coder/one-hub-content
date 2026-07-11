@@ -7,6 +7,7 @@ import LastUpdated from '../../components/LastUpdated';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
 import { recordDecision, matureLedger, computeShowdown, getTodayDecision } from '../../lib/verdictLedger';
 import { fetchAssetsTotal } from '../../lib/assetsTotal';
+import { dedupBy } from '../../lib/useDedup';
 
 // [v9.0] 안전 숫자 포맷 — INVALID_PRICE/STOP/NaN/undefined → '-'
 function safeLocale(v, suffix = '') {
@@ -612,6 +613,8 @@ export default function PWADashboard({ latestReport }) {
   if (data?.balance?.positions) {
     try { positions = JSON.parse(data.balance.positions); } catch(e) {}
   }
+  // [S1.4] 보유 종목도 종목코드 기준 공용 dedup(이중 방어)
+  positions = dedupBy(positions, (p) => p.code || p.stock || p.name);
 
   // [v8.7] 포트폴리오 요약 — 보유종목 평가수익률 + 오늘 변동
   const portCostBasis = positions.reduce((sum, p) => sum + (Number(p.avg_price||0) * Number(p.qty||0)), 0);
@@ -1212,8 +1215,8 @@ export default function PWADashboard({ latestReport }) {
                   if (profile.style === 'conservative') return base - Math.abs((s.vol_ratio ?? 1) - 1) * 3;
                   return base;
                 };
-                // [S1] 종목코드 기준 dedup(중복 렌더 방지) 후 정렬
-                const uniqCands = [...new Map(data.screening_candidates.map((c) => [c.code || c.name, c])).values()];
+                // [S1.4] 종목코드 기준 공용 dedup(이중 방어) 후 정렬
+                const uniqCands = dedupBy(data.screening_candidates, (c) => c.code || c.name);
                 const sorted = uniqCands.sort((a, b) => personalScore(b) - personalScore(a));
                 const top3 = sorted.slice(0, 3);
                 const rest = sorted.slice(3);
@@ -1731,7 +1734,7 @@ export default function PWADashboard({ latestReport }) {
                 {(!data.today_blocked || data.today_blocked.length===0)
                   ? <div className="pwa-empty">차단 종목 없음</div>
                   : (<>
-                    <div className="blocked-list">{[...new Map(data.today_blocked.map(b=>[b.stock,b])).values()].slice(0,5).map((b,i) => (
+                    <div className="blocked-list">{dedupBy(data.today_blocked, (b) => b.code || b.stock).slice(0,5).map((b,i) => (
                       <div key={i} className="blocked-card">
                         <div className="blocked-top">
                           <span className="blocked-stock">{b.stock}</span>
