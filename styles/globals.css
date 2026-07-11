@@ -43,6 +43,16 @@
   --ob-soft:            #EEE9FF;
   --ob-ink:             #3A2B8C;
 
+  /* ---- [S2.4] 밸류에이션 시맨틱(3자산군 공통) — 기존 토큰 별칭이라 다크모드 자동 반영 ---- */
+  --color-undervalued:      var(--color-primary);       /* 저평가 = 파랑(기회) */
+  --color-undervalued-soft: var(--color-primary-soft);
+  --color-fair:             var(--color-ink-3);         /* 적정 = 회색(중립) */
+  --color-fair-soft:        var(--color-card-soft);
+  --color-overvalued:       var(--color-danger);        /* 고평가 = 빨강 */
+  --color-overvalued-soft:  var(--color-danger-soft);
+  --color-sell:             var(--color-danger);        /* 매도/차단 = 빨강 */
+  --color-hold:             var(--color-ink-3);         /* 유지 = 회색 */
+
   /* ---- 다크 네이비 히어로 (화면마다 상단 앵커) ---- */
   --hero-grad-1:        #12213B;
   --hero-grad-2:        #20375F;
