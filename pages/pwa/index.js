@@ -774,22 +774,24 @@ export default function PWADashboard({ latestReport }) {
           </div>
         </header>
 
-        {/* [v11 IA] 자산 카테고리 네비 — 홈 · AI자산 · 주식 · ETF · 부동산 · 설정 */}
+        {/* [S2 IA] 대시보드 · 주식 · ETF · 부동산 · 트러스트 (AI자산=대시보드 링크, 기록=트러스트로 이동) */}
         <nav className="pwa-tabs">
           {[
-            ['dashboard','홈'],
-            ['ai','AI자산'],
+            ['dashboard','대시보드'],
             ['stock','주식'],
             ['etf','ETF'],
             ['realestate','부동산'],
-            // [설정] 탭 제거 — 헤더 ⚙️ 아이콘과 중복. 설정은 아이콘으로만 진입.
+            ['trust','트러스트'],
           ].map(([t,label]) => {
-            const routes = { etf: '/pwa/etf', realestate: '/pwa/realestate', ai: '/pwa/ai-advisor' };
-            const stockTabs = ['recommend','portfolio','report','analyze'];
-            const isActive = t === 'stock' ? stockTabs.includes(tab) : tab === t;
+            const routes = { etf: '/pwa/etf', realestate: '/pwa/realestate' };
+            const stockTabs = ['recommend','portfolio','analyze'];   // 기록(report)은 트러스트로 이동
+            const isActive = t === 'stock' ? stockTabs.includes(tab)
+              : t === 'trust' ? tab === 'report'
+              : tab === t;
             const go = () => {
               if (routes[t]) { window.location.href = routes[t]; return; }
               if (t === 'stock') { setTab('portfolio'); return; }
+              if (t === 'trust') { setTab('report'); return; }
               setTab(t);
             };
             return (
@@ -799,10 +801,10 @@ export default function PWADashboard({ latestReport }) {
             );
           })}
         </nav>
-        {/* [v11 IA] 주식 카테고리 서브탭 — 추천 · 보유 · 기록 */}
-        {['recommend','portfolio','report'].includes(tab) && (
+        {/* [S2 IA] 주식 카테고리 서브탭 — 보유 · 추천 (기록은 트러스트 탭으로) */}
+        {['recommend','portfolio'].includes(tab) && (
           <nav className="pwa-subtabs">
-            {[['portfolio','보유'],['recommend','추천'],['report','기록']].map(([t,label]) => (
+            {[['portfolio','보유'],['recommend','추천']].map(([t,label]) => (
               <button key={t} className={`pwa-subtab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
                 {label}
               </button>
@@ -991,6 +993,10 @@ export default function PWADashboard({ latestReport }) {
                           : <span className="v10-miss"><span className="v10-miss-tag">미입력</span><button className="v10-miss-btn" onClick={() => { window.location.href = href; }}>입력하기 →</button></span>}
                       </div>
                     ))}
+                    {/* [S2 IA] AI자산(배분 정밀 진단)은 대시보드에서 진입 — 상시 노출 링크 */}
+                    <button className="v10-diag-link" onClick={() => { window.location.href = '/pwa/ai-advisor'; }}>
+                      🩺 AI 배분 정밀 진단 · 포트폴리오 주치의 <span>→</span>
+                    </button>
                   </section>
                 );
               })()}
@@ -1742,9 +1748,15 @@ export default function PWADashboard({ latestReport }) {
           </main>
         )}
 
-        {/* ── Report Tab ── */}
+        {/* ── Report Tab = [S2 IA] 트러스트 허브 ── */}
         {tab === 'report' && (
           <main className="pwa-main">
+
+            {/* [S2 IA] 트러스트 허브 인트로 — 나vsAI·자기검증·성적표·차단정확도가 여기 모임 */}
+            <section className="trust-hero">
+              <div className="trust-hero-lbl">🛡️ AI 트러스트</div>
+              <div className="trust-hero-sub">이 AI를 왜 믿나 — 판단 흐름 · 나 vs AI · 자기검증 · 성적표를 한 곳에서 투명하게 공개합니다.</div>
+            </section>
 
             {/* [나 vs AI 대결] AI 추천 중 내가 산 것 vs AI 단독매매, 3일·7일 수익 승부 */}
             {(() => {
@@ -2669,6 +2681,8 @@ export default function PWADashboard({ latestReport }) {
         .v10-total { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
         .v10-total-lbl { font-size: 13px; color: var(--color-ink-2); font-weight: 600; }
         .v10-total-amt { font-size: 26px; font-weight: 800; letter-spacing: -.5px; color: var(--color-ink); }
+        .v10-diag-link { width: 100%; margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--color-primary-soft); color: var(--color-primary); border: none; border-radius: 11px; padding: 11px 0; font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: var(--font-body); }
+        .v10-diag-link span { font-weight: 800; }
         .v10-arow { display: flex; align-items: center; justify-content: space-between; padding: 11px 0; border-top: 1px solid var(--color-line); }
         .v10-aname { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--color-ink); }
         .v10-adot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -3164,6 +3178,10 @@ export default function PWADashboard({ latestReport }) {
         .ml-rec-badge { font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: var(--inset-bg); }
         .ml-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 8px; line-height: 1.5; }
         /* [나 vs AI 대결] */
+        /* [S2 IA] 트러스트 허브 인트로 */
+        .trust-hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 16px 18px; box-shadow: var(--shadow-float); margin-bottom: 4px; }
+        .trust-hero-lbl { font-size: 1rem; font-weight: 800; }
+        .trust-hero-sub { font-size: 0.76rem; color: var(--hero-ink-soft); line-height: 1.55; margin-top: 6px; word-break: keep-all; }
         .vs-card { border: 1px solid var(--color-line); }
         .vs-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
         .vs-overall { font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
