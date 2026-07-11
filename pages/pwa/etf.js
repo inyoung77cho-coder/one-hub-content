@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import TopNav from "../../components/TopNav";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS } from "../../lib/etfHoldings";
+import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress } from "../../lib/taxRules";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -15,12 +16,11 @@ const won = (n) => {
 };
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${n.toFixed(2)}%`);
 const sign = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : "");
-// [S4] 계좌 유형별 세제 안내 — 세금 계산이 근본부터 다름(리뷰 #5 "연금 포함 운영")
-const ACCT_TAX = {
-  "일반": "💸 해외상장 ETF 양도세 22%(250만 공제) · 국내상장 해외ETF 배당소득 15.4%(2천만 초과 종합과세)",
-  "연금": "🏦 매도해도 양도세 0 · 인출 시 연금소득세 3.3~5.5%(저율) · 세액공제 한도 연 900만원",
-  "ISA": "🧾 순이익 200만(서민형 400만) 비과세 + 초과분 9.9% 분리과세",
-};
+// [S4] 계좌 유형별 세제 안내 — data/tax_rules.json 단일 소스에서 로드(세율 하드코딩 제거)
+const ACCT_EMOJI = { "일반": "💸", "연금": "🏦", "ISA": "🧾" };
+const ACCT_TAX = ACCOUNTS.reduce((m, a) => { m[a] = `${ACCT_EMOJI[a] || ""} ${acctTaxNote(a)}`; return m; }, {});
+// [S4] 계좌 필터 칩
+const ACCT_FILTERS = ["전체", ...ACCOUNTS];
 
 export default function EtfDashboard() {
   const [report, setReport] = useState(null);
@@ -35,6 +35,22 @@ export default function EtfDashboard() {
   const [form, setForm] = useState({ side: "buy", ticker: "", shares: "", price: "", ccy: "USD", account: "일반" });
   const [formMsg, setFormMsg] = useState("");
   const [posQty, setPosQtyState] = useState({}); // [등록 ETF] 티커별 사용자 입력 수량(백엔드 미제공 보완)
+  const [acctFilter, setAcctFilter] = useState("전체"); // [S4] 계좌 유형 필터([전체][일반][연금][ISA])
+  const [pensionContrib, setPensionContrib] = useState(""); // [S4] 올해 연금 납입액(원, 세액공제 진행률)
+
+  // [S4] 계좌 필터·연금 납입액·마지막 사용 계좌 기억(localStorage)
+  useEffect(() => {
+    try {
+      const f = localStorage.getItem("onehub_etf_acct_filter");
+      if (f && ACCT_FILTERS.includes(f)) setAcctFilter(f);
+      const pc = localStorage.getItem("onehub_pension_contrib");
+      if (pc != null) setPensionContrib(pc);
+      const last = localStorage.getItem("onehub_etf_last_acct");
+      if (last && ACCOUNTS.includes(last)) setForm((prev) => ({ ...prev, account: last }));
+    } catch (e) {}
+  }, []);
+  const changeAcctFilter = (f) => { setAcctFilter(f); try { localStorage.setItem("onehub_etf_acct_filter", f); } catch (e) {} };
+  const changePensionContrib = (v) => { setPensionContrib(v); try { localStorage.setItem("onehub_pension_contrib", v); } catch (e) {} };
 
   useEffect(() => {
     const load = () => {
@@ -111,6 +127,7 @@ export default function EtfDashboard() {
       ? buyEtf({ ticker, market: inferMarket(ticker), shares, avgPrice: price, avgCcy: ccy, account, trader: tr })
       : sellEtf({ ticker, shares, account, trader: tr });
     if (!res.ok) { setFormMsg("⚠️ " + (res.error || "입력 오류")); return; }
+    try { localStorage.setItem("onehub_etf_last_acct", account); } catch (e) {} // [S4] 마지막 사용 계좌 기억
     const tk = String(ticker).trim().toUpperCase();
     setFormMsg(side === "buy" ? `✓ ${tk} 매수 기록됨` : (res.short > 0 ? `✓ ${tk} 매도(보유수량까지만 반영)` : `✓ ${tk} 매도 반영됨`));
     const l = getHoldings(tr); setHoldings(l); refreshQuotes(l);
@@ -229,7 +246,7 @@ export default function EtfDashboard() {
             <div className="decomp">
               <div className="drow"><span className="dk">ETF 자체수익 ($)</span><span className={`dv ${sign(s.etf_self_pct)}`}>{pct(s.etf_self_pct)}</span></div>
               <div className="drow"><span className="dk">환차손익</span><span className={`dv ${sign(s.fx_pure_pct)}`}>{pct(s.fx_pure_pct)}</span></div>
-              <div className="drow"><span className="dk">교차항</span><span className={`dv ${sign(s.cross_pct)}`}>{pct(s.cross_pct)}</span></div>
+              <div className="drow"><span className="dk"><span className="term light" title="ETF 자체수익과 환차손익이 곱해져 생기는 상호작용분. (1+ETF수익)×(1+환수익)−1 에서 단순 합을 넘는 나머지입니다.">교차항</span></span><span className={`dv ${sign(s.cross_pct)}`}>{pct(s.cross_pct)}</span></div>
               <div className="drow total"><span className="dk">실질 원화수익</span><span className={`dv ${sign(s.total_pnl_pct)}`}>{pct(s.total_pnl_pct)}</span></div>
             </div>
             <div className="foot-note">달러 수익 {pct(s.etf_self_pct)} 위에 환율효과 {pct((s.fx_pure_pct||0) + (s.cross_pct||0))}가 더해진 원화 실질 수익입니다.</div>
@@ -250,6 +267,20 @@ export default function EtfDashboard() {
           {topRisk && <div className="ev-risk">⚠️ 핵심 리스크 · {topRisk}</div>}
         </div>
       )}
+
+      {/* [S4] 계좌 유형 필터 — 세제가 근본부터 다르므로 계좌별로 보유·세제를 분리해 본다 */}
+      <div className="acct-filter" role="tablist" aria-label="계좌 유형 필터">
+        {ACCT_FILTERS.map((f) => {
+          const cnt = f === "전체" ? holdings.length : holdings.filter((h) => (h.account || "일반") === f).length;
+          return (
+            <button key={f} role="tab" aria-selected={acctFilter === f}
+              className={`acct-chip ${acctFilter === f ? "on" : ""} ${f === "연금" ? "pension" : f === "ISA" ? "isa" : ""}`}
+              onClick={() => changeAcctFilter(f)}>
+              {f}{cnt > 0 && <span className="acct-chip-n">{cnt}</span>}
+            </button>
+          );
+        })}
+      </div>
 
       {/* [§3-2 원칙1] 포트폴리오 합계는 홈·AI자산 2곳에만. ETF 페이지는 ETF 슬라이스만 표시(피드백14) */}
       {err && <div className="err">데이터 로드 오류: {err}</div>}
@@ -402,17 +433,20 @@ export default function EtfDashboard() {
         );
       })()}
 
-      {/* 4) 절세 (확정 계산) */}
+      {/* 4) 절세 (확정 계산) — 일반 계좌 기준 · 계좌 유형별 세제는 아래 '내 ETF' 버킷 참고 */}
       {tax && (
         <section className="card">
-          <div className="label">세금 · 절세 <span className="sub">확정 계산</span></div>
+          <div className="label">세금 · 절세 <span className="sub">일반 계좌 · 확정 계산</span>
+            <span className="tax-info" title="일반 계좌(해외상장 ETF) 기준 계산입니다. 연금·ISA 계좌는 세제가 다르므로 아래 '내 ETF' 계좌 버킷에서 확인하세요.">ⓘ</span>
+          </div>
           <div className="tax-line"><span>전량 매도 시 양도세</span><b className="neg">{won(tax.tax_all)}원</b></div>
           <div className="tax-hint">
             순이익 {won(tax.net)}원 − 기본공제 250만 = 과세표준 {won(tax.base_all)}원 × 22%
           </div>
           <div className="tax-hint sub">
-            손실종목({tax.losses?.map((l) => l.ticker).join("·") || "-"}) 손익통산 후. 손실수확+이익이연 시 올해 0원 가능.
+            손실종목({tax.losses?.map((l) => l.ticker).join("·") || "-"}) <span className="term" title="같은 과세연도 내 이익과 손실을 합산해 순이익에만 과세하는 것. 손실 종목을 함께 매도하면 과세표준이 줄어듭니다.">손익통산</span> 후. <span className="term" title="평가손실 종목을 연내 매도해 손실을 확정(실현)하고, 이익 실현은 다음 해로 미뤄 올해 과세표준을 낮추는 절세 기법.">손실수확</span>+이익이연 시 올해 0원 가능.
           </div>
+          <div className="tax-disclaim">⚖️ {TAX_DISCLAIMER}</div>
         </section>
       )}
 
@@ -509,8 +543,8 @@ export default function EtfDashboard() {
         {formMsg && <div className="me-msg">{formMsg}</div>}
         {holdings.length > 0 ? (
           <div className="me-groups">
-            {/* [S4] 계좌 유형별 그룹 — 세제가 다르므로 버킷별 평가·세제 안내 분리 */}
-            {ACCOUNTS.filter((a) => holdings.some((h) => (h.account || "일반") === a)).map((acct) => {
+            {/* [S4] 계좌 유형별 그룹 — 세제가 다르므로 버킷별 평가·세제 안내 분리 · 상단 필터 반영 */}
+            {ACCOUNTS.filter((a) => (acctFilter === "전체" || acctFilter === a) && holdings.some((h) => (h.account || "일반") === a)).map((acct) => {
               const rows = holdings.filter((h) => (h.account || "일반") === acct);
               const sub = rows.reduce((acc, h) => { const v = holdingMetrics(h).valueKrw; return acc + (v || 0); }, 0);
               return (
@@ -541,6 +575,31 @@ export default function EtfDashboard() {
                     })}
                   </div>
                   <div className="me-tax">{ACCT_TAX[acct]}</div>
+                  {/* [S4] 연금 세액공제 진행률 — 올해 납입액(입력) 대비 한도(연 900만) · 추정(참고용) */}
+                  {acct === "연금" && (() => {
+                    const limit = pensionCreditLimit();
+                    const acquired = rows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
+                    const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
+                    const prog = pensionCreditProgress(contrib);
+                    const est = pensionContrib === ""; // 미입력 시 취득원가 기반 추정
+                    return (
+                      <div className="pen-credit">
+                        <div className="pc-h">
+                          <span className="pc-lbl">🎁 세액공제 한도 진행률</span>
+                          <span className={`pc-tag ${est ? "est" : "fix"}`}>{est ? "추정" : "입력"}</span>
+                          <span className="pc-pct">{Math.round(prog * 100)}%</span>
+                        </div>
+                        <div className="pc-bar"><div className="pc-fill" style={{ width: `${prog * 100}%` }} /></div>
+                        <div className="pc-nums">납입 {won(contrib)}원 / 한도 {won(limit)}원 {prog >= 1 ? "· 한도 소진" : `· 여유 ${won(Math.max(0, limit - contrib))}원`}</div>
+                        <div className="pc-in-wrap">
+                          <span className="pc-in-lbl">올해 납입액 직접 입력(원)</span>
+                          <input className="pc-in" type="number" inputMode="numeric" placeholder={`${Math.round(acquired).toLocaleString()} (취득 추정)`}
+                            value={pensionContrib} onChange={(e) => changePensionContrib(e.target.value)} />
+                        </div>
+                        <div className="pc-note">세액공제 한도(연 {won(limit)}원)는 <b>납입액 기준</b>입니다. 미입력 시 이 계좌 취득원가로 <b>추정</b>하므로 실제 납입액과 다를 수 있습니다.</div>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
@@ -729,6 +788,36 @@ export default function EtfDashboard() {
         .me-empty b { color: var(--color-ink); font-weight: 700; }
         .me-foot { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 12px; line-height: 1.5; word-break: keep-all; }
         .foot { font-size: 0.68rem; color: var(--color-ink-3); text-align: center; margin-top: 16px; line-height: 1.5; }
+        /* [S4] 계좌 유형 필터 칩 */
+        .acct-filter { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        .acct-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 999px; padding: 7px 14px; font-size: 0.78rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .acct-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .acct-chip.on.pension { background: var(--color-success); border-color: var(--color-success); }
+        .acct-chip.on.isa { background: var(--color-primary); border-color: var(--color-primary); }
+        .acct-chip-n { font-size: 0.66rem; font-weight: 800; background: var(--color-card-soft); color: var(--color-ink-2); border-radius: 999px; padding: 1px 6px; }
+        .acct-chip.on .acct-chip-n { background: rgba(255,255,255,0.25); color: #fff; }
+        /* [S4] 세법 툴팁/면책 */
+        .tax-info { margin-left: auto; font-size: 0.8rem; color: var(--color-ink-3); cursor: help; font-weight: 600; }
+        .term { border-bottom: 1px dotted var(--color-ink-3); cursor: help; }
+        .term.light { border-bottom-color: var(--hero-ink-faint); color: var(--hero-ink-soft); }
+        .tax-disclaim { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 10px; line-height: 1.5; word-break: keep-all; padding-top: 9px; border-top: 1px solid var(--color-line); }
+        /* [S4] 연금 세액공제 진행률 */
+        .pen-credit { margin-top: 10px; background: var(--color-success-soft); border-radius: 11px; padding: 12px 13px; }
+        .pc-h { display: flex; align-items: center; gap: 8px; }
+        .pc-lbl { font-size: 0.76rem; font-weight: 800; color: var(--color-success-ink, var(--color-success)); }
+        .pc-tag { font-size: 0.6rem; font-weight: 800; padding: 2px 6px; border-radius: 5px; }
+        .pc-tag.est { background: var(--color-warning-soft); color: var(--color-warning-ink); }
+        .pc-tag.fix { background: var(--color-card); color: var(--color-success-ink, var(--color-success)); }
+        .pc-pct { margin-left: auto; font-size: 0.9rem; font-weight: 800; color: var(--color-success-ink, var(--color-success)); }
+        .pc-bar { height: 8px; background: var(--color-card); border-radius: 999px; overflow: hidden; margin: 8px 0 6px; }
+        .pc-fill { height: 100%; background: var(--color-success); border-radius: 999px; }
+        .pc-nums { font-size: 0.7rem; color: var(--color-ink-2); font-weight: 600; }
+        .pc-in-wrap { display: flex; align-items: center; gap: 8px; margin-top: 9px; }
+        .pc-in-lbl { font-size: 0.66rem; color: var(--color-ink-3); font-weight: 700; flex-shrink: 0; }
+        .pc-in { flex: 1; min-width: 0; border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 8px; padding: 6px 9px; font-size: 0.76rem; color: var(--color-ink); font-family: var(--font-sans); }
+        .pc-in:focus { outline: none; border-color: var(--color-success); }
+        .pc-note { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 8px; line-height: 1.5; word-break: keep-all; }
+        .pc-note b { color: var(--color-ink-2); font-weight: 700; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>
