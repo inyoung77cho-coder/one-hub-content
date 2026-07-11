@@ -6,6 +6,7 @@ import TopNav from "../../components/TopNav";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS } from "../../lib/etfHoldings";
 import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress } from "../../lib/taxRules";
+import QuickAddFab from "../../components/shared/QuickAddFab";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -93,7 +94,8 @@ export default function EtfDashboard() {
     load();
     const poll = setInterval(load, 60000);
     window.addEventListener("onehub-trader-change", load);
-    return () => { clearInterval(poll); window.removeEventListener("onehub-trader-change", load); };
+    window.addEventListener("onehub-assets-change", load); // [S3] 빠른입력 낙관적 갱신
+    return () => { clearInterval(poll); window.removeEventListener("onehub-trader-change", load); window.removeEventListener("onehub-assets-change", load); };
   }, []);
 
   const s = report?.summary;
@@ -611,6 +613,7 @@ export default function EtfDashboard() {
       </section>
 
       <div className="foot">확정 계산(수익·세금·중복도)은 입력값 기반. 예측(Forecast)은 통계적 시나리오(참고용·확정 아님). · 세무자문 아님</div>
+      <QuickAddFab initialAsset="etf" />
 
       <style jsx>{`
         .etf { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
