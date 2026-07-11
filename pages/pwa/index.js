@@ -6,6 +6,7 @@ import { getLatestDailyReport } from '../../lib/reports';
 import LastUpdated from '../../components/LastUpdated';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
 import { recordDecision, matureLedger, computeShowdown, getTodayDecision } from '../../lib/verdictLedger';
+import { fetchAssetsTotal } from '../../lib/assetsTotal';
 
 // [v9.0] 안전 숫자 포맷 — INVALID_PRICE/STOP/NaN/undefined → '-'
 function safeLocale(v, suffix = '') {
@@ -376,10 +377,10 @@ export default function PWADashboard({ latestReport }) {
       .then(r => r.json())
       .then(d => { if (d.ok && Array.isArray(d.items)) setNotis(d.items); })
       .catch(() => {});
-    fetch(`/api/realestate/v2/total-asset?trader_id=${trader}`)
-      .then(r => r.json())
-      .then(d => setAssetSum(mergeOnboardAssets(d)))
-      .catch(() => setAssetSum(mergeOnboardAssets(null)));
+    // [S1.1] 총자산 단일 소스(/api/assets/total, 미배포 시 기존 total-asset+온보딩 폴백)
+    fetchAssetsTotal(trader)
+      .then(a => setAssetSum(a?.total_uk != null ? { total_uk: a.total_uk, breakdown: a.breakdown, realty_state: a.realty_state, source: a.source } : null))
+      .catch(() => setAssetSum(null));
     fetch(`/api/realestate/v2/ai-summary?trader_id=${trader}`)
       .then(r => r.json())
       .then(d => { if (d && Array.isArray(d.summary_items)) setAiRec(d); })
