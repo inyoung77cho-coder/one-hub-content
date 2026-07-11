@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import PageHero from '../components/PageHero';
 import { useState } from 'react';
 import CTABar from '../components/CTABar';
 
@@ -53,14 +54,9 @@ export default function LearningCenter() {
         <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css" rel="stylesheet" />
       </Head>
 
-      <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'Pretendard, sans-serif', paddingBottom: 80 }}>
-        <main style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
-          <Link href="/" style={{ color: '#64748b', fontSize: 13, textDecoration: 'none' }}>← ONE-HUB</Link>
-
-          <div style={{ marginTop: 20, marginBottom: 28 }}>
-            <h1 style={{ fontSize: '1.6rem', fontWeight: 800, color: '#0f172a', margin: '0 0 6px' }}>📚 Learning Center</h1>
-            <p style={{ fontSize: '0.9rem', color: '#64748b', margin: 0 }}>AI 자동매매를 이해하는 가장 빠른 길</p>
-          </div>
+      <div style={{ minHeight: '100vh', background: '#F4F9FF', fontFamily: 'Pretendard, sans-serif' }}>
+        <PageHero eyebrow="Learning Center" title="📚 러닝 센터" subtitle="AI 자동매매를 이해하는 가장 빠른 길 — 기초·시장 지표·리스크·ETF 전략까지." />
+        <main className="oh-main" style={{ maxWidth: 760 }}>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginBottom: 28 }}>
             {CATEGORIES.map(c => (

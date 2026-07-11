@@ -1,4 +1,5 @@
 ﻿import Head from "next/head";
+import PageHero from "../components/PageHero";
 import { useState } from "react";
 import { APP_VERSION, LAST_UPDATED } from '../lib/version';
 
@@ -43,10 +44,9 @@ export default function StrategiesPage() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet" />
       </Head>
-      <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#1e293b", fontFamily: "Pretendard, sans-serif", padding: "0 0 80px" }}>
-        <main style={{ maxWidth: "720px", margin: "0 auto", padding: "40px 20px" }}>
-          <h1 style={{ fontSize: "22px", fontWeight: 800, marginBottom: 6 }}>전략 라이브러리</h1>
-          <p style={{ fontSize: "13px", color: "#64748b", marginBottom: 28 }}>ONE-HUB 자동매매 전략 구성 및 가중치</p>
+      <div style={{ minHeight: "100vh", background: "#F4F9FF", fontFamily: "Pretendard, sans-serif" }}>
+        <PageHero eyebrow="Strategies" title="전략 라이브러리" subtitle="ONE-HUB 자동매매 전략 구성 및 가중치 — ML 예측기·Final Score·리스크 관리·거시경제 필터를 공개합니다." />
+        <main className="oh-main" style={{ maxWidth: "760px" }}>
 
           {/* 가중치 바 */}
           <div style={{ background: "#fff", border: "1px solid #e2e8f0", borderRadius: 20, padding: "20px 24px", marginBottom: 24, boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>

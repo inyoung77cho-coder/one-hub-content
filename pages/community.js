@@ -1,4 +1,5 @@
 import Head from "next/head";
+import PageHero from "../components/PageHero";
 import { useState, useEffect } from "react";
 
 const channels = [
@@ -85,11 +86,9 @@ export default function CommunityPage() {
         <meta property="og:site_name" content="ONE-HUB" />
         <meta name="twitter:card" content="summary" />
       </Head>
-      <div style={{ minHeight: "100vh", background: "#f8fafc", color: "#0f172a", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
-        <main style={{ maxWidth: "860px", margin: "0 auto", padding: isMobile ? "24px 16px" : "40px 24px" }}>
-
-          <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#94A3B8", textTransform: "uppercase", marginBottom: "8px" }}>Community</h1>
-          <p style={{ fontSize: "13px", color: "#64748B", marginBottom: "36px" }}>AI 자동매매 여정을 함께하는 투자 생태계</p>
+      <div style={{ minHeight: "100vh", background: "#F4F9FF" }}>
+        <PageHero eyebrow="Community" title="커뮤니티" subtitle="AI 자동매매 여정을 함께하는 투자 생태계 — 매일의 AI 판단과 리포트를 실시간으로 받아보세요." />
+        <main className="oh-main">
 
           {/* ① 채널 카드 6개 */}
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "14px", marginBottom: "40px" }}>

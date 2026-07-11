@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import PageHero from '../components/PageHero';
 import { useState, useEffect } from 'react';
 
 export default function TrustCenter() {
@@ -64,23 +65,15 @@ export default function TrustCenter() {
         <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
       </Head>
 
+      <PageHero eyebrow="Trust Center" title="🛡️ 트러스트 센터" subtitle="ONE-HUB 실시간 운영 현황 — 시스템 상태·AI 통계·오늘 활동을 투명하게 공개합니다." />
       <div className="page-wrapper">
         <main className="main" style={{ maxWidth: 720 }}>
 
-          {/* 헤더 */}
-          <div style={{ marginBottom: 32 }}>
-            <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.75rem', fontWeight: 800, marginBottom: 8 }}>
-              🛡️ Trust Center
-            </h1>
-            <p style={{ color: 'var(--color-muted)', fontSize: '0.9rem', lineHeight: 1.7 }}>
-              ONE-HUB 실시간 운영 현황 — 시스템 상태, AI 통계, 오늘 활동을 투명하게 공개합니다.
+          {lastUpdated && (
+            <p style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginBottom: 20, fontFamily: 'Space Mono, monospace' }}>
+              마지막 갱신: {lastUpdated.toLocaleTimeString('ko-KR')} · 30초마다 자동 갱신
             </p>
-            {lastUpdated && (
-              <p style={{ fontSize: '0.75rem', color: 'var(--color-muted)', marginTop: 6, fontFamily: 'Space Mono, monospace' }}>
-                마지막 갱신: {lastUpdated.toLocaleTimeString('ko-KR')} · 30초마다 자동 갱신
-              </p>
-            )}
-          </div>
+          )}
 
           {/* ENGINE STATUS */}
           <section style={cardStyle}>
