@@ -8,6 +8,7 @@ import TopNav from "../../components/TopNav";
 import { computeSummary, toManwon } from "../../lib/aiAssets";
 import { getTrader } from "../../lib/trader";
 import { fetchAssetsTotal } from "../../lib/assetsTotal";
+import { acctRule } from "../../lib/taxRules";
 
 const UK = 1e8; // 억 → 원
 
@@ -47,6 +48,8 @@ export default function AIAdvisor() {
   const [s, setS] = useState(null); // computeSummary 결과(단일 소스)
   const [err, setErr] = useState(false);
   const [realtyState, setRealtyState] = useState(null); // [S1.1] 단일소스 부동산 입력상태
+  const [ovTarget, setOvTarget] = useState(null); // [S6] 배분 실행: 해외 목표 비중(%) 슬라이더
+  const [fundSrc, setFundSrc] = useState("cash"); // [S6] 스왑 재원(세금 효과가 달라짐)
 
   useEffect(() => {
     const load = () => {
@@ -74,6 +77,11 @@ export default function AIAdvisor() {
   const p = s?.policy;
   const eq = s?.equity;
   const risk = s?.structural_risk;
+
+  // [S6] 배분 실행 슬라이더 기본값 = 온보딩 해외 목표(최초 1회)
+  useEffect(() => {
+    if (ovTarget == null && p?.overseas != null) setOvTarget(p.overseas);
+  }, [p?.overseas, ovTarget]);
   const measured = s?.measurable && s?.liquid_score != null;
   // §3 유동 점수 색: 80+ 초록 / 50+ 앰버 / 미만 빨강 / 미측정 회색
   const scoreColor = !measured ? "var(--color-ink-3)"
@@ -112,6 +120,24 @@ export default function AIAdvisor() {
     ["부동산", "var(--color-success)", s.assets.realestate],
     ["현금", "var(--color-warning)", s.assets.cash],
   ] : [];
+
+  // [S6] 오늘 할 일 실행 건수(0~3 밴드) — 실제 조정이 필요한 액션만 카운트
+  const todoCount = Math.min(3, (overseasSwapWon > 0 ? 1 : 0) + (diluteWon > 0 ? 1 : 0) + (Math.abs(cashDeltaWon) > s?.total * 0.01 ? 1 : 0));
+
+  // [S6] 배분 제안 실행 카드 — 해외 목표비중 슬라이더 → 실시간 스왑액·세금·환효과(추정)
+  const curOverseasPct = eq?.region ? eq.region.overseas : 0;
+  const swapExecWon = eq && ovTarget != null ? s.equity_won * ((ovTarget - curOverseasPct) / 100) : 0; // +매수해외 / −회수국내
+  const swapAbsWon = Math.abs(swapExecWon);
+  // 세금(추정·전액 차익 가정 최대치): 재원별 세율 — 현금/국내주식형ETF=비과세, 국내기타=배당 15.4%, 해외=양도 22%
+  const FUND = {
+    cash: { label: "현금", rate: 0, note: "현금 재원 — 매도 없음·세금 0" },
+    kr_equity_etf: { label: "국내주식형 ETF", rate: 0, note: "매매차익 비과세 — 세금 0" },
+    kr_other_etf: { label: "국내 기타 ETF", rate: acctRule("일반").domestic_etf_dividend_rate || 0.154, note: "배당소득세 + 금융소득종합과세 주의" },
+    overseas_etf: { label: "해외상장 ETF", rate: acctRule("일반").overseas_capital_gains_rate || 0.22, note: "양도세(250만 공제·손익통산 가능)" },
+  };
+  const fund = FUND[fundSrc] || FUND.cash;
+  const swapTaxWon = swapExecWon > 0 ? swapAbsWon * fund.rate : 0; // 매수 방향일 때 재원 매도분 과세(최대 추정)
+  const fxSensWon = swapExecWon > 0 ? swapAbsWon * 0.10 : 0; // 환효과: 신규 해외노출 × 환율 ±10% 민감도(추정)
 
   return (
     <div className="m pwa-shell">
@@ -230,6 +256,14 @@ export default function AIAdvisor() {
       {s && p && (
         <div className="card">
           <div className="sec-title">📋 오늘 할 일 <span className="sec-sub">주식형 재구성 · 세금 고려</span></div>
+          {/* [S6] 오늘 할 일 0~3 밴드 — 실행이 필요한 액션 건수 */}
+          <div className="todo-band">
+            <div className="tb-count"><b>{todoCount}</b><span>/3</span></div>
+            <div className="tb-steps">
+              {[1, 2, 3].map((n) => <i key={n} className={n <= todoCount ? "on" : ""} />)}
+            </div>
+            <div className="tb-label">{todoCount === 0 ? "오늘은 조정 불필요 — 목표 범위 내" : `${todoCount}건의 배분 조정 권장`}</div>
+          </div>
           <ul className="todo">
             {overseasSwapWon > 0 && (
               <li><div className="n">1</div>
@@ -311,6 +345,54 @@ export default function AIAdvisor() {
           <div className="reb-row"><div className="a">💰 <b>현금 비중</b> {curCashPct.toFixed(1)}% → {cashFloorTgtPct.toFixed(1)}%</div><div className={`r ${cashDeltaWon >= 0 ? "buy" : "sell"}`}>{cashDeltaWon >= 0 ? "+" : "−"}{toManwon(Math.abs(cashDeltaWon))}</div></div>
           <div className="reb-row"><div className="a">🏠 <b>부동산</b> 구조 리스크·실물</div><div className="r lock">🔒 장기</div></div>
           <div className="foot-note">📌 <b>확장 예정:</b> ETF 룩스루(개별종목↔ETF 중복), 기초지수 중복, 손익통산 시뮬레이션(해외상장 250만원 공제·손실 종목 매칭)을 리밸런싱 엔진이 자동 산출. 목표·상한은 모두 온보딩 투자성향 기준.</div>
+        </div>
+      )}
+
+      {/* [S6] 배분 제안 실행 카드 — 목표비중 슬라이더 + 실시간 세금·환효과(추정) */}
+      {s && p && eq && ovTarget != null && (
+        <div className="card exec-card">
+          <div className="sec-title">🎚️ 배분 제안 실행 <span className="sec-sub">해외 목표비중 · 실시간 세금·환</span></div>
+          <div className="exec-lead">주식형 <b>{toManwon(s.equity_won)}</b> 중 해외 노출을 조정합니다. 현재 국내 {curOverseasPct === 0 ? 100 : 100 - curOverseasPct}% · 해외 {curOverseasPct}%.</div>
+          <div className="exec-slider">
+            <div className="es-top"><span>해외 목표</span><b>{ovTarget}%</b><span className="es-goal">온보딩 {p.overseas}%</span></div>
+            <input type="range" min="0" max="100" step="5" value={ovTarget} onChange={(e) => setOvTarget(Number(e.target.value))} />
+            <div className="es-scale"><span>0%</span><span>50%</span><span>100%</span></div>
+          </div>
+          <div className="exec-src">
+            <span className="src-lbl">스왑 재원</span>
+            <select value={fundSrc} onChange={(e) => setFundSrc(e.target.value)}>
+              {Object.entries(FUND).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+          </div>
+          <div className="exec-out">
+            <div className="eo-row"><span className="eo-k">스왑 금액</span><b className={swapExecWon > 0 ? "buy" : swapExecWon < 0 ? "sell" : ""}>{swapExecWon > 0 ? "해외 매수 +" : swapExecWon < 0 ? "국내 회수 −" : ""}{toManwon(swapAbsWon)}</b></div>
+            <div className="eo-row"><span className="eo-k">예상 세금<em>추정·최대</em></span><b className={swapTaxWon > 0 ? "sell" : "free"}>{swapTaxWon > 0 ? toManwon(swapTaxWon) : "0"}</b></div>
+            <div className="eo-row"><span className="eo-k">환 민감도<em>±10% 환율</em></span><b className="fx">±{toManwon(fxSensWon)}</b></div>
+          </div>
+          <div className="exec-note">재원: <b>{fund.note}</b>. 세금은 <b>전액 차익 가정 최대치(추정)</b>이며 실제는 취득가·공제·손익통산에 따라 낮아집니다. 환 민감도는 신규 해외노출에 환율 ±10% 적용한 <b>참고 범위</b>입니다. <b>확정 아님 · 세무자문 아님.</b></div>
+        </div>
+      )}
+
+      {/* [S6] 유동 / 비유동 2트랙 — 조정 가능(유동) vs 즉시 조정 불가(비유동·부동산) */}
+      {s && (
+        <div className="card track-card">
+          <div className="sec-title">🛤️ 유동 · 비유동 2트랙 <span className="sec-sub">조정 가능성 기준</span></div>
+          <div className="track">
+            <div className="tk-h"><span className="tk-name">💧 유동 트랙</span><b>{toManwon(s.liquid)}</b><span className="tk-pct">{pctOfTotal(s.liquid)}%</span></div>
+            <div className="tk-bar liquid">
+              {[["주식", s.assets.stock, "var(--color-primary)"], ["ETF", s.assets.etf, "var(--color-etf)"], ["현금", s.assets.cash, "var(--color-warning)"]].map(([n, v, c]) => (
+                s.liquid > 0 ? <i key={n} style={{ width: `${(v / s.liquid) * 100}%`, background: c }} title={`${n} ${toManwon(v)}`} /> : null
+              ))}
+            </div>
+            <div className="tk-sub">주식·ETF·현금 — 신규 자금·매매 수익은 여기서만 재배분합니다.</div>
+          </div>
+          <div className="track">
+            <div className="tk-h"><span className="tk-name">🏠 비유동 트랙</span><b>{toManwon(s.assets.realestate)}</b><span className="tk-pct">{pctOfTotal(s.assets.realestate)}%</span></div>
+            <div className="tk-bar solid">
+              {s.assets.realestate > 0 ? <i style={{ width: "100%", background: "var(--color-success)" }} /> : <i className="empty" style={{ width: "100%" }} />}
+            </div>
+            <div className="tk-sub">{s.assets.realestate > 0 ? "부동산 실물 — 즉시 조정 불가(장기·구조 리스크로 별도 진단)." : "부동산 미입력 — 등록 시 비유동 트랙에 반영됩니다."}</div>
+          </div>
         </div>
       )}
 
@@ -454,6 +536,48 @@ export default function AIAdvisor() {
         .pill-tax.free { background: var(--color-success-soft); color: var(--color-success-ink); }
         .pill-tax.watch { background: var(--color-warning-soft); color: var(--color-warning-ink); }
 
+        /* [S6] 오늘 할 일 0~3 밴드 */
+        .todo-band { display: flex; align-items: center; gap: 12px; background: var(--color-bg); border-radius: 12px; padding: 11px 14px; margin-bottom: 14px; }
+        .tb-count { font-size: 13px; color: var(--color-ink-3); font-weight: 700; }
+        .tb-count b { font-size: 22px; font-weight: 800; color: var(--color-primary); }
+        .tb-steps { display: flex; gap: 5px; }
+        .tb-steps i { width: 26px; height: 6px; border-radius: 3px; background: var(--color-line); display: inline-block; }
+        .tb-steps i.on { background: var(--color-primary); }
+        .tb-label { font-size: 12px; color: var(--color-ink-2); font-weight: 600; margin-left: auto; text-align: right; }
+        /* [S6] 배분 제안 실행 카드 */
+        .exec-lead { font-size: 12.5px; color: var(--color-ink-2); line-height: 1.55; margin-bottom: 14px; }
+        .exec-lead b { color: var(--color-ink); font-weight: 800; }
+        .exec-slider { margin-bottom: 14px; }
+        .es-top { display: flex; align-items: baseline; gap: 8px; font-size: 12px; color: var(--color-ink-2); font-weight: 600; margin-bottom: 6px; }
+        .es-top b { font-size: 18px; color: var(--color-primary); font-weight: 800; }
+        .es-goal { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--ob); background: var(--ob-soft); padding: 2px 9px; border-radius: 7px; }
+        .exec-slider input[type="range"] { width: 100%; accent-color: var(--color-primary); }
+        .es-scale { display: flex; justify-content: space-between; font-size: 10px; color: var(--color-ink-3); font-weight: 600; margin-top: 2px; }
+        .exec-src { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+        .src-lbl { font-size: 12px; font-weight: 700; color: var(--color-ink-2); }
+        .exec-src select { flex: 1; border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 9px; padding: 9px 10px; font-size: 0.84rem; font-family: var(--font-sans); color: var(--color-ink); }
+        .exec-src select:focus { outline: none; border-color: var(--color-primary); }
+        .exec-out { display: flex; flex-direction: column; gap: 2px; background: var(--color-bg); border-radius: 12px; padding: 6px 14px; }
+        .eo-row { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--color-line); font-size: 13px; }
+        .eo-row:last-child { border-bottom: none; }
+        .eo-k { color: var(--color-ink-2); font-weight: 600; }
+        .eo-k em { font-style: normal; font-size: 9.5px; font-weight: 800; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 1px 6px; border-radius: 5px; margin-left: 6px; }
+        .eo-row b { font-weight: 800; font-size: 14px; }
+        .eo-row b.buy { color: var(--color-primary); } .eo-row b.sell { color: var(--color-danger); }
+        .eo-row b.free { color: var(--color-success); } .eo-row b.fx { color: var(--color-ink); }
+        .exec-note { font-size: 11px; color: var(--color-ink-3); margin-top: 12px; line-height: 1.55; word-break: keep-all; }
+        .exec-note b { color: var(--color-ink-2); font-weight: 700; }
+        /* [S6] 유동/비유동 2트랙 */
+        .track { margin-bottom: 16px; }
+        .track:last-of-type { margin-bottom: 0; }
+        .tk-h { display: flex; align-items: baseline; gap: 8px; margin-bottom: 7px; }
+        .tk-name { font-size: 13px; font-weight: 700; color: var(--color-ink); }
+        .tk-h b { font-size: 15px; font-weight: 800; color: var(--color-ink); }
+        .tk-pct { margin-left: auto; font-size: 12px; font-weight: 700; color: var(--color-ink-2); }
+        .tk-bar { height: 14px; border-radius: 7px; overflow: hidden; display: flex; background: var(--color-bg); }
+        .tk-bar i { height: 100%; display: block; }
+        .tk-bar i.empty { background: var(--color-line); }
+        .tk-sub { font-size: 11.5px; color: var(--color-ink-2); margin-top: 7px; line-height: 1.5; word-break: keep-all; }
         .cta-row { display: flex; gap: 10px; margin-top: 4px; }
         .cta { flex: 1; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; box-shadow: var(--shadow-card); padding: 15px; text-align: center; font-weight: 700; font-size: 14px; text-decoration: none; color: var(--color-ink); }
       `}</style>
