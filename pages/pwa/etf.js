@@ -238,7 +238,8 @@ export default function EtfDashboard() {
     const diff = Math.round((new Date(todayKST).getTime() - new Date(priceDate).getTime()) / 86400000);
     return Number.isFinite(diff) ? Math.max(0, diff) : null;
   })();
-  const priceStale = priceDaysAgo != null && priceDaysAgo > 2; // 주말 감안 2일 초과면 지연 표기
+  // 실측 시세가 있으면 항상 '실시간'(최신 가용 종가) — 지연 배지는 실측 시세가 전혀 없을 때만.
+  const priceStale = !priceFromLive && priceDaysAgo != null && priceDaysAgo > 2;
   const fxDaysAgo = (() => {
     if (!fxDate || !todayKST) return null;
     const diff = Math.round((new Date(todayKST).getTime() - new Date(fxDate).getTime()) / 86400000);
