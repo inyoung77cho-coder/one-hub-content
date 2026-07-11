@@ -7,7 +7,8 @@
     "prebuild": "node scripts/gen-sitemap.mjs",
     "build": "next build",
     "start": "next start",
-    "gen:sitemap": "node scripts/gen-sitemap.mjs"
+    "gen:sitemap": "node scripts/gen-sitemap.mjs",
+    "check:colors": "bash scripts/check-colors.sh"
   },
   "dependencies": {
     "gray-matter": "^4.0.3",
