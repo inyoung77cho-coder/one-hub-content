@@ -9,7 +9,6 @@ import { computeSummary, toManwon } from "../../lib/aiAssets";
 import { getTrader } from "../../lib/trader";
 import { fetchAssetsTotal } from "../../lib/assetsTotal";
 import { acctRule } from "../../lib/taxRules";
-import QuickAddFab from "../../components/shared/QuickAddFab";
 
 const UK = 1e8; // 억 → 원
 
@@ -402,7 +401,6 @@ export default function AIAdvisor() {
         <Link href="/pwa/portfolio" className="cta">💼 통합 포트폴리오</Link>
         <Link href="/pwa/etf" className="cta">📊 ETF 상세</Link>
       </div>
-      <QuickAddFab initialAsset="stock" />
 
       <style jsx>{`
         .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--color-bg); padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
