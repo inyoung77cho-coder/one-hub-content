@@ -16,6 +16,8 @@ export default function RealEstateDashboard() {
   const [macro, setMacro] = useState(null);
   const [feed, setFeed] = useState(null); // [v11 #16] 최근 실거래 피드
   const [err, setErr] = useState(null);
+  const [myC, setMyC] = useState("");   // [S5] 내 단지
+  const [tgtC, setTgtC] = useState(""); // [S5] 갈아탈 목표 단지
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/re/${fn}`).then((r) => r.json());
@@ -25,7 +27,10 @@ export default function RealEstateDashboard() {
         setBrief(b); setRank(r); setMacro(m); setFeed(f);
       })
       .catch((e) => setErr(e.message));
+    try { setMyC(localStorage.getItem("onehub_re_my") || ""); setTgtC(localStorage.getItem("onehub_re_target") || ""); } catch (e) {}
   }, []);
+  const pickMy = (v) => { setMyC(v); try { localStorage.setItem("onehub_re_my", v); } catch (e) {} };
+  const pickTgt = (v) => { setTgtC(v); try { localStorage.setItem("onehub_re_target", v); } catch (e) {} };
 
   const mac = macro?.latest;
 
@@ -69,6 +74,43 @@ export default function RealEstateDashboard() {
 
       {/* slim CTA — 내 단지 등록 유도 (§5③ 미입력=회색 중립, 위험 아님) */}
       <div className="cta-slim" onClick={() => { window.location.href = '/pwa/onboarding'; }}><span className="cta-txt">🏠 내 단지를 등록하면 <b>국면·저평가·리밸런싱에 반영</b>됩니다</span><span className="arr">→</span></div>
+
+      {/* [S5] 갈아타기 갭 트래커 — 내 단지 vs 목표 단지 갭(핵심 기능 3종) */}
+      {rank?.ranking?.length > 0 && (() => {
+        const opts = [...new Map(rank.ranking.map((c) => [c.단지명, c])).values()];
+        const find = (n) => opts.find((o) => o.단지명 === n);
+        const my = find(myC), tgt = find(tgtC);
+        const gap = my && tgt ? Number(tgt.avm_total_uk || 0) - Number(my.avm_total_uk || 0) : null;
+        return (
+          <section className="card gap-card">
+            <div className="label">🔀 갈아타기 갭 <span className="sub">내 단지 → 목표 단지 소요 자금</span></div>
+            <div className="gap-selects">
+              <label className="gap-sel"><span>내 단지</span>
+                <select value={myC} onChange={(e) => pickMy(e.target.value)}>
+                  <option value="">선택</option>{opts.map((o) => <option key={o.단지명} value={o.단지명}>{o.단지명}</option>)}
+                </select></label>
+              <span className="gap-arrow">→</span>
+              <label className="gap-sel"><span>목표 단지</span>
+                <select value={tgtC} onChange={(e) => pickTgt(e.target.value)}>
+                  <option value="">선택</option>{opts.map((o) => <option key={o.단지명} value={o.단지명}>{o.단지명}</option>)}
+                </select></label>
+            </div>
+            {gap != null ? (
+              <div className="gap-result">
+                <div className="gap-amt">필요 자금 <b className={gap > 0 ? "pos" : "neg"}>{uk(Math.abs(gap))}</b>
+                  <span className="gap-dir">{gap > 0 ? "목표가 더 비쌈 — 이만큼 추가 필요" : gap < 0 ? "내 단지가 더 비쌈 — 차익 실현 여지" : "동일가"}</span></div>
+                <div className="gap-rows">
+                  <div className="gap-row"><span>{my.단지명}</span><b>{uk(my.avm_total_uk)}</b></div>
+                  <div className="gap-row"><span>{tgt.단지명}</span><b>{uk(tgt.avm_total_uk)}</b></div>
+                </div>
+                <div className="gap-note">현재 시점 AVM 기준 갭입니다. 갭 <b>추이·축소 알림</b>은 단지별 실거래 이력이 축적되면 제공됩니다 (회귀 근사·lag=0·확정 아님).</div>
+              </div>
+            ) : (
+              <div className="gap-empty">내 단지와 목표 단지를 고르면 <b>갈아타기에 필요한 자금(갭)</b>이 계산됩니다.</div>
+            )}
+          </section>
+        );
+      })()}
 
       {/* [§3-2 원칙1] 포트폴리오 합계는 홈·AI자산 2곳에만. 부동산 페이지는 부동산 슬라이스만 표시(피드백14) */}
 
@@ -187,6 +229,24 @@ export default function RealEstateDashboard() {
         .cta-txt { flex: 1; word-break: keep-all; }
         .cta-slim b { color: var(--color-primary); font-weight: 700; }
         .cta-slim .arr { color: var(--color-primary); font-weight: 800; flex-shrink: 0; }
+        /* [S5] 갈아타기 갭 트래커 */
+        .gap-selects { display: flex; align-items: flex-end; gap: 8px; }
+        .gap-sel { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 0.68rem; color: var(--color-ink-3); font-weight: 700; }
+        .gap-sel select { border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 9px; padding: 9px 8px; font-size: 0.82rem; font-family: var(--font-sans); color: var(--color-ink); }
+        .gap-sel select:focus { outline: none; border-color: var(--color-primary); }
+        .gap-arrow { font-size: 1rem; font-weight: 800; color: var(--color-ink-3); padding-bottom: 9px; }
+        .gap-result { margin-top: 14px; }
+        .gap-amt { font-size: 0.9rem; font-weight: 700; color: var(--color-ink-2); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+        .gap-amt b { font-size: 1.3rem; font-weight: 800; font-family: var(--font-display, var(--font-sans)); }
+        .gap-amt b.pos { color: var(--color-primary); } .gap-amt b.neg { color: var(--color-success); }
+        .gap-dir { font-size: 0.7rem; font-weight: 600; color: var(--color-ink-3); }
+        .gap-rows { display: flex; flex-direction: column; gap: 6px; margin-top: 11px; }
+        .gap-row { display: flex; align-items: center; justify-content: space-between; background: var(--color-card-soft); border-radius: 9px; padding: 8px 12px; font-size: 0.8rem; color: var(--color-ink); }
+        .gap-row b { font-family: ui-monospace, monospace; font-weight: 800; }
+        .gap-note { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 11px; line-height: 1.55; word-break: keep-all; }
+        .gap-note b { color: var(--color-ink-2); font-weight: 700; }
+        .gap-empty { margin-top: 12px; font-size: 0.76rem; color: var(--color-ink-2); line-height: 1.6; word-break: keep-all; }
+        .gap-empty b { color: var(--color-ink); font-weight: 700; }
         .label { font-size: 0.9rem; font-weight: 700; color: var(--color-ink); margin-bottom: 12px; }
         .sub { font-weight: 600; color: var(--color-ink-3); font-size: 0.68rem; margin-left: 6px; }
         /* ONE Score 랭킹 */
