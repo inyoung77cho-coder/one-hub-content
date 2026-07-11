@@ -192,6 +192,7 @@ export default function PWADashboard({ latestReport }) {
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
+  const [quickAdd, setQuickAdd] = useState(null); // [S3] 빠른입력 시트: null | { asset, amount }
   const [basisOpen, setBasisOpen] = useState(false); // [v10 UI] 홈 'AI 판단 근거' 접기
   const [heroWhyOpen, setHeroWhyOpen] = useState(false); // [v11-ux] 홈 통합 판단 '왜?' 인라인 펼치기(근거 버튼 제거)
   const [logOpen, setLogOpen] = useState(false);     // [v10 UI] 홈 '최근 활동' 접기
@@ -298,6 +299,21 @@ export default function PWADashboard({ latestReport }) {
     });
     if (closeOnboarding) setOnboarding(false);
   }, []);
+
+  // [S3] 빠른입력 저장 — 자산군 금액(억)을 온보딩 자산에 반영 → 총자산 즉시 갱신
+  const saveQuickAdd = useCallback(() => {
+    if (!quickAdd) return;
+    const amt = Number(quickAdd.amount);
+    if (quickAdd.amount === '' || !(amt >= 0)) return;
+    let onb = {};
+    try { onb = JSON.parse(window.localStorage.getItem('onehub_onboard_assets') || '{}') || {}; } catch (e) {}
+    onb[quickAdd.asset] = amt;
+    try { window.localStorage.setItem('onehub_onboard_assets', JSON.stringify(onb)); } catch (e) {}
+    fetchAssetsTotal(trader)
+      .then(a => setAssetSum(a?.total_uk != null ? { total_uk: a.total_uk, breakdown: a.breakdown, realty_state: a.realty_state, source: a.source } : null))
+      .catch(() => {});
+    setQuickAdd(null);
+  }, [quickAdd, trader]);
 
   const toggleTheme = useCallback(() => {
     setTheme(prev => {
@@ -729,7 +745,15 @@ export default function PWADashboard({ latestReport }) {
             <span className="pwa-logo">ONE<span className="pwa-logo-dot">·</span>HUB</span>
           </button>
           <div className="pwa-header-actions">
-            {/* [v10 UI] A/B 트레이더 토글 제거 — 헤더 줄바꿈/탭바 이동 유발. 기본 계좌 A 고정(설정에서 변경) */}
+            {/* [S3] 빠른입력 — 어디서나 자산(주식/ETF/부동산/현금) 금액 빠르게 반영 */}
+            <button
+              className="pwa-quickadd-toggle"
+              onClick={() => setQuickAdd({ asset: 'stock_uk', amount: '' })}
+              aria-label="자산 빠른입력"
+              title="자산 빠른입력"
+            >
+              ＋
+            </button>
             {/* [v9.1 PWA-01] 검색: 중앙 FAB → 우측 상단 아이콘으로 이동 */}
             <button
               className={`pwa-search-toggle ${tab==='analyze'?'active':''}`}
@@ -2525,6 +2549,27 @@ export default function PWADashboard({ latestReport }) {
             })()}
           </div>
         </>)}
+
+        {/* [S3] 빠른입력 시트 — 자산군 선택 + 금액(억) → 총자산 즉시 반영 */}
+        {quickAdd && (<>
+          <div className="qa-dim" onClick={() => setQuickAdd(null)} />
+          <div className="qa-sheet">
+            <div className="qa-head"><span>＋ 자산 빠른입력</span><button className="qa-x" onClick={() => setQuickAdd(null)} aria-label="닫기">✕</button></div>
+            <div className="qa-chips">
+              {[['stock_uk','📈','주식'],['etf_uk','📊','ETF'],['realestate_uk','🏢','부동산'],['cash_uk','💵','현금']].map(([k,ic,lb]) => (
+                <button key={k} className={`qa-chip ${quickAdd.asset===k?'on':''}`} onClick={() => setQuickAdd(q => ({ ...q, asset: k }))}>{ic} {lb}</button>
+              ))}
+            </div>
+            <div className="qa-input-row">
+              <input className="qa-input" type="number" inputMode="decimal" autoFocus placeholder="금액" value={quickAdd.amount}
+                onChange={(e) => setQuickAdd(q => ({ ...q, amount: e.target.value }))}
+                onKeyDown={(e) => { if (e.key === 'Enter') saveQuickAdd(); }} />
+              <span className="qa-unit">억</span>
+            </div>
+            <div className="qa-hint">입력하면 총자산에 즉시 반영됩니다. (해당 자산군 보유액 = 입력값으로 설정)</div>
+            <button className="qa-save" onClick={saveQuickAdd}>저장</button>
+          </div>
+        </>)}
       </div>
 
       <style jsx>{`
@@ -2551,6 +2596,21 @@ export default function PWADashboard({ latestReport }) {
         .pwa-header-actions { display: flex; align-items: center; gap: 8px; }
         /* [v10 UI] 헤더 아이콘 = 공유 TopNav(.tn-ic button)와 동일 규격(34px·그림자·무테두리) */
         .pwa-search-toggle, .pwa-theme-toggle { width: 34px; height: 34px; border-radius: 50%; background: var(--color-card); border: none; display: grid; place-items: center; font-size: 15px; cursor: pointer; box-shadow: var(--shadow-card); flex-shrink: 0; }
+        /* [S3] 빠른입력 */
+        .pwa-quickadd-toggle { width: 34px; height: 34px; border-radius: 50%; background: var(--color-primary); color: #fff; border: none; display: grid; place-items: center; font-size: 20px; font-weight: 700; cursor: pointer; box-shadow: var(--shadow-card); flex-shrink: 0; line-height: 1; }
+        .qa-dim { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 8999; }
+        .qa-sheet { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; z-index: 9000; background: var(--card-bg); border-radius: 20px 20px 0 0; padding: 22px 20px calc(env(safe-area-inset-bottom, 0px) + 28px); box-shadow: 0 -4px 32px rgba(0,0,0,0.18); }
+        .qa-head { display: flex; align-items: center; justify-content: space-between; font-size: 1rem; font-weight: 800; color: var(--text-primary); margin-bottom: 16px; }
+        .qa-x { background: none; border: none; font-size: 1.2rem; color: var(--text-secondary); cursor: pointer; }
+        .qa-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .qa-chip { padding: 10px 4px; border: 1px solid var(--border); background: var(--card-bg); border-radius: 10px; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); }
+        .qa-chip.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+        .qa-input-row { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+        .qa-input { flex: 1; border: 1px solid var(--border); background: var(--inset-bg); border-radius: 12px; padding: 13px 14px; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); }
+        .qa-input:focus { outline: none; border-color: var(--color-primary); }
+        .qa-unit { font-size: 1rem; font-weight: 700; color: var(--text-secondary); }
+        .qa-hint { font-size: 0.72rem; color: var(--text-tertiary); margin-top: 10px; line-height: 1.5; word-break: keep-all; }
+        .qa-save { width: 100%; margin-top: 16px; background: var(--color-primary); color: #fff; border: none; border-radius: 12px; padding: 13px 0; font-size: 0.92rem; font-weight: 800; cursor: pointer; font-family: var(--font-body); }
         .pwa-search-toggle.active { color: var(--color-primary); }
         .pwa-trader-toggle { display: flex; gap: 3px; background: var(--inset-bg); padding: 3px; border-radius: var(--radius-pill); }
         .pwa-trader-toggle button { background: none; border: none; color: var(--text-secondary); padding: 5px 13px; border-radius: var(--radius-pill); cursor: pointer; font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; }
