@@ -4,13 +4,13 @@
 import { useRouter } from "next/router";
 
 const ITEMS = [
-  // 홈은 ?tab=dashboard로 진입 → 스플래시 재생 건너뜀(홈·주식 로고와 동일하게 즉시 홈 표시)
-  ["home", "홈", "/pwa?tab=dashboard"],
-  ["ai", "AI자산", "/pwa/ai-advisor"],
+  // [S2 IA] 대시보드 · 주식 · ETF · 부동산 · 트러스트
+  //   대시보드는 ?tab=dashboard로 진입 → 스플래시 재생 건너뜀. AI자산은 대시보드 링크로 진입.
+  ["dashboard", "대시보드", "/pwa?tab=dashboard"],
   ["stock", "주식", "/pwa?tab=portfolio"],
   ["etf", "ETF", "/pwa/etf"],
   ["realestate", "부동산", "/pwa/realestate"],
-  // [설정] 탭 제거 — 헤더 ⚙️ 아이콘과 중복. 설정은 아이콘으로만 진입.
+  ["trust", "트러스트", "/pwa?tab=report"],
 ];
 
 export default function TopNav({ active }) {
