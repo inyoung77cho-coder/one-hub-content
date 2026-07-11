@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback } from "react";
 import TopNav from "../../components/TopNav";
 import { getTrader } from "../../lib/trader";
-import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty } from "../../lib/etfHoldings";
+import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS } from "../../lib/etfHoldings";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -15,6 +15,12 @@ const won = (n) => {
 };
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${n.toFixed(2)}%`);
 const sign = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : "");
+// [S4] 계좌 유형별 세제 안내 — 세금 계산이 근본부터 다름(리뷰 #5 "연금 포함 운영")
+const ACCT_TAX = {
+  "일반": "💸 해외상장 ETF 양도세 22%(250만 공제) · 국내상장 해외ETF 배당소득 15.4%(2천만 초과 종합과세)",
+  "연금": "🏦 매도해도 양도세 0 · 인출 시 연금소득세 3.3~5.5%(저율) · 세액공제 한도 연 900만원",
+  "ISA": "🧾 순이익 200만(서민형 400만) 비과세 + 초과분 9.9% 분리과세",
+};
 
 export default function EtfDashboard() {
   const [report, setReport] = useState(null);
@@ -26,7 +32,7 @@ export default function EtfDashboard() {
   // [내 ETF] 사용자 직접 입력 보유 + 자동 시세
   const [holdings, setHoldings] = useState([]);
   const [quotes, setQuotes] = useState({}); // { TICKER: {price, currency, date} }
-  const [form, setForm] = useState({ side: "buy", ticker: "", shares: "", price: "", ccy: "USD" });
+  const [form, setForm] = useState({ side: "buy", ticker: "", shares: "", price: "", ccy: "USD", account: "일반" });
   const [formMsg, setFormMsg] = useState("");
   const [posQty, setPosQtyState] = useState({}); // [등록 ETF] 티커별 사용자 입력 수량(백엔드 미제공 보완)
 
@@ -99,18 +105,18 @@ export default function EtfDashboard() {
   // [내 ETF] 매수/매도 기록 + 티커 삭제
   const submitTrade = () => {
     const tr = getTrader();
-    const { side, ticker, shares, price, ccy } = form;
+    const { side, ticker, shares, price, ccy, account } = form;
     setFormMsg("");
     const res = side === "buy"
-      ? buyEtf({ ticker, market: inferMarket(ticker), shares, avgPrice: price, avgCcy: ccy, trader: tr })
-      : sellEtf({ ticker, shares, trader: tr });
+      ? buyEtf({ ticker, market: inferMarket(ticker), shares, avgPrice: price, avgCcy: ccy, account, trader: tr })
+      : sellEtf({ ticker, shares, account, trader: tr });
     if (!res.ok) { setFormMsg("⚠️ " + (res.error || "입력 오류")); return; }
     const tk = String(ticker).trim().toUpperCase();
     setFormMsg(side === "buy" ? `✓ ${tk} 매수 기록됨` : (res.short > 0 ? `✓ ${tk} 매도(보유수량까지만 반영)` : `✓ ${tk} 매도 반영됨`));
     const l = getHoldings(tr); setHoldings(l); refreshQuotes(l);
     setForm((f) => ({ ...f, ticker: "", shares: "", price: "" }));
   };
-  const delHolding = (tk) => { const tr = getTrader(); removeEtf({ ticker: tk, trader: tr }); setHoldings(getHoldings(tr)); };
+  const delHolding = (tk, account) => { const tr = getTrader(); removeEtf({ ticker: tk, account, trader: tr }); setHoldings(getHoldings(tr)); };
 
   // [등록 ETF] 수량 입력 → 실측 종가로 실시간 평가액 재계산
   const onQtyChange = (ticker, val) => {
@@ -485,6 +491,10 @@ export default function EtfDashboard() {
             onChange={(e) => setForm((f) => ({ ...f, ticker: e.target.value }))} />
           <input className="me-in num" type="number" inputMode="decimal" placeholder="수량" value={form.shares}
             onChange={(e) => setForm((f) => ({ ...f, shares: e.target.value }))} />
+          {/* [S4] 계좌 유형 — 세제가 다름 */}
+          <select className="me-in acct" value={form.account} onChange={(e) => setForm((f) => ({ ...f, account: e.target.value }))}>
+            {ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}
+          </select>
           {form.side === "buy" && (
             <>
               <input className="me-in num" type="number" inputMode="decimal" placeholder="평단가" value={form.price}
@@ -498,23 +508,39 @@ export default function EtfDashboard() {
         <button className={`me-submit ${form.side}`} onClick={submitTrade}>{form.side === "buy" ? "＋ 매수 기록" : "－ 매도 기록"}</button>
         {formMsg && <div className="me-msg">{formMsg}</div>}
         {holdings.length > 0 ? (
-          <div className="me-list">
-            {holdings.map((h) => {
-              const m = holdingMetrics(h);
+          <div className="me-groups">
+            {/* [S4] 계좌 유형별 그룹 — 세제가 다르므로 버킷별 평가·세제 안내 분리 */}
+            {ACCOUNTS.filter((a) => holdings.some((h) => (h.account || "일반") === a)).map((acct) => {
+              const rows = holdings.filter((h) => (h.account || "일반") === acct);
+              const sub = rows.reduce((acc, h) => { const v = holdingMetrics(h).valueKrw; return acc + (v || 0); }, 0);
               return (
-                <div className="me-row" key={h.id}>
-                  <div className="me-l">
-                    <span className="me-tk">{h.ticker}</span>
-                    <span className="me-qty">{h.shares}주 · 평단 {h.avgCcy === "USD" ? "$" : ""}{h.avgPrice.toLocaleString()}{h.avgCcy === "KRW" ? "원" : ""}</span>
+                <div className="me-grp" key={acct}>
+                  <div className="me-grp-h">
+                    <span className={`me-acct-badge ${acct === "연금" ? "pension" : acct === "ISA" ? "isa" : "normal"}`}>{acct}</span>
+                    {sub > 0 && <span className="me-grp-sum">평가 {won(sub)}원</span>}
                   </div>
-                  <div className="me-r">
-                    <span className="me-px">{m.curPx != null ? `${m.curCcy === "USD" ? "$" : ""}${m.curPx.toLocaleString()}${m.curCcy === "KRW" ? "원" : ""}` : "시세 조회 중…"}</span>
-                    <span className="me-sub2">
-                      {m.valueKrw != null && <span className="me-val">{won(m.valueKrw)}원</span>}
-                      {m.pnlPct != null && <span className={`me-pnl ${sign(m.pnlPct)}`}>{pct(m.pnlPct)}</span>}
-                    </span>
+                  <div className="me-list">
+                    {rows.map((h) => {
+                      const m = holdingMetrics(h);
+                      return (
+                        <div className="me-row" key={h.id}>
+                          <div className="me-l">
+                            <span className="me-tk">{h.ticker}</span>
+                            <span className="me-qty">{h.shares}주 · 평단 {h.avgCcy === "USD" ? "$" : ""}{h.avgPrice.toLocaleString()}{h.avgCcy === "KRW" ? "원" : ""}</span>
+                          </div>
+                          <div className="me-r">
+                            <span className="me-px">{m.curPx != null ? `${m.curCcy === "USD" ? "$" : ""}${m.curPx.toLocaleString()}${m.curCcy === "KRW" ? "원" : ""}` : "시세 조회 중…"}</span>
+                            <span className="me-sub2">
+                              {m.valueKrw != null && <span className="me-val">{won(m.valueKrw)}원</span>}
+                              {m.pnlPct != null && <span className={`me-pnl ${sign(m.pnlPct)}`}>{pct(m.pnlPct)}</span>}
+                            </span>
+                          </div>
+                          <button className="me-del" onClick={() => delHolding(h.ticker, h.account)} aria-label={`${h.ticker} 삭제`}>✕</button>
+                        </div>
+                      );
+                    })}
                   </div>
-                  <button className="me-del" onClick={() => delHolding(h.ticker)} aria-label={`${h.ticker} 삭제`}>✕</button>
+                  <div className="me-tax">{ACCT_TAX[acct]}</div>
                 </div>
               );
             })}
@@ -673,7 +699,17 @@ export default function EtfDashboard() {
         .me-in { flex: 1 1 70px; min-width: 0; border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 9px; padding: 9px 10px; font-size: 0.84rem; font-family: var(--font-sans); color: var(--color-ink); }
         .me-in.tk { flex: 2 1 120px; text-transform: uppercase; }
         .me-in.ccy { flex: 0 0 68px; }
+        .me-in.acct { flex: 0 0 76px; }
         .me-in:focus { outline: none; border-color: var(--color-primary); }
+        /* [S4] 계좌 유형 그룹 */
+        .me-groups { margin-top: 14px; display: flex; flex-direction: column; gap: 14px; }
+        .me-grp-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+        .me-acct-badge { font-size: 0.72rem; font-weight: 800; padding: 3px 11px; border-radius: 999px; }
+        .me-acct-badge.normal { background: var(--color-card-soft); color: var(--color-ink-2); }
+        .me-acct-badge.pension { background: var(--color-success-soft); color: var(--color-success-ink, var(--color-success)); }
+        .me-acct-badge.isa { background: var(--color-primary-soft); color: var(--color-primary); }
+        .me-grp-sum { font-size: 0.74rem; font-weight: 700; color: var(--color-ink-2); }
+        .me-tax { margin-top: 8px; font-size: 0.68rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 9px; padding: 8px 11px; line-height: 1.5; word-break: keep-all; }
         .me-submit { width: 100%; margin-top: 8px; border: none; border-radius: 10px; padding: 11px 0; font-size: 0.88rem; font-weight: 800; color: #fff; cursor: pointer; font-family: var(--font-sans); }
         .me-submit.buy { background: var(--color-primary); } .me-submit.sell { background: var(--color-danger); }
         .me-msg { font-size: 0.76rem; font-weight: 600; color: var(--color-ink-2); margin-top: 8px; text-align: center; }
