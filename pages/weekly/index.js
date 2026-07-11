@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import matter from 'gray-matter'
 import Link from 'next/link'
+import PageHero from '../../components/PageHero'
 import Head from 'next/head'
 import { useState } from 'react'
 import CTABar from '../../components/CTABar'
@@ -36,11 +37,9 @@ export default function WeeklyIndex({ reports }) {
         <meta name="twitter:title" content="Weekly Reports — ONE-HUB" />
         <meta name="twitter:description" content="ONE-HUB 주간 운영 리포트. 매주 금요일 한 주간의 시장 분석과 운영 회고를 발행합니다." />
       </Head>
-      <div style={{ minHeight: "100vh", background: "#F4F9FF", color: "#1a202c", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
-        <main style={{ maxWidth: "800px", margin: "0 auto", padding: "40px 24px" }}>
-          <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#94A3B8", textTransform: "uppercase", marginBottom: "24px" }}>
-            Weekly Reports
-          </h1>
+      <div style={{ minHeight: "100vh", background: "#F4F9FF" }}>
+        <PageHero eyebrow="Weekly Reports" title="📅 주간 리포트" subtitle="한 주의 운영 성과와 AI 인사이트를 요약합니다." />
+        <main className="oh-main" style={{ maxWidth: "820px" }}>
 
           {/* ① KPI 요약 카드 (최근 4주) */}
           {recent4.length > 0 && (

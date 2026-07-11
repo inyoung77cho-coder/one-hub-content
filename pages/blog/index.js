@@ -3,6 +3,7 @@ import path from 'path';
 import matter from 'gray-matter';
 import Link from 'next/link';
 import Head from 'next/head';
+import PageHero from '../../components/PageHero';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import CTABar from '../../components/CTABar';
@@ -73,18 +74,9 @@ export default function Blog({ posts }) {
         <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" rel="stylesheet" />
       </Head>
 
+      <PageHero eyebrow="Blog" title="✍ AI 투자 인사이트" subtitle="AI 자동매매 운영 경험과 투자 방법론을 공유합니다." />
       <div className="page-wrapper">
-        <div className="status-bar">
-          <span style={{ fontFamily: 'Space Mono,monospace', fontSize: '11px' }}>BLOG · AI 투자 인사이트</span>
-        </div>
-
-        <main style={{ maxWidth: '960px', margin: '0 auto', padding: '2rem 1.5rem' }}>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: '#1e293b', marginBottom: '0.4rem', fontFamily: 'Pretendard, sans-serif' }}>
-            AI 투자 인사이트
-          </h1>
-          <p style={{ fontSize: '13px', color: '#64748b', marginBottom: '1.2rem' }}>
-            AI 자동매매 운영 경험과 투자 방법론을 공유합니다.
-          </p>
+        <main className="oh-main" style={{ maxWidth: '960px' }}>
 
           {/* [v9.0] 오늘 시장 브리핑 카드 */}
           {brief && (

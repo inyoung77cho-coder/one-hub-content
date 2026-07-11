@@ -1,4 +1,5 @@
 import Head from "next/head";
+import PageHero from "../../components/PageHero";
 import CTABar from "../../components/CTABar";
 import Link from "next/link";
 
@@ -103,13 +104,9 @@ export default function DailyIndex({ posts, postsB }) {
 
       </Head>
 
-      <div style={{ minHeight: "100vh", background: "#F4F9FF", color: "#1a202c", fontFamily: "'Noto Sans KR', sans-serif", padding: "0 0 80px" }}>
-
-        <main style={{ maxWidth: "800px", margin: "0 auto", padding: isMobile ? "24px 16px" : "40px 24px" }}>
-
-          <h1 style={{ fontFamily: "monospace", fontSize: "13px", letterSpacing: "0.2em", color: "#718096", textTransform: "uppercase", marginBottom: "24px" }}>
-            Daily Operations Log
-          </h1>
+      <div style={{ minHeight: "100vh", background: "#F4F9FF" }}>
+        <PageHero eyebrow="Daily Reports" title="🗓 운영일지" subtitle="매일 15:30 KST — AI의 그날 판단을 기록으로 남깁니다. ONE-HUB의 콘텐츠이자 신뢰의 근거." />
+        <main className="oh-main" style={{ maxWidth: "820px" }}>
 
           {/* Trader 전환 */}
           <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
