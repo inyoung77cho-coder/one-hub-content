@@ -36,6 +36,9 @@ export default function EtfDashboard() {
   const [form, setForm] = useState({ side: "buy", ticker: "", shares: "", price: "", ccy: "USD", account: "일반" });
   const [formMsg, setFormMsg] = useState("");
   const [posQty, setPosQtyState] = useState({}); // [등록 ETF] 티커별 사용자 입력 수량(백엔드 미제공 보완)
+  const [quotesAt, setQuotesAt] = useState(null); // [실시간] 마지막 시세 갱신 시각(ms)
+  const [nowTick, setNowTick] = useState(0);      // [실시간] 상대시간 표시용 1초 틱
+  const [refreshing, setRefreshing] = useState(false); // [실시간] 수동 새로고침 진행중
   const [acctFilter, setAcctFilter] = useState("전체"); // [S4] 계좌 유형 필터([전체][일반][연금][ISA])
   const [fcOpen, setFcOpen] = useState(false); // [S7.4] 예측 섹션 기본 접기
   const [pensionContrib, setPensionContrib] = useState(""); // [S4] 올해 연금 납입액(원, 세액공제 진행률)
@@ -80,11 +83,12 @@ export default function EtfDashboard() {
   //   백엔드 평가 종가가 지연되어도, 티커별 '실제 최근 종가'를 여기서 직접 확인해 표기한다.
   const refreshQuotes = useCallback((list) => {
     const uniq = [...new Set(list.map((h) => h.ticker).filter(Boolean))];
+    if (!uniq.length) return;
     uniq.forEach((tk) => {
       const mkt = inferMarket(tk, list.find((h) => h.ticker === tk)?.market);
-      fetch(`/api/etf/quote?ticker=${encodeURIComponent(tk)}&market=${mkt}`)
+      fetch(`/api/etf/quote?ticker=${encodeURIComponent(tk)}&market=${mkt}&t=${Date.now()}`)
         .then((r) => r.json())
-        .then((d) => { if (d?.ok) setQuotes((q) => ({ ...q, [tk]: { price: d.price, currency: d.currency, date: d.date } })); })
+        .then((d) => { if (d?.ok) { setQuotes((q) => ({ ...q, [tk]: { price: d.price, currency: d.currency, date: d.date } })); setQuotesAt(Date.now()); } })
         .catch(() => {});
     });
   }, []);
@@ -102,17 +106,54 @@ export default function EtfDashboard() {
   const s = report?.summary;
   const positions = (report?.positions || []).filter((p) => !p.error);
 
-  // [ETF 시세] 등록 종목 + 내 보유 티커의 최근 종가를 티커 기준으로 자동 조회(60초). 티커셋 바뀌면 재구독.
+  // [ETF 시세·실시간] 등록 종목 + 내 보유 티커의 최근 종가를 20초 폴링 + 탭 복귀/포커스 시 즉시 갱신.
   const posTickers = positions.map((p) => p.ticker).filter(Boolean).join(",");
   const holdTickers = holdings.map((h) => h.ticker).filter(Boolean).join(",");
   useEffect(() => {
     const all = [...positions, ...holdings];
     if (!all.length) return;
-    refreshQuotes(all);
-    const poll = setInterval(() => refreshQuotes([...positions, ...holdings]), 60000);
-    return () => clearInterval(poll);
+    const doRefresh = () => refreshQuotes([...positions, ...holdings]);
+    doRefresh();
+    const poll = setInterval(doRefresh, 20000); // 60초 → 20초(실시간 체감)
+    // 탭이 다시 보이거나 창 포커스 시 즉시 최신 시세 반영
+    const onVisible = () => { if (document.visibilityState === "visible") doRefresh(); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", doRefresh);
+    return () => { clearInterval(poll); document.removeEventListener("visibilitychange", onVisible); window.removeEventListener("focus", doRefresh); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [posTickers, holdTickers, refreshQuotes]);
+
+  // [실시간] 상대 시간("N초 전 갱신")을 위한 1초 틱 — 탭 숨김 시 정지
+  useEffect(() => {
+    const tick = () => setNowTick((n) => n + 1);
+    const iv = setInterval(() => { if (document.visibilityState === "visible") tick(); }, 1000);
+    return () => clearInterval(iv);
+  }, []);
+
+  // [실시간] 수동 새로고침 — 리포트·환율·시세 즉시 재조회
+  const refreshAll = useCallback(() => {
+    setRefreshing(true);
+    const tr = getTrader();
+    const g = (fn) => fetch(`/api/pwa/etf/${fn}?trader=${tr}`).then((r) => r.json());
+    Promise.all([g("report"), g("tax"), g("overlap"), g("rebalance")])
+      .then(([r, t, o, rb]) => { if (!(r.error || t.error)) { setReport(r); setTax(t); setOverlap(o); setRebal(rb); } })
+      .catch(() => {});
+    fetch("/api/fx/usdkrw").then((r) => r.json()).then((d) => { if (d?.ok) setLiveFx(d); }).catch(() => {});
+    refreshQuotes([...positions, ...holdings]);
+    setTimeout(() => setRefreshing(false), 700);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [positions, holdings, refreshQuotes]);
+
+  // [실시간] "N초 전 갱신" 표기 문자열
+  const freshLabel = (() => {
+    void nowTick; // 1초마다 재계산 트리거
+    if (!quotesAt) return null;
+    const sec = Math.max(0, Math.round((Date.now() - quotesAt) / 1000));
+    if (sec < 5) return "방금 갱신";
+    if (sec < 60) return `${sec}초 전 갱신`;
+    const min = Math.floor(sec / 60);
+    return `${min}분 전 갱신`;
+  })();
 
   // 등록 티커들의 실제 최근 종가 중 가장 최신 날짜 — 히어로 '실시간 종가' 신선도 표기용
   const liveCloseDate = positions
@@ -221,7 +262,11 @@ export default function EtfDashboard() {
       <section className="hero">
         <div className="eyebrow">
           <span className="lbl">📊 ETF 평가 기준{priceDate ? ` · ${priceDate}` : ""}{priceDate ? <span className={`date-flag ${priceStale ? "stale" : "fresh"}`}>{priceStale ? `지연 ${priceDaysAgo}일` : "최신"}</span> : null}{liveCloseDate ? <span className="date-flag fresh">실시간 종가 {liveCloseDate.slice(5)}</span> : null}</span>
-          <span className="live">LIVE</span>
+          <span className="live-wrap">
+            {freshLabel && <span className="fresh-ago">{freshLabel}</span>}
+            <button className={`refresh-btn ${refreshing ? "spin" : ""}`} onClick={refreshAll} aria-label="시세 새로고침" title="지금 시세 새로고침">↻</button>
+            <span className="live"><span className="live-dot" />LIVE</span>
+          </span>
         </div>
         {liveFx?.ok ? (
           <div className="fx-note">
@@ -631,7 +676,15 @@ export default function EtfDashboard() {
         .hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 20px 18px; box-shadow: var(--shadow-float); margin-bottom: 14px; }
         .hero .eyebrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
         .hero .lbl { font-size: 12px; font-weight: 700; color: var(--hero-ink-sub); }
-        .live { background: var(--color-success); color: #04351f; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 5px; letter-spacing: .5px; }
+        .live { background: var(--color-success); color: #04351f; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 5px; letter-spacing: .5px; display: inline-flex; align-items: center; gap: 4px; }
+        /* [실시간] 갱신 표기 · 새로고침 · 라이브 점멸 */
+        .live-wrap { display: inline-flex; align-items: center; gap: 8px; }
+        .fresh-ago { font-size: 10px; font-weight: 700; color: var(--hero-ink-sub); white-space: nowrap; }
+        .refresh-btn { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--hero-fill-line); background: var(--hero-fill); color: var(--hero-ink); font-size: 13px; line-height: 1; cursor: pointer; display: grid; place-items: center; font-family: var(--font-sans); }
+        .refresh-btn.spin { animation: etf-spin .7s linear; }
+        @keyframes etf-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
+        .live-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: etf-pulse 1.4s ease-in-out infinite; }
+        @keyframes etf-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
         .hero .big { font-size: 32px; font-weight: 800; letter-spacing: -.8px; line-height: 1; }
         .hero .big span { font-size: 19px; font-weight: 700; }
         .date-flag { display: inline-block; margin-left: 7px; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; letter-spacing: .2px; vertical-align: middle; }
