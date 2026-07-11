@@ -70,7 +70,7 @@ export default function RealEstateDashboard() {
       {/* slim CTA — 내 단지 등록 유도 (§5③ 미입력=회색 중립, 위험 아님) */}
       <div className="cta-slim" onClick={() => { window.location.href = '/pwa/onboarding'; }}><span className="cta-txt">🏠 내 단지를 등록하면 <b>국면·저평가·리밸런싱에 반영</b>됩니다</span><span className="arr">→</span></div>
 
-      {/* [§3-2 원칙1] 총자산 바 제거 — 총자산은 홈·AI자산 2곳에만. 부동산 페이지는 부동산 슬라이스만 표시 */}
+      {/* [§3-2 원칙1] 포트폴리오 합계는 홈·AI자산 2곳에만. 부동산 페이지는 부동산 슬라이스만 표시(피드백14) */}
 
       {/* 2) ONE Score 랭킹 */}
       {rank?.ranking?.length > 0 && (

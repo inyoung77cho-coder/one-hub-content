@@ -245,7 +245,7 @@ export default function EtfDashboard() {
         </div>
       )}
 
-      {/* [§3-2 원칙1] 총자산 바 제거 — 총자산은 홈·AI자산 2곳에만. ETF 페이지는 ETF 슬라이스만 표시 */}
+      {/* [§3-2 원칙1] 포트폴리오 합계는 홈·AI자산 2곳에만. ETF 페이지는 ETF 슬라이스만 표시(피드백14) */}
       {err && <div className="err">데이터 로드 오류: {err}</div>}
 
       {/* 2) Portfolio Score — 블랙박스 금지, 구성요소 공개 */}
