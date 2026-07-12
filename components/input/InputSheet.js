@@ -67,10 +67,9 @@ export default function InputSheet({ trader = "A" }) {
         } else if (tab === "etf") {
           const d = await j(`/api/pwa/etf/positions?trader=${trader}`).catch(() => null);
           if (alive && d?.positions) setHold((s) => ({ ...s, etf: d.positions }));
-        } else {
-          const d = await j(`/api/input/kis-import?trader_id=${trader}`).catch(() => null);
-          if (alive && d?.items) setHold((s) => ({ ...s, stock: d.items }));
         }
+        // 주식 보유는 KIS 라이브 조회이므로 마운트 시 자동 호출하지 않음 —
+        // 사용자가 [KIS에서 불러오기]를 누를 때만 브로커리지 호출.
       } catch (_) {}
     })();
     return () => { alive = false; };
