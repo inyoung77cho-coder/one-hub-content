@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import TopNav from "../../components/TopNav";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS } from "../../lib/etfHoldings";
-import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress } from "../../lib/taxRules";
+import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress, pensionCreditLimitCombined } from "../../lib/taxRules";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -17,7 +17,9 @@ const won = (n) => {
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${n.toFixed(2)}%`);
 const sign = (n) => (n > 0 ? "pos" : n < 0 ? "neg" : "");
 // [S4] 계좌 유형별 세제 안내 — data/tax_rules.json 단일 소스에서 로드(세율 하드코딩 제거)
-const ACCT_EMOJI = { "일반": "💸", "연금": "🏦", "ISA": "🧾" };
+const ACCT_EMOJI = { "일반": "💸", "개인연금": "🏦", "퇴직연금": "🏛️", "ISA": "🧾" };
+// [계좌 세분화] 연금 계열(개인연금·퇴직연금) 판별 — 세액공제 한도 합산 대상
+const isPensionAcct = (a) => a === "개인연금" || a === "퇴직연금";
 const ACCT_TAX = ACCOUNTS.reduce((m, a) => { m[a] = `${ACCT_EMOJI[a] || ""} ${acctTaxNote(a)}`; return m; }, {});
 // [S4] 계좌 필터 칩
 const ACCT_FILTERS = ["전체", ...ACCOUNTS];
@@ -297,19 +299,20 @@ export default function EtfDashboard() {
     etfTodos.push({ acct: "일반", icon: "🧾", title: `손실 종목 손익통산(${tax.losses.map((l) => l.ticker).join("·")})`, detail: "일반계좌는 같은 해 이익·손실을 합산 과세합니다. 손실 종목을 함께 매도(손실수확)하면 과세표준이 줄어 양도세를 아낄 수 있습니다.", tone: "info" });
   if (tax?.dividend_usd > 0)
     etfTodos.push({ acct: "일반", icon: "💵", title: `해외 배당 연 $${tax.dividend_usd} 관리`, detail: "해외상장 ETF 배당은 15% 원천징수 후 지급됩니다. 연 금융소득 2,000만원 초과 시 종합과세 대상이니 규모를 확인하세요.", tone: "info" });
-  const hasPension = holdings.some((h) => (h.account || "일반") === "연금");
+  const hasPension = holdings.some((h) => isPensionAcct(h.account || "일반"));
   if (hasPension) {
-    const limit = pensionCreditLimit();
-    const penRows = holdings.filter((h) => (h.account || "일반") === "연금");
+    // 세액공제 한도는 개인연금+IRP 합산(연 900만) — 두 계좌 취득액을 함께 본다
+    const limit = pensionCreditLimitCombined();
+    const penRows = holdings.filter((h) => isPensionAcct(h.account || "일반"));
     const acquired = penRows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
     const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
     const room = Math.max(0, limit - contrib);
     if (room > 0)
-      etfTodos.push({ acct: "연금", icon: "🎁", title: `연금 추가납입 여유 ${won(room)}원`, detail: `올해 세액공제 한도(${won(limit)}원)까지 ${won(room)}원 남았습니다. 추가 납입하면 13.2~16.5% 세액공제를 더 받습니다.`, tone: "good" });
+      etfTodos.push({ acct: "연금", icon: "🎁", title: `연금 추가납입 여유 ${won(room)}원`, detail: `개인연금+IRP 합산 세액공제 한도(${won(limit)}원)까지 ${won(room)}원 남았습니다. 추가 납입하면 13.2~16.5% 세액공제를 더 받습니다(연금저축 단독 한도 600만).`, tone: "good" });
     else
-      etfTodos.push({ acct: "연금", icon: "✅", title: "연금 세액공제 한도 충족", detail: "올해 세액공제 한도를 채웠습니다. 초과 납입분은 내년 이월공제 또는 다른 계좌 활용을 검토하세요.", tone: "good" });
+      etfTodos.push({ acct: "연금", icon: "✅", title: "연금 세액공제 한도 충족", detail: "개인연금+IRP 합산 세액공제 한도를 채웠습니다. 초과 납입분은 내년 이월공제 또는 ISA·일반 활용을 검토하세요.", tone: "good" });
   }
-  const todosForAcct = etfTodos.filter((t) => acctFilter === "전체" || t.acct === "전체" || t.acct === acctFilter);
+  const todosForAcct = etfTodos.filter((t) => acctFilter === "전체" || t.acct === "전체" || t.acct === acctFilter || (t.acct === "연금" && isPensionAcct(acctFilter)));
 
   return (
     <div className="etf pwa-shell">
@@ -376,7 +379,7 @@ export default function EtfDashboard() {
           const cnt = f === "전체" ? holdings.length : holdings.filter((h) => (h.account || "일반") === f).length;
           return (
             <button key={f} role="tab" aria-selected={acctFilter === f}
-              className={`acct-chip ${acctFilter === f ? "on" : ""} ${f === "연금" ? "pension" : f === "ISA" ? "isa" : ""}`}
+              className={`acct-chip ${acctFilter === f ? "on" : ""} ${isPensionAcct(f) ? "pension" : f === "ISA" ? "isa" : ""}`}
               onClick={() => changeAcctFilter(f)}>
               {f}{cnt > 0 && <span className="acct-chip-n">{cnt}</span>}
             </button>
@@ -396,7 +399,7 @@ export default function EtfDashboard() {
                 <div className={`todo-item ${t.tone}`} key={i}>
                   <span className="todo-ic">{t.icon}</span>
                   <div className="todo-body">
-                    <div className="todo-t">{t.title}<span className={`todo-acct ${t.acct === "연금" ? "pension" : t.acct === "ISA" ? "isa" : t.acct === "일반" ? "normal" : "all"}`}>{t.acct}</span></div>
+                    <div className="todo-t">{t.title}<span className={`todo-acct ${(t.acct === "연금" || isPensionAcct(t.acct)) ? "pension" : t.acct === "ISA" ? "isa" : t.acct === "일반" ? "normal" : "all"}`}>{t.acct}</span></div>
                     <div className="todo-d">{t.detail}</div>
                   </div>
                 </div>
@@ -685,14 +688,14 @@ export default function EtfDashboard() {
         {formMsg && <div className="me-msg">{formMsg}</div>}
         {holdings.length > 0 ? (
           <div className="me-groups">
-            {/* [S4] 계좌 유형별 그룹 — 세제가 다르므로 버킷별 평가·세제 안내 분리 · 상단 필터 반영 */}
-            {ACCOUNTS.filter((a) => (acctFilter === "전체" || acctFilter === a) && holdings.some((h) => (h.account || "일반") === a)).map((acct) => {
+            {/* [S4·계좌 세분화] 계좌 유형별 그룹 — 세제가 다르므로 버킷별 평가·세제 안내 분리 · 상단 필터 반영 */}
+            {(() => { const presentAccts = ACCOUNTS.filter((a) => (acctFilter === "전체" || acctFilter === a) && holdings.some((h) => (h.account || "일반") === a)); const firstPension = presentAccts.find(isPensionAcct); return presentAccts.map((acct) => {
               const rows = holdings.filter((h) => (h.account || "일반") === acct);
               const sub = rows.reduce((acc, h) => { const v = holdingMetrics(h).valueKrw; return acc + (v || 0); }, 0);
               return (
                 <div className="me-grp" key={acct}>
                   <div className="me-grp-h">
-                    <span className={`me-acct-badge ${acct === "연금" ? "pension" : acct === "ISA" ? "isa" : "normal"}`}>{acct}</span>
+                    <span className={`me-acct-badge ${isPensionAcct(acct) ? "pension" : acct === "ISA" ? "isa" : "normal"}`}>{acct}</span>
                     {sub > 0 && <span className="me-grp-sum">평가 {won(sub)}원</span>}
                   </div>
                   <div className="me-list">
@@ -717,34 +720,35 @@ export default function EtfDashboard() {
                     })}
                   </div>
                   <div className="me-tax">{ACCT_TAX[acct]}</div>
-                  {/* [S4] 연금 세액공제 진행률 — 올해 납입액(입력) 대비 한도(연 900만) · 추정(참고용) */}
-                  {acct === "연금" && (() => {
-                    const limit = pensionCreditLimit();
-                    const acquired = rows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
+                  {/* [계좌 세분화] 연금 세액공제 진행률 — 개인연금+IRP 합산(연 900만) 기준. 첫 연금 그룹에 1회만 표시 */}
+                  {acct === firstPension && (() => {
+                    const limit = pensionCreditLimitCombined();
+                    const penRows = holdings.filter((h) => isPensionAcct(h.account || "일반"));
+                    const acquired = penRows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
                     const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
-                    const prog = pensionCreditProgress(contrib);
+                    const prog = Math.max(0, Math.min(1, contrib / limit));
                     const est = pensionContrib === ""; // 미입력 시 취득원가 기반 추정
                     return (
                       <div className="pen-credit">
                         <div className="pc-h">
-                          <span className="pc-lbl">🎁 세액공제 한도 진행률</span>
+                          <span className="pc-lbl">🎁 연금 세액공제 진행률 <span className="pc-scope">개인연금+IRP 합산</span></span>
                           <span className={`pc-tag ${est ? "est" : "fix"}`}>{est ? "추정" : "입력"}</span>
                           <span className="pc-pct">{Math.round(prog * 100)}%</span>
                         </div>
                         <div className="pc-bar"><div className="pc-fill" style={{ width: `${prog * 100}%` }} /></div>
                         <div className="pc-nums">납입 {won(contrib)}원 / 한도 {won(limit)}원 {prog >= 1 ? "· 한도 소진" : `· 여유 ${won(Math.max(0, limit - contrib))}원`}</div>
                         <div className="pc-in-wrap">
-                          <span className="pc-in-lbl">올해 납입액 직접 입력(원)</span>
+                          <span className="pc-in-lbl">올해 연금 납입액 직접 입력(원)</span>
                           <input className="pc-in" type="number" inputMode="numeric" placeholder={`${Math.round(acquired).toLocaleString()} (취득 추정)`}
                             value={pensionContrib} onChange={(e) => changePensionContrib(e.target.value)} />
                         </div>
-                        <div className="pc-note">세액공제 한도(연 {won(limit)}원)는 <b>납입액 기준</b>입니다. 미입력 시 이 계좌 취득원가로 <b>추정</b>하므로 실제 납입액과 다를 수 있습니다.</div>
+                        <div className="pc-note">합산 한도(연 {won(limit)}원)는 개인연금+IRP <b>납입액 기준</b>이며 연금저축 단독 한도는 600만원입니다. 미입력 시 연금 계좌 취득원가로 <b>추정</b>합니다.</div>
                       </div>
                     );
                   })()}
                 </div>
               );
-            })}
+            }); })()}
           </div>
         ) : (
           <div className="me-empty">보유 ETF를 추가하면 <b>현재가·평가액·손익</b>이 자동으로 갱신됩니다. 미국 ETF는 티커(<b>SCHD</b>), 국내는 숫자코드(<b>069500</b>)로 입력하세요.</div>
@@ -918,7 +922,7 @@ export default function EtfDashboard() {
         .me-in { flex: 1 1 70px; min-width: 0; border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 9px; padding: 9px 10px; font-size: 0.84rem; font-family: var(--font-sans); color: var(--color-ink); }
         .me-in.tk { flex: 2 1 120px; text-transform: uppercase; }
         .me-in.ccy { flex: 0 0 68px; }
-        .me-in.acct { flex: 0 0 76px; }
+        .me-in.acct { flex: 0 0 92px; }
         .me-in:focus { outline: none; border-color: var(--color-primary); }
         /* [S4] 계좌 유형 그룹 */
         .me-groups { margin-top: 14px; display: flex; flex-direction: column; gap: 14px; }
@@ -983,6 +987,7 @@ export default function EtfDashboard() {
         .pen-credit { margin-top: 10px; background: var(--color-success-soft); border-radius: 11px; padding: 12px 13px; }
         .pc-h { display: flex; align-items: center; gap: 8px; }
         .pc-lbl { font-size: 0.76rem; font-weight: 800; color: var(--color-success-ink, var(--color-success)); }
+        .pc-scope { font-size: 0.62rem; font-weight: 700; color: var(--color-ink-3); margin-left: 4px; }
         .pc-tag { font-size: 0.6rem; font-weight: 800; padding: 2px 6px; border-radius: 5px; }
         .pc-tag.est { background: var(--color-warning-soft); color: var(--color-warning-ink); }
         .pc-tag.fix { background: var(--color-card); color: var(--color-success-ink, var(--color-success)); }

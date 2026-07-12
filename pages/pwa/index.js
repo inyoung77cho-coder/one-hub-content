@@ -7,6 +7,7 @@ import LastUpdated from '../../components/LastUpdated';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
 import { recordDecision, matureLedger, computeShowdown, getTodayDecision } from '../../lib/verdictLedger';
 import { fetchAssetsTotal } from '../../lib/assetsTotal';
+import { fetchLiveEtfKrw } from '../../lib/etfLive';
 import { dedupBy } from '../../lib/useDedup';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
 
@@ -396,7 +397,26 @@ export default function PWADashboard({ latestReport }) {
       .catch(() => {});
     // [S1.1] 총자산 단일 소스(/api/assets/total, 미배포 시 기존 total-asset+온보딩 폴백)
     fetchAssetsTotal(trader)
-      .then(a => setAssetSum(a?.total_uk != null ? { total_uk: a.total_uk, breakdown: a.breakdown, realty_state: a.realty_state, source: a.source } : null))
+      .then(async a => {
+        const base = a?.total_uk != null ? { total_uk: a.total_uk, breakdown: a.breakdown, realty_state: a.realty_state, source: a.source } : null;
+        setAssetSum(base);
+        // [D1] ETF 실시간 평가액을 대시보드가 직접 계산(ETF 페이지 방문 여부와 무관) → 총자산이 항상 최신 ETF 반영
+        if (!base) return;
+        try {
+          const live = await fetchLiveEtfKrw(trader);
+          if (live?.krw != null && live.krw > 0) {
+            const etfUk = Math.round((live.krw / 1e8) * 100) / 100;
+            const prevEtf = base.breakdown?.etf_uk ?? 0;
+            const total = base.total_uk != null ? Math.round((base.total_uk - prevEtf + etfUk) * 100) / 100 : etfUk;
+            setAssetSum({ ...base, total_uk: total, breakdown: { ...base.breakdown, etf_uk: etfUk } });
+            try {
+              const onb = JSON.parse(localStorage.getItem('onehub_onboard_assets') || '{}') || {};
+              onb.etf_uk = Math.round((live.krw / 1e8) * 10000) / 10000;
+              localStorage.setItem('onehub_onboard_assets', JSON.stringify(onb));
+            } catch (e) {}
+          }
+        } catch (e) {}
+      })
       .catch(() => setAssetSum(null));
     fetch(`/api/realestate/v2/ai-summary?trader_id=${trader}`)
       .then(r => r.json())
@@ -873,8 +893,16 @@ export default function PWADashboard({ latestReport }) {
                 const totalUk = assetSum?.total_uk != null ? Math.round((assetSum.total_uk + acctCashUk) * 100) / 100 : null;
                 const reUk = b.realestate_uk;
                 const rePct = (totalUk && reUk != null) ? Math.round((reUk / totalUk) * 1000) / 10 : null;
+                const etfPct = (totalUk && b.etf_uk != null) ? Math.round((b.etf_uk / totalUk) * 1000) / 10 : null;
                 const riskGrade = rePct == null ? null : rePct > 70 ? '높음' : rePct >= 40 ? '중간' : '낮음';
                 const stance = buyCount > 0 ? `${buyCount}종목 매수` : '선별 관망';
+                // [오늘의 액션] 주식만이 아닌 크로스에셋 실행 항목 2~3개(항상 최소 2개)
+                const actions = [];
+                actions.push(buyCount > 0
+                  ? { ic: '📈', k: '주식', t: `매수 신호 ${buyCount}종목 — 추천 탭에서 확인`, go: () => setTab('recommend') }
+                  : { ic: '📈', k: '주식', t: `매수 조건 미달 — 선별 관망 유지${blockCount > 0 ? ` (${blockCount}건 차단)` : ''}`, go: () => setTab('recommend') });
+                actions.push({ ic: '💠', k: 'ETF', t: etfPct != null ? `보유 비중 ${etfPct}% — 계좌별 리밸런싱·세제 점검` : '계좌별(연금·ISA) 비중·세제 점검', go: () => router.push('/pwa/etf') });
+                if (rePct != null) actions.push({ ic: '🏠', k: '부동산', t: rePct > 70 ? `자산의 ${rePct}% 집중 — 신규 매입 보류·쏠림 축소` : '갈아타기·전세 갭 추이 점검', go: () => router.push('/pwa/realestate') });
                 // 크로스에셋 결론: 부동산 구조 쏠림 > 시장 스탠스 순으로 한 줄 결론 산출
                 let concl, why;
                 if (rePct != null && rePct > 70) {
@@ -900,6 +928,18 @@ export default function PWADashboard({ latestReport }) {
                     {totalUk != null && (
                       <div className="hh-total">총자산 <b>{totalUk}억</b>{rePct != null && <span className="hh-total-sub"> · 부동산 {rePct}%</span>}</div>
                     )}
+                    {/* [오늘의 액션] 최소 2가지 크로스에셋 실행 항목 — 카드만 보고 오늘 할 일 파악 */}
+                    <div className="hh-actions">
+                      <div className="hh-actions-h">✅ 오늘의 액션</div>
+                      {actions.map((a, i) => (
+                        <button className="hh-act" key={i} onClick={(e) => { e.stopPropagation(); a.go && a.go(); }}>
+                          <span className="hh-act-ic">{a.ic}</span>
+                          <span className="hh-act-k">{a.k}</span>
+                          <span className="hh-act-t">{a.t}</span>
+                          <span className="hh-act-go">→</span>
+                        </button>
+                      ))}
+                    </div>
                     {/* 근거: 버튼/이탈 없이 카드 안 '왜?' 인라인 펼치기 (원칙4) */}
                     <button className="hh-why" onClick={() => setHeroWhyOpen(o => !o)} aria-expanded={heroWhyOpen}>
                       <span>왜 이렇게 판단했나?</span><span className={`hh-why-caret ${heroWhyOpen ? 'open' : ''}`}>▾</span>
@@ -2736,6 +2776,15 @@ export default function PWADashboard({ latestReport }) {
         .hh-total { font-size: 0.82rem; color: var(--hero-ink-soft); margin-bottom: 4px; }
         .hh-total b { color: var(--hero-ink); font-weight: 800; font-size: 0.95rem; }
         .hh-total-sub { color: var(--hero-ink-faint); }
+        /* [오늘의 액션] 히어로 안 실행 리스트 */
+        .hh-actions { margin-top: 12px; background: var(--hero-fill); border: 1px solid var(--hero-fill-line); border-radius: 12px; padding: 10px 11px; }
+        .hh-actions-h { font-size: 0.72rem; font-weight: 800; color: var(--hero-ink-soft); margin-bottom: 7px; letter-spacing: -.01em; }
+        .hh-act { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: none; padding: 7px 4px; cursor: pointer; text-align: left; font-family: var(--font-body); border-top: 1px solid var(--hero-fill-line); }
+        .hh-act:first-of-type { border-top: none; }
+        .hh-act-ic { font-size: 0.9rem; flex-shrink: 0; }
+        .hh-act-k { font-size: 0.7rem; font-weight: 800; color: var(--hero-accent); flex-shrink: 0; min-width: 34px; }
+        .hh-act-t { font-size: 0.78rem; font-weight: 600; color: var(--hero-ink); flex: 1; min-width: 0; line-height: 1.35; word-break: keep-all; }
+        .hh-act-go { font-size: 0.8rem; color: var(--hero-ink-faint); flex-shrink: 0; }
         .hh-why { margin-top: 12px; width: 100%; display: flex; align-items: center; justify-content: space-between; background: var(--hero-fill); border: 1px solid var(--hero-fill-line); color: var(--hero-ink-soft); font-family: var(--font-body); font-weight: 700; font-size: 0.8rem; padding: 11px 14px; border-radius: 12px; cursor: pointer; }
         .hh-why-caret { transition: transform .2s; font-size: 0.7rem; }
         .hh-why-caret.open { transform: rotate(180deg); }
