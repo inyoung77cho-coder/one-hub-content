@@ -15,9 +15,9 @@ function useSuggest(kind, q) {
   useEffect(() => {
     const t = String(q || "").trim();
     if (t.length < 1) { setOpts([]); return; }
-    const url = kind === "stock" ? `/api/search/stock?q=${encodeURIComponent(t)}`
-      : kind === "etf" ? `/api/search/etf?q=${encodeURIComponent(t)}`
-      : `/api/re/search-complex?q=${encodeURIComponent(t)}`;
+    const url = kind === "stock" ? `/api/input/stock-search?q=${encodeURIComponent(t)}`
+      : kind === "etf" ? `/api/input/etf-search?q=${encodeURIComponent(t)}`
+      : `/api/input/re-search?q=${encodeURIComponent(t)}`;
     let alive = true;
     fetch(url).then((r) => r.json()).then((d) => {
       if (!alive) return;
