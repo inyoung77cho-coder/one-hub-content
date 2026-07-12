@@ -15,7 +15,7 @@ export default function ReportShell({ title, sub, children }) {
       {children}
       <div className="rp-foot">
         <Link href="/pwa?tab=report" className="rp-foot-link">← AI 신뢰도로 돌아가기</Link>
-        <Link href="/pwa?tab=dashboard" className="rp-foot-link">🏠 대시보드</Link>
+        <Link href="/pwa?tab=dashboard" className="rp-foot-link">🏠 종합자산</Link>
       </div>
       <style jsx>{`
         .rp { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }

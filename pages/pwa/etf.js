@@ -229,6 +229,23 @@ export default function EtfDashboard() {
   const heroPnl = heroVal - heroCost;
   const heroPnlPct = heroCost > 0 ? (heroVal / heroCost - 1) * 100 : (s?.total_pnl_pct ?? 0);
 
+  // [총자산 동기화] ETF 실시간 평가액(억)을 온보딩 자산(etf_uk)에 반영 → 대시보드 총자산이 최신 ETF 포함.
+  //   변화가 있을 때만 기록·방송(루프 방지). 실시간 평가가 없으면 건너뜀.
+  useEffect(() => {
+    const base = heroLive ? liveTotal : (s?.value_krw ?? null);
+    if (base == null || !(base > 0)) return;
+    const uk = Math.round((base / 1e8) * 10000) / 10000;
+    try {
+      const onb = JSON.parse(localStorage.getItem("onehub_onboard_assets") || "{}") || {};
+      if (Math.abs(Number(onb.etf_uk || 0) - uk) > 0.0005) {
+        onb.etf_uk = uk;
+        localStorage.setItem("onehub_onboard_assets", JSON.stringify(onb));
+        window.dispatchEvent(new Event("onehub-assets-change"));
+      }
+    } catch (e) {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [liveTotal, heroLive, s?.value_krw]);
+
   // [환율 신선도] 기준일이 오늘(KST)인지 표시 — 오래된 종가 환율이면 사용자에게 명확히 알림
   const asof = report?.as_of;
   const todayKST = (() => { try { return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }); } catch (e) { return null; } })();
