@@ -76,13 +76,13 @@ export default function Nav() {
   return (
     <>
       <style>{`
-        .nav-desktop { display: flex; }
-        .nav-app-btn { display: flex; }
-        .nav-hamburger { display: none; }
-        @media (max-width: 768px) {
-          .nav-desktop { display: none !important; }
+        /* 상단 드롭다운 바 제거 — 전 메뉴는 햄버거 안으로. 상단은 로고+앱열기+햄버거만. */
+        .nav-desktop { display: none !important; }
+        .nav-app-btn { display: flex; margin-left: auto; }
+        .nav-hamburger { display: flex; margin-left: 8px; }
+        @media (max-width: 480px) {
           .nav-app-btn { display: none !important; }
-          .nav-hamburger { display: flex !important; }
+          .nav-hamburger { margin-left: auto; }
         }
       `}</style>
 
