@@ -15,6 +15,23 @@ export default function Home({ reports, stats }) {
   const label = (r) => REGIME_LABEL[r] || '횡보장';
   const analyzed = latest ? (latest.block_count || 0) + (latest.trade_count || 0) : 0;
 
+  // 조부장 오늘 경제일기 — 오늘 운영일지(latest)로 매일 갱신되는 1인칭 일기
+  const diary = latest ? {
+    open: latest.regime === 'BEAR'
+        ? '출근길 지하철에서 지수를 확인했다. 오늘도 화면이 파랗다.'
+        : latest.regime === 'BULL'
+        ? '아침 뉴스가 온통 강세 얘기다. 이럴 때가 오히려 더 조심스럽다.'
+        : '시장은 오늘도 방향을 정하지 못했다. 그래서 나도 서두르지 않기로 했다.',
+    act: latest.trade_count > 0
+        ? `ONE-HUB가 걸러준 후보 중 ${latest.trade_count}건, 내 손으로 승인 버튼을 눌렀다.`
+        : 'AI는 후보를 모두 걸렀고, 나는 오늘 아무것도 사지 않았다. 참는 것도 결정이다.',
+    close: latest.regime === 'BEAR'
+        ? '잃지 않은 하루가, 내일의 실탄을 남긴다.'
+        : latest.regime === 'BULL'
+        ? '오를 때일수록 전체 배분을 본다. 남들 따라가지 않는다.'
+        : '기다림도 하나의 포지션이다. 오늘의 나는 흔들리지 않았다.',
+  } : null;
+
   const canonical = `${SITE}/`;
   const ogImage = `${SITE}/api/og-home`;
   const description =
@@ -134,6 +151,33 @@ export default function Home({ reports, stats }) {
               </div>
             </div>
           </div>
+
+          {/* 조부장 오늘 경제일기 (상단 프로미넌트) */}
+          {latest && diary && (
+            <section style={{ paddingTop: 44, paddingBottom: 0 }}>
+              <div className="container">
+                <div className="diary">
+                  <div className="diary-side">
+                    <div className="diary-avatar" aria-hidden="true">🧑‍💼</div>
+                    <div className="diary-who">조 부장<span>분당 · 대기업 18년차</span></div>
+                  </div>
+                  <div className="diary-main">
+                    <div className="diary-top">
+                      <span className="diary-eyebrow">📔 조부장의 오늘 경제일기</span>
+                      <span className="diary-date">{latest.date} · {emoji(latest.regime)} {label(latest.regime)}</span>
+                    </div>
+                    <p className="diary-p">{diary.open}</p>
+                    <p className="diary-quote">&ldquo;{latest.insight}&rdquo;</p>
+                    <p className="diary-p">{diary.act} {diary.close}</p>
+                    <div className="diary-links">
+                      <a href="/story">조 부장 이야기 처음부터 →</a>
+                      <a href={`/daily/${latest.date}`}>오늘 판단 근거 보기 →</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
 
           {/* WHY */}
           <section>
@@ -511,6 +555,22 @@ export default function Home({ reports, stats }) {
         @media(max-width:640px){.board-grid{grid-template-columns:1fr}}
         .channels-more{text-align:center;font-size:14px;color:var(--ink2);margin-top:24px}
         .channels-more :global(a){color:var(--blue);font-weight:700}
+
+        /* 조부장 오늘 경제일기 */
+        .diary{display:flex;gap:26px;background:linear-gradient(135deg,#FFFFFF,#F1F6FF);border:1px solid #DCE7FF;border-radius:24px;padding:30px 34px;box-shadow:var(--shadow)}
+        .diary-side{flex-shrink:0;width:96px;text-align:center}
+        .diary-avatar{font-size:48px;line-height:1}
+        .diary-who{font-size:12.5px;font-weight:800;color:var(--ink);margin-top:8px;line-height:1.4;display:flex;flex-direction:column}
+        .diary-who span{font-size:10.5px;font-weight:600;color:var(--ink3);margin-top:2px}
+        .diary-main{flex:1;min-width:0}
+        .diary-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+        .diary-eyebrow{font-size:15px;font-weight:800;color:var(--blue);letter-spacing:-.2px}
+        .diary-date{font-size:12.5px;color:var(--ink3);font-family:'Space Mono',monospace}
+        .diary-p{font-size:15px;line-height:1.8;color:var(--ink);margin-bottom:8px;word-break:keep-all}
+        .diary-quote{font-size:16px;line-height:1.65;color:var(--ink);font-weight:700;border-left:3px solid var(--blue);padding:2px 0 2px 14px;margin:12px 0}
+        .diary-links{display:flex;gap:20px;flex-wrap:wrap;margin-top:16px}
+        .diary-links :global(a){font-size:13.5px;font-weight:700;color:var(--blue)}
+        @media(max-width:640px){.diary{flex-direction:column;gap:16px;padding:24px 22px}.diary-side{width:auto;display:flex;align-items:center;gap:12px;text-align:left}.diary-who{align-items:flex-start}.diary-avatar{font-size:40px}}
         @media(max-width:860px){.channels{grid-template-columns:1fr 1fr}}
         @media(max-width:520px){.channels{grid-template-columns:1fr}}
 
