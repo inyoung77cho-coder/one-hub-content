@@ -30,7 +30,7 @@ export default function Home({ reports, stats }) {
       url: `${SITE}/`,
       logo: `${SITE}/icons/icon-512.png`,
       description: '주식·ETF·부동산을 하나의 AI가 분석·배분·운영하는 통합 자산관리 플랫폼',
-      sameAs: ['https://t.me/onehub', 'https://blog.naver.com/onehub'],
+      sameAs: ['https://t.me/onehub_jiy_bot', 'https://github.com/inyoung77cho-coder'],
     },
     {
       '@context': 'https://schema.org',
@@ -292,7 +292,7 @@ export default function Home({ reports, stats }) {
                 <p>새 글·리포트·영상은 아래 채널로 먼저 도착합니다. 팔로우하고 ONE-HUB의 성장 과정을 함께 보세요.</p>
               </div>
               <div className="channels">
-                <a className="channel" href="https://youtube.com/@onehub" target="_blank" rel="noopener">
+                <a className="channel" href="https://youtube.com/@onehub_invest" target="_blank" rel="noopener">
                   <div className="ch-ic">▶️</div>
                   <div className="ch-t">YouTube</div>
                   <div className="ch-d">AI 운영 브이로그·시장 브리핑 영상</div>
@@ -304,7 +304,7 @@ export default function Home({ reports, stats }) {
                   <div className="ch-d">AI 판단 근거·투자 방법론 아티클</div>
                   <span className="ch-cta">읽으러 가기 →</span>
                 </a>
-                <a className="channel" href="https://t.me/onehub" target="_blank" rel="noopener">
+                <a className="channel" href="https://t.me/onehub_jiy_bot" target="_blank" rel="noopener">
                   <div className="ch-ic">✈️</div>
                   <div className="ch-t">텔레그램</div>
                   <div className="ch-d">매일 15:30 리포트를 실시간으로</div>
