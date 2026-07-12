@@ -570,7 +570,11 @@ export default function PWADashboard({ latestReport }) {
         const cur = Number(d?.current_price ?? d?.price) || null;
         const tgt = Number(d?.target) || null;
         const stp = Number(d?.stop_loss) || null;
-        merge({ cur, tgt, stp, ok: !!tgt });
+        // [업체 정보] 백엔드가 주는 업종/요약을 있으면 그대로 노출(허위 생성 금지)
+        const info = d?.sector || d?.업종 || d?.industry || d?.summary || d?.technical_summary || d?.key_signal || null;
+        // [목표가 기간] 백엔드 horizon 우선, 없으면 상승여력 크기로 추정
+        const horizonDays = Number(d?.horizon_days ?? d?.target_days) || null;
+        merge({ cur, tgt, stp, ok: !!tgt, info: info ? String(info).slice(0, 80) : null, horizonDays });
       })
       .catch(() => { if (alive) merge({ ok: false }); });
     return () => { alive = false; };
@@ -2589,6 +2593,10 @@ export default function PWADashboard({ latestReport }) {
                 <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {bottomSheet.name} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-tertiary)' }}>({bottomSheet.code})</span>
                 </div>
+                {/* [업체 정보] 종목명 밑 한 줄 요약 — 빠른 이해용(백엔드 업종/요약 있을 때) */}
+                {bottomSheet.priceMeta?.info && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.4, maxWidth: 260, wordBreak: 'keep-all' }}>🏢 {bottomSheet.priceMeta.info}</div>
+                )}
               </div>
               <button onClick={() => setBottomSheet(null)}
                 style={{ background: 'none', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: 'var(--text-secondary)', lineHeight: 1, padding: '0 4px' }}>✕</button>
@@ -2631,6 +2639,18 @@ export default function PWADashboard({ latestReport }) {
                       {rr != null && <span style={{ color: 'var(--text-secondary)' }}>손익비 RR <b style={{ color: rrColor, fontFamily: 'var(--font-mono)' }}>{rr.toFixed(1)}</b></span>}
                     </div>
                   )}
+                  {/* [목표가 기간] 백엔드 horizon 우선, 없으면 상승여력 크기로 도달 예상기간 추정 */}
+                  {(() => {
+                    const estFromUpside = upside == null ? null : upside < 8 ? '약 2~4주' : upside <= 15 ? '약 1~3개월' : '약 3~6개월';
+                    const label = pm.horizonDays ? `약 ${pm.horizonDays}일` : estFromUpside;
+                    if (!label) return null;
+                    return (
+                      <div style={{ marginTop: 9, fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                        ⏳ 목표가 도달 예상 기간 <b style={{ color: 'var(--text-primary)' }}>{label}</b>
+                        <span style={{ fontSize: '0.6rem', fontWeight: 700, color: 'var(--text-tertiary)', border: '1px solid var(--border)', borderRadius: 4, padding: '0 4px', marginLeft: 5 }}>{pm.horizonDays ? 'AI' : '추정'}</span>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })()}
