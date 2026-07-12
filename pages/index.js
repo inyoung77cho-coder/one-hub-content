@@ -166,6 +166,37 @@ export default function Home({ reports, stats }) {
             </div>
           </section>
 
+          {/* USE CASES — PWA 활용 사례 (3자산 균형) */}
+          <section style={{ paddingTop: 0 }}>
+            <div className="container">
+              <div className="sec-head">
+                <p className="eyebrow">HOW YOU USE IT</p>
+                <h2>세 자산, 이렇게 씁니다</h2>
+                <p>&ldquo;AI가 어떻게 판단하나&rdquo;가 아니라 — 당신의 세 자산에 무엇이 달라지는지, 사례로 봅니다.</p>
+              </div>
+              <div className="usecases">
+                <div className="uc uc-stock">
+                  <div className="uc-badge">📈 주식</div>
+                  <h3>&ldquo;물려있는 종목, 팔까 말까?&rdquo;</h3>
+                  <p>보유 종목마다 매일 손절·홀딩 신호와 <b>그 이유</b>를 받습니다. 감으로 버티지 않고, 규칙으로 지킵니다.</p>
+                </div>
+                <div className="uc uc-etf">
+                  <div className="uc-badge">📊 ETF</div>
+                  <h3>&ldquo;내 ETF 3개, 사실 같은 지수였다?&rdquo;</h3>
+                  <p>중복도·환차·세금까지 반영한 <b>실질수익</b>으로 봅니다. 분산인 줄 알았던 게 집중이었음을 잡아줍니다.</p>
+                </div>
+                <div className="uc uc-re">
+                  <div className="uc-badge">🏢 부동산</div>
+                  <h3>&ldquo;내 아파트, 지금 저평가일까?&rdquo;</h3>
+                  <p>실거래가 기반 <b>ONE Score</b>로 보유·추가·관망을 자산 <b>전체 배분</b> 안에서 판단합니다.</p>
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', marginTop: 26 }}>
+                <a className="btn btn-primary btn-lg" href="/pwa">🚀 앱에서 내 자산으로 시작하기</a>
+              </div>
+            </div>
+          </section>
+
           {/* STORY */}
           <section style={{ paddingTop: 0 }}>
             <div className="container">
@@ -262,6 +293,35 @@ export default function Home({ reports, stats }) {
             </div>
           </section>
 
+          {/* THE BOARD — 성과 랭킹 + 부동산 신규정보 (경쟁·재미) */}
+          <section style={{ paddingTop: 0 }}>
+            <div className="container">
+              <div className="sec-head">
+                <p className="eyebrow">THE BOARD · 함께, 재미있게</p>
+                <h2>이번 주, 누가 잘하고 있나</h2>
+                <p>혼자가 아니라 함께 — 참여자들의 성과 보드와 새 부동산 소식을 홈에서 먼저 봅니다.</p>
+              </div>
+              <div className="board-grid">
+                <a className="board-card" href="/leaderboard">
+                  <div className="board-ic">🏆</div>
+                  <div className="board-body">
+                    <div className="board-t">주간·일일 성과 랭킹</div>
+                    <div className="board-d">수익·정확도 상위 참여자 보드 — 경쟁하듯 배웁니다.</div>
+                  </div>
+                  <span className="board-arrow">보드 열기 →</span>
+                </a>
+                <div className="board-card board-soon">
+                  <div className="board-ic">🏢</div>
+                  <div className="board-body">
+                    <div className="board-t">부동산 신규 정보 <span className="ch-soon">준비중</span></div>
+                    <div className="board-d">협력업체가 올리는 신규 매물·시세 소식을 이곳에.</div>
+                  </div>
+                  <span className="board-arrow-soon">곧 공개</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* PWA FUNNEL (콘솔 중복 제거 · 단일 퍼널) */}
           <section>
             <div className="container">
@@ -317,6 +377,9 @@ export default function Home({ reports, stats }) {
                   <span className="ch-cta">전체 보기 →</span>
                 </a>
               </div>
+              <p className="channels-more">
+                용어가 낯설다면 <a href="/learning-center">러닝센터 · 지표 해설</a>부터, 더 깊이 보려면 <a href="/blog">블로그</a>로.
+              </p>
             </div>
           </section>
 
@@ -420,6 +483,34 @@ export default function Home({ reports, stats }) {
         .channel-soon{opacity:.72;cursor:default}
         .channel-soon:hover{transform:none;box-shadow:var(--shadow)}
         .ch-soon{font-size:10px;font-weight:800;color:#64748B;background:#F1F5F9;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:middle}
+
+        /* 3자산 활용 사례 */
+        .usecases{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+        .uc{background:#fff;border:1px solid var(--line);border-radius:20px;padding:26px 22px;box-shadow:var(--shadow)}
+        .uc-badge{display:inline-block;font-size:12.5px;font-weight:800;padding:5px 11px;border-radius:9px;margin-bottom:14px}
+        .uc-stock .uc-badge{background:var(--blue-soft);color:var(--blue)}
+        .uc-etf .uc-badge{background:var(--green-soft);color:#0E9E6A}
+        .uc-re .uc-badge{background:#FFF6E5;color:#B45309}
+        .uc h3{font-size:17px;font-weight:800;letter-spacing:-.3px;color:var(--ink);line-height:1.45;margin-bottom:10px}
+        .uc p{font-size:14px;color:var(--ink2);line-height:1.7}
+        .uc p b{color:var(--ink)}
+        @media(max-width:820px){.usecases{grid-template-columns:1fr}}
+
+        /* 성과 보드 */
+        .board-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+        .board-card{display:flex;align-items:center;gap:16px;background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px 24px;box-shadow:var(--shadow);transition:transform .15s ease}
+        .board-card:hover{transform:translateY(-2px)}
+        .board-soon{opacity:.72;cursor:default}
+        .board-soon:hover{transform:none}
+        .board-ic{font-size:30px;flex-shrink:0}
+        .board-body{flex:1}
+        .board-t{font-size:16px;font-weight:800;color:var(--ink)}
+        .board-d{font-size:13px;color:var(--ink2);margin-top:4px;line-height:1.5}
+        .board-arrow{font-size:13px;font-weight:700;color:var(--blue);flex-shrink:0}
+        .board-arrow-soon{font-size:13px;font-weight:700;color:var(--ink3);flex-shrink:0}
+        @media(max-width:640px){.board-grid{grid-template-columns:1fr}}
+        .channels-more{text-align:center;font-size:14px;color:var(--ink2);margin-top:24px}
+        .channels-more :global(a){color:var(--blue);font-weight:700}
         @media(max-width:860px){.channels{grid-template-columns:1fr 1fr}}
         @media(max-width:520px){.channels{grid-template-columns:1fr}}
 
