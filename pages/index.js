@@ -86,23 +86,6 @@ export default function Home({ reports, stats }) {
       </Head>
 
       <div className="wrap">
-        {/* NAV */}
-        <header className="nav">
-          <div className="container nav-in">
-            <Link href="/" className="brand" aria-label="ONE-HUB 홈">
-              ONE<span className="dot">·</span>HUB
-            </Link>
-            <nav className="nav-links" aria-label="주 메뉴">
-              <Link href="/daily">운영일지</Link>
-              <Link href="/blog">인사이트</Link>
-              <Link href="/community">커뮤니티</Link>
-              <Link href="/about">About</Link>
-              <Link href="/pwa" className="btn btn-primary">앱 열기 →</Link>
-            </nav>
-            <Link href="/pwa" className="btn btn-primary nav-app-m" aria-label="ONE-HUB 앱 열기">앱 열기</Link>
-          </div>
-        </header>
-
         <main>
           {/* HERO */}
           <section className="hero">
@@ -120,10 +103,10 @@ export default function Home({ reports, stats }) {
                 하며, 그 판단 과정을 매일 투명하게 공개합니다.
               </p>
               <div className="hero-cta">
-                <Link className="btn btn-white btn-lg" href="/pwa">🚀 ONE-HUB 앱 시작하기</Link>
-                <Link className="btn btn-line btn-lg" href={latest ? `/daily/${latest.date}` : '/daily'}>
+                <a className="btn btn-white btn-lg" href="/pwa">🚀 ONE-HUB 앱 시작하기</a>
+                <a className="btn btn-line btn-lg" href={latest ? `/daily/${latest.date}` : '/daily'}>
                   📋 오늘의 판단 보기
-                </Link>
+                </a>
               </div>
               <div className="hero-teaser">
                 <span className="tchip">통합 자산 <b>주식 · ETF · 부동산</b></span>
@@ -183,6 +166,25 @@ export default function Home({ reports, stats }) {
             </div>
           </section>
 
+          {/* STORY */}
+          <section style={{ paddingTop: 0 }}>
+            <div className="container">
+              <div className="story-wrap">
+                <p className="story-eyebrow">STORY · 머니더버니 노트</p>
+                <h2 className="story-title">분당 조부장의 자산 이야기</h2>
+                <p className="story-body">
+                  분당에 자가 한 채, 대기업 18년 차 조 부장. 남들은 성공했다지만 통장은 늘 불안하다.
+                  물려서 손실 난 주식, 뭘 살지 모르는 ETF, 대출 낀 아파트 한 채 — 세 자산은 따로 놀고 노후 계산은 서지 않는다.
+                </p>
+                <p className="story-body">
+                  그가 ONE-HUB로 세 자산을 한곳에 모았다. AI가 매일 시장을 읽고, 최종 결정은 조 부장이 내린다.
+                  잘한 날도, &lsquo;아무것도 하지 않은 게 최선&rsquo;이던 날도, 손절로 쓰라린 날도 — 그대로 기록된다. 이건 그 이야기다.
+                </p>
+                <a href="/story" className="story-cta">조 부장의 이야기 계속 읽기 →</a>
+              </div>
+            </div>
+          </section>
+
           {/* TODAY */}
           {latest && (
             <section style={{ paddingTop: 0 }}>
@@ -191,7 +193,7 @@ export default function Home({ reports, stats }) {
                   <p className="eyebrow">TODAY&apos;S JUDGMENT</p>
                   <h2>오늘 AI는 무엇을 했는가?</h2>
                 </div>
-                <Link className="today-wrap" href={`/daily/${latest.date}`} aria-label={`${latest.date} 오늘의 판단 전체 보기`}>
+                <a className="today-wrap" href={`/daily/${latest.date}`} aria-label={`${latest.date} 오늘의 판단 전체 보기`}>
                   <div className="today-l">
                     <p className="d">{latest.date} · 오늘의 판단</p>
                     <p className="phase">
@@ -210,7 +212,7 @@ export default function Home({ reports, stats }) {
                     <p className="quote-meta">ONE-HUB Insight · AI 분석 15:30 KST</p>
                     <span className="link-arrow">전체 분석 보기 →</span>
                   </div>
-                </Link>
+                </a>
               </div>
             </section>
           )}
@@ -225,7 +227,7 @@ export default function Home({ reports, stats }) {
               </div>
               <div className="logs">
                 {reports.slice(0, 4).map((r) => (
-                  <Link className="log" key={r.date} href={`/daily/${r.date}`}>
+                  <a className="log" key={r.date} href={`/daily/${r.date}`}>
                     <div className="log-top">
                       <span className="log-date">{r.date}</span>
                       <span className={`phase-tag ${REGIME_TAG[r.regime] || 'p-flat'}`}>
@@ -234,11 +236,11 @@ export default function Home({ reports, stats }) {
                     </div>
                     <p className="log-txt">{r.insight}</p>
                     <span className="log-foot">실행 {r.trade_count || 0}건 · 자세히 →</span>
-                  </Link>
+                  </a>
                 ))}
               </div>
               <div style={{ textAlign: 'center', marginTop: 28 }}>
-                <Link className="btn btn-ghost" href="/daily">운영일지 전체 보기 →</Link>
+                <a className="btn btn-ghost" href="/daily">운영일지 전체 보기 →</a>
               </div>
             </div>
           </section>
@@ -260,58 +262,60 @@ export default function Home({ reports, stats }) {
             </div>
           </section>
 
-          {/* PWA PREVIEW */}
+          {/* PWA FUNNEL (콘솔 중복 제거 · 단일 퍼널) */}
           <section>
             <div className="container">
-              <div className="sec-head">
+              <div className="funnel">
                 <p className="eyebrow">THE CONSOLE</p>
-                <h2>주식·ETF·부동산, 한 콘솔에서</h2>
-                <p>세 자산의 분석·배분·리밸런싱·의사결정을 PWA 콘솔에서 통합 운영합니다. 홈페이지는 기록을, 앱은 운영을 담당합니다.</p>
-              </div>
-              <div className="previews">
-                {[
-                  { href: '/pwa/ai-advisor', icon: '🤖', t: 'AI 자산운영', d: '3자산 종합 판단과 리밸런싱 플랜.' },
-                  { href: '/pwa/portfolio', icon: '💼', t: '통합 자산', d: '주식·ETF·부동산 총자산을 한 화면에.' },
-                  { href: '/pwa/etf', icon: '📊', t: 'ETF 자산', d: '실질수익·환차·세금·중복도 분석.' },
-                  { href: '/pwa/realestate', icon: '🏢', t: '부동산 자산', d: 'ONE Score 랭킹·저평가·시장 브리핑.' },
-                  { href: '/pwa', icon: '📈', t: '주식 운영', d: '추천·보유·AI 판단 기록.' },
-                  { href: '/pwa/system-health', icon: '🛡️', t: '시스템 상태', d: '엔진·토큰·스케줄러 헬스체크.' },
-                ].map((p) => (
-                  <Link className="pv" key={p.t} href={p.href}>
-                    <div className="pv-shot">
-                      <span aria-hidden="true">{p.icon}</span>
-                      <span className="pv-badge">LIVE</span>
-                    </div>
-                    <div className="pv-body">
-                      <h3>{p.t}</h3>
-                      <p>{p.d}</p>
-                      <span className="pv-link">앱에서 열기 →</span>
-                    </div>
-                  </Link>
-                ))}
+                <h2 className="funnel-h">운영은 앱에서 — 주식·ETF·부동산을 한 콘솔에서</h2>
+                <p className="funnel-p">
+                  분석·배분·리밸런싱·의사결정은 ONE-HUB PWA 콘솔이 담당합니다. 홈페이지는 기록과 이야기를, 앱은 실제 운영을.
+                </p>
+                <div className="funnel-tags">
+                  <span>🤖 AI 자산운영</span><span>💼 통합 자산</span><span>📊 ETF</span><span>🏢 부동산</span><span>🛡️ 시스템 상태</span>
+                </div>
+                <a href="/pwa" className="btn btn-primary btn-lg" style={{ marginTop: 20 }}>🚀 ONE-HUB 앱 시작하기</a>
+                <p className="funnel-sub">
+                  설치 없이 웹에서 바로 · 홈 화면에 추가하면 실시간 알림까지 ·{' '}
+                  <Link href="/pwa-guide" style={{ color: 'var(--blue)', fontWeight: 700 }}>설치 가이드</Link>
+                </p>
               </div>
             </div>
           </section>
 
-          {/* CONTENT & COMMUNITY */}
+          {/* ACQUISITION CHANNELS (유입 강화) */}
           <section style={{ paddingTop: 0 }}>
             <div className="container">
-              <div className="cc">
-                <div className="cc-card cc-news">
-                  <h3>📮 개발로그 · 인사이트</h3>
-                  <p>1인 기업이 AI 투자 OS를 만들어가는 과정과 시장 인사이트를 기록합니다. &ldquo;머니더버니&rdquo;의 빌드 로그.</p>
-                  <div className="cc-btns">
-                    <Link href="/blog">개발로그 보기 →</Link>
-                  </div>
-                </div>
-                <div className="cc-card cc-comm">
-                  <h3>💬 커뮤니티</h3>
-                  <p>매일의 AI 판단과 리포트를 실시간으로 받아보고, 함께 이야기 나눠요.</p>
-                  <div className="cc-btns">
-                    <a href="https://t.me/onehub" target="_blank" rel="noopener">텔레그램 채널</a>
-                    <a href="https://pf.kakao.com/onehub" target="_blank" rel="noopener">카카오 채널</a>
-                  </div>
-                </div>
+              <div className="sec-head">
+                <p className="eyebrow">FOLLOW ONE-HUB</p>
+                <h2>매일의 판단을, 원하는 채널에서</h2>
+                <p>새 글·리포트·영상은 아래 채널로 먼저 도착합니다. 팔로우하고 ONE-HUB의 성장 과정을 함께 보세요.</p>
+              </div>
+              <div className="channels">
+                <a className="channel" href="https://youtube.com/@onehub" target="_blank" rel="noopener">
+                  <div className="ch-ic">▶️</div>
+                  <div className="ch-t">YouTube</div>
+                  <div className="ch-d">AI 운영 브이로그·시장 브리핑 영상</div>
+                  <span className="ch-cta">구독하기 →</span>
+                </a>
+                <a className="channel" href="/blog">
+                  <div className="ch-ic">✍️</div>
+                  <div className="ch-t">블로그</div>
+                  <div className="ch-d">AI 판단 근거·투자 방법론 아티클</div>
+                  <span className="ch-cta">읽으러 가기 →</span>
+                </a>
+                <a className="channel" href="https://t.me/onehub" target="_blank" rel="noopener">
+                  <div className="ch-ic">✈️</div>
+                  <div className="ch-t">텔레그램</div>
+                  <div className="ch-d">매일 15:30 리포트를 실시간으로</div>
+                  <span className="ch-cta">채널 참여 →</span>
+                </a>
+                <a className="channel" href="/community">
+                  <div className="ch-ic">💬</div>
+                  <div className="ch-t">커뮤니티</div>
+                  <div className="ch-d">뉴스레터·카카오·전체 채널 허브</div>
+                  <span className="ch-cta">전체 보기 →</span>
+                </a>
               </div>
             </div>
           </section>
@@ -328,6 +332,16 @@ export default function Home({ reports, stats }) {
                 <div className="rm">Engine Hub<span>4주차</span></div>
                 <div className="rm">전략 라이브러리<span>4주차</span></div>
                 <div className="rm">참여자 온보딩 위저드<span>예정</span></div>
+              </div>
+            </div>
+          </section>
+          {/* CTA BAND (퍼널 마감) */}
+          <section>
+            <div className="container">
+              <div className="cta-band">
+                <h2 className="cta-h">세 자산, 이제 따로 굴리지 마세요.</h2>
+                <p className="cta-p">주식·ETF·부동산을 하나의 AI로 — 오늘부터 ONE-HUB.</p>
+                <a href="/pwa" className="btn btn-white btn-lg">🚀 무료로 앱 시작하기</a>
               </div>
             </div>
           </section>
@@ -366,7 +380,8 @@ export default function Home({ reports, stats }) {
           min-height:100vh;background:var(--bg);color:var(--ink);
           font-family:'Pretendard',-apple-system,BlinkMacSystemFont,sans-serif;line-height:1.5;
         }
-        .wrap :global(a){text-decoration:none;color:inherit}
+        .wrap :global(a){text-decoration:none}
+        .wrap :global(a:not([class])){color:inherit}
         .container{max-width:var(--maxw);margin:0 auto;padding:0 22px}
         .eyebrow{font-size:12.5px;font-weight:800;letter-spacing:.4px;color:var(--blue);margin-bottom:12px}
         .eyebrow-green{color:#7FE9C0}
@@ -374,6 +389,40 @@ export default function Home({ reports, stats }) {
         .sec-head{text-align:center;max-width:640px;margin:0 auto 40px}
         .sec-head h2{font-size:30px;font-weight:800;letter-spacing:-.6px;line-height:1.3}
         .sec-head p{font-size:15px;color:var(--ink2);margin-top:12px;line-height:1.6}
+
+        /* STORY 티저 */
+        .story-wrap{background:linear-gradient(150deg,var(--hero1),var(--hero2));color:#fff;border-radius:24px;padding:48px 44px;box-shadow:var(--shadow)}
+        .story-eyebrow{font-size:12.5px;font-weight:800;letter-spacing:.5px;color:#7FE9C0;text-transform:uppercase;margin-bottom:14px}
+        .story-title{font-size:28px;font-weight:800;letter-spacing:-.6px;margin-bottom:18px}
+        .story-body{font-size:16px;line-height:1.85;color:#D7E1F3;max-width:780px;margin-bottom:14px}
+        .story-cta{display:inline-block;margin-top:12px;font-size:15px;font-weight:700;color:#7FE9C0}
+        @media(max-width:640px){.story-wrap{padding:32px 24px}.story-title{font-size:22px}.story-body{font-size:15px}}
+
+        /* PWA 퍼널 밴드 */
+        .funnel{background:#fff;border:1px solid var(--line);border-radius:24px;padding:52px 40px;box-shadow:var(--shadow);text-align:center}
+        .funnel-h{font-size:26px;font-weight:800;letter-spacing:-.5px;margin:10px 0 12px;color:var(--ink)}
+        .funnel-p{font-size:15px;color:var(--ink2);max-width:640px;margin:0 auto 20px;line-height:1.65}
+        .funnel-tags{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+        .funnel-tags span{background:var(--blue-soft);color:var(--blue);font-size:13px;font-weight:700;padding:7px 13px;border-radius:11px}
+        .funnel-sub{font-size:13px;color:var(--ink3);margin-top:16px}
+        @media(max-width:640px){.funnel{padding:36px 22px}.funnel-h{font-size:21px}}
+
+        /* 유입 채널 */
+        .channels{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+        .channel{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:5px;transition:transform .15s ease,box-shadow .15s ease}
+        .channel:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(31,63,120,.12)}
+        .ch-ic{font-size:26px;margin-bottom:6px}
+        .ch-t{font-size:16px;font-weight:800;color:var(--ink)}
+        .ch-d{font-size:13px;color:var(--ink2);line-height:1.5;flex:1}
+        .ch-cta{font-size:13px;font-weight:700;color:var(--blue);margin-top:10px}
+        @media(max-width:860px){.channels{grid-template-columns:1fr 1fr}}
+        @media(max-width:520px){.channels{grid-template-columns:1fr}}
+
+        /* 최종 CTA 밴드 */
+        .cta-band{background:linear-gradient(150deg,var(--blue),var(--hero1));color:#fff;border-radius:24px;padding:56px 40px;text-align:center}
+        .cta-h{font-size:28px;font-weight:800;letter-spacing:-.6px;margin-bottom:12px}
+        .cta-p{font-size:15.5px;color:#DCE6FA;margin-bottom:26px}
+        @media(max-width:640px){.cta-band{padding:40px 24px}.cta-h{font-size:22px}}
 
         .nav{position:sticky;top:0;z-index:50;background:rgba(244,249,255,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
         .nav-in{display:flex;align-items:center;justify-content:space-between;height:64px}
