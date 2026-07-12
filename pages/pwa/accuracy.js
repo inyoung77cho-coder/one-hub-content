@@ -1,9 +1,8 @@
-﻿import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
 import { dedupBy } from '../../lib/useDedup';
+import ReportShell from '../../components/shared/ReportShell';
 
 export default function AccuracyPage() {
-  const router = useRouter();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -15,247 +14,251 @@ export default function AccuracyPage() {
   }, []);
 
   const pct = data?.summary?.accuracy_pct;
-  const pctColor = pct == null ? 'var(--color-ink-3)' : pct >= 70 ? 'var(--color-success)' : pct >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
+  const pctTone = pct == null ? 'na' : pct >= 70 ? 'good' : pct >= 50 ? 'warn' : 'bad';
   const pctLabel = pct == null ? '-' : pct >= 70 ? '우수' : pct >= 50 ? '보통' : '개선 필요';
+  const barTone = (p) => (p >= 70 ? 'good' : p >= 50 ? 'warn' : 'bad');
 
   return (
-    <div style={{ minHeight:'100vh', background:'var(--color-bg)', color:'var(--color-ink)',
-                  fontFamily:'Pretendard, sans-serif', paddingBottom:80 }}>
+    <ReportShell title="AI 차단 정확도" sub="AI가 매수를 차단한 종목이 이후 실제로 하락했는지 매주 검증합니다. 적중률과 막아낸 손실, 그리고 큰 오판의 개선 방향을 함께 봅니다.">
+      {loading && <div className="ac-loading">불러오는 중…</div>}
 
-      {/* 헤더 */}
-      <div style={{ background:'var(--color-card)', padding:'16px 20px',
-                    display:'flex', alignItems:'center', gap:12,
-                    borderBottom:'1px solid var(--color-line)', position:'sticky', top:0, zIndex:10 }}>
-        <button onClick={() => router.back()}
-                style={{ background:'none', border:'none', fontSize:20,
-                         cursor:'pointer', color:'var(--color-ink)', lineHeight:1 }}>←</button>
-        <span style={{ fontWeight:700, fontSize:17 }}>AI 차단 정확도</span>
-      </div>
+      {!loading && data?.ok && (() => {
+        const s = data.summary;
+        const recent = data.recent || [];
+        // 큰 오판(차단 후 상승 최대)
+        const bigMiss = recent.filter((r) => r.price_change_pct != null && r.price_change_pct > 0)
+          .sort((a, b) => b.price_change_pct - a.price_change_pct)[0];
 
-      <div style={{ padding:'20px 16px', maxWidth:480, margin:'0 auto' }}>
+        // [A2] 큰 오판 개선 제안 — 취약 사유·최대 오판·전체 캘리브레이션에서 결정론적 산출
+        const improvements = [];
+        const weak = (data.by_reason || []).filter((r) => r.total >= 2 && (r.accuracy_pct ?? 100) < 50)
+          .sort((a, b) => (a.accuracy_pct ?? 0) - (b.accuracy_pct ?? 0));
+        weak.slice(0, 2).forEach((r) => improvements.push({
+          icon: '🎯', title: `'${r.reason || '미분류'}' 사유 기준 강화`,
+          detail: `적중률 ${r.accuracy_pct}%(${r.success}/${r.total}건). 이 신호 단독 차단은 오판이 잦습니다. 거래량·수급 등 보조지표가 함께 악화될 때만 차단하도록 조건을 좁히는 것을 제안합니다.`,
+        }));
+        if (bigMiss) improvements.push({
+          icon: '📈', title: `최대 오판 보정 · ${bigMiss.stock} +${bigMiss.price_change_pct.toFixed(1)}%`,
+          detail: `차단 후 급등한 사례입니다. 차단 시점 '${bigMiss.block_reason || '사유'}' 신호가 반등 모멘텀을 놓쳤습니다. 거래량 급증(평소 2배↑) 구간은 차단 예외로 두는 규칙을 검토합니다.`,
+        });
+        if (pct != null) {
+          if (pct < 60) improvements.push({
+            icon: '🛡️', title: '차단 임계값 상향(정밀도 우선)',
+            detail: `전체 적중률 ${pct}%. 확신이 낮은 경계 케이스까지 차단하면 오판이 늘어납니다. 임계값을 높여 확신 높은 종목만 차단하도록 조정을 제안합니다.`,
+          });
+          else if (pct >= 70) improvements.push({
+            icon: '⏱️', title: '현 기준 유지 · 검증 주기 단축',
+            detail: `적중률 ${pct}%로 양호합니다. 기준은 유지하되 검증을 3거래일→2거래일로 앞당겨 반응성을 높이는 방안을 검토합니다.`,
+          });
+        }
+        if (!improvements.length) improvements.push({
+          icon: '✅', title: '현재 오판 이슈 없음',
+          detail: '큰 오판이나 취약 사유가 확인되지 않았습니다. 현 차단 기준을 유지하며 신규 데이터로 계속 검증합니다.',
+        });
 
-        {loading && (
-          <div style={{ textAlign:'center', padding:60, color:'var(--color-ink-2)', fontSize:14 }}>
-            불러오는 중...
-          </div>
-        )}
-
-        {!loading && data?.ok && (() => {
-          const s = data.summary;
-          return (
-            <>
-              {/* 정확도 요약 카드 */}
-              <div style={{ background:'var(--color-card)', borderRadius:16, padding:24,
-                            marginBottom:16, textAlign:'center',
-                            boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
-                <div style={{ fontSize:13, color:'var(--color-ink-2)', marginBottom:4 }}>
-                  AI 차단 적중률
-                </div>
-                <div style={{ fontSize:64, fontWeight:800, color: pctColor, lineHeight:1.1 }}>
-                  {pct != null ? `${pct}%` : '-'}
-                </div>
-                <div style={{ fontSize:12, color: pctColor, fontWeight:600, marginTop:4 }}>
-                  {pctLabel}
-                </div>
-                <div style={{ fontSize:12, color:'var(--color-ink-2)', marginTop:8 }}>
-                  검증 완료 {s.total_checked}건 중 {s.success_count}건 적중
-                </div>
-
-                {/* 수평 프로그레스바 */}
-                <div style={{ margin:'16px 0 4px', height:8, background:'var(--color-bg)',
-                              borderRadius:4, overflow:'hidden' }}>
-                  <div style={{ height:'100%', width:`${pct || 0}%`,
-                                background: pctColor, borderRadius:4,
-                                transition:'width 0.8s ease' }} />
-                </div>
-
-                {/* 3개 통계 */}
-                <div style={{ display:'flex', justifyContent:'space-around', marginTop:16 }}>
-                  {[
-                    { label:'총 차단', value: s.total_blocked, color:'var(--color-ink)' },
-                    { label:'✓ 적중', value: s.success_count, color:'var(--color-success)' },
-                    { label:'✗ 오판', value: s.fail_count,    color:'var(--color-danger)' },
-                  ].map(stat => (
-                    <div key={stat.label} style={{ textAlign:'center' }}>
-                      <div style={{ fontWeight:800, fontSize:22, color: stat.color }}>
-                        {stat.value}
-                      </div>
-                      <div style={{ fontSize:11, color:'var(--color-ink-2)', marginTop:2 }}>
-                        {stat.label}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* [S7.6] 회피손실 합계 — 적중률만의 오해 방지(차단 적중이 실제로 막은 손실) */}
-                {(() => {
-                  const recent = data.recent || [];
-                  const hits = recent.filter((r) => r.price_change_pct != null && r.price_change_pct < 0);
-                  const avoidedPct = s.avoided_loss_pct != null ? s.avoided_loss_pct
-                    : (hits.length ? hits.reduce((a, r) => a + Math.abs(r.price_change_pct), 0) : null);
-                  const est = s.avoided_loss_pct == null;
-                  if (avoidedPct == null) return null;
-                  return (
-                    <div style={{ marginTop:16, paddingTop:14, borderTop:'1px solid var(--color-line)',
-                                  fontSize:12.5, color:'var(--color-ink-2)', lineHeight:1.55, textAlign:'left' }}>
-                      🛡️ 차단 적중 <b style={{ color:'var(--color-ink)' }}>{s.success_count}건</b>으로 약{' '}
-                      <b style={{ color:'var(--color-primary)' }}>-{Number(avoidedPct).toFixed(1)}%</b> 손실을 회피했습니다.
-                      {est && <span style={{ fontSize:10.5, fontWeight:800, color:'var(--color-warning-ink)',
-                        background:'var(--color-warning-soft)', padding:'1px 6px', borderRadius:5, marginLeft:6 }}>추정</span>}
-                      <div style={{ fontSize:11, color:'var(--color-ink-3)', marginTop:4 }}>적중률뿐 아니라 <b>막아낸 손실 크기</b>로 차단의 실효를 봅니다{est ? ' (검증 하락분 합산 추정)' : ''}.</div>
-                    </div>
-                  );
-                })()}
+        return (
+          <>
+            {/* 정확도 요약 카드 */}
+            <section className="ac-card ac-hero">
+              <div className="ac-hero-lbl">AI 차단 적중률</div>
+              <div className={`ac-hero-pct ${pctTone}`}>{pct != null ? `${pct}%` : '-'}</div>
+              <div className={`ac-hero-tag ${pctTone}`}>{pctLabel}</div>
+              <div className="ac-hero-sub">검증 완료 {s.total_checked}건 중 {s.success_count}건 적중</div>
+              <div className="ac-bar"><div className={`ac-bar-fill ${pctTone}`} style={{ width: `${pct || 0}%` }} /></div>
+              <div className="ac-stats">
+                {[
+                  { label: '총 차단', value: s.total_blocked, tone: '' },
+                  { label: '✓ 적중', value: s.success_count, tone: 'good' },
+                  { label: '✗ 오판', value: s.fail_count, tone: 'bad' },
+                ].map((stat) => (
+                  <div className="ac-stat" key={stat.label}>
+                    <div className={`ac-stat-v ${stat.tone}`}>{stat.value}</div>
+                    <div className="ac-stat-k">{stat.label}</div>
+                  </div>
+                ))}
               </div>
-
-              {/* [S7.6] 큰 오판 → 개선노트 링크 — 실패의 투명한 서사화 */}
+              {/* [S7.6] 회피손실 합계 — 적중률만의 오해 방지 */}
               {(() => {
-                const recent = data.recent || [];
-                const bigMiss = recent.filter((r) => r.price_change_pct != null && r.price_change_pct > 0)
-                  .sort((a, b) => b.price_change_pct - a.price_change_pct)[0];
-                if (!bigMiss) return null;
+                const hits = recent.filter((r) => r.price_change_pct != null && r.price_change_pct < 0);
+                const avoidedPct = s.avoided_loss_pct != null ? s.avoided_loss_pct
+                  : (hits.length ? hits.reduce((a, r) => a + Math.abs(r.price_change_pct), 0) : null);
+                const est = s.avoided_loss_pct == null;
+                if (avoidedPct == null) return null;
                 return (
-                  <button onClick={() => router.push('/pwa?tab=report')} style={{ width:'100%', textAlign:'left',
-                    background:'var(--color-danger-soft)', border:'1px solid var(--color-danger)', borderRadius:14,
-                    padding:'13px 15px', marginBottom:16, cursor:'pointer', fontFamily:'var(--font-sans)' }}>
-                    <div style={{ fontSize:13, fontWeight:800, color:'var(--color-danger)' }}>
-                      🔧 큰 오판 · {bigMiss.stock} +{bigMiss.price_change_pct.toFixed(1)}%
-                    </div>
-                    <div style={{ fontSize:11.5, color:'var(--color-ink-2)', marginTop:4 }}>
-                      차단 후 상승한 종목입니다. AI가 이 오판을 어떻게 보정 중인지 개선노트에서 확인 →
-                    </div>
-                  </button>
+                  <div className="ac-avoid">
+                    🛡️ 차단 적중 <b>{s.success_count}건</b>으로 약 <b className="hl">-{Number(avoidedPct).toFixed(1)}%</b> 손실을 회피했습니다.
+                    {est && <span className="ac-est">추정</span>}
+                    <div className="ac-avoid-note">적중률뿐 아니라 <b>막아낸 손실 크기</b>로 차단의 실효를 봅니다{est ? ' (검증 하락분 합산 추정)' : ''}.</div>
+                  </div>
                 );
               })()}
+            </section>
 
-              {/* 사유별 정확도 */}
-              <div style={{ background:'var(--color-card)', borderRadius:16, padding:20,
-                            marginBottom:16, boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
-                <div style={{ fontWeight:700, fontSize:14, marginBottom:14 }}>차단 사유별 적중률</div>
-                {data.by_reason.map((r, i) => {
-                  const p = r.accuracy_pct || 0;
-                  const c = p >= 70 ? 'var(--color-success)' : p >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
-                  return (
-                    <div key={i} style={{ marginBottom: i < data.by_reason.length-1 ? 14 : 0 }}>
-                      <div style={{ display:'flex', justifyContent:'space-between',
-                                    fontSize:12, marginBottom:5, alignItems:'center' }}>
-                        <span style={{ color:'var(--color-ink)', fontWeight:500,
-                                       maxWidth:'65%', overflow:'hidden',
-                                       textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                          {r.reason || '(미분류)'}
-                        </span>
-                        <span style={{ fontWeight:700, color: c, whiteSpace:'nowrap' }}>
-                          {r.accuracy_pct != null ? `${r.accuracy_pct}%` : '-'}
-                          <span style={{ color:'var(--color-ink-2)', fontWeight:400,
-                                         marginLeft:4, fontSize:11 }}>
-                            {r.success}/{r.total}건
-                          </span>
-                        </span>
-                      </div>
-                      <div style={{ height:6, background:'var(--color-bg)', borderRadius:3, overflow:'hidden' }}>
-                        <div style={{ height:'100%', width:`${p}%`,
-                                      background: c, borderRadius:3,
-                                      transition:'width 0.6s ease' }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* 최근 차단 내역 */}
-              <div style={{ background:'var(--color-card)', borderRadius:16, padding:20,
-                            boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
-                <div style={{ fontWeight:700, fontSize:14, marginBottom:14 }}>
-                  최근 차단 내역 (최근 20건)
-                </div>
-                {/* [S1.4] 종목코드+차단일 기준 공용 dedup(이중 방어) + 부호 단일 채점 */}
-                {(() => {
-                  const list = dedupBy(data.recent, (r) => `${r.code || r.stock}-${r.block_date || ""}`);
-                  // 채점은 검증가-차단가 부호로 통일: 하락=적중 / 상승=오판 / 보합=보합
-                  const verdict = (r) => {
-                    if (r.price_change_pct == null) return "unchecked";
-                    if (r.price_change_pct < 0) return "hit";
-                    if (r.price_change_pct > 0) return "miss";
-                    return "flat";
-                  };
-                  const V = { hit:  { t:"✓ 적중", bg:"var(--color-success-soft)", c:"var(--color-success-ink)" },
-                              miss: { t:"✗ 오판", bg:"var(--color-danger-soft)",  c:"var(--color-danger)" },
-                              flat: { t:"― 보합", bg:"var(--color-card-soft)",     c:"var(--color-ink-2)" },
-                              unchecked: { t:"미검증", bg:"var(--color-bg)",       c:"var(--color-ink-2)" } };
-                  return list.map((r, i) => { const v = V[verdict(r)]; return (
-                  <div key={`${r.code || r.stock}-${r.block_date || i}`} style={{
-                    padding:'12px 0',
-                    borderBottom: i < list.length-1 ? '1px solid var(--color-line)' : 'none'
-                  }}>
-                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start' }}>
-                      <div>
-                        <span style={{ fontWeight:700, fontSize:14 }}>{r.stock}</span>
-                        <span style={{ fontSize:11, color:'var(--color-ink-2)', marginLeft:6 }}>
-                          {r.code}
-                        </span>
-                      </div>
-                      <span style={{
-                        fontSize:11, fontWeight:700, padding:'2px 10px', borderRadius:20,
-                        background: v.bg, color: v.c
-                      }}>{v.t}</span>
-                    </div>
-                    <div style={{ fontSize:11, color:'var(--color-ink-2)', marginTop:3 }}>
-                      {r.block_reason}
-                    </div>
-                    <div style={{ display:'flex', gap:12, marginTop:5, fontSize:12, flexWrap:'wrap' }}>
-                      <span>차단가 <b>{r.block_price?.toLocaleString()}원</b></span>
-                      {r.check_price && (
-                        <span>검증가 <b>{r.check_price?.toLocaleString()}원</b></span>
-                      )}
-                      {r.price_change_pct != null && (
-                        <span style={{
-                          fontWeight:700,
-                          color: r.price_change_pct < 0 ? 'var(--color-primary)' : r.price_change_pct > 0 ? 'var(--color-danger)' : 'var(--color-ink-2)'
-                        }}>
-                          {r.price_change_pct > 0 ? '+' : ''}{r.price_change_pct?.toFixed(2)}%
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ fontSize:10, color:'var(--color-ink-2)', marginTop:3 }}>
-                      {r.block_date?.slice(0,10)} → {r.check_date || '미검증'}
+            {/* [A2] 큰 오판 개선 제안 */}
+            <section className="ac-card ac-improve">
+              <div className="ac-card-h">🔧 큰 오판 · 향후 개선 제안</div>
+              <div className="ac-imp-list">
+                {improvements.map((im, i) => (
+                  <div className="ac-imp" key={i}>
+                    <span className="ac-imp-ic">{im.icon}</span>
+                    <div className="ac-imp-body">
+                      <div className="ac-imp-t">{im.title}</div>
+                      <div className="ac-imp-d">{im.detail}</div>
                     </div>
                   </div>
-                ); }); })()}
+                ))}
               </div>
+              <div className="ac-imp-foot">개선 제안은 최근 검증 결과에서 자동 산출됩니다. 실제 차단 기준 반영은 주간 리뷰에서 확정됩니다.</div>
+            </section>
 
-              {/* 안내 문구 */}
-              <div style={{ marginTop:16, padding:'12px 16px', background:'var(--color-card)',
-                            borderRadius:12, fontSize:11, color:'var(--color-ink-2)',
-                            lineHeight:1.6 }}>
-                * 적중: AI가 차단한 종목이 이후 하락한 경우<br/>
-                * 오판: AI가 차단했으나 이후 상승한 경우<br/>
-                * 보합: 변동 0.00% (적중·오판 어느 쪽도 아님, 별도 집계)<br/>
-                * 채점은 검증가−차단가 부호로 통일 · 매주 월요일 자동 검증(차단 후 3거래일 기준)
-              </div>
-            </>
-          );
-        })()}
+            {/* 사유별 적중률 */}
+            <section className="ac-card">
+              <div className="ac-card-h">차단 사유별 적중률</div>
+              {data.by_reason.map((r, i) => {
+                const p = r.accuracy_pct || 0;
+                const t = barTone(p);
+                return (
+                  <div className="ac-reason" key={i}>
+                    <div className="ac-reason-top">
+                      <span className="ac-reason-k">{r.reason || '(미분류)'}</span>
+                      <span className={`ac-reason-p ${t}`}>{r.accuracy_pct != null ? `${r.accuracy_pct}%` : '-'}<span className="ac-reason-n">{r.success}/{r.total}건</span></span>
+                    </div>
+                    <div className="ac-bar sm"><div className={`ac-bar-fill ${t}`} style={{ width: `${p}%` }} /></div>
+                  </div>
+                );
+              })}
+            </section>
 
-        {!loading && (!data || !data.ok) && (
-          <div style={{ background:'var(--color-card)', borderRadius:16, padding:'40px 24px',
-                        textAlign:'center', boxShadow:'0 2px 12px rgba(0,0,0,0.06)' }}>
-            <div style={{ fontSize:40, marginBottom:16 }}>🔄</div>
-            <div style={{ fontSize:17, fontWeight:700, color:'var(--color-ink)', marginBottom:8 }}>
-              데이터 수집 중
+            {/* 최근 차단 내역 */}
+            <section className="ac-card">
+              <div className="ac-card-h">최근 차단 내역 <span className="ac-card-sub">최근 20건</span></div>
+              {(() => {
+                const list = dedupBy(data.recent, (r) => `${r.code || r.stock}-${r.block_date || ''}`);
+                const verdict = (r) => {
+                  if (r.price_change_pct == null) return 'unchecked';
+                  if (r.price_change_pct < 0) return 'hit';
+                  if (r.price_change_pct > 0) return 'miss';
+                  return 'flat';
+                };
+                const V = {
+                  hit: { t: '✓ 적중', cls: 'hit' }, miss: { t: '✗ 오판', cls: 'miss' },
+                  flat: { t: '― 보합', cls: 'flat' }, unchecked: { t: '미검증', cls: 'flat' },
+                };
+                return list.map((r, i) => {
+                  const v = V[verdict(r)];
+                  return (
+                    <div className={`ac-rec ${i < list.length - 1 ? 'div' : ''}`} key={`${r.code || r.stock}-${r.block_date || i}`}>
+                      <div className="ac-rec-top">
+                        <div><b className="ac-rec-name">{r.stock}</b><span className="ac-rec-code">{r.code}</span></div>
+                        <span className={`ac-verdict ${v.cls}`}>{v.t}</span>
+                      </div>
+                      <div className="ac-rec-reason">{r.block_reason}</div>
+                      <div className="ac-rec-prices">
+                        <span>차단가 <b>{r.block_price?.toLocaleString()}원</b></span>
+                        {r.check_price && <span>검증가 <b>{r.check_price?.toLocaleString()}원</b></span>}
+                        {r.price_change_pct != null && (
+                          <span className={`ac-rec-chg ${r.price_change_pct < 0 ? 'good' : r.price_change_pct > 0 ? 'bad' : ''}`}>
+                            {r.price_change_pct > 0 ? '+' : ''}{r.price_change_pct?.toFixed(2)}%
+                          </span>
+                        )}
+                      </div>
+                      <div className="ac-rec-date">{r.block_date?.slice(0, 10)} → {r.check_date || '미검증'}</div>
+                    </div>
+                  );
+                });
+              })()}
+            </section>
+
+            {/* 안내 문구 */}
+            <div className="ac-legend">
+              * 적중: AI가 차단한 종목이 이후 하락한 경우<br />
+              * 오판: AI가 차단했으나 이후 상승한 경우<br />
+              * 보합: 변동 0.00% (적중·오판 어느 쪽도 아님, 별도 집계)<br />
+              * 채점은 검증가−차단가 부호로 통일 · 매주 월요일 자동 검증(차단 후 3거래일 기준)
             </div>
-            <div style={{ fontSize:13, color:'var(--color-ink-2)', lineHeight:1.7, marginBottom:16 }}>
-              첫 통계는 <strong>5건 이상</strong> 거래 완료 후 표시됩니다.<br/>
-              AI가 매일 종목을 차단하고 3거래일 후 검증합니다.
-            </div>
-            {data?.total_blocked != null && (
-              <div style={{ display:'inline-block', padding:'8px 20px', borderRadius:20,
-                            background:'var(--color-primary-soft)', color:'var(--color-primary)', fontSize:13, fontWeight:700 }}>
-                현재 수집된 차단 기록: {data.total_blocked}건
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+          </>
+        );
+      })()}
+
+      {!loading && (!data || !data.ok) && (
+        <section className="ac-card ac-empty">
+          <div className="ac-empty-ic">🔄</div>
+          <div className="ac-empty-t">데이터 수집 중</div>
+          <div className="ac-empty-d">첫 통계는 <b>5건 이상</b> 거래 완료 후 표시됩니다.<br />AI가 매일 종목을 차단하고 3거래일 후 검증합니다.</div>
+          {data?.total_blocked != null && <div className="ac-empty-badge">현재 수집된 차단 기록: {data.total_blocked}건</div>}
+        </section>
+      )}
+
+      <style jsx>{`
+        .ac-loading { text-align: center; padding: 60px 0; color: var(--color-ink-2); font-size: 0.88rem; }
+        .ac-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 18px; margin-bottom: 14px; }
+        .ac-card-h { font-weight: 800; font-size: 0.92rem; color: var(--color-ink); margin-bottom: 13px; display: flex; align-items: baseline; gap: 7px; }
+        .ac-card-sub { font-size: 0.7rem; font-weight: 700; color: var(--color-ink-3); }
+        /* 히어로 요약 */
+        .ac-hero { text-align: center; }
+        .ac-hero-lbl { font-size: 0.8rem; color: var(--color-ink-2); margin-bottom: 4px; }
+        .ac-hero-pct { font-size: 3.7rem; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
+        .ac-hero-tag { font-size: 0.76rem; font-weight: 700; margin-top: 4px; }
+        .ac-hero-sub { font-size: 0.76rem; color: var(--color-ink-2); margin-top: 8px; }
+        .good { color: var(--color-success); }
+        .warn { color: var(--color-warning); }
+        .bad { color: var(--color-danger); }
+        .na { color: var(--color-ink-3); }
+        .ac-bar { height: 8px; background: var(--color-bg); border-radius: 4px; overflow: hidden; margin: 15px 0 4px; }
+        .ac-bar.sm { height: 6px; margin: 0; }
+        .ac-bar-fill { height: 100%; border-radius: 4px; transition: width 0.7s ease; background: var(--color-ink-3); }
+        .ac-bar-fill.good { background: var(--color-success); }
+        .ac-bar-fill.warn { background: var(--color-warning); }
+        .ac-bar-fill.bad { background: var(--color-danger); }
+        .ac-stats { display: flex; justify-content: space-around; margin-top: 16px; }
+        .ac-stat-v { font-weight: 800; font-size: 1.4rem; color: var(--color-ink); }
+        .ac-stat-k { font-size: 0.68rem; color: var(--color-ink-2); margin-top: 2px; }
+        .ac-avoid { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--color-line); font-size: 0.78rem; color: var(--color-ink-2); line-height: 1.55; text-align: left; }
+        .ac-avoid b { color: var(--color-ink); }
+        .ac-avoid b.hl { color: var(--color-primary); }
+        .ac-est { font-size: 0.62rem; font-weight: 800; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 1px 6px; border-radius: 5px; margin-left: 6px; }
+        .ac-avoid-note { font-size: 0.68rem; color: var(--color-ink-3); margin-top: 4px; }
+        /* [A2] 개선 제안 */
+        .ac-improve { border-left: 4px solid var(--color-danger); }
+        .ac-imp-list { display: flex; flex-direction: column; gap: 9px; }
+        .ac-imp { display: flex; gap: 10px; align-items: flex-start; background: var(--color-card-soft); border-radius: 12px; padding: 12px 13px; }
+        .ac-imp-ic { font-size: 1.05rem; line-height: 1.3; flex-shrink: 0; }
+        .ac-imp-body { flex: 1; min-width: 0; }
+        .ac-imp-t { font-size: 0.85rem; font-weight: 800; color: var(--color-ink); }
+        .ac-imp-d { font-size: 0.75rem; color: var(--color-ink-2); line-height: 1.55; margin-top: 3px; word-break: keep-all; }
+        .ac-imp-foot { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 11px; line-height: 1.5; word-break: keep-all; }
+        /* 사유별 */
+        .ac-reason { margin-bottom: 13px; }
+        .ac-reason:last-child { margin-bottom: 0; }
+        .ac-reason-top { display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem; margin-bottom: 5px; }
+        .ac-reason-k { color: var(--color-ink); font-weight: 500; max-width: 62%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ac-reason-p { font-weight: 800; white-space: nowrap; }
+        .ac-reason-n { color: var(--color-ink-2); font-weight: 500; margin-left: 4px; font-size: 0.68rem; }
+        /* 최근 내역 */
+        .ac-rec { padding: 12px 0; }
+        .ac-rec.div { border-bottom: 1px solid var(--color-line); }
+        .ac-rec-top { display: flex; justify-content: space-between; align-items: flex-start; }
+        .ac-rec-name { font-weight: 700; font-size: 0.86rem; color: var(--color-ink); }
+        .ac-rec-code { font-size: 0.68rem; color: var(--color-ink-2); margin-left: 6px; }
+        .ac-verdict { font-size: 0.68rem; font-weight: 700; padding: 2px 10px; border-radius: 20px; white-space: nowrap; }
+        .ac-verdict.hit { background: var(--color-success-soft); color: var(--color-success-ink); }
+        .ac-verdict.miss { background: var(--color-danger-soft); color: var(--color-danger); }
+        .ac-verdict.flat { background: var(--color-card-soft); color: var(--color-ink-2); }
+        .ac-rec-reason { font-size: 0.7rem; color: var(--color-ink-2); margin-top: 3px; }
+        .ac-rec-prices { display: flex; gap: 12px; margin-top: 5px; font-size: 0.76rem; flex-wrap: wrap; }
+        .ac-rec-prices b { color: var(--color-ink); }
+        .ac-rec-chg { font-weight: 700; }
+        .ac-rec-chg.good { color: var(--color-primary); }
+        .ac-rec-chg.bad { color: var(--color-danger); }
+        .ac-rec-date { font-size: 0.62rem; color: var(--color-ink-3); margin-top: 3px; }
+        .ac-legend { margin-top: 4px; padding: 13px 16px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; font-size: 0.68rem; color: var(--color-ink-2); line-height: 1.6; }
+        /* 빈 상태 */
+        .ac-empty { text-align: center; padding: 40px 24px; }
+        .ac-empty-ic { font-size: 2.4rem; margin-bottom: 14px; }
+        .ac-empty-t { font-size: 1.05rem; font-weight: 700; color: var(--color-ink); margin-bottom: 8px; }
+        .ac-empty-d { font-size: 0.82rem; color: var(--color-ink-2); line-height: 1.7; margin-bottom: 16px; }
+        .ac-empty-badge { display: inline-block; padding: 8px 20px; border-radius: 20px; background: var(--color-primary-soft); color: var(--color-primary); font-size: 0.8rem; font-weight: 700; }
+      `}</style>
+    </ReportShell>
   );
 }

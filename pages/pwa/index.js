@@ -950,26 +950,14 @@ export default function PWADashboard({ latestReport }) {
                       <div className="mp-chip">
                         <span className="mp-ck">🌡️ 시장온도</span>
                         <span className="mp-cv" style={{ color: htColor }}>{heat ?? '-'} {htLabel ? `· ${htLabel}` : ''}</span>
+                        {heat != null && <div className="mini-g heat"><span className="mini-dot" style={{ left: `${Math.max(0, Math.min(100, heat))}%` }} /></div>}
                       </div>
                       <div className="mp-chip">
                         <span className="mp-ck">😨 공포·탐욕</span>
                         <span className="mp-cv" style={{ color: fgColor(fearGreed) }}>{fearGreed ?? '-'} {fearGreed != null ? `· ${fgLabel(fearGreed)}` : ''}</span>
+                        {fearGreed != null && <div className="mini-g fg"><span className="mini-dot" style={{ left: `${Math.max(0, Math.min(100, fearGreed))}%`, background: fgColor(fearGreed) }} /></div>}
                       </div>
                     </div>
-                    {/* [공포탐욕 게이지] 0 극공포 → 100 극탐욕, 현재 위치를 바 위 마커로 표시 */}
-                    {fearGreed != null && (
-                      <div className="fg-bar">
-                        <div className="fg-track">
-                          {[['극공포', 25], ['공포', 20], ['중립', 10], ['탐욕', 20], ['극탐욕', 25]].map(([lb, w], i) => (
-                            <span className={`fg-zone z${i + 1}`} style={{ flexBasis: `${w}%` }} key={lb}>{lb}</span>
-                          ))}
-                          <span className="fg-marker" style={{ left: `${Math.max(0, Math.min(100, fearGreed))}%` }}>
-                            <span className="fg-pin" style={{ background: fgColor(fearGreed) }}>{fearGreed}</span>
-                          </span>
-                        </div>
-                        <div className="fg-scale"><span>0 극공포</span><span>50 중립</span><span>100 극탐욕</span></div>
-                      </div>
-                    )}
                     <div className="mp-read">{pulseRead}</div>
                     <div className="mp-foot">
                       {vix != null && <span className="mp-tag">VIX {vix}</span>}
@@ -1321,13 +1309,11 @@ export default function PWADashboard({ latestReport }) {
                               onClick={(e) => { e.stopPropagation(); setTab('analyze'); runAnalyze(s.code, s.name); }}
                             >{s.name}</button>
                             <div className="top3-ai-pct mono">관심도 {sc}</div>
-                            {/* [S7.2] 관심도 5신호 점등 */}
-                            <div className="sig5" title="MA·RSI·볼린저·거래량·수급">
-                              {sig5(s).map((on, k) => <span key={k} className={`sig-dot ${on === true ? 'on' : on === false ? 'off' : 'na'}`}>{SIG_LBL[k]}</span>)}
-                            </div>
                             <span className="top3-stance" style={{ color: m.stance.color, borderColor: m.stance.color }}>{m.stance.label}</span>
+                            {/* [S2 가치화] 왜 지금 관심인지 근거 1줄(간결) — 카드만 보고도 판단 */}
                             <div className="top3-reason">{m.reason}</div>
-                            <div className="top3-upside">기대 <b>~+{m.upside}%</b><span className="est">추정</span></div>
+                            {/* [간결화] 모바일 오버플로우 원인이던 5아이콘 제거 → 기대수익률만 크게 강조 */}
+                            <div className="top3-upside-lg"><span className="tu-k">기대수익</span><b>~+{m.upside}%</b><span className="est">추정</span></div>
                             <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>목표가·상세 →</button>
                             {/* [나 vs AI] 내 판단 기록 — 샀어요/안 샀어요 */}
                             {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (
@@ -2811,18 +2797,11 @@ export default function PWADashboard({ latestReport }) {
         .mp-chip.bear { border-color: color-mix(in srgb, var(--color-danger) 40%, transparent); }
         .mp-ck { font-size: 10.5px; color: var(--color-ink-3); font-weight: 700; white-space: nowrap; }
         .mp-cv { font-size: 13px; font-weight: 800; color: var(--color-ink); word-break: keep-all; }
-        /* [공포탐욕 게이지] */
-        .fg-bar { margin-top: 12px; }
-        .fg-track { position: relative; display: flex; height: 20px; border-radius: 6px; overflow: hidden; }
-        .fg-zone { display: flex; align-items: center; justify-content: center; font-size: 8.5px; font-weight: 800; color: #fff; letter-spacing: -.3px; white-space: nowrap; }
-        .fg-zone.z1 { background: var(--color-danger); }
-        .fg-zone.z2 { background: color-mix(in srgb, var(--color-danger) 60%, var(--color-warning)); }
-        .fg-zone.z3 { background: var(--color-ink-3); }
-        .fg-zone.z4 { background: color-mix(in srgb, var(--color-success) 60%, var(--color-warning)); }
-        .fg-zone.z5 { background: var(--color-success); }
-        .fg-marker { position: absolute; top: -4px; bottom: -4px; width: 0; transform: translateX(-50%); display: flex; align-items: flex-start; justify-content: center; }
-        .fg-pin { font-size: 10px; font-weight: 800; color: #fff; padding: 2px 6px; border-radius: 6px; border: 2px solid var(--color-card); box-shadow: var(--shadow-card); transform: translateY(-8px); font-family: ui-monospace, monospace; }
-        .fg-scale { display: flex; justify-content: space-between; font-size: 9px; color: var(--color-ink-3); font-weight: 600; margin-top: 10px; }
+        /* [미니 게이지] 시장온도·공포탐욕 카드 안 소형 위치바 */
+        .mini-g { position: relative; height: 5px; border-radius: 3px; margin-top: 7px; }
+        .mini-g.fg { background: linear-gradient(90deg, var(--color-danger), var(--color-ink-3) 50%, var(--color-success)); }
+        .mini-g.heat { background: linear-gradient(90deg, var(--color-success), var(--color-warning) 55%, var(--color-danger)); }
+        .mini-dot { position: absolute; top: 50%; width: 9px; height: 9px; border-radius: 50%; background: var(--color-ink); border: 2px solid var(--color-card); transform: translate(-50%, -50%); box-shadow: 0 0 0 1px var(--color-line); }
         .mp-read { margin-top: 11px; font-size: 12.5px; font-weight: 600; background: var(--color-primary-soft); color: var(--color-primary); border-radius: 10px; padding: 9px 12px; line-height: 1.45; word-break: keep-all; }
         .mp-foot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
         .mp-tag { font-size: 10.5px; font-weight: 700; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 999px; padding: 3px 9px; }
@@ -2993,6 +2972,11 @@ export default function PWADashboard({ latestReport }) {
         .top3-upside { font-size: 0.66rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
         .top3-upside b { color: var(--color-success); font-weight: 800; }
         .top3-upside .est { font-size: 0.54rem; color: var(--text-tertiary); border: 1px solid var(--border); border-radius: 4px; padding: 0 3px; }
+        /* [간결화] 기대수익 강조(카드 값 축) */
+        .top3-upside-lg { display: flex; flex-direction: column; align-items: center; gap: 1px; margin-top: 2px; }
+        .top3-upside-lg .tu-k { font-size: 0.54rem; color: var(--text-tertiary); font-weight: 700; }
+        .top3-upside-lg b { font-size: 0.95rem; color: var(--color-success); font-weight: 800; font-variant-numeric: tabular-nums; }
+        .top3-upside-lg .est { font-size: 0.5rem; color: var(--text-tertiary); border: 1px solid var(--border); border-radius: 4px; padding: 0 3px; }
         .rec-rest-h { font-size: 0.68rem; font-weight: 700; color: var(--text-tertiary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
         .rec-rest-list { display: flex; flex-direction: column; gap: 6px; }
         .rec-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: var(--inset-bg); border-radius: 10px; }
