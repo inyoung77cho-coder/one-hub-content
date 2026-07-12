@@ -63,13 +63,14 @@ export function StockForm({ onSaved, autofocusName = false }) {
   const [price, setPrice] = useState("");
   const [broker, setBroker] = useState(STOCK_BROKERS[0]);
   const [account, setAccount] = useState("일반");
+  const [buyDate, setBuyDate] = useState("");
   const [msg, setMsg] = useState("");
   const suggest = useSuggest("stock", name);
   const ccy = market === "us" ? "USD" : "KRW";
 
   const save = () => {
     const tr = getTrader();
-    const res = buyStock({ name, code, shares, avgPrice: price, ccy, broker, market, account, trader: tr });
+    const res = buyStock({ name, code, shares, avgPrice: price, ccy, broker, market, account, buyDate, trader: tr });
     if (!res.ok) { setMsg("⚠️ " + res.error); return; }
     // 총자산 근사 반영(원화 기준만). 해외(USD)는 ETF와 동일하게 페이지 실측에 위임.
     if (ccy === "KRW") {
@@ -77,7 +78,7 @@ export function StockForm({ onSaved, autofocusName = false }) {
       const onb = readOnb(); onb.stock_uk = Number(((Number(onb.stock_uk) || 0) + addUk).toFixed(4)); writeOnb(onb);
     }
     broadcast();
-    setMsg(""); setName(""); setCode(""); setShares(""); setPrice("");
+    setMsg(""); setName(""); setCode(""); setShares(""); setPrice(""); setBuyDate("");
     if (onSaved) onSaved("stock");
   };
 
@@ -101,8 +102,11 @@ export function StockForm({ onSaved, autofocusName = false }) {
         <label className="af-f"><span>증권사</span>
           <select value={broker} onChange={(e) => setBroker(e.target.value)}>{STOCK_BROKERS.map((b) => <option key={b} value={b}>{b}</option>)}</select></label>
       </div>
-      <label className="af-f"><span>계좌</span>
-        <select value={account} onChange={(e) => setAccount(e.target.value)}>{ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}</select></label>
+      <div className="af-row">
+        <label className="af-f"><span>계좌</span>
+          <select value={account} onChange={(e) => setAccount(e.target.value)}>{ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}</select></label>
+        <label className="af-f"><span>매수일<em>성과비교용</em></span><input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} /></label>
+      </div>
       {Number(shares) > 0 && Number(price) > 0 && (
         <div className="af-calc">평가액 ≈ <b>{ccy === "USD" ? `$${(Number(shares) * Number(price)).toLocaleString()}` : `${((Number(shares) * Number(price)) / 1e8).toFixed(2)}억`}</b> <span>(수량 × 평단)</span></div>
       )}
@@ -122,13 +126,14 @@ export function EtfForm({ onSaved }) {
   const [ccy, setCcy] = useState("USD");
   const [account, setAccount] = useState("일반");
   const [broker, setBroker] = useState(STOCK_BROKERS[0]);
+  const [buyDate, setBuyDate] = useState("");
   const [msg, setMsg] = useState("");
 
   const save = () => {
     const tr = getTrader();
     const mkt = market === "kr" || market === "us" ? market : inferMarket(ticker);
     const res = side === "buy"
-      ? buyEtf({ ticker, market: mkt, shares, avgPrice: price, avgCcy: ccy, account, broker, trader: tr })
+      ? buyEtf({ ticker, market: mkt, shares, avgPrice: price, avgCcy: ccy, account, broker, buyDate, trader: tr })
       : sellEtf({ ticker, shares, account, trader: tr });
     if (!res?.ok) { setMsg("⚠️ " + (res?.error || "입력 오류")); return; }
     if (side === "buy" && ccy === "KRW") {
@@ -136,7 +141,7 @@ export function EtfForm({ onSaved }) {
       const onb = readOnb(); onb.etf_uk = Number(((Number(onb.etf_uk) || 0) + addUk).toFixed(4)); writeOnb(onb);
     }
     broadcast();
-    setMsg(""); setTicker(""); setShares(""); setPrice("");
+    setMsg(""); setTicker(""); setShares(""); setPrice(""); setBuyDate("");
     if (onSaved) onSaved("etf");
   };
 
@@ -167,8 +172,11 @@ export function EtfForm({ onSaved }) {
             <label className="af-f"><span>통화</span>
               <select value={ccy} onChange={(e) => setCcy(e.target.value)}><option value="USD">USD</option><option value="KRW">KRW</option></select></label>
           </div>
-          <label className="af-f"><span>증권사<em>연금·ISA 구분</em></span>
-            <select value={broker} onChange={(e) => setBroker(e.target.value)}>{STOCK_BROKERS.map((b) => <option key={b} value={b}>{b}</option>)}</select></label>
+          <div className="af-row">
+            <label className="af-f"><span>증권사<em>연금·ISA 구분</em></span>
+              <select value={broker} onChange={(e) => setBroker(e.target.value)}>{STOCK_BROKERS.map((b) => <option key={b} value={b}>{b}</option>)}</select></label>
+            <label className="af-f"><span>매수일<em>성과비교용</em></span><input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} /></label>
+          </div>
         </>
       )}
       {msg && <div className="af-msg err">{msg}</div>}
