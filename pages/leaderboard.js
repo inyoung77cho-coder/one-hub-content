@@ -1,5 +1,8 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import fs from 'fs';
+import path from 'path';
+import matter from 'gray-matter';
 import PageHero from '../components/PageHero';
 import { useState, useEffect } from 'react';
 import CTABar from '../components/CTABar';
@@ -50,9 +53,11 @@ const RECORDS = [
 const rankEmoji = (r) => r === 1 ? '🥇' : r === 2 ? '🥈' : r === 3 ? '🥉' : String(r);
 const sectorColor = (r) => r >= 80 ? '#22c55e' : r >= 70 ? '#2563eb' : '#94a3b8';
 
-export default function Leaderboard() {
+export default function Leaderboard({ monthly = [], totals = {} }) {
   const [period, setPeriod] = useState('이번달');
   const [liveData, setLiveData] = useState(null);
+  const monthLabel = (m) => `${parseInt(m.slice(5), 10)}월`;
+  const maxTrades = Math.max(1, ...monthly.map((m) => m.trades));
 
   useEffect(() => {
     const daysMap = { '이번달': 30, '3개월': 90, '전체': 365 };
@@ -105,7 +110,15 @@ export default function Leaderboard() {
             </div>
           </div>
 
+          <div style={{ background: '#EAF1FF', border: '1px solid #DCE7FF', borderRadius: 14, padding: '13px 16px', marginBottom: 18, fontSize: 12.5, color: '#475569', lineHeight: 1.7 }}>
+            전략 랭킹은 <b style={{ color: '#2F6BFF' }}>실시간 엔진 데이터</b> 기준입니다{liveData ? '' : ' (지금은 오프라인이라 예시값)'}. 월별 요약은 <b style={{ color: '#2F6BFF' }}>운영일지 실집계</b>(총 {totals.days || 0}일 · 매매 {totals.trades || 0} · 차단 {totals.blocked || 0}). 참여자 커뮤니티 랭킹은 사용자 유입과 함께 확대됩니다.
+          </div>
+
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, overflow: 'hidden', marginBottom: 20, boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#0f172a' }}>🤖 전략별 성과</span>
+              <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 6, background: liveData ? '#E7FAF2' : '#FEF3C7', color: liveData ? '#0E9E6A' : '#B45309' }}>{liveData ? '실시간' : '예시'}</span>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr 60px 70px 60px', padding: '10px 16px',
               borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
               {['순위', '전략', '승률', '수익률', '건수'].map(h => (
@@ -128,25 +141,31 @@ export default function Leaderboard() {
           </div>
 
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '20px', marginBottom: 20, boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 14 }}>📈 월별 성과 추이</div>
-            {MONTHLY.map((m, i) => (
-              <Link key={i} href={m.href} style={{ textDecoration: 'none', display: 'block', marginBottom: 14 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+              📅 월별 운영 요약 <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 6, background: '#E7FAF2', color: '#0E9E6A' }}>실집계</span>
+            </div>
+            <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 16 }}>운영일지 기준 · 매매/차단/운영일수</div>
+            {monthly.length === 0 ? (
+              <div style={{ fontSize: 13, color: '#94a3b8' }}>집계된 운영일지가 아직 없습니다.</div>
+            ) : monthly.map((m) => (
+              <Link key={m.month} href="/daily" style={{ textDecoration: 'none', display: 'block', marginBottom: 14 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 13 }}>
-                  <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#1e293b' }}>{m.month}</span>
-                  <span style={{ display: 'flex', gap: 10 }}>
-                    <span style={{ fontFamily: 'monospace', color: '#22c55e', fontWeight: 700 }}>{m.returns}</span>
-                    <span style={{ fontFamily: 'monospace', color: '#94a3b8' }}>{m.count}건</span>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 700, color: '#1e293b' }}>{monthLabel(m.month)}</span>
+                  <span style={{ display: 'flex', gap: 10, fontFamily: 'monospace' }}>
+                    <span style={{ color: '#22c55e', fontWeight: 700 }}>매매 {m.trades}</span>
+                    <span style={{ color: '#ef4444', fontWeight: 700 }}>차단 {m.blocked}</span>
+                    <span style={{ color: '#94a3b8' }}>{m.days}일</span>
                   </span>
                 </div>
                 <div style={{ height: 10, background: '#f1f5f9', borderRadius: 5, overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: `${m.bar}%`, background: '#2563eb', borderRadius: 5 }} />
+                  <div style={{ height: '100%', width: `${Math.max(6, Math.round(m.trades / maxTrades * 100))}%`, background: '#2563eb', borderRadius: 5 }} />
                 </div>
               </Link>
             ))}
           </div>
 
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '20px', marginBottom: 20, boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 14 }}>🗺️ 섹터별 AI 승률</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>🗺️ 섹터별 AI 승률 <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 6, background: liveData?.sectors?.length ? '#E7FAF2' : '#FEF3C7', color: liveData?.sectors?.length ? '#0E9E6A' : '#B45309' }}>{liveData?.sectors?.length ? '실시간' : '예시'}</span></div>
             {sectors.map(s => (
               <div key={s.name} style={{ marginBottom: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5, fontSize: 13 }}>
@@ -161,7 +180,7 @@ export default function Leaderboard() {
           </div>
 
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '20px', marginBottom: 24, boxShadow: '0 2px 16px rgba(0,0,0,0.07)' }}>
-            <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 14 }}>⭐ 명예의 전당</div>
+            <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>⭐ 명예의 전당 <span style={{ fontSize: 10, fontWeight: 800, padding: '2px 7px', borderRadius: 6, background: '#FEF3C7', color: '#B45309' }}>예시</span></div>
             {RECORDS.map((r, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '10px 0', borderBottom: i < RECORDS.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
                 <span style={{ fontSize: 13, color: '#64748b' }}>{r.label}</span>
@@ -175,4 +194,41 @@ export default function Leaderboard() {
       </div>
     </>
   );
+}
+
+export async function getStaticProps() {
+  const dir = path.join(process.cwd(), 'content', 'daily');
+  let reports = [];
+  try {
+    reports = fs.readdirSync(dir)
+      .filter((f) => f.endsWith('.md'))
+      .map((f) => {
+        const { data } = matter(fs.readFileSync(path.join(dir, f), 'utf8'));
+        return {
+          date: data.date || f.replace('.md', ''),
+          regime: data.regime || 'SIDEWAYS',
+          trade_count: data.trade_count || 0,
+          block_count: data.block_count || 0,
+          published: data.published !== false,
+        };
+      })
+      .filter((r) => r.published);
+  } catch (e) { reports = []; }
+
+  const byMonth = {};
+  reports.forEach((r) => {
+    const m = (r.date || '').slice(0, 7);
+    if (!m) return;
+    byMonth[m] = byMonth[m] || { month: m, days: 0, trades: 0, blocked: 0 };
+    byMonth[m].days += 1;
+    byMonth[m].trades += r.trade_count;
+    byMonth[m].blocked += r.block_count;
+  });
+  const monthly = Object.values(byMonth).sort((a, b) => (a.month < b.month ? 1 : -1)).slice(0, 6);
+  const totals = {
+    days: reports.length,
+    trades: reports.reduce((s, r) => s + r.trade_count, 0),
+    blocked: reports.reduce((s, r) => s + r.block_count, 0),
+  };
+  return { props: { monthly, totals } };
 }
