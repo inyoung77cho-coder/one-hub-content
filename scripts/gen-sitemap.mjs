@@ -55,6 +55,7 @@ const entries = [
   ...collect('daily', '/daily', { changefreq: 'never', priority: '0.7' }),
   ...collect('weekly', '/weekly', { changefreq: 'never', priority: '0.6' }),
   ...collect('blog', '/blog', { changefreq: 'monthly', priority: '0.5' }),
+  ...collect('story', '/story', { changefreq: 'weekly', priority: '0.6' }),
 ];
 
 const xml =
