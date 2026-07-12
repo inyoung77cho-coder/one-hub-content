@@ -1,4 +1,5 @@
 {
+  "buildCommand": "npm run build",
   "functions": {
     "pages/api/engine-status.js": {
       "maxDuration": 15
