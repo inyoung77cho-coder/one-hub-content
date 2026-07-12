@@ -9,7 +9,9 @@ import { recordDecision, matureLedger, computeShowdown, getTodayDecision } from 
 import { fetchAssetsTotal } from '../../lib/assetsTotal';
 import { fetchLiveEtfKrw } from '../../lib/etfLive';
 import { dedupBy } from '../../lib/useDedup';
+import { getStockHoldings, removeStock } from '../../lib/stockHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
+import { StockForm } from '../../components/shared/AssetForms';
 
 // [v9.0] 안전 숫자 포맷 — INVALID_PRICE/STOP/NaN/undefined → '-'
 function safeLocale(v, suffix = '') {
@@ -197,6 +199,8 @@ export default function PWADashboard({ latestReport }) {
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
   const [reFeed, setReFeed] = useState(null); // [브리핑] 부동산 최근 실거래(신고가) 피드
   const [fxRate, setFxRate] = useState(null); // [브리핑] 오늘 USD/KRW 환율(경제 지표용)
+  const [stFormOpen, setStFormOpen] = useState(false); // [주식 직접입력] 폼 열림
+  const [stManualTick, setStManualTick] = useState(0); // [주식 직접입력] 보유 목록 재조회 트리거
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
   const [qaOpen, setQaOpen] = useState(false); // [S3] 빠른입력 시트(공용 QuickAddSheet) 열림
@@ -1862,6 +1866,35 @@ export default function PWADashboard({ latestReport }) {
                       </div>))}
                     </div>}
               </section>
+
+              {/* [주식 직접입력] KIS 외 증권사 보유 — 빠른입력과 동일한 공용 StockForm */}
+              <section className="pwa-card">
+                <div className="mh-head">
+                  <span className="pwa-card-label" style={{ margin: 0 }}>🧾 직접 입력 보유 <span className="mh-sub">KIS 외 증권사</span></span>
+                  <button className="mh-add" onClick={() => setStFormOpen(o => !o)}>{stFormOpen ? '닫기' : '＋ 추가'}</button>
+                </div>
+                {stFormOpen && <div className="mh-form"><StockForm onSaved={() => { setStManualTick(t => t + 1); setStFormOpen(false); }} /></div>}
+                {(() => {
+                  const _tick = stManualTick; // 저장/삭제 후 재조회 트리거
+                  const list = mounted ? getStockHoldings(trader) : [];
+                  if (!list.length) return <div className="pwa-empty">미래에셋·삼성 등 KIS 외 증권사 보유를 <b>＋ 추가</b>로 입력하면 여기에 표시됩니다.</div>;
+                  return (
+                    <div className="mh-list">
+                      {list.map((h) => (
+                        <div className="mh-row" key={h.id}>
+                          <div className="mh-l">
+                            <b className="mh-name">{h.name}</b>
+                            <span className="mh-meta">{h.broker} · {h.account} · {h.market === 'us' ? '🇺🇸 해외' : '🇰🇷 국내'}</span>
+                          </div>
+                          <div className="mh-r">{h.shares}주 · 평단 {h.ccy === 'USD' ? '$' : ''}{Number(h.avgPrice).toLocaleString()}{h.ccy === 'KRW' ? '원' : ''}</div>
+                          <button className="mh-del" onClick={() => { removeStock({ id: h.id, trader }); setStManualTick(t => t + 1); }} aria-label={`${h.name} 삭제`}>✕</button>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </section>
+
               <section className="pwa-card">
                 <span className="pwa-card-label">🤖 AI 판단 — 매수 차단 종목</span>
                 {(!data.today_blocked || data.today_blocked.length===0)
@@ -2876,6 +2909,18 @@ export default function PWADashboard({ latestReport }) {
         .bf-exec-h { font-size: 11.5px; font-weight: 800; color: var(--color-ink-2); }
         .bf-exec-items { display: flex; flex-wrap: wrap; gap: 4px 11px; font-size: 11.5px; color: var(--color-ink-3); }
         .bf-exec-items b { font-variant-numeric: tabular-nums; font-weight: 800; }
+        /* [주식 직접입력] 보유 목록 */
+        .mh-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .mh-sub { font-size: 0.62rem; font-weight: 700; color: var(--text-tertiary); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; margin-left: 5px; }
+        .mh-add { font-size: 0.72rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border: none; border-radius: 8px; padding: 6px 12px; cursor: pointer; font-family: var(--font-body); }
+        .mh-form { margin-bottom: 12px; }
+        .mh-list { display: flex; flex-direction: column; gap: 7px; }
+        .mh-row { display: flex; align-items: center; gap: 10px; background: var(--inset-bg); border-radius: 10px; padding: 10px 12px; }
+        .mh-l { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+        .mh-name { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mh-meta { font-size: 0.66rem; color: var(--text-tertiary); }
+        .mh-r { font-size: 0.74rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+        .mh-del { flex-shrink: 0; width: 24px; height: 24px; border-radius: 6px; border: none; background: var(--color-danger-soft); color: var(--color-danger); font-size: 0.7rem; cursor: pointer; }
         /* [#3 알림 피드] */
         .v10-noti { margin-top: 13px; border-top: 1px solid var(--color-line); padding-top: 12px; }
         .bf-block.v10-noti { margin-top: 14px; }

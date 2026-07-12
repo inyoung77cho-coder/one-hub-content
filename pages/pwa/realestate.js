@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import TopNav from "../../components/TopNav";
 import { dedupBy } from "../../lib/useDedup";
+import { ReForm } from "../../components/shared/AssetForms";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -403,35 +404,14 @@ export default function RealEstateDashboard() {
         <div className="wiz-scrim" onClick={() => setWizOpen(false)}>
           <div className="wiz" onClick={(e) => e.stopPropagation()}>
             <div className="wiz-h">🏠 내 단지 등록<button className="wiz-x" onClick={() => setWizOpen(false)} aria-label="닫기">✕</button></div>
-            {/* [S5+] 단지명 = DB(랭킹) 로딩 select */}
-            <label className="wiz-f"><span>단지명 <em>실거래 DB</em></span>
-              <select value={wiz.name} onChange={(e) => setWiz((w) => ({ ...w, name: e.target.value, pyeong: "" }))}>
-                <option value="">단지 선택</option>
-                {(rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명) : []).map((o) => <option key={o.단지ID || o.단지명} value={o.단지명}>{o.단지명}</option>)}
-              </select>
-            </label>
-            <div className="wiz-row">
-              {/* [S5+] 평형 = 선택 단지의 실거래 전용면적 옵션 로딩(없으면 직접입력) */}
-              <label className="wiz-f"><span>평형 <em>{areaOptsFor(wiz.name).length ? "실거래 DB" : "직접입력"}</em></span>
-                {areaOptsFor(wiz.name).length ? (
-                  <select value={wiz.pyeong} onChange={(e) => setWiz((w) => ({ ...w, pyeong: e.target.value }))}>
-                    <option value="">평형 선택</option>
-                    {areaOptsFor(wiz.name).map((a) => <option key={a.m2} value={a.m2}>전용 {a.m2}㎡ (약 {m2ToPyeong(a.m2)}평){a.priceUk ? ` · ${a.priceUk}억` : ""}</option>)}
-                  </select>
-                ) : (
-                  <input type="number" inputMode="numeric" value={wiz.pyeong} onChange={(e) => setWiz((w) => ({ ...w, pyeong: e.target.value }))} placeholder="전용㎡ 또는 평" />
-                )}
-              </label>
-              <label className="wiz-f"><span>동/층</span>
-                <input value={wiz.dongfloor} onChange={(e) => setWiz((w) => ({ ...w, dongfloor: e.target.value }))} placeholder="101동 15층" /></label>
-            </div>
-            <div className="wiz-row">
-              <label className="wiz-f"><span>매수가(억)</span>
-                <input type="number" inputMode="decimal" value={wiz.buyUk} onChange={(e) => setWiz((w) => ({ ...w, buyUk: e.target.value }))} placeholder="8.5" /></label>
-              <label className="wiz-f"><span>매수 시점</span>
-                <input type="month" value={wiz.buyMonth} onChange={(e) => setWiz((w) => ({ ...w, buyMonth: e.target.value }))} /></label>
-            </div>
-            <button className="wiz-save" onClick={saveWiz} disabled={!String(wiz.name || "").trim()}>저장</button>
+            {/* [폼 일원화] 빠른입력과 동일한 공용 ReForm. 페이지에서는 실거래 DB 옵션(단지·평형)을 넘겨 드롭다운 제공 */}
+            <ReForm
+              initial={myProp}
+              nameOptions={(rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명).map((o) => o.단지명) : [])}
+              getAreaOptions={(nm) => areaOptsFor(nm).map((a) => ({ value: a.m2, label: `전용 ${a.m2}㎡ (약 ${m2ToPyeong(a.m2)}평)${a.priceUk ? ` · ${a.priceUk}억` : ""}` }))}
+              saveLabel="저장"
+              onSaved={(key, obj) => { setMyProp(obj); setMyC(obj.name); setWizOpen(false); }}
+            />
             <div className="wiz-note">입력값은 이 기기에만 저장됩니다(localStorage). 평가손익·갭은 현재 AVM 기준 <b>추정</b>입니다.</div>
           </div>
         </div>
