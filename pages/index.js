@@ -359,6 +359,7 @@ export default function Home({ reports, stats }) {
                 <Link href="/daily">운영일지</Link>
                 <Link href="/about">About</Link>
                 <Link href="/community">커뮤니티</Link>
+                <Link href="/partners/realestate">협력업체</Link>
                 <Link href="/pwa">앱 열기</Link>
               </nav>
             </div>
