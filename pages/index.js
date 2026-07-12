@@ -310,14 +310,14 @@ export default function Home({ reports, stats }) {
                   </div>
                   <span className="board-arrow">보드 열기 →</span>
                 </a>
-                <div className="board-card board-soon">
+                <a className="board-card" href="/board/realestate">
                   <div className="board-ic">🏢</div>
                   <div className="board-body">
-                    <div className="board-t">부동산 신규 정보 <span className="ch-soon">준비중</span></div>
-                    <div className="board-d">협력업체가 올리는 신규 매물·시세 소식을 이곳에.</div>
+                    <div className="board-t">부동산 신규 정보</div>
+                    <div className="board-d">협력업체가 올리는 신규 매물·시세 소식을 홈에서 먼저.</div>
                   </div>
-                  <span className="board-arrow-soon">곧 공개</span>
-                </div>
+                  <span className="board-arrow">보드 열기 →</span>
+                </a>
               </div>
             </div>
           </section>

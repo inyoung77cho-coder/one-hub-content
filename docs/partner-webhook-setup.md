@@ -88,3 +88,28 @@ curl -X POST https://one-hub-content.vercel.app/api/partners/realestate \
 
 - **Slack 알림만 원할 때**: `PARTNER_WEBHOOK_URL`에 Slack Incoming Webhook URL을 넣어도 됩니다(간단 알림용).
 - **이메일 발송**: Resend/SendGrid API 키가 있으면 `pages/api/partners/realestate.js`에 발송 로직을 추가할 수 있습니다(키 필요 → 알려주시면 배선).
+
+---
+
+## 공개 보드(`/board/realestate`)에 매물 게시하기
+
+접수된 매물을 홈의 **부동산 신규 정보** 보드에 공개하려면, 시트/접수 내용을 `content/listings/*.md` 파일로 커밋합니다(블로그·운영일지와 동일한 콘텐츠 방식). 커밋 → Vercel 재빌드 시 보드에 자동 노출됩니다.
+
+```markdown
+---
+title: "분당 서현 시범단지 84㎡"
+region: "경기 성남시 분당구 서현동"
+ptype: "아파트"      # 아파트·오피스텔·빌라/연립·상가·사무실·토지·기타
+deal: "매매"          # 매매·전세·월세·분양
+price: "13억 5,000"
+area: "84.9"          # 전용 ㎡
+partner: "한빛공인중개사"
+date: "2026-07-10"
+sample: false          # true면 '예시' 배지 표시(형식 안내용)
+published: true
+summary: "서현역 도보 7분·초품아, 저평가 구간."
+---
+```
+
+> 현재 `content/listings/`에는 형식 안내용 **예시 3건**이 들어 있습니다(카드에 「예시」 배지). 실제 매물을 올릴 땐 `sample: false`로 새 파일을 추가하고, 예시는 지우면 됩니다.
+> 자동화하려면 시트→md 변환 스크립트 또는 GitHub API(`pages/api/comments.js`가 쓰는 방식)로 접수 시 자동 커밋하도록 확장할 수 있습니다.
