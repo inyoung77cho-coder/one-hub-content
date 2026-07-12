@@ -32,7 +32,7 @@ export default function EtfDashboard() {
   // [내 ETF] 사용자 직접 입력 보유 + 자동 시세
   const [holdings, setHoldings] = useState([]);
   const [quotes, setQuotes] = useState({}); // { TICKER: {price, currency, date} }
-  const [form, setForm] = useState({ side: "buy", ticker: "", shares: "", price: "", ccy: "USD", account: "일반" });
+  const [form, setForm] = useState({ side: "buy", ticker: "", shares: "", price: "", ccy: "USD", account: "일반", market: "auto" });
   const [formMsg, setFormMsg] = useState("");
   const [posQty, setPosQtyState] = useState({}); // [등록 ETF] 티커별 사용자 입력 수량(백엔드 미제공 보완)
   const [quotesAt, setQuotesAt] = useState(null); // [실시간] 마지막 시세 갱신 시각(ms)
@@ -164,10 +164,12 @@ export default function EtfDashboard() {
   // [내 ETF] 매수/매도 기록 + 티커 삭제
   const submitTrade = () => {
     const tr = getTrader();
-    const { side, ticker, shares, price, ccy, account } = form;
+    const { side, ticker, shares, price, ccy, account, market } = form;
     setFormMsg("");
+    // [E1] 국내/해외 구분 — 사용자가 명시 선택(kr/us)하면 그 값 우선, auto면 티커로 추론
+    const mkt = market === "kr" || market === "us" ? market : inferMarket(ticker);
     const res = side === "buy"
-      ? buyEtf({ ticker, market: inferMarket(ticker), shares, avgPrice: price, avgCcy: ccy, account, trader: tr })
+      ? buyEtf({ ticker, market: mkt, shares, avgPrice: price, avgCcy: ccy, account, trader: tr })
       : sellEtf({ ticker, shares, account, trader: tr });
     if (!res.ok) { setFormMsg("⚠️ " + (res.error || "입력 오류")); return; }
     try { localStorage.setItem("onehub_etf_last_acct", account); } catch (e) {} // [S4] 마지막 사용 계좌 기억
@@ -281,6 +283,34 @@ export default function EtfDashboard() {
   if (overlapWarn) rebalReasons.push(`${overlapWarn} — 중복 종목 통합으로 실질 분산 확보`);
   if (tax?.losses?.length) rebalReasons.push(`손실 종목(${tax.losses.map((l) => l.ticker).join("·")}) 손익통산 — 절세 매도 후 재매수 검토`);
 
+  // [E2·E3] 계좌별 '해야 할 일' + 리밸런싱 제안 — 보유·세제·중복·집중·리밸 데이터에서 결정론적으로 산출.
+  //   각 항목에 대상 계좌(전체/일반/연금/ISA) 태그를 붙여, 상단 계좌 필터가 곧 '할 일' 필터가 되도록 한다.
+  const etfTodos = [];
+  if (maxSector && maxSector.weight * 100 >= 25)
+    etfTodos.push({ acct: "전체", icon: "📊", title: `${maxSector.sector} ${(maxSector.weight * 100).toFixed(0)}% 집중 축소`, detail: "단일 섹터 비중이 25% 상한을 넘습니다. 초과분을 다른 섹터로 분산해 리스크를 낮추세요.", tone: "warn" });
+  if (overlapWarn)
+    etfTodos.push({ acct: "전체", icon: "🔁", title: "중복 종목 통합", detail: `${overlapWarn} — 겹치는 종목을 정리하면 같은 금액으로 실질 분산이 늘어납니다.`, tone: "warn" });
+  const rebalActs = Array.isArray(rebal?.actions) ? rebal.actions.filter((a) => a.action !== "HOLD") : [];
+  if (rebalActs.length)
+    etfTodos.push({ acct: "전체", icon: "⚖️", title: `리밸런싱 ${rebalActs.length}건 실행`, detail: `${rebalActs.slice(0, 3).map((a) => `${a.ticker} ${a.action === "SELL" ? "축소" : "확대"} ${a.qty}주`).join(" · ")}${rebalActs.length > 3 ? " 외" : ""} · 예상 양도세 ${won(rebal?.est_tax_krw)}원. 밴드 내 종목은 보유 권장.`, tone: "info" });
+  if (tax?.losses?.length)
+    etfTodos.push({ acct: "일반", icon: "🧾", title: `손실 종목 손익통산(${tax.losses.map((l) => l.ticker).join("·")})`, detail: "일반계좌는 같은 해 이익·손실을 합산 과세합니다. 손실 종목을 함께 매도(손실수확)하면 과세표준이 줄어 양도세를 아낄 수 있습니다.", tone: "info" });
+  if (tax?.dividend_usd > 0)
+    etfTodos.push({ acct: "일반", icon: "💵", title: `해외 배당 연 $${tax.dividend_usd} 관리`, detail: "해외상장 ETF 배당은 15% 원천징수 후 지급됩니다. 연 금융소득 2,000만원 초과 시 종합과세 대상이니 규모를 확인하세요.", tone: "info" });
+  const hasPension = holdings.some((h) => (h.account || "일반") === "연금");
+  if (hasPension) {
+    const limit = pensionCreditLimit();
+    const penRows = holdings.filter((h) => (h.account || "일반") === "연금");
+    const acquired = penRows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
+    const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
+    const room = Math.max(0, limit - contrib);
+    if (room > 0)
+      etfTodos.push({ acct: "연금", icon: "🎁", title: `연금 추가납입 여유 ${won(room)}원`, detail: `올해 세액공제 한도(${won(limit)}원)까지 ${won(room)}원 남았습니다. 추가 납입하면 13.2~16.5% 세액공제를 더 받습니다.`, tone: "good" });
+    else
+      etfTodos.push({ acct: "연금", icon: "✅", title: "연금 세액공제 한도 충족", detail: "올해 세액공제 한도를 채웠습니다. 초과 납입분은 내년 이월공제 또는 다른 계좌 활용을 검토하세요.", tone: "good" });
+  }
+  const todosForAcct = etfTodos.filter((t) => acctFilter === "전체" || t.acct === "전체" || t.acct === acctFilter);
+
   return (
     <div className="etf pwa-shell">
       <TopNav active="etf" />
@@ -353,6 +383,31 @@ export default function EtfDashboard() {
           );
         })}
       </div>
+
+      {/* [E2·E3] 해야 할 일 · 리밸런싱 제안 — 계좌 필터가 곧 '할 일' 필터. 조치 없으면 보유 권장 */}
+      {s && (
+        <section className="card todo-card">
+          <div className="label">📋 해야 할 일 · 리밸런싱 제안
+            <span className="sub">{acctFilter === "전체" ? "전 계좌" : `${acctFilter} 계좌`}</span>
+          </div>
+          {todosForAcct.length > 0 ? (
+            <div className="todo-list">
+              {todosForAcct.map((t, i) => (
+                <div className={`todo-item ${t.tone}`} key={i}>
+                  <span className="todo-ic">{t.icon}</span>
+                  <div className="todo-body">
+                    <div className="todo-t">{t.title}<span className={`todo-acct ${t.acct === "연금" ? "pension" : t.acct === "ISA" ? "isa" : t.acct === "일반" ? "normal" : "all"}`}>{t.acct}</span></div>
+                    <div className="todo-d">{t.detail}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="todo-none">✅ {acctFilter === "전체" ? "현재 조정할 항목이 없습니다" : `${acctFilter} 계좌에 조치할 항목이 없습니다`} — 배분·세제 이슈 없이 밴드 내 보유 권장.</div>
+          )}
+          <div className="todo-foot">집중도·중복·절세·연금 한도·리밸런싱 밴드를 종합해 제안합니다. 참고용이며 세무자문이 아닙니다.</div>
+        </section>
+      )}
 
       {/* [§3-2 원칙1] 포트폴리오 합계는 홈·AI자산 2곳에만. ETF 페이지는 ETF 슬라이스만 표시(피드백14) */}
       {err && <div className="err">데이터 로드 오류: {err}</div>}
@@ -598,8 +653,17 @@ export default function EtfDashboard() {
           <button className={form.side === "buy" ? "on buy" : ""} onClick={() => { setForm((f) => ({ ...f, side: "buy" })); setFormMsg(""); }}>매수</button>
           <button className={form.side === "sell" ? "on sell" : ""} onClick={() => { setForm((f) => ({ ...f, side: "sell" })); setFormMsg(""); }}>매도</button>
         </div>
+        {/* [E1] 국내/해외 구분자 — 세제(양도세 vs 배당소득세)·통화·시세소스가 다르므로 명시 선택 */}
+        {form.side === "buy" && (
+          <div className="me-mkt" role="group" aria-label="국내/해외 구분">
+            {[["auto", "자동"], ["kr", "🇰🇷 국내"], ["us", "🇺🇸 해외"]].map(([v, l]) => (
+              <button key={v} type="button" className={form.market === v ? "on" : ""}
+                onClick={() => setForm((f) => ({ ...f, market: v, ccy: v === "kr" ? "KRW" : v === "us" ? "USD" : f.ccy }))}>{l}</button>
+            ))}
+          </div>
+        )}
         <div className="me-form">
-          <input className="me-in tk" placeholder="티커 (SCHD / 069500)" value={form.ticker}
+          <input className="me-in tk" placeholder={form.market === "kr" ? "코드 (069500)" : form.market === "us" ? "티커 (SCHD)" : "티커 (SCHD / 069500)"} value={form.ticker}
             onChange={(e) => setForm((f) => ({ ...f, ticker: e.target.value }))} />
           <input className="me-in num" type="number" inputMode="decimal" placeholder="수량" value={form.shares}
             onChange={(e) => setForm((f) => ({ ...f, shares: e.target.value }))} />
@@ -846,6 +910,10 @@ export default function EtfDashboard() {
         .me-toggle button { flex: 1; border: none; background: none; padding: 8px 0; border-radius: 8px; font-family: var(--font-sans); font-size: 0.82rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
         .me-toggle button.on.buy { background: var(--color-primary); color: #fff; }
         .me-toggle button.on.sell { background: var(--color-danger); color: #fff; }
+        /* [E1] 국내/해외 구분 세그먼트 */
+        .me-mkt { display: flex; gap: 4px; background: var(--color-card-soft); border-radius: 10px; padding: 3px; margin-bottom: 8px; }
+        .me-mkt button { flex: 1; border: none; background: none; padding: 7px 0; border-radius: 8px; font-family: var(--font-sans); font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
+        .me-mkt button.on { background: var(--color-primary); color: #fff; }
         .me-form { display: flex; gap: 6px; flex-wrap: wrap; }
         .me-in { flex: 1 1 70px; min-width: 0; border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 9px; padding: 9px 10px; font-size: 0.84rem; font-family: var(--font-sans); color: var(--color-ink); }
         .me-in.tk { flex: 2 1 120px; text-transform: uppercase; }
@@ -888,6 +956,24 @@ export default function EtfDashboard() {
         .acct-chip.on.isa { background: var(--color-primary); border-color: var(--color-primary); }
         .acct-chip-n { font-size: 0.66rem; font-weight: 800; background: var(--color-card-soft); color: var(--color-ink-2); border-radius: 999px; padding: 1px 6px; }
         .acct-chip.on .acct-chip-n { background: rgba(255,255,255,0.25); color: #fff; }
+        /* [E2·E3] 해야 할 일 · 리밸런싱 카드 */
+        .todo-card { border-left: 4px solid var(--color-primary); }
+        .todo-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+        .todo-item { display: flex; gap: 10px; align-items: flex-start; background: var(--color-card-soft); border-radius: 12px; padding: 11px 12px; border-left: 3px solid var(--color-line); }
+        .todo-item.warn { border-left-color: var(--color-warning); background: var(--color-warning-soft); }
+        .todo-item.info { border-left-color: var(--color-primary); }
+        .todo-item.good { border-left-color: var(--color-success); background: var(--color-success-soft); }
+        .todo-ic { font-size: 1.05rem; line-height: 1.3; flex-shrink: 0; }
+        .todo-body { flex: 1; min-width: 0; }
+        .todo-t { font-size: 0.85rem; font-weight: 800; color: var(--color-ink); display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+        .todo-acct { font-size: 0.62rem; font-weight: 800; padding: 1px 8px; border-radius: 999px; }
+        .todo-acct.all { background: var(--color-card); color: var(--color-ink-2); border: 1px solid var(--color-line); }
+        .todo-acct.normal { background: var(--color-card); color: var(--color-ink-2); border: 1px solid var(--color-line); }
+        .todo-acct.pension { background: var(--color-success-soft); color: var(--color-success); }
+        .todo-acct.isa { background: var(--color-primary-soft); color: var(--color-primary); }
+        .todo-d { font-size: 0.75rem; color: var(--color-ink-2); line-height: 1.5; margin-top: 3px; word-break: keep-all; }
+        .todo-none { font-size: 0.82rem; color: var(--color-ink-2); background: var(--color-success-soft); border-radius: 12px; padding: 13px 14px; line-height: 1.5; word-break: keep-all; }
+        .todo-foot { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 10px; line-height: 1.5; word-break: keep-all; }
         /* [S4] 세법 툴팁/면책 */
         .tax-info { margin-left: auto; font-size: 0.8rem; color: var(--color-ink-3); cursor: help; font-weight: 600; }
         .term { border-bottom: 1px dotted var(--color-ink-3); cursor: help; }
