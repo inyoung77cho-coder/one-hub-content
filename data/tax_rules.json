@@ -25,6 +25,28 @@
       "tax_credit_income_threshold_won": 55000000,
       "note": "계좌 내 매도 시 양도세 0 · 인출 시 연금소득세 3.3~5.5%(저율 과세) · 세액공제 한도 연 900만원"
     },
+    "개인연금": {
+      "label": "개인연금(연금저축)",
+      "capital_gains_rate": 0.0,
+      "pension_income_rate_min": 0.033,
+      "pension_income_rate_max": 0.055,
+      "tax_credit_limit_won": 6000000,
+      "tax_credit_rate_low": 0.165,
+      "tax_credit_rate_high": 0.132,
+      "tax_credit_income_threshold_won": 55000000,
+      "note": "연금저축 계좌 · 매도 양도세 0 · 인출 시 연금소득세 3.3~5.5% · 세액공제 한도 연 600만원(IRP 합산 900만)"
+    },
+    "퇴직연금": {
+      "label": "퇴직연금(IRP)",
+      "capital_gains_rate": 0.0,
+      "pension_income_rate_min": 0.033,
+      "pension_income_rate_max": 0.055,
+      "tax_credit_limit_won": 9000000,
+      "tax_credit_rate_low": 0.165,
+      "tax_credit_rate_high": 0.132,
+      "tax_credit_income_threshold_won": 55000000,
+      "note": "IRP 계좌 · 매도 양도세 0 · 인출 시 연금소득세 3.3~5.5% · 연금저축 합산 세액공제 한도 연 900만원"
+    },
     "ISA": {
       "label": "ISA(개인종합자산관리계좌)",
       "tax_free_limit_won": 2000000,
