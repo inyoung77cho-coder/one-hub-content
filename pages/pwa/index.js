@@ -10,6 +10,7 @@ import { fetchAssetsTotal } from '../../lib/assetsTotal';
 import { fetchLiveEtfKrw } from '../../lib/etfLive';
 import { dedupBy } from '../../lib/useDedup';
 import { getStockHoldings, removeStock } from '../../lib/stockHoldings';
+import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
 import { StockForm } from '../../components/shared/AssetForms';
 
@@ -82,6 +83,30 @@ function scoreGrade(fs) {
 
 // [§3-3 피드백7] 추천 카드 인라인 메타 — 왜 후보인지(근거 1줄) + 스탠스 + 기대 여력(기술적 추정).
 //   백엔드 미도달 + 후보에 가격 필드 없음 → 목표가(원)는 상세(AI분석)에서, 리스트엔 종목 신호 기반 요약.
+// [성과비교] 내 포트폴리오의 '현재 평가 기준' 수익률 + 가장 이른 매수일(가입 시점).
+//   cost/current 짝을 신뢰할 수 있는 자산만 사용(KIS 주식 잔고 + ETF 실시간). 시세 미연동(직접입력 주식)은 제외.
+function computeMyPerf(data, assetSum, trader, fxRate) {
+  if (typeof window === 'undefined') return null;
+  const dates = [];
+  try { getStockHoldings(trader).forEach((h) => { if (h.buyDate) dates.push(h.buyDate); }); } catch (e) {}
+  try { getEtfHoldings(trader).forEach((h) => { if (h.buyDate) dates.push(h.buyDate); }); } catch (e) {}
+  try { const re = JSON.parse(localStorage.getItem('onehub_re_my_property') || 'null'); if (re && re.buyMonth) dates.push(String(re.buyMonth).slice(0, 7) + '-01'); } catch (e) {}
+  const sinceDate = dates.length ? dates.slice().sort()[0] : null;
+  let cost = 0, val = 0; const parts = [];
+  const bal = data?.balance || {};
+  const kisVal = (Number(bal.total_asset) || 0) - (Number(bal.cash) || 0);
+  const kisPnl = Number(bal.unrealized_pnl) || 0;
+  if (kisVal > 0) { const kisCost = kisVal - kisPnl; if (kisCost > 0) { cost += kisCost; val += kisVal; parts.push('주식'); } }
+  try {
+    let etfCost = 0;
+    getEtfHoldings(trader).forEach((h) => { etfCost += (h.avgCcy === 'USD' ? (fxRate ? h.avgPrice * h.shares * fxRate : 0) : h.avgPrice * h.shares); });
+    const etfVal = assetSum?.breakdown?.etf_uk != null ? assetSum.breakdown.etf_uk * 1e8 : 0;
+    if (etfCost > 0 && etfVal > 0) { cost += etfCost; val += etfVal; parts.push('ETF'); }
+  } catch (e) {}
+  const myPct = cost > 0 ? Math.round((val / cost - 1) * 10000) / 100 : null;
+  return { sinceDate, myPct, invested: cost, current: val, parts };
+}
+
 function deriveRecMeta(s) {
   const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
   const rsi = s?.rsi != null ? Number(s.rsi) : null;
@@ -201,6 +226,7 @@ export default function PWADashboard({ latestReport }) {
   const [fxRate, setFxRate] = useState(null); // [브리핑] 오늘 USD/KRW 환율(경제 지표용)
   const [stFormOpen, setStFormOpen] = useState(false); // [주식 직접입력] 폼 열림
   const [stManualTick, setStManualTick] = useState(0); // [주식 직접입력] 보유 목록 재조회 트리거
+  const [benchPerf, setBenchPerf] = useState(null); // [성과비교] 시장지수 구간 수익률 { ok, label, pct, startDate, symbol }
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
   const [qaOpen, setQaOpen] = useState(false); // [S3] 빠른입력 시트(공용 QuickAddSheet) 열림
@@ -437,6 +463,26 @@ export default function PWADashboard({ latestReport }) {
       .then(r => r.json())
       .then(d => { if (d?.ok && d.rate) setFxRate(d.rate); })
       .catch(() => {});
+  }, [mounted, trader]);
+
+  // [성과비교] 가장 이른 매수일 기준으로 시장지수 구간 수익률 조회(보유가 해외 우세면 S&P, 아니면 KOSPI)
+  useEffect(() => {
+    if (!mounted) return;
+    const perf = computeMyPerf(data, assetSum, trader, fxRate);
+    const sd = perf?.sinceDate;
+    if (!sd) { setBenchPerf(null); return; }
+    let overseas = 0, domestic = 0;
+    try { getEtfHoldings(trader).forEach((h) => (h.market === 'us' ? overseas++ : domestic++)); getStockHoldings(trader).forEach((h) => (h.market === 'us' ? overseas++ : domestic++)); } catch (e) {}
+    const symbol = overseas > domestic ? 'spx' : 'kospi';
+    fetch(`/api/index/history?symbol=${symbol}&from=${sd}`)
+      .then((r) => r.json())
+      .then((d) => setBenchPerf({ ...d, from: sd, symbol }))
+      .catch(() => setBenchPerf({ ok: false, from: sd, symbol }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, trader, assetSum, fxRate, stManualTick]);
+
+  useEffect(() => {
+    if (!mounted) return;
     // [기록] AI 자기검증(차단 적중률) — ML 누적 학습 현황 카드용
     fetch(`/api/pwa/accuracy?trader_id=${trader}`)
       .then(r => r.json())
@@ -1143,6 +1189,49 @@ export default function PWADashboard({ latestReport }) {
                   </span>
                 </div>
               </section>
+
+              {/* [성과비교] 시장 대비 내 성과 — 매수일 기준 구간 수익률 vs 지수. 조기 사용 효과로 지속 사용 유도 */}
+              {(() => {
+                const perf = mounted ? computeMyPerf(data, assetSum, trader, fxRate) : null;
+                const months = perf?.sinceDate ? Math.max(1, Math.round((Date.now() - new Date(perf.sinceDate).getTime()) / (86400000 * 30.4))) : null;
+                return (
+                  <section className="card cmp-card">
+                    <div className="v10-sect"><h3>📈 시장 대비 내 성과</h3>{perf?.parts?.length ? <span className="cmp-scope">{perf.parts.join('·')} 기준</span> : null}</div>
+                    {!perf?.sinceDate ? (
+                      <div className="cmp-cta">보유 입력 시 <b>매수일</b>을 넣으면, 그때부터 지금까지 <b>내 자산 vs 시장지수</b>를 비교해 <b>ONE-HUB 조기 사용 효과</b>를 보여드립니다. <button className="cmp-cta-link" onClick={() => setTab('portfolio')}>주식 보유 입력 →</button></div>
+                    ) : perf.myPct == null ? (
+                      <div className="cmp-cta">실시간 시세가 연동된 보유(주식 계좌·ETF)가 있으면 성과 비교가 표시됩니다.</div>
+                    ) : (() => {
+                      const my = perf.myPct;
+                      const bench = benchPerf?.ok ? benchPerf.pct : null;
+                      const excess = bench != null ? Math.round((my - bench) * 100) / 100 : null;
+                      return (
+                        <>
+                          <div className="cmp-since">🗓️ {perf.sinceDate} 부터 <b>{months}개월</b> 관리 · 현재 평가 기준</div>
+                          <div className="cmp-rows">
+                            <div className="cmp-row">
+                              <span className="cmp-k">내 자산</span>
+                              <span className={`cmp-v ${my >= 0 ? 'up' : 'dn'}`}>{my >= 0 ? '+' : ''}{my.toFixed(2)}%</span>
+                            </div>
+                            <div className="cmp-row">
+                              <span className="cmp-k">{benchPerf?.label || (benchPerf?.symbol === 'spx' ? 'S&P 500' : 'KOSPI')} <span className="cmp-k-sub">같은 기간</span></span>
+                              <span className={`cmp-v ${bench == null ? 'na' : bench >= 0 ? 'up' : 'dn'}`}>{bench == null ? '—' : `${bench >= 0 ? '+' : ''}${bench.toFixed(2)}%`}</span>
+                            </div>
+                          </div>
+                          {excess != null ? (
+                            <div className={`cmp-verdict ${excess >= 0 ? 'win' : 'lose'}`}>
+                              {excess >= 0 ? '🎉' : '📉'} 시장 대비 <b>{excess >= 0 ? '+' : ''}{excess.toFixed(2)}%p</b> {excess >= 0 ? '초과 성과' : '밑도는 성과'} — {excess >= 0 ? '조기부터 관리한 효과가 나타나고 있습니다.' : '리밸런싱·차단 신호를 참고해 개선해 보세요.'}
+                            </div>
+                          ) : (
+                            <div className="cmp-note">지수 비교는 배포(온라인) 환경에서 표시됩니다. 현재는 내 수익률만 표시합니다.</div>
+                          )}
+                          <div className="cmp-foot">내 수익률은 현재 평가(주식 계좌·ETF 실측) 기준, 지수는 매수일 종가 대비입니다. 참고용이며 시세·환율에 따라 달라집니다.</div>
+                        </>
+                      );
+                    })()}
+                  </section>
+                );
+              })()}
 
               {/* [v10 UI 시안] ④ AI 판단 근거 — 접기(요약 한 줄 → 지표/확률바) */}
               {regime && (() => {
@@ -2941,6 +3030,27 @@ export default function PWADashboard({ latestReport }) {
         .mh-meta { font-size: 0.66rem; color: var(--text-tertiary); }
         .mh-r { font-size: 0.74rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
         .mh-del { flex-shrink: 0; width: 24px; height: 24px; border-radius: 6px; border: none; background: var(--color-danger-soft); color: var(--color-danger); font-size: 0.7rem; cursor: pointer; }
+        /* [성과비교] 시장 대비 내 성과 */
+        .cmp-scope { font-size: 0.66rem; font-weight: 700; color: var(--text-tertiary); }
+        .cmp-cta { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.55; word-break: keep-all; background: var(--inset-bg); border-radius: 12px; padding: 13px 14px; }
+        .cmp-cta b { color: var(--text-primary); }
+        .cmp-cta-link { display: inline-block; margin-top: 6px; background: none; border: none; color: var(--color-primary); font-weight: 700; font-size: 0.8rem; cursor: pointer; font-family: var(--font-body); padding: 0; }
+        .cmp-since { font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 10px; }
+        .cmp-since b { color: var(--text-primary); font-weight: 800; }
+        .cmp-rows { display: flex; flex-direction: column; gap: 8px; }
+        .cmp-row { display: flex; align-items: center; justify-content: space-between; background: var(--inset-bg); border-radius: 11px; padding: 11px 13px; }
+        .cmp-k { font-size: 0.82rem; font-weight: 700; color: var(--text-primary); }
+        .cmp-k-sub { font-size: 0.62rem; font-weight: 600; color: var(--text-tertiary); margin-left: 4px; }
+        .cmp-v { font-size: 1rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .cmp-v.up { color: var(--color-success); }
+        .cmp-v.dn { color: var(--color-danger); }
+        .cmp-v.na { color: var(--text-tertiary); }
+        .cmp-verdict { margin-top: 11px; font-size: 0.8rem; font-weight: 600; line-height: 1.5; word-break: keep-all; border-radius: 11px; padding: 11px 13px; }
+        .cmp-verdict.win { background: var(--color-success-soft); color: var(--color-success-ink, var(--color-success)); }
+        .cmp-verdict.lose { background: var(--color-warning-soft); color: var(--color-warning-ink); }
+        .cmp-verdict b { font-weight: 800; }
+        .cmp-note { margin-top: 10px; font-size: 0.7rem; color: var(--text-tertiary); line-height: 1.5; }
+        .cmp-foot { margin-top: 10px; font-size: 0.64rem; color: var(--text-tertiary); line-height: 1.5; word-break: keep-all; }
         /* [#3 알림 피드] */
         .v10-noti { margin-top: 13px; border-top: 1px solid var(--color-line); padding-top: 12px; }
         .bf-block.v10-noti { margin-top: 14px; }
