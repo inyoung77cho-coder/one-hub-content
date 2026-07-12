@@ -417,10 +417,21 @@ export default function RealEstateDashboard() {
         </div>
       )}
 
+      <a href="/partners/realestate" className="partner-cta">
+        <span className="pc-l"><span className="pc-ic">🤝</span><span><b>협력업체 매물 등록</b><span className="pc-sub">중개·시행사이신가요? 매물 정보를 등록하세요</span></span></span>
+        <span className="pc-arrow">→</span>
+      </a>
+
       <div className="foot">실거래 기반 확정 지표 + 회귀 예측(근사). 예측치는 참고용이며 투자판단은 본인 책임.</div>
 
       <style jsx>{`
         .re { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
+        .partner-cta { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-decoration: none; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 14px 16px; margin: 4px 0 14px; box-shadow: var(--shadow-card); }
+        .partner-cta .pc-l { display: flex; align-items: center; gap: 10px; }
+        .partner-cta .pc-ic { font-size: 20px; }
+        .partner-cta b { display: block; color: var(--color-ink); font-size: 0.92rem; }
+        .partner-cta .pc-sub { display: block; color: var(--color-muted); font-size: 0.76rem; margin-top: 2px; }
+        .partner-cta .pc-arrow { color: var(--color-primary); font-weight: 700; }
         .err { background: var(--color-danger-soft); color: var(--color-danger); padding: 10px 12px; border-radius: 10px; font-size: 0.82rem; margin-bottom: 12px; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow-card); }
         /* HERO — 시장 브리핑 */

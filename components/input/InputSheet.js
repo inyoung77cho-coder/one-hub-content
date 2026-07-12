@@ -48,6 +48,7 @@ export default function InputSheet({ trader = "A" }) {
   const [areaIdx, setAreaIdx] = useState("");
   const [rePrice, setRePrice] = useState("");
   const [reHint, setReHint] = useState("");
+  const [spots, setSpots] = useState([]); // 운영자 신고가/속보(참고 전용)
 
   // ── 운영자 속보 ──
   const [opCx, setOpCx] = useState("");
@@ -110,7 +111,7 @@ export default function InputSheet({ trader = "A" }) {
 
   const pickComplex = async (name) => {
     setReSel(name); setReQ(name); setReMenu([]);
-    setAreas([]); setAreaIdx(""); setRePrice(""); setReHint("불러오는 중…");
+    setAreas([]); setAreaIdx(""); setRePrice(""); setSpots([]); setReHint("불러오는 중…");
     try {
       const d = await j(`/api/input/re-areas?complex=${encodeURIComponent(name)}`);
       const a = d.areas || [];
@@ -119,6 +120,11 @@ export default function InputSheet({ trader = "A" }) {
     } catch (_) {
       setReHint("면적 정보를 불러오지 못했습니다");
     }
+    // 운영자 신고가/속보(참고 전용) 병행 로드
+    try {
+      const s = await j(`/api/input/re-spot?complex_name=${encodeURIComponent(name)}`);
+      setSpots(s.items || []);
+    } catch (_) { setSpots([]); }
   };
 
   const onAreaChange = (idx) => {
@@ -127,7 +133,7 @@ export default function InputSheet({ trader = "A" }) {
     const rec = areas[+idx];
     if (rec) {
       setRePrice(String(rec.rep_price_manwon ?? ""));
-      setReHint(`대표 실거래 ${eok(rec.rep_price_manwon)} 자동 제안됨 (수정 가능)`);
+      setReHint(`시세 ${eok(rec.rep_price_manwon)} · 최고 ${eok(rec.max_price_manwon)} — 매수가 자동 제안(수정 가능)`);
     }
   };
 
@@ -278,7 +284,7 @@ export default function InputSheet({ trader = "A" }) {
               <select value={areaIdx} disabled={areas.length === 0} onChange={(e) => onAreaChange(e.target.value)}>
                 <option value="">{areas.length ? "면적 선택" : "단지를 먼저 선택하세요"}</option>
                 {areas.map((a, i) => (
-                  <option key={i} value={i}>{a.m2}㎡ · 약 {eok(a.rep_price_manwon)} (n={a.n})</option>
+                  <option key={i} value={i}>{a.m2}㎡ · 시세 {eok(a.rep_price_manwon)} · 최고 {eok(a.max_price_manwon)} (n={a.n})</option>
                 ))}
               </select>
               <div className="hint">{reHint}</div>
@@ -287,6 +293,20 @@ export default function InputSheet({ trader = "A" }) {
               <label>매수가 (만원 · 최근 실거래 자동 제안)</label>
               <input type="number" value={rePrice} onChange={(e) => setRePrice(e.target.value)} placeholder="0" />
             </div>
+
+            {spots.length > 0 && (
+              <div className="spots">
+                <div className="spots-h">운영자 신고가 · 속보 <span>참고 전용 · 엔진(시세·갭) 미반영</span></div>
+                {spots.map((s) => (
+                  <div className="spot-row" key={s.id}>
+                    <span className={`spot-kind k-${s.kind}`}>{s.kind === "report" ? "신고가" : s.kind === "listing" ? "매물호가" : "소문"}</span>
+                    <span className="spot-nm">{s.complex_name}{s.area_m2 ? ` ${s.area_m2}㎡` : ""}</span>
+                    <span className="spot-px">{eok(s.price_manwon)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <button className="btn" onClick={addRE}>내 단지로 추가</button>
 
             {op ? (
@@ -359,6 +379,13 @@ export default function InputSheet({ trader = "A" }) {
         .two > * { flex: 1; }
         .hint { font-size: 12px; color: var(--color-primary); margin-top: 5px; min-height: 16px; }
         .note { font-size: 12px; color: var(--color-muted); margin-top: 10px; }
+        .spots { margin-top: 12px; border: 1px solid var(--color-line); border-radius: 12px; padding: 10px 12px; background: var(--color-bg); }
+        .spots-h { font-size: 12px; font-weight: 700; color: var(--color-text); margin-bottom: 6px; }
+        .spots-h span { font-weight: 500; color: var(--color-muted); font-size: 11px; margin-left: 6px; }
+        .spot-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 13px; }
+        .spot-kind { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 99px; background: var(--color-warning-soft, var(--color-primary-soft)); color: var(--color-warning-ink, var(--color-warning)); }
+        .spot-nm { flex: 1; }
+        .spot-px { font-weight: 700; }
         .btn { display: block; width: 100%; margin-top: 14px; padding: 13px; border: none; border-radius: 12px; background: var(--color-primary); color: #fff; font-weight: 700; font-size: 15px; font-family: inherit; cursor: pointer; transition: .15s; }
         .btn:active { transform: scale(.99); }
         .btn.ghost { background: var(--color-primary-soft); color: var(--color-primary); }

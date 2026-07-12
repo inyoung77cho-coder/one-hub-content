@@ -221,6 +221,7 @@ export default function PWADashboard({ latestReport }) {
   const [recSort, setRecSort] = useState('interest'); // [S7.2] 추천 정렬(interest/upside)
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
+  const [showAssetDetail, setShowAssetDetail] = useState(false); // [팝업] 총자산 클릭 → 상세 breakdown
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
   const [reFeed, setReFeed] = useState(null); // [브리핑] 부동산 최근 실거래(신고가) 피드
   const [fxRate, setFxRate] = useState(null); // [브리핑] 오늘 USD/KRW 환율(경제 지표용)
@@ -1088,8 +1089,9 @@ export default function PWADashboard({ latestReport }) {
                   ? null
                   : Math.round(((baseTotal || 0) + (acctCashUk || 0)) * 100) / 100;
                 return (
+                  <>
                   <section className="card v10">
-                    <div className="v10-total"><span className="v10-total-lbl">총자산</span><span className="v10-total-amt mono">{totalUk != null ? `${totalUk}억` : '—'}</span></div>
+                    <div className="v10-total" onClick={() => setShowAssetDetail(true)} style={{ cursor: 'pointer' }}><span className="v10-total-lbl">총자산</span><span className="v10-total-amt mono">{totalUk != null ? `${totalUk}억` : '—'}</span><span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--color-muted)' }}>상세 ▸</span></div>
                     {[
                       ['주식', 'var(--color-primary)', assetSum?.breakdown?.stock_uk, '/pwa?tab=recommend'],
                       ['ETF', 'var(--color-success)', assetSum?.breakdown?.etf_uk, '/pwa/etf'],
@@ -1108,6 +1110,43 @@ export default function PWADashboard({ latestReport }) {
                       🩺 AI 배분 정밀 진단 · 포트폴리오 주치의 <span>→</span>
                     </button>
                   </section>
+                  {showAssetDetail && (() => {
+                    const rows = [
+                      ['주식', assetSum?.breakdown?.stock_uk, 'var(--color-primary)'],
+                      ['ETF', assetSum?.breakdown?.etf_uk, 'var(--color-success)'],
+                      ['부동산', assetSum?.breakdown?.realestate_uk, 'var(--color-ink-3)'],
+                      ['현금', cashUk, 'var(--color-warning)'],
+                    ];
+                    const denom = totalUk || rows.reduce((s, r) => s + (Number(r[1]) || 0), 0) || 1;
+                    return (
+                      <div onClick={() => setShowAssetDetail(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+                        <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 380, background: 'var(--color-card)', color: 'var(--color-text)', borderRadius: 16, padding: 18, boxShadow: '0 12px 40px rgba(0,0,0,.3)' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                            <b style={{ fontSize: 15 }}>총자산 상세</b>
+                            <button onClick={() => setShowAssetDetail(false)} style={{ border: 'none', background: 'transparent', fontSize: 18, color: 'var(--color-muted)', cursor: 'pointer' }}>✕</button>
+                          </div>
+                          <div className="mono" style={{ fontSize: 26, fontWeight: 800, marginBottom: 12 }}>{totalUk != null ? `${totalUk}억` : '—'}</div>
+                          {rows.map((r) => {
+                            const label = r[0], val = r[1], color = r[2];
+                            const v = Number(val);
+                            const has = val != null && !Number.isNaN(v);
+                            const pct = has ? Math.round((v / denom) * 1000) / 10 : null;
+                            return (
+                              <div key={label} style={{ marginBottom: 10 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 14 }}>
+                                  <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><i style={{ width: 9, height: 9, borderRadius: '50%', background: color, display: 'inline-block' }} />{label}</span>
+                                  <span style={{ fontWeight: 700 }}>{has ? `${v}억` : '미입력'}{has && pct != null ? <span style={{ color: 'var(--color-muted)', fontWeight: 500, marginLeft: 6 }}>{pct}%</span> : null}</span>
+                                </div>
+                                {has && <div style={{ height: 6, borderRadius: 99, background: 'var(--color-line)', marginTop: 5, overflow: 'hidden' }}><div style={{ width: `${Math.min(100, pct || 0)}%`, height: '100%', background: color }} /></div>}
+                              </div>
+                            );
+                          })}
+                          <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 8 }}>주식=KIS 실시간 · ETF=평가액 · 부동산=AVM 추정. 미입력 자산군은 입력 시 반영됩니다.</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                  </>
                 );
               })()}
 
