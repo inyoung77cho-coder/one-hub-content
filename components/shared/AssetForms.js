@@ -121,13 +121,14 @@ export function EtfForm({ onSaved }) {
   const [price, setPrice] = useState("");
   const [ccy, setCcy] = useState("USD");
   const [account, setAccount] = useState("일반");
+  const [broker, setBroker] = useState(STOCK_BROKERS[0]);
   const [msg, setMsg] = useState("");
 
   const save = () => {
     const tr = getTrader();
     const mkt = market === "kr" || market === "us" ? market : inferMarket(ticker);
     const res = side === "buy"
-      ? buyEtf({ ticker, market: mkt, shares, avgPrice: price, avgCcy: ccy, account, trader: tr })
+      ? buyEtf({ ticker, market: mkt, shares, avgPrice: price, avgCcy: ccy, account, broker, trader: tr })
       : sellEtf({ ticker, shares, account, trader: tr });
     if (!res?.ok) { setMsg("⚠️ " + (res?.error || "입력 오류")); return; }
     if (side === "buy" && ccy === "KRW") {
@@ -160,11 +161,15 @@ export function EtfForm({ onSaved }) {
           <select value={account} onChange={(e) => setAccount(e.target.value)}>{ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}</select></label>
       </div>
       {side === "buy" && (
-        <div className="af-row">
-          <label className="af-f"><span>평단</span><input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="78" /></label>
-          <label className="af-f"><span>통화</span>
-            <select value={ccy} onChange={(e) => setCcy(e.target.value)}><option value="USD">USD</option><option value="KRW">KRW</option></select></label>
-        </div>
+        <>
+          <div className="af-row">
+            <label className="af-f"><span>평단</span><input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="78" /></label>
+            <label className="af-f"><span>통화</span>
+              <select value={ccy} onChange={(e) => setCcy(e.target.value)}><option value="USD">USD</option><option value="KRW">KRW</option></select></label>
+          </div>
+          <label className="af-f"><span>증권사<em>연금·ISA 구분</em></span>
+            <select value={broker} onChange={(e) => setBroker(e.target.value)}>{STOCK_BROKERS.map((b) => <option key={b} value={b}>{b}</option>)}</select></label>
+        </>
       )}
       {msg && <div className="af-msg err">{msg}</div>}
       <button className={`af-save ${side === "sell" ? "sell" : ""}`} onClick={save}>{side === "buy" ? "＋ 매수 기록" : "－ 매도 기록"}</button>

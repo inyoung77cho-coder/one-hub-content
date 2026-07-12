@@ -1,6 +1,6 @@
 // public/sw.js — ONE-HUB v9.0 PWA Service Worker
 
-const CACHE_VERSION = 'onehub-v20';
+const CACHE_VERSION = 'onehub-v21';
 const CACHE_NAME = CACHE_VERSION;
 const STATIC_ASSETS = ['/pwa', '/icons/icon-192.png', '/icons/icon-512.png'];
 

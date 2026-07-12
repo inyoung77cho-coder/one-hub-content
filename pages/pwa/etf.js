@@ -673,7 +673,7 @@ export default function EtfDashboard() {
                       return (
                         <div className="me-row" key={h.id}>
                           <div className="me-l">
-                            <span className="me-tk">{h.ticker}</span>
+                            <span className="me-tk">{h.ticker}{h.broker ? <span className="me-broker">{h.broker}</span> : null}</span>
                             <span className="me-qty">{h.shares}주 · 평단 {h.avgCcy === "USD" ? "$" : ""}{h.avgPrice.toLocaleString()}{h.avgCcy === "KRW" ? "원" : ""}</span>
                           </div>
                           <div className="me-r">
@@ -908,7 +908,8 @@ export default function EtfDashboard() {
         .me-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
         .me-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--color-card-soft); border-radius: 11px; }
         .me-l { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-        .me-tk { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); }
+        .me-tk { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); display: inline-flex; align-items: center; gap: 6px; }
+        .me-broker { font-size: 0.6rem; font-weight: 700; color: var(--color-ink-2); background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 7px; }
         .me-qty { font-size: 0.68rem; color: var(--color-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .me-r { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
         .me-px { font-size: 0.82rem; font-weight: 700; color: var(--color-ink); font-family: ui-monospace, monospace; }
