@@ -292,12 +292,12 @@ export default function Home({ reports, stats }) {
                 <p>새 글·리포트·영상은 아래 채널로 먼저 도착합니다. 팔로우하고 ONE-HUB의 성장 과정을 함께 보세요.</p>
               </div>
               <div className="channels">
-                <a className="channel" href="https://youtube.com/@onehub_invest" target="_blank" rel="noopener">
+                <div className="channel channel-soon">
                   <div className="ch-ic">▶️</div>
-                  <div className="ch-t">YouTube</div>
+                  <div className="ch-t">YouTube <span className="ch-soon">준비중</span></div>
                   <div className="ch-d">AI 운영 브이로그·시장 브리핑 영상</div>
-                  <span className="ch-cta">구독하기 →</span>
-                </a>
+                  <span className="ch-cta-soon">곧 공개</span>
+                </div>
                 <a className="channel" href="/blog">
                   <div className="ch-ic">✍️</div>
                   <div className="ch-t">블로그</div>
@@ -416,6 +416,10 @@ export default function Home({ reports, stats }) {
         .ch-t{font-size:16px;font-weight:800;color:var(--ink)}
         .ch-d{font-size:13px;color:var(--ink2);line-height:1.5;flex:1}
         .ch-cta{font-size:13px;font-weight:700;color:var(--blue);margin-top:10px}
+        .ch-cta-soon{font-size:13px;font-weight:700;color:var(--ink3);margin-top:10px}
+        .channel-soon{opacity:.72;cursor:default}
+        .channel-soon:hover{transform:none;box-shadow:var(--shadow)}
+        .ch-soon{font-size:10px;font-weight:800;color:#64748B;background:#F1F5F9;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:middle}
         @media(max-width:860px){.channels{grid-template-columns:1fr 1fr}}
         @media(max-width:520px){.channels{grid-template-columns:1fr}}
 
