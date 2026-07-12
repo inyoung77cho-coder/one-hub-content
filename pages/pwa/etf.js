@@ -6,6 +6,7 @@ import TopNav from "../../components/TopNav";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS } from "../../lib/etfHoldings";
 import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress, pensionCreditLimitCombined } from "../../lib/taxRules";
+import { EtfForm } from "../../components/shared/AssetForms";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -652,40 +653,8 @@ export default function EtfDashboard() {
         <div className="label">🧾 내 ETF · 직접 입력 <span className="sub">시세 자동 갱신</span>
           {myTotal > 0 && <span className="me-total">평가 {won(myTotal)}원</span>}
         </div>
-        <div className="me-toggle">
-          <button className={form.side === "buy" ? "on buy" : ""} onClick={() => { setForm((f) => ({ ...f, side: "buy" })); setFormMsg(""); }}>매수</button>
-          <button className={form.side === "sell" ? "on sell" : ""} onClick={() => { setForm((f) => ({ ...f, side: "sell" })); setFormMsg(""); }}>매도</button>
-        </div>
-        {/* [E1] 국내/해외 구분자 — 세제(양도세 vs 배당소득세)·통화·시세소스가 다르므로 명시 선택 */}
-        {form.side === "buy" && (
-          <div className="me-mkt" role="group" aria-label="국내/해외 구분">
-            {[["auto", "자동"], ["kr", "🇰🇷 국내"], ["us", "🇺🇸 해외"]].map(([v, l]) => (
-              <button key={v} type="button" className={form.market === v ? "on" : ""}
-                onClick={() => setForm((f) => ({ ...f, market: v, ccy: v === "kr" ? "KRW" : v === "us" ? "USD" : f.ccy }))}>{l}</button>
-            ))}
-          </div>
-        )}
-        <div className="me-form">
-          <input className="me-in tk" placeholder={form.market === "kr" ? "코드 (069500)" : form.market === "us" ? "티커 (SCHD)" : "티커 (SCHD / 069500)"} value={form.ticker}
-            onChange={(e) => setForm((f) => ({ ...f, ticker: e.target.value }))} />
-          <input className="me-in num" type="number" inputMode="decimal" placeholder="수량" value={form.shares}
-            onChange={(e) => setForm((f) => ({ ...f, shares: e.target.value }))} />
-          {/* [S4] 계좌 유형 — 세제가 다름 */}
-          <select className="me-in acct" value={form.account} onChange={(e) => setForm((f) => ({ ...f, account: e.target.value }))}>
-            {ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}
-          </select>
-          {form.side === "buy" && (
-            <>
-              <input className="me-in num" type="number" inputMode="decimal" placeholder="평단가" value={form.price}
-                onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} />
-              <select className="me-in ccy" value={form.ccy} onChange={(e) => setForm((f) => ({ ...f, ccy: e.target.value }))}>
-                <option value="USD">USD</option><option value="KRW">KRW</option>
-              </select>
-            </>
-          )}
-        </div>
-        <button className={`me-submit ${form.side}`} onClick={submitTrade}>{form.side === "buy" ? "＋ 매수 기록" : "－ 매도 기록"}</button>
-        {formMsg && <div className="me-msg">{formMsg}</div>}
+        {/* [폼 일원화] 빠른입력과 동일한 공용 EtfForm 사용 */}
+        <EtfForm onSaved={() => { const tr = getTrader(); const l = getHoldings(tr); setHoldings(l); refreshQuotes(l); }} />
         {holdings.length > 0 ? (
           <div className="me-groups">
             {/* [S4·계좌 세분화] 계좌 유형별 그룹 — 세제가 다르므로 버킷별 평가·세제 안내 분리 · 상단 필터 반영 */}
