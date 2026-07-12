@@ -195,6 +195,8 @@ export default function PWADashboard({ latestReport }) {
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
+  const [reFeed, setReFeed] = useState(null); // [브리핑] 부동산 최근 실거래(신고가) 피드
+  const [fxRate, setFxRate] = useState(null); // [브리핑] 오늘 USD/KRW 환율(경제 지표용)
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
   const [qaOpen, setQaOpen] = useState(false); // [S3] 빠른입력 시트(공용 QuickAddSheet) 열림
@@ -421,6 +423,15 @@ export default function PWADashboard({ latestReport }) {
     fetch(`/api/realestate/v2/ai-summary?trader_id=${trader}`)
       .then(r => r.json())
       .then(d => { if (d && Array.isArray(d.summary_items)) setAiRec(d); })
+      .catch(() => {});
+    // [브리핑] 부동산 최근 실거래(신고가) 피드 + 오늘 환율 — 판단 근거 카드용
+    fetch(`/api/pwa/re/feed`)
+      .then(r => r.json())
+      .then(d => { if (d && Array.isArray(d.feed)) setReFeed(d); })
+      .catch(() => {});
+    fetch(`/api/fx/usdkrw`)
+      .then(r => r.json())
+      .then(d => { if (d?.ok && d.rate) setFxRate(d.rate); })
       .catch(() => {});
     // [기록] AI 자기검증(차단 적중률) — ML 누적 학습 현황 카드용
     fetch(`/api/pwa/accuracy?trader_id=${trader}`)
@@ -1046,52 +1057,52 @@ export default function PWADashboard({ latestReport }) {
                 );
               })()}
 
-              {/* [v10 UI 시안] ③ 오늘의 행동 — 4셀 + 요약 노트 */}
+              {/* [브리핑] ③ 오늘의 브리핑 · 판단 근거 — 상단 '판단·액션'과 다른 '근거'를 제시.
+                    경제지표 + 부동산 신고가·실거래 + 내 자산 활동(실데이터만, 허위 헤드라인 금지) */}
               <section className="card v10">
-                <div className="v10-sect"><h3>🎯 오늘의 종합 행동</h3><a onClick={() => setTab('report')}>기록 →</a></div>
-                <div className="v10-acts">
-                  {[
-                    ['매수', buyCount, 'var(--color-success)'],
-                    ['매도', sellCount, 'var(--color-danger)'],
-                    ['관망', watchCount, 'var(--color-primary)'],
-                    ['차단', blockCount, 'var(--color-ink-3)'],
-                  ].map(([k, n, c]) => (
-                    <div className="v10-act" key={k}><div className="v10-act-n mono" style={{ color: c }}>{n}</div><div className="v10-act-k">{k}</div></div>
-                  ))}
-                </div>
-                <div className="v10-act-note">AI는 오늘 {buyCount > 0 ? <><b>{buyCount}종목을 매수</b>했습니다.</> : blockCount > 0 ? <>매수 없이 <b>{blockCount}건을 신중히 차단</b>했습니다.</> : <><b>선별 관망</b>했습니다.</>} 승인 대기 <b>{pendingList.length}건</b>.</div>
+                <div className="v10-sect"><h3>📰 오늘의 브리핑 · 판단 근거</h3><a onClick={() => setTab('report')}>기록 →</a></div>
 
-                {/* [종합 브리핑] 주식·ETF·부동산을 한눈에 — 자산군별 한 줄 + 상세 딥링크 */}
-                {(() => {
-                  const bd = assetSum?.breakdown || {};
-                  const etfPct = assetSum?.total_uk > 0 && bd.etf_uk != null ? Math.round((bd.etf_uk / assetSum.total_uk) * 100) : null;
-                  const reState = assetSum?.realty_state;
-                  const reItem = aiRec?.summary_items?.find(x => typeof x === 'string') || (typeof aiRec?.summary_items?.[0] === 'object' ? (aiRec.summary_items[0].text || aiRec.summary_items[0].message) : null);
-                  const reNote = reItem || (reState === 'entered' ? '국면·저평가·갈아타기 점검' : reState === 'not_entered' ? '미입력 · 등록하면 통합자산 반영' : '국면·저평가 확인');
-                  const stockLine = buyCount > 0 ? `${buyCount}종목 매수 후보` : blockCount > 0 ? `${blockCount}건 차단 · 선별 관망` : '선별 관망';
-                  const rows = [
-                    ['📈', '주식', stockLine + (pendingList.length > 0 ? ` · 승인대기 ${pendingList.length}` : ''), () => setTab('recommend')],
-                    ['📊', 'ETF', etfPct != null ? `보유 비중 ${etfPct}% · 리밸런싱·세금 점검` : '보유·평가 실시간 점검', () => router.push('/pwa/etf')],
-                    ['🏠', '부동산', reNote, () => router.push('/pwa/realestate')],
-                  ];
-                  return (
-                    <div className="v10-brief">
-                      {rows.map(([ic, k, tx, go]) => (
-                        <button className="v10-brief-row" key={k} onClick={go}>
-                          <span className="vb-ic">{ic}</span>
-                          <span className="vb-k">{k}</span>
-                          <span className="vb-tx">{tx}</span>
-                          <span className="vb-arr">›</span>
+                {/* A) 시장·경제 지표 — 실측 매크로(경제 브리핑의 근거) */}
+                <div className="bf-block">
+                  <div className="bf-h">🌐 시장·경제 지표</div>
+                  <div className="bf-macro">
+                    {regime && <span className={`bf-chip ${regimeClass(regime)}`}>국면 {regime}</span>}
+                    {heat != null && <span className="bf-chip">시장온도 {heat}</span>}
+                    {fearGreed != null && <span className="bf-chip">공포·탐욕 {fearGreed}</span>}
+                    {vix != null && <span className="bf-chip">VIX {vix}</span>}
+                    {fxRate != null && <span className="bf-chip">환율 {Math.round(fxRate).toLocaleString()}원</span>}
+                  </div>
+                  <div className="bf-macro-read">{regime === 'BEAR' ? '위험선호 위축 — 방어적 배분 우위' : regime === 'BULL' ? (heat != null && heat >= 70 ? '상승세 과열 — 추격보다 눌림목 대기' : '상승 우호 — 선별 매수 유효') : '중립 — 지표 확인 후 선별 대응'}</div>
+                </div>
+
+                {/* B) 부동산 신고가·실거래 — raw_transactions 기반 실데이터(변동률>0 = 직전 대비 신고가) */}
+                <div className="bf-block">
+                  <div className="bf-h">🏠 부동산 신고가·실거래</div>
+                  {reFeed?.feed?.length > 0 ? (
+                    <>
+                      {[...reFeed.feed].sort((a, b) => (b.변동률 ?? -999) - (a.변동률 ?? -999)).slice(0, 2).map((f, i) => (
+                        <button className="bf-re" key={`${f.단지명}-${f.거래일}-${i}`} onClick={() => router.push('/pwa/realestate')}>
+                          <span className="bf-re-l">
+                            <b className="bf-re-name">{f.단지명}</b>
+                            <span className="bf-re-sub">{f.전용면적}㎡{f.층 ? ` · ${f.층}층` : ''}{f.거래일 ? ` · ${f.거래일.slice(5)}` : ''}</span>
+                          </span>
+                          <span className="bf-re-r">
+                            <b className="bf-re-px">{f.거래금액_억}억</b>
+                            {f.변동률 != null && <span className={`bf-re-chg ${f.변동률 > 0 ? 'up' : f.변동률 < 0 ? 'dn' : 'fl'}`}>{f.변동률 > 0 ? `▲${f.변동률}% 신고가` : f.변동률 < 0 ? `▼${Math.abs(f.변동률)}%` : '−'}</span>}
+                          </span>
                         </button>
                       ))}
-                    </div>
-                  );
-                })()}
+                      <div className="bf-note">raw_transactions 실거래 기준 · 동일 단지·평형 직전 대비{reFeed.updated ? ` · ${reFeed.updated}` : ''}</div>
+                    </>
+                  ) : (
+                    <div className="bf-empty">관심·보유 단지를 등록하면 최근 실거래·신고가가 표시됩니다. <button className="bf-empty-link" onClick={() => router.push('/pwa/realestate')}>부동산 열기 →</button></div>
+                  )}
+                </div>
 
-                {/* [#3 알림 피드] 텔레그램·리포트·큐 동기화 알림을 액션 카드 안에 인라인 노출 */}
+                {/* C) 내 자산 활동 — 텔레그램/리포트/큐 동기화 알림(입출금·체결·리포트 등 실데이터) */}
                 {notis.length > 0 && (
-                  <div className="v10-noti">
-                    <div className="v10-noti-h">🔔 최근 알림</div>
+                  <div className="bf-block v10-noti">
+                    <div className="v10-noti-h">💰 내 자산 활동</div>
                     {notis.slice(0, 4).map((n, i) => {
                       const title = n.title || n.message || n.body || n.text || '알림';
                       const t = n.type || n.category || '';
@@ -1111,6 +1122,18 @@ export default function PWADashboard({ latestReport }) {
                     })}
                   </div>
                 )}
+
+                {/* D) 오늘 AI 실행 — 판단이 실제 행동으로 이어진 근거(집계) */}
+                <div className="bf-exec">
+                  <span className="bf-exec-h">오늘 AI 실행</span>
+                  <span className="bf-exec-items">
+                    <span>매수 <b style={{ color: 'var(--color-success)' }}>{buyCount}</b></span>
+                    <span>매도 <b style={{ color: 'var(--color-danger)' }}>{sellCount}</b></span>
+                    <span>관망 <b style={{ color: 'var(--color-primary)' }}>{watchCount}</b></span>
+                    <span>차단 <b style={{ color: 'var(--color-ink-3)' }}>{blockCount}</b></span>
+                    <span>승인대기 <b>{pendingList.length}</b></span>
+                  </span>
+                </div>
               </section>
 
               {/* [v10 UI 시안] ④ AI 판단 근거 — 접기(요약 한 줄 → 지표/확률바) */}
@@ -2827,8 +2850,35 @@ export default function PWADashboard({ latestReport }) {
         .vb-tx { flex: 1; min-width: 0; font-size: 12px; color: var(--color-ink-2); font-weight: 600; line-height: 1.4; word-break: keep-all; }
         .vb-arr { color: var(--color-ink-3); font-weight: 800; flex-shrink: 0; }
         .v10-act-note b { color: var(--color-ink); }
+        /* [브리핑·판단 근거] */
+        .bf-block { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--color-line); }
+        .bf-block:first-of-type { margin-top: 12px; }
+        .bf-h { font-size: 12.5px; font-weight: 800; color: var(--color-ink); margin-bottom: 9px; }
+        .bf-macro { display: flex; flex-wrap: wrap; gap: 6px; }
+        .bf-chip { font-size: 11px; font-weight: 700; color: var(--color-ink-2); background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+        .bf-chip.bull { color: var(--color-success); border-color: color-mix(in srgb, var(--color-success) 35%, transparent); }
+        .bf-chip.bear { color: var(--color-danger); border-color: color-mix(in srgb, var(--color-danger) 35%, transparent); }
+        .bf-macro-read { margin-top: 8px; font-size: 12px; font-weight: 600; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 10px; padding: 8px 11px; line-height: 1.45; word-break: keep-all; }
+        .bf-re { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 11px; padding: 9px 12px; margin-bottom: 6px; cursor: pointer; font-family: var(--font-sans); text-align: left; }
+        .bf-re-l { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+        .bf-re-name { font-size: 12.5px; font-weight: 700; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bf-re-sub { font-size: 10.5px; color: var(--color-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .bf-re-r { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+        .bf-re-px { font-size: 13px; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+        .bf-re-chg { font-size: 10.5px; font-weight: 800; white-space: nowrap; }
+        .bf-re-chg.up { color: var(--color-danger); }
+        .bf-re-chg.dn { color: var(--color-primary); }
+        .bf-re-chg.fl { color: var(--color-ink-3); }
+        .bf-note { font-size: 10px; color: var(--color-ink-3); margin-top: 4px; line-height: 1.5; word-break: keep-all; }
+        .bf-empty { font-size: 12px; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 10px; padding: 11px 12px; line-height: 1.5; word-break: keep-all; }
+        .bf-empty-link { background: none; border: none; color: var(--color-primary); font-weight: 700; font-size: 12px; cursor: pointer; font-family: var(--font-sans); padding: 0; }
+        .bf-exec { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); }
+        .bf-exec-h { font-size: 11.5px; font-weight: 800; color: var(--color-ink-2); }
+        .bf-exec-items { display: flex; flex-wrap: wrap; gap: 4px 11px; font-size: 11.5px; color: var(--color-ink-3); }
+        .bf-exec-items b { font-variant-numeric: tabular-nums; font-weight: 800; }
         /* [#3 알림 피드] */
         .v10-noti { margin-top: 13px; border-top: 1px solid var(--color-line); padding-top: 12px; }
+        .bf-block.v10-noti { margin-top: 14px; }
         .v10-noti-h { font-size: 12px; font-weight: 700; color: var(--color-ink-2); margin-bottom: 8px; }
         .v10-noti-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
         .v10-noti-ic { flex-shrink: 0; font-size: 14px; }
