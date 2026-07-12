@@ -3,6 +3,8 @@ import Nav from "../components/Nav";
 import Head from "next/head";
 import { useEffect } from "react";
 import { useRouter } from "next/router";
+import { initSync } from "../lib/syncManager";
+import { getTrader } from "../lib/trader";
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
@@ -13,6 +15,18 @@ export default function App({ Component, pageProps }) {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
+  }, []);
+
+  // [기기 동기화] PC↔모바일 자산 입력 정합(충돌 시 모바일 우선). 백엔드 미배포 시 로컬만(회귀 없음).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let cleanup;
+    let cancelled = false;
+    const run = async () => { const c = await initSync(getTrader()); if (cancelled) c && c(); else cleanup = c; };
+    run();
+    const onTrader = () => { if (cleanup) cleanup(); run(); };
+    window.addEventListener("onehub-trader-change", onTrader);
+    return () => { cancelled = true; if (cleanup) cleanup(); window.removeEventListener("onehub-trader-change", onTrader); };
   }, []);
 
   // [v10 UI] 다크모드 단일 소스 — <html data-theme> 를 onehub_theme(localStorage)와 동기화.
