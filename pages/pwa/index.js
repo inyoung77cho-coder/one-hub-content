@@ -2933,14 +2933,15 @@ export default function PWADashboard({ latestReport }) {
         .hero-v9-btn.secondary { background: var(--inset-bg); color: var(--text-secondary); border: 1px solid var(--border); }
 
         /* [v8.7] Top3 Hero Cards */
-        .top3-hero-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
-        .top3-hero-card { display: flex; flex-direction: column; align-items: center; padding: 12px 6px; background: var(--card-bg); border-radius: var(--radius-md); border: 1.5px solid var(--border); gap: 4px; cursor: pointer; text-align: center; transition: border-color 0.15s; }
+        /* [모바일] minmax(0,1fr) — 1fr의 암묵적 min-content 최소폭 때문에 nowrap 자식(종목명·버튼)이 트랙을 밀어 가로 오버플로우 나던 문제 해소 */
+        .top3-hero-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-bottom: 4px; }
+        .top3-hero-card { display: flex; flex-direction: column; align-items: center; min-width: 0; padding: 12px 6px; background: var(--card-bg); border-radius: var(--radius-md); border: 1.5px solid var(--border); gap: 4px; cursor: pointer; text-align: center; transition: border-color 0.15s; }
         .top3-hero-card:hover { border-color: var(--color-primary); }
         .top3-hero-card:nth-child(1) { border-color: var(--color-warning); }
         .top3-hero-card:nth-child(2) { border-color: var(--color-ink-3); }
         .top3-hero-card:nth-child(3) { border-color: var(--color-warning-ink); }
         .top3-medal { font-size: 1.4rem; line-height: 1; }
-        .top3-name { font-size: 0.8rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+        .top3-name { font-size: 0.8rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; width: 100%; min-width: 0; display: block; }
         .top3-stars { font-size: 0.7rem; letter-spacing: -1px; color: var(--color-warning); }
         .top3-ai-pct { font-size: 0.78rem; font-weight: 800; color: var(--color-primary); }
         .top3-why-btn { font-size: 0.62rem; padding: 3px 8px; border-radius: 6px; background: var(--inset-bg); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; margin-top: 2px; }
