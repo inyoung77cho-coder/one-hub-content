@@ -11,7 +11,7 @@ const QA_ASSET = { etf: "etf", realestate: "realestate" };
 const ITEMS = [
   // [S2 IA] 대시보드 · 주식 · ETF · 부동산 · 트러스트
   //   대시보드는 ?tab=dashboard로 진입 → 스플래시 재생 건너뜀. AI자산은 대시보드 링크로 진입.
-  ["dashboard", "대시보드", "/pwa?tab=dashboard"],
+  ["dashboard", "종합자산", "/pwa?tab=dashboard"],
   ["stock", "주식", "/pwa?tab=portfolio"],
   ["etf", "ETF", "/pwa/etf"],
   ["realestate", "부동산", "/pwa/realestate"],

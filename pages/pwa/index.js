@@ -780,7 +780,7 @@ export default function PWADashboard({ latestReport }) {
         {/* [S2 IA] 대시보드 · 주식 · ETF · 부동산 · 트러스트 (AI자산=대시보드 링크, 기록=트러스트로 이동) */}
         <nav className="pwa-tabs">
           {[
-            ['dashboard','대시보드'],
+            ['dashboard','종합자산'],
             ['stock','주식'],
             ['etf','ETF'],
             ['realestate','부동산'],
@@ -953,9 +953,23 @@ export default function PWADashboard({ latestReport }) {
                       </div>
                       <div className="mp-chip">
                         <span className="mp-ck">😨 공포·탐욕</span>
-                        <span className="mp-cv">{fearGreed ?? '-'} {fearGreed != null ? `· ${fgLabel(fearGreed)}` : ''}</span>
+                        <span className="mp-cv" style={{ color: fgColor(fearGreed) }}>{fearGreed ?? '-'} {fearGreed != null ? `· ${fgLabel(fearGreed)}` : ''}</span>
                       </div>
                     </div>
+                    {/* [공포탐욕 게이지] 0 극공포 → 100 극탐욕, 현재 위치를 바 위 마커로 표시 */}
+                    {fearGreed != null && (
+                      <div className="fg-bar">
+                        <div className="fg-track">
+                          {[['극공포', 25], ['공포', 20], ['중립', 10], ['탐욕', 20], ['극탐욕', 25]].map(([lb, w], i) => (
+                            <span className={`fg-zone z${i + 1}`} style={{ flexBasis: `${w}%` }} key={lb}>{lb}</span>
+                          ))}
+                          <span className="fg-marker" style={{ left: `${Math.max(0, Math.min(100, fearGreed))}%` }}>
+                            <span className="fg-pin" style={{ background: fgColor(fearGreed) }}>{fearGreed}</span>
+                          </span>
+                        </div>
+                        <div className="fg-scale"><span>0 극공포</span><span>50 중립</span><span>100 극탐욕</span></div>
+                      </div>
+                    )}
                     <div className="mp-read">{pulseRead}</div>
                     <div className="mp-foot">
                       {vix != null && <span className="mp-tag">VIX {vix}</span>}
@@ -1006,7 +1020,7 @@ export default function PWADashboard({ latestReport }) {
 
               {/* [v10 UI 시안] ③ 오늘의 행동 — 4셀 + 요약 노트 */}
               <section className="card v10">
-                <div className="v10-sect"><h3>🎯 오늘의 행동</h3><a onClick={() => setTab('report')}>기록 →</a></div>
+                <div className="v10-sect"><h3>🎯 오늘의 종합 행동</h3><a onClick={() => setTab('report')}>기록 →</a></div>
                 <div className="v10-acts">
                   {[
                     ['매수', buyCount, 'var(--color-success)'],
@@ -1018,6 +1032,33 @@ export default function PWADashboard({ latestReport }) {
                   ))}
                 </div>
                 <div className="v10-act-note">AI는 오늘 {buyCount > 0 ? <><b>{buyCount}종목을 매수</b>했습니다.</> : blockCount > 0 ? <>매수 없이 <b>{blockCount}건을 신중히 차단</b>했습니다.</> : <><b>선별 관망</b>했습니다.</>} 승인 대기 <b>{pendingList.length}건</b>.</div>
+
+                {/* [종합 브리핑] 주식·ETF·부동산을 한눈에 — 자산군별 한 줄 + 상세 딥링크 */}
+                {(() => {
+                  const bd = assetSum?.breakdown || {};
+                  const etfPct = assetSum?.total_uk > 0 && bd.etf_uk != null ? Math.round((bd.etf_uk / assetSum.total_uk) * 100) : null;
+                  const reState = assetSum?.realty_state;
+                  const reItem = aiRec?.summary_items?.find(x => typeof x === 'string') || (typeof aiRec?.summary_items?.[0] === 'object' ? (aiRec.summary_items[0].text || aiRec.summary_items[0].message) : null);
+                  const reNote = reItem || (reState === 'entered' ? '국면·저평가·갈아타기 점검' : reState === 'not_entered' ? '미입력 · 등록하면 통합자산 반영' : '국면·저평가 확인');
+                  const stockLine = buyCount > 0 ? `${buyCount}종목 매수 후보` : blockCount > 0 ? `${blockCount}건 차단 · 선별 관망` : '선별 관망';
+                  const rows = [
+                    ['📈', '주식', stockLine + (pendingList.length > 0 ? ` · 승인대기 ${pendingList.length}` : ''), () => setTab('recommend')],
+                    ['📊', 'ETF', etfPct != null ? `보유 비중 ${etfPct}% · 리밸런싱·세금 점검` : '보유·평가 실시간 점검', () => router.push('/pwa/etf')],
+                    ['🏠', '부동산', reNote, () => router.push('/pwa/realestate')],
+                  ];
+                  return (
+                    <div className="v10-brief">
+                      {rows.map(([ic, k, tx, go]) => (
+                        <button className="v10-brief-row" key={k} onClick={go}>
+                          <span className="vb-ic">{ic}</span>
+                          <span className="vb-k">{k}</span>
+                          <span className="vb-tx">{tx}</span>
+                          <span className="vb-arr">›</span>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })()}
 
                 {/* [#3 알림 피드] 텔레그램·리포트·큐 동기화 알림을 액션 카드 안에 인라인 노출 */}
                 {notis.length > 0 && (
@@ -2743,6 +2784,13 @@ export default function PWADashboard({ latestReport }) {
         .v10-act-n { font-size: 22px; font-weight: 800; line-height: 1; }
         .v10-act-k { font-size: 11px; font-weight: 600; color: var(--color-ink-3); margin-top: 5px; letter-spacing: .3px; }
         .v10-act-note { margin-top: 13px; font-size: 12.5px; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 12px; padding: 11px 13px; line-height: 1.5; }
+        /* [종합 브리핑] 주식·ETF·부동산 한 줄 */
+        .v10-brief { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+        .v10-brief-row { display: flex; align-items: center; gap: 8px; width: 100%; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 11px; padding: 10px 12px; cursor: pointer; font-family: var(--font-sans); text-align: left; }
+        .vb-ic { font-size: 14px; flex-shrink: 0; }
+        .vb-k { font-size: 12px; font-weight: 800; color: var(--color-ink); flex-shrink: 0; width: 34px; }
+        .vb-tx { flex: 1; min-width: 0; font-size: 12px; color: var(--color-ink-2); font-weight: 600; line-height: 1.4; word-break: keep-all; }
+        .vb-arr { color: var(--color-ink-3); font-weight: 800; flex-shrink: 0; }
         .v10-act-note b { color: var(--color-ink); }
         /* [#3 알림 피드] */
         .v10-noti { margin-top: 13px; border-top: 1px solid var(--color-line); padding-top: 12px; }
@@ -2763,6 +2811,18 @@ export default function PWADashboard({ latestReport }) {
         .mp-chip.bear { border-color: color-mix(in srgb, var(--color-danger) 40%, transparent); }
         .mp-ck { font-size: 10.5px; color: var(--color-ink-3); font-weight: 700; white-space: nowrap; }
         .mp-cv { font-size: 13px; font-weight: 800; color: var(--color-ink); word-break: keep-all; }
+        /* [공포탐욕 게이지] */
+        .fg-bar { margin-top: 12px; }
+        .fg-track { position: relative; display: flex; height: 20px; border-radius: 6px; overflow: hidden; }
+        .fg-zone { display: flex; align-items: center; justify-content: center; font-size: 8.5px; font-weight: 800; color: #fff; letter-spacing: -.3px; white-space: nowrap; }
+        .fg-zone.z1 { background: var(--color-danger); }
+        .fg-zone.z2 { background: color-mix(in srgb, var(--color-danger) 60%, var(--color-warning)); }
+        .fg-zone.z3 { background: var(--color-ink-3); }
+        .fg-zone.z4 { background: color-mix(in srgb, var(--color-success) 60%, var(--color-warning)); }
+        .fg-zone.z5 { background: var(--color-success); }
+        .fg-marker { position: absolute; top: -4px; bottom: -4px; width: 0; transform: translateX(-50%); display: flex; align-items: flex-start; justify-content: center; }
+        .fg-pin { font-size: 10px; font-weight: 800; color: #fff; padding: 2px 6px; border-radius: 6px; border: 2px solid var(--color-card); box-shadow: var(--shadow-card); transform: translateY(-8px); font-family: ui-monospace, monospace; }
+        .fg-scale { display: flex; justify-content: space-between; font-size: 9px; color: var(--color-ink-3); font-weight: 600; margin-top: 10px; }
         .mp-read { margin-top: 11px; font-size: 12.5px; font-weight: 600; background: var(--color-primary-soft); color: var(--color-primary); border-radius: 10px; padding: 9px 12px; line-height: 1.45; word-break: keep-all; }
         .mp-foot { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
         .mp-tag { font-size: 10.5px; font-weight: 700; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 999px; padding: 3px 9px; }
