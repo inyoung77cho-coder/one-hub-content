@@ -121,13 +121,17 @@ function deriveRecMeta(s) {
   else if (rsi != null && rsi >= 45 && rsi <= 62) reason = `RSI 중립 · 수급 개선 관찰`;
   else if (vol != null && vol >= 1.3) reason = `거래량 ${vol.toFixed(1)}배 · 관심 유입`;
   else reason = `기술 지표 상위 관심 후보`;
-  // 기대 여력(기술적 추정): 변동성·모멘텀 기반 상단 여력 %
-  const upside = Math.round(clamp(6 + Math.max(0, mom ?? 0) * 0.15 + Math.max(0, (vol ?? 1) - 1) * 1.5, 5, 18));
+  // 기대 여력(기술적 추정): 변동성·모멘텀 기반 상단 여력 % — [S-4] 소수 1자리로 동점 최소화
+  const upside = Math.round(clamp(6 + Math.max(0, mom ?? 0) * 0.15 + Math.max(0, (vol ?? 1) - 1) * 1.5, 5, 18) * 10) / 10;
   // 스탠스(관심 강도)
   const stance = score >= 12 ? { label: '강한 후보', color: 'var(--color-success)' }
     : score >= 9 ? { label: '양호', color: 'var(--color-primary)' }
     : { label: '보통', color: 'var(--text-secondary)' };
-  return { reason, upside, stance, score };
+  // [S-8] AI 판단 등급 — 관심도(0~15)를 '매수/관심/관망'으로. 카드 최상단·최대 위계로 노출.
+  const verdict = score >= 12 ? { label: 'AI 판단: 매수', short: '매수', color: 'var(--color-danger)', bg: 'var(--color-danger-soft)' }
+    : score >= 9 ? { label: 'AI 판단: 관심', short: '관심', color: 'var(--color-warning-ink, var(--color-warning))', bg: 'var(--color-warning-soft)' }
+    : { label: 'AI 판단: 관망', short: '관망', color: 'var(--color-ink-2)', bg: 'var(--color-card-soft)' };
+  return { reason, upside, stance, score, verdict };
 }
 
 // [§3-4 피드백8] 보유 종목 AI 스탠스(유지/추가/축소/매도) + 근거 1줄 — 목표가/손절가 기반.
@@ -800,16 +804,10 @@ export default function PWADashboard({ latestReport }) {
     ...(data?.today_buys || []).map(b => _mkPick(b, true)),
     ...(data?.screening_candidates || []).map(s => _mkPick(s, false)),
   ].filter(p => p.name);
-  // dedup: 종목코드(없으면 이름) 기준 1건 — 매수신호 우선, 그다음 최고 스코어
-  const _pickMap = new Map();
-  for (const p of _pickPool) {
-    const k = p.code || p.name;
-    const cur = _pickMap.get(k);
-    if (!cur) { _pickMap.set(k, p); continue; }
-    if ((p.isBuy && !cur.isBuy) || (p.isBuy === cur.isBuy && p.score > cur.score)) _pickMap.set(k, p);
-  }
+  // [S-4] dedup: 홈·추천 공용 dedupBy 사용(종목코드 기준). 매수신호·고스코어 우선을 위해 사전 정렬 후 첫 항목 채택.
+  const _ordered = [..._pickPool].sort((a, b) => (Number(b.isBuy) - Number(a.isBuy)) || (b.score - a.score));
   // 타이브레이커: 종합 스코어 → 모멘텀(5일) → 유동성(거래량비)
-  const _picks = [..._pickMap.values()].sort((a, b) =>
+  const _picks = dedupBy(_ordered, (p) => p.code || p.name).sort((a, b) =>
     (b.score - a.score) || ((b.chg5 ?? 0) - (a.chg5 ?? 0)) || ((b.volRatio ?? 0) - (a.volRatio ?? 0))
   ).slice(0, 3);
   const _pickTags = (p) => {
@@ -1543,6 +1541,15 @@ export default function PWADashboard({ latestReport }) {
                   ];
                 };
                 const SIG_LBL = ['MA', 'RSI', '볼', '량', '수급'];
+                // [S-4] 관심도 동점 시 2차 정렬 근거 한 줄(거래량→모멘텀→수급)
+                const tieNote = (s) => {
+                  const sc = Math.round(s.score ?? 0);
+                  if (sorted.filter((x) => Math.round(x.score ?? 0) === sc).length < 2) return null;
+                  if (s.vol_ratio != null && Number(s.vol_ratio) >= 1.2) return `동점 中 거래량 상위 (평소 ${Number(s.vol_ratio).toFixed(1)}배)`;
+                  if (s.change_5d != null) return `동점 中 모멘텀 ${Number(s.change_5d) >= 0 ? '+' : ''}${Number(s.change_5d).toFixed(1)}%`;
+                  if (s.net_buy != null || s.supply != null) return '동점 中 수급 우위';
+                  return '동점 中 기술점수 상위';
+                };
                 const top3 = sorted.slice(0, 3);
                 const rest = sorted.slice(3);
                 const MEDALS = ['🥇', '🥈', '🥉'];
@@ -1583,20 +1590,22 @@ export default function PWADashboard({ latestReport }) {
                         const m = deriveRecMeta(s);
                         return (
                           <div key={s.code || i} className="top3-hero-card" onClick={() => openSheet(s)}>
+                            {/* [S-8] AI 판단 등급 — 카드 최상단·최대 위계 */}
+                            <div className="ai-verdict-badge" style={{ color: m.verdict.color, background: m.verdict.bg, borderColor: m.verdict.color }}>{m.verdict.label}</div>
                             <div className="top3-medal">{MEDALS[i]}</div>
                             <button
                               className="top3-name"
                               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-body)', textAlign: 'center' }}
                               onClick={(e) => { e.stopPropagation(); setTab('analyze'); runAnalyze(s.code, s.name); }}
                             >{s.name}</button>
-                            <div className="top3-ai-pct mono">관심도 {sc}</div>
-                            <span className="top3-stance" style={{ color: m.stance.color, borderColor: m.stance.color }}>{m.stance.label}</span>
-                            {/* [S2 가치화] 왜 지금 관심인지 근거 1줄(간결) — 카드만 보고도 판단 */}
+                            {/* [S-8] 근거 한 줄 */}
                             <div className="top3-reason">{m.reason}</div>
-                            {/* [간결화] 모바일 오버플로우 원인이던 5아이콘 제거 → 기대수익률만 크게 강조 */}
-                            <div className="top3-upside-lg"><span className="tu-k">기대수익</span><b>~+{m.upside}%</b><span className="est">추정</span></div>
-                            <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>목표가·상세 →</button>
-                            {/* [나 vs AI] 내 판단 기록 — 샀어요/안 샀어요 */}
+                            {/* [S-4] 관심도·기대수익(소수1자리) + 동점 2차근거 */}
+                            <div className="top3-ai-pct mono">관심도 {sc} · 기대 +{m.upside.toFixed(1)}%</div>
+                            {tieNote(s) && <div className="tie-note">↳ {tieNote(s)}</div>}
+                            <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>판단근거 ›</button>
+                            {/* [S-8] 나 vs AI 예고 */}
+                            <div className="vs-teaser">AI는 <b style={{ color: m.verdict.color }}>{m.verdict.short}</b> · 당신의 선택은?</div>
                             {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (
                               <div className="dec-mini" onClick={(e) => e.stopPropagation()}>
                                 <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>{dec === 'take' ? '✓ 샀어요' : '샀어요'}</button>
@@ -1621,9 +1630,10 @@ export default function PWADashboard({ latestReport }) {
                                 <div className="rec-row-l">
                                   <button className="rec-name" onClick={() => { setTab('analyze'); runAnalyze(s.code, s.name); }}>
                                     {s.name} <span className="mono dim rec-code">{s.code}</span>
-                                    <span className="rec-stance-inline" style={{ color: m.stance.color }}>{m.stance.label}</span>
+                                    <span className="rec-verdict-inline" style={{ color: m.verdict.color, background: m.verdict.bg }}>{m.verdict.short}</span>
                                   </button>
                                   <div className="rec-reason">{m.reason}</div>
+                                  {tieNote(s) && <div className="tie-note sm">↳ {tieNote(s)}</div>}
                                   {/* [나 vs AI] 내 판단 기록 */}
                                   {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (
                                     <div className="dec-mini">
@@ -1634,7 +1644,7 @@ export default function PWADashboard({ latestReport }) {
                                 </div>
                                 <div className="rec-row-r">
                                   <span className="rec-interest mono">관심도 {sc}</span>
-                                  <span className="rec-upside">기대 ~+{m.upside}%</span>
+                                  <span className="rec-upside">기대 +{m.upside.toFixed(1)}%</span>
                                   <button className="rec-detail" onClick={() => openSheet(s)}>상세 →</button>
                                 </div>
                               </div>
@@ -3415,6 +3425,15 @@ export default function PWADashboard({ latestReport }) {
         .rec-name { background: none; border: none; cursor: pointer; font-family: var(--font-body); font-size: 0.84rem; color: var(--text-primary); font-weight: 700; padding: 0; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; text-align: left; }
         .rec-code { font-size: 0.66rem; font-weight: 400; }
         .rec-stance-inline { font-size: 0.6rem; font-weight: 800; }
+        /* [S-8] AI 판단 배지 — 카드 최상단 최대 위계 */
+        .ai-verdict-badge { align-self: stretch; text-align: center; font-size: 0.82rem; font-weight: 800; padding: 6px 8px; border-radius: 9px; border: 1.5px solid; letter-spacing: -0.01em; margin-bottom: 2px; }
+        .rec-verdict-inline { font-size: 0.62rem; font-weight: 800; padding: 1px 7px; border-radius: 20px; margin-left: 4px; }
+        /* [S-4] 동점 2차 정렬 근거 */
+        .tie-note { font-size: 0.62rem; color: var(--color-primary); font-weight: 600; line-height: 1.3; word-break: keep-all; }
+        .tie-note.sm { font-size: 0.6rem; margin-top: 2px; }
+        /* [S-8] 나 vs AI 예고 */
+        .vs-teaser { font-size: 0.64rem; font-weight: 700; color: var(--text-secondary); margin-top: 2px; }
+        .vs-teaser b { font-weight: 800; }
         .rec-reason { font-size: 0.7rem; color: var(--text-secondary); margin-top: 3px; line-height: 1.4; word-break: keep-all; }
         .rec-row-r { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
         .rec-interest { font-size: 0.68rem; color: var(--text-secondary); }
