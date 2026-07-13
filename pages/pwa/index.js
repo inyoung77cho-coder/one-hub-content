@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getLatestDailyReport } from '../../lib/reports';
 import LastUpdated from '../../components/LastUpdated';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
-import { recordDecision, matureLedger, computeShowdown, getTodayDecision, reconcileAutoWatch } from '../../lib/verdictLedger';
+import { recordDecision, matureLedger, computeShowdown, getTodayDecision, reconcileAutoWatch, getLedger } from '../../lib/verdictLedger';
 import { fetchAssetsTotal } from '../../lib/assetsTotal';
 import { fetchLiveEtfKrw } from '../../lib/etfLive';
 import { dedupBy } from '../../lib/useDedup';
@@ -269,6 +269,7 @@ export default function PWADashboard({ latestReport }) {
   const [holdSort, setHoldSort] = useState('urgency'); // [S-2] 보유 정렬(urgency/value)
   const [autoWatchNote, setAutoWatchNote] = useState([]); // [S-6] 추천해제→자동 관망 편입 알림
   const [buyNotice, setBuyNotice] = useState(null); // [S-6] 바로매수 핸드오프 { name, code }
+  const [decFeedback, setDecFeedback] = useState(null); // [S-5] 판단 기록 직후 즉시 피드백 { name, decision, date }
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [showAssetDetail, setShowAssetDetail] = useState(false); // [팝업] 총자산 클릭 → 상세 breakdown
@@ -624,6 +625,10 @@ export default function PWADashboard({ latestReport }) {
     // 즉시 기록(버튼 상태 바로 반영) → 진입가는 조회 후 백필
     recordDecision({ code, name, entry: Number(priceHint) || null, decision, trader });
     setDecTick((t) => t + 1);
+    // [S-5] 즉시 피드백 — 결과 확인일(3일 뒤) 명시
+    const _rd = new Date(Date.now() + 3 * 86400000);
+    setDecFeedback({ name, decision, date: `${_rd.getMonth() + 1}/${_rd.getDate()}` });
+    clearTimeout(logDecision._t); logDecision._t = setTimeout(() => setDecFeedback(null), 5000);
     if (!Number(priceHint)) {
       try {
         const r = await fetch(`/api/analyze-stock?code=${code}`);
@@ -1610,7 +1615,13 @@ export default function PWADashboard({ latestReport }) {
                       ))}
                     </div>
                     {/* [S7.2] 샀어요 마이크로카피 — 채점 등록 안내 + 기록 탭 딥링크 */}
-                    <div className="rec-micro">🥊 <b>샀어요</b>를 누르면 <b>나 vs AI 채점</b>에 등록되고 <b>3일·7일 뒤</b> 실제 수익으로 자동 비교됩니다 <button className="rec-micro-link" onClick={() => setTab('report')}>기록 보기 →</button></div>
+                    {/* [S-5] 나 vs AI 참여 유도 — 버튼과 동등 위계. 기록 0이면 첫 참여 온보딩. */}
+                    {(() => { const _has = (getLedger(trader) || []).length > 0; return (
+                      <div className={`vs-cta ${_has ? '' : 'first'}`}>
+                        <div className="vs-cta-h">⚔ {_has ? '지금 판단을 남기면 3일 뒤 AI와 승부가 시작됩니다' : '아직 승부 기록이 없습니다'}</div>
+                        <div className="vs-cta-sub">{_has ? '샀어요·관망을 누르면 3·7일 뒤 실제 수익으로 나 vs AI 자동 채점' : '첫 판단을 남기면 3일 뒤 AI와 결과를 비교해 드립니다'} <button className="rec-micro-link" onClick={() => setTab('report')}>기록 보기 →</button></div>
+                      </div>
+                    ); })()}
                     {/* [S-6] 추천 해제 종목 자동 관망 편입 알림 */}
                     {autoWatchNote.length > 0 && (
                       <div className="auto-watch-note">
@@ -1643,12 +1654,13 @@ export default function PWADashboard({ latestReport }) {
                             <div className="vs-teaser">AI는 <b style={{ color: m.verdict.color }}>{m.verdict.short}</b> · 당신의 선택은?</div>
                             {/* [S-6] 바로 매수(Primary) — 실주문은 증권사에서, 체결 후 '샀어요'로 기록 */}
                             <button className="buy-now-btn" onClick={(e) => { e.stopPropagation(); setBuyNotice({ name: s.name, code: s.code }); }}>⚡ 바로 매수</button>
-                            {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (
+                            {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (<>
                               <div className="dec-mini" onClick={(e) => e.stopPropagation()}>
                                 <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>{dec === 'take' ? '✓ 샀어요' : '샀어요'}</button>
                                 <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>{dec === 'pass' ? '✓ 관망' : '관망'}</button>
                               </div>
-                            ); })()}
+                              {dec && <div className="dec-dday">🏁 승부 진행 중 · D-3</div>}
+                            </>); })()}
                           </div>
                         );
                       })}
@@ -2840,6 +2852,14 @@ export default function PWADashboard({ latestReport }) {
           </Link>
         </footer>
 
+        {/* [S-5] 판단 기록 직후 즉시 피드백 — 결과 확인일 명시 + 나 vs AI 링크 */}
+        {decFeedback && (
+          <div className="dec-feedback" onClick={() => { setTab('report'); setDecFeedback(null); }}>
+            <span>✅ 기록 완료 · <b>{decFeedback.name}</b> {decFeedback.decision === 'take' ? '샀어요' : '관망'}. <b>{decFeedback.date}</b>에 결과를 알려드릴게요</span>
+            <span className="df-link">나 vs AI →</span>
+          </div>
+        )}
+
         {/* [S-6] 바로 매수 핸드오프 — 실주문은 증권사, 체결 후 '샀어요' 자동 기록 경로 */}
         {buyNotice && (
           <div onClick={() => setBuyNotice(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
@@ -3501,6 +3521,15 @@ export default function PWADashboard({ latestReport }) {
         .auto-watch-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4; word-break: keep-all; }
         .auto-watch-note b { color: var(--color-ink); font-weight: 800; }
         .auto-watch-note button { flex-shrink: 0; font-family: var(--font-body); font-size: 0.7rem; font-weight: 700; color: var(--color-primary); background: none; border: none; cursor: pointer; }
+        /* [S-5] 나 vs AI 참여 유도 — 버튼과 동등 위계 */
+        .vs-cta { background: var(--color-primary-soft); border: 1px solid var(--color-primary); border-radius: 12px; padding: 11px 13px; margin-bottom: 12px; }
+        .vs-cta.first { background: var(--color-warning-soft, var(--color-primary-soft)); border-color: var(--color-warning, var(--color-primary)); }
+        .vs-cta-h { font-size: 0.88rem; font-weight: 800; color: var(--color-ink); line-height: 1.35; word-break: keep-all; }
+        .vs-cta-sub { font-size: 0.72rem; color: var(--text-secondary); margin-top: 3px; line-height: 1.4; word-break: keep-all; }
+        .dec-dday { font-size: 0.62rem; font-weight: 800; color: var(--color-primary); margin-top: 4px; }
+        .dec-feedback { position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%); z-index: 1200; display: flex; align-items: center; gap: 10px; max-width: 92vw; background: var(--color-ink, #1f2a37); color: #fff; padding: 11px 16px; border-radius: 12px; font-size: 0.76rem; font-weight: 600; box-shadow: 0 8px 30px rgba(0,0,0,.3); cursor: pointer; word-break: keep-all; line-height: 1.4; }
+        .dec-feedback b { font-weight: 800; }
+        .dec-feedback .df-link { flex-shrink: 0; font-weight: 800; color: #7db3ff; }
         .rec-reason { font-size: 0.7rem; color: var(--text-secondary); margin-top: 3px; line-height: 1.4; word-break: keep-all; }
         .rec-row-r { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
         .rec-interest { font-size: 0.68rem; color: var(--text-secondary); }
