@@ -270,6 +270,7 @@ export default function PWADashboard({ latestReport }) {
   const [autoWatchNote, setAutoWatchNote] = useState([]); // [S-6] 추천해제→자동 관망 편입 알림
   const [buyNotice, setBuyNotice] = useState(null); // [S-6] 바로매수 핸드오프 { name, code }
   const [decFeedback, setDecFeedback] = useState(null); // [S-5] 판단 기록 직후 즉시 피드백 { name, decision, date }
+  const [manualPx, setManualPx] = useState({}); // [S-1] 직접입력 보유 이상치 검증용 현재가맵(code→close_price)
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [showAssetDetail, setShowAssetDetail] = useState(false); // [팝업] 총자산 클릭 → 상세 breakdown
@@ -544,6 +545,21 @@ export default function PWADashboard({ latestReport }) {
       .then(d => { if (d && d.ok) setAccuracy(d); })
       .catch(() => {});
   }, [mounted, trader]);
+
+  // [S-1] 직접입력 보유의 평단 이상치 검증 — 마스터 현재가와 대조(±10배 이탈 시 배지)
+  useEffect(() => {
+    if (!mounted) return;
+    let alive = true;
+    (async () => {
+      const list = getStockHoldings(trader).filter((h) => h.ccy === 'KRW' && h.code);
+      const px = {};
+      for (const h of list.slice(0, 20)) {
+        try { const d = await fetch(`/api/input/master-get?code=${encodeURIComponent(h.code)}`).then((r) => r.json()); if (d?.close_price) px[h.code] = d.close_price; } catch {}
+      }
+      if (alive) setManualPx(px);
+    })();
+    return () => { alive = false; };
+  }, [mounted, trader, stManualTick]);
 
   // [S-6] 추천 리스트가 갱신될 때, 직전에 노출됐다가 사라진(해제된) 무액션 종목을
   //   자동 '관망'(auto_watch)으로 편입 → 추천 종목의 '나 vs AI' 편입률 100%(데이터 유실 0).
@@ -2164,16 +2180,20 @@ export default function PWADashboard({ latestReport }) {
                   if (!list.length) return <div className="pwa-empty">미래에셋·삼성 등 KIS 외 증권사 보유를 <b>＋ 추가</b>로 입력하면 여기에 표시됩니다.</div>;
                   return (
                     <div className="mh-list">
-                      {list.map((h) => (
-                        <div className="mh-row" key={h.id}>
+                      {list.map((h) => {
+                        const cp = manualPx[h.code];
+                        const anomaly = cp && h.avgPrice && (h.avgPrice > cp * 10 || h.avgPrice < cp / 10);
+                        return (
+                        <div className={`mh-row ${anomaly ? 'mh-anomaly' : ''}`} key={h.id}>
                           <div className="mh-l">
-                            <b className="mh-name">{h.name}</b>
+                            <b className="mh-name">{h.name}{anomaly && <span className="mh-warn" title={`평단 ${Number(h.avgPrice).toLocaleString()}원이 현재가 ${Number(cp).toLocaleString()}원과 크게 차이납니다. 총매수금액을 평단에 넣었는지 확인 후 다시 입력하세요.`}>⚠ 데이터 확인 필요</span>}</b>
                             <span className="mh-meta">{h.broker} · {h.account} · {h.market === 'us' ? '🇺🇸 해외' : '🇰🇷 국내'}</span>
                           </div>
                           <div className="mh-r">{h.shares}주 · 평단 {h.ccy === 'USD' ? '$' : ''}{Number(h.avgPrice).toLocaleString()}{h.ccy === 'KRW' ? '원' : ''}</div>
                           <button className="mh-del" onClick={() => { removeStock({ id: h.id, trader }); setStManualTick(t => t + 1); }} aria-label={`${h.name} 삭제`}>✕</button>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   );
                 })()}
@@ -3239,8 +3259,12 @@ export default function PWADashboard({ latestReport }) {
         .mh-list { display: flex; flex-direction: column; gap: 7px; }
         .mh-row { display: flex; align-items: center; gap: 10px; background: var(--inset-bg); border-radius: 10px; padding: 10px 12px; }
         .mh-l { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
-        .mh-name { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .mh-name { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); word-break: keep-all; line-height: 1.25; }
         .mh-meta { font-size: 0.66rem; color: var(--text-tertiary); }
+        /* [S-1] 평단 이상치 배지 */
+        .mh-warn { display: inline-block; margin-left: 6px; font-size: 0.6rem; font-weight: 800; color: var(--color-danger); background: var(--color-danger-soft); padding: 1px 6px; border-radius: 6px; white-space: nowrap; }
+        .mh-anomaly { border: 1px solid var(--color-danger); }
+        .mh-l { min-width: 0; flex: 1; }
         .mh-r { font-size: 0.74rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
         .mh-del { flex-shrink: 0; width: 24px; height: 24px; border-radius: 6px; border: none; background: var(--color-danger-soft); color: var(--color-danger); font-size: 0.7rem; cursor: pointer; }
         /* [성과비교] 시장 대비 내 성과 */
