@@ -7,6 +7,7 @@ import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS } from "../../lib/etfHoldings";
 import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress, pensionCreditLimitCombined } from "../../lib/taxRules";
 import Term from "../../components/Term";
+import REBAL_PRESETS from "../../data/rebalance_presets.json";
 import { EtfForm } from "../../components/shared/AssetForms";
 
 const won = (n) => {
@@ -45,6 +46,14 @@ export default function EtfDashboard() {
   const [acctFilter, setAcctFilter] = useState("전체"); // [S4] 계좌 유형 필터([전체][일반][연금][ISA])
   const [fcOpen, setFcOpen] = useState(false); // [S7.4] 예측 섹션 기본 접기
   const [pensionContrib, setPensionContrib] = useState(""); // [S4] 올해 연금 납입액(원, 세액공제 진행률)
+  const [targetAlloc, setTargetAlloc] = useState(null); // [E-4] 목표 배분(onehub_target_alloc)
+  const applyPreset = (key) => {
+    const p = REBAL_PRESETS.presets[key];
+    if (!p) return;
+    const alloc = { region: p.region, asset: p.asset, preset: key };
+    try { localStorage.setItem("onehub_target_alloc", JSON.stringify(alloc)); window.dispatchEvent(new Event("onehub-assets-change")); } catch {}
+    setTargetAlloc(alloc);
+  };
 
   // [S4] 계좌 필터·연금 납입액·마지막 사용 계좌 기억(localStorage)
   useEffect(() => {
@@ -53,6 +62,8 @@ export default function EtfDashboard() {
       if (f && ACCT_FILTERS.includes(f)) setAcctFilter(f);
       const pc = localStorage.getItem("onehub_pension_contrib");
       if (pc != null) setPensionContrib(pc);
+      const ta = localStorage.getItem("onehub_target_alloc");
+      if (ta) setTargetAlloc(JSON.parse(ta));
       const last = localStorage.getItem("onehub_etf_last_acct");
       if (last && ACCOUNTS.includes(last)) setForm((prev) => ({ ...prev, account: last }));
     } catch (e) {}
@@ -413,6 +424,84 @@ export default function EtfDashboard() {
           <div className="todo-foot">집중도·중복·절세·연금 한도·리밸런싱 밴드를 종합해 제안합니다. ⚠ <b>투자자문·세무자문이 아닙니다.</b> 실제 세액은 개인 상황에 따라 다르며, 최종 매매·실행 판단은 본인이 하세요.</div>
         </section>
       )}
+
+      {/* [E-4] 목표 배분 · 국내/해외 이탈도 → 처방(진단 단독 금지). 목표 미설정 시 프리셋 3종. */}
+      {holdings.length > 0 && (() => {
+        const overseasKrw = holdings.reduce((a, h) => a + ((h.avgCcy === "USD") ? (holdingMetrics(h).valueKrw || 0) : 0), 0);
+        const domesticKrw = Math.max(0, myTotal - overseasKrw);
+        const curO = myTotal > 0 ? Math.round(overseasKrw / myTotal * 1000) / 10 : null;
+        const curD = myTotal > 0 ? Math.round(domesticKrw / myTotal * 1000) / 10 : null;
+        const tgt = targetAlloc?.region || null;
+        const thr = REBAL_PRESETS.threshold_pp;
+        return (
+          <section className="card">
+            <div className="label">🎯 목표 배분 · 국내/해외 리밸런싱{targetAlloc?.preset ? <span className="sub">{targetAlloc.preset}</span> : null}</div>
+            {!tgt ? (
+              <>
+                <div className="rb-tax sub" style={{ marginBottom: 8 }}>목표 배분을 정하면 이탈도 기준 <b>구체적 실행안(매도·매수 수량)</b>을 제안합니다. 프리셋으로 시작하세요.</div>
+                <div className="acct-filter" role="group" aria-label="목표 배분 프리셋">
+                  {Object.keys(REBAL_PRESETS.presets).map((k) => (
+                    <button key={k} className="acct-chip" onClick={() => applyPreset(k)}>{k}</button>
+                  ))}
+                </div>
+              </>
+            ) : (() => {
+              const driftO = curO != null ? Math.round((curO - tgt.해외) * 10) / 10 : null;
+              const over = driftO != null && Math.abs(driftO) >= thr;
+              // 처방: 해외 초과 시 가장 큰 USD 보유 축소 수량 산출
+              let rx = null;
+              if (over && driftO > 0) {
+                const usd = holdings.filter((h) => h.avgCcy === "USD").map((h) => ({ h, v: holdingMetrics(h).valueKrw || 0, px: (quotes[h.ticker]?.price ?? 0) * (fxRate || 0) })).sort((a, b) => b.v - a.v)[0];
+                const cutKrw = overseasKrw - (tgt.해외 / 100) * myTotal;
+                const qty = usd && usd.px > 0 ? Math.max(1, Math.round(cutKrw / usd.px)) : null;
+                if (usd && qty) rx = { name: usd.h.ticker, qty, amt: Math.round(qty * usd.px) };
+              } else if (over && driftO < 0) {
+                rx = { buyMore: true };
+              }
+              return (
+                <>
+                  <div className="rb"><span className="rt">해외</span><span className="rw">{curO}% → 목표 {tgt.해외}%</span><b className={driftO > 0 ? "neg" : driftO < 0 ? "pos" : ""}>{driftO > 0 ? "+" : ""}{driftO}%p</b></div>
+                  <div className="rb"><span className="rt">국내</span><span className="rw">{curD}% → 목표 {tgt.국내}%</span><b /></div>
+                  {!over ? (
+                    <div className="rb-tax" style={{ marginTop: 8 }}>✅ 국내/해외 이탈도 {thr}%p 이내 — 리밸런싱 불필요, 보유 권장.</div>
+                  ) : rx?.buyMore ? (
+                    <div className="rb-why" style={{ marginTop: 8 }}><div className="rb-why-h">→ 처방</div><div className="rb-why-row"><span className="rb-why-t">해외 비중이 목표보다 <b>{Math.abs(driftO)}%p</b> 낮습니다. 해외 ETF(예: TIGER 미국S&P500)를 추가 매수해 목표에 맞추세요.</span></div></div>
+                  ) : rx ? (
+                    <div className="rb-why" style={{ marginTop: 8 }}><div className="rb-why-h">→ 처방</div>
+                      <div className="rb-why-row"><span className="rb-why-t"><b>{rx.name} {rx.qty}주 매도</b> (약 {won(rx.amt)}원) → 대금을 국내 ETF(KODEX 200 등)로 분산. 해외 {curO}% → {tgt.해외}% 목표.</span></div>
+                    </div>
+                  ) : null}
+                  <button className="acct-chip" style={{ marginTop: 10 }} onClick={() => { try { localStorage.removeItem("onehub_target_alloc"); } catch {} setTargetAlloc(null); }}>목표 다시 설정</button>
+                  <div className="rb-tax sub" style={{ marginTop: 8 }}>⚠ 투자자문이 아닙니다. 국내/해외는 통화 기준 근사이며, 국내상장 해외지수 ETF의 실질 노출(look-through)은 구성종목 데이터 연동 시 정밀화됩니다.</div>
+                </>
+              );
+            })()}
+          </section>
+        );
+      })()}
+
+      {/* [E-5] 계좌 배치(asset location) 최적화 — 세제계좌 한도는 희소자원. 세금 큰 자산 우선 배치. */}
+      {holdings.length > 1 && (() => {
+        const genAcct = holdings.filter((h) => (h.account || "일반") === "일반");
+        const taxAcct = holdings.filter((h) => isPensionAcct(h.account || "일반") || (h.account || "일반") === "ISA");
+        const overseasInGen = genAcct.filter((h) => h.avgCcy === "USD");
+        const domesticInTax = taxAcct.filter((h) => h.avgCcy === "KRW");
+        const swap = overseasInGen.length > 0 && domesticInTax.length > 0;
+        return (
+          <section className="card">
+            <div className="label"><Term term="자산 배치">🧮 계좌 배치 최적화</Term></div>
+            {swap ? (
+              <div className="rb-why">
+                <div className="rb-why-h">💡 배치 개선 여지</div>
+                <div className="rb-why-row"><span className="rb-why-n">→</span><span className="rb-why-t">세금이 큰 <b>해외 ETF({overseasInGen.map((h) => h.ticker).join("·")})</b>가 일반계좌에, 세금이 작은 <b>국내형({domesticInTax.map((h) => h.ticker).join("·")})</b>이 세제계좌에 있습니다. <b>두 자산의 계좌를 맞바꾸면</b> 세제계좌(ISA·연금) 한도를 세금 큰 자산에 써서 세후 수익을 높일 수 있습니다.</span></div>
+              </div>
+            ) : (
+              <div className="rb-tax sub">현재 계좌 배치에 뚜렷한 개선 여지는 없습니다. 원칙: <b>세제계좌 한도는 세금이 큰 해외·배당형에 우선</b> 배정하고, 매매차익 비과세 성격의 국내주식형은 일반계좌 여지가 큽니다.</div>
+            )}
+            <div className="rb-tax sub" style={{ marginTop: 8 }}>⚠ 세무자문이 아닙니다. 실제 절세액은 개인 소득·거래·현행 세법에 따라 다릅니다.</div>
+          </section>
+        );
+      })()}
 
       {/* [§3-2 원칙1] 포트폴리오 합계는 홈·AI자산 2곳에만. ETF 페이지는 ETF 슬라이스만 표시(피드백14) */}
       {err && <div className="err">데이터 로드 오류: {err}</div>}
