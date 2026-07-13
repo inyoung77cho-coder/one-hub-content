@@ -188,6 +188,33 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
+// [홈 재설계 T-3] 아코디언 펼침/접힘 상태를 사용자별로 저장(onehub_home_open).
+function readHomeOpen(id, def) {
+  try { const m = JSON.parse(localStorage.getItem('onehub_home_open') || '{}'); return id in m ? !!m[id] : def; } catch { return def; }
+}
+function writeHomeOpen(id, val) {
+  try { const m = JSON.parse(localStorage.getItem('onehub_home_open') || '{}'); m[id] = val; localStorage.setItem('onehub_home_open', JSON.stringify(m)); } catch {}
+}
+
+// [홈 재설계 T-3] Tier 2 공용 아코디언 — 접힌 상태에서도 헤더에 요약 값 1개 노출(빈 껍데기 금지).
+function HomeAccordion({ id, title, summary, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => { setOpen(readHomeOpen(id, defaultOpen)); }, [id]);
+  const toggle = () => { const n = !open; setOpen(n); writeHomeOpen(id, n); };
+  return (
+    <section className={`card v10 v10-collap ${open ? 'open' : ''}`}>
+      <div className="v10-collap-head" onClick={toggle}>
+        <div className="acc-htxt">
+          <h3 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>{title}</h3>
+          {summary != null && <span className="acc-sum">{summary}</span>}
+        </div>
+        <span className="v10-caret">▾</span>
+      </div>
+      <div className="v10-collap-body"><div className="v10-collap-inner">{children}</div></div>
+    </section>
+  );
+}
+
 export default function PWADashboard({ latestReport }) {
   const [tab, setTab] = useState('dashboard');
   const [data, setData] = useState(null);
@@ -281,6 +308,9 @@ export default function PWADashboard({ latestReport }) {
 
   useEffect(() => {
     setMounted(true);
+    // [T-3] 홈 아코디언 펼침 상태 복원(AI근거·최근활동)
+    setBasisOpen(readHomeOpen('basis', false));
+    setLogOpen(readHomeOpen('log', false));
     // [v9.0] Splash: 2초 후 해제
     const splashTimer = setTimeout(() => setSplash(false), 2000);
     // [v10 UI] 투자성향 프로필 로드 — 최초 진입(온보딩 미완료)이면 온보딩 위저드로 이동
@@ -754,20 +784,51 @@ export default function PWADashboard({ latestReport }) {
         ? `오늘은 ${watchCount}건 분석했지만 매수 조건은 안 됐어요`
         : '오늘은 아직 활동 기록이 없어요';
 
-  // [v8.7] TOP PICK 3 — 매수신호 우선, 부족하면 관심종목(screening_candidates)으로 채움
-  const topPicksRaw = (data?.today_buys || []).map(b => ({
-    name: b.stock, score: b.score, isBuy: true, reason: b.reason,
-  }));
-  if (topPicksRaw.length < 3 && data?.screening_candidates?.length) {
-    const usedNames = new Set(topPicksRaw.map(p => p.name));
-    const fillers = [...data.screening_candidates]
-      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-      .filter(s => !usedNames.has(s.name))
-      .slice(0, 3 - topPicksRaw.length)
-      .map(s => ({ name: s.name, score: s.score, isBuy: false, reason: null }));
-    topPicksRaw.push(...fillers);
+  // [T-2] TOP PICK — 종목코드 dedup + 스코어 차등 + 근거 태그 2개 + 타이브레이커.
+  const _mkPick = (x, isBuy) => ({
+    code: x.code || null,
+    name: x.stock || x.name || '',
+    score: Number(x.final_score ?? x.score ?? 0),
+    isBuy,
+    reasons: x.reasons || null,
+    rsi: x.rsi != null ? Number(x.rsi) : null,
+    volRatio: x.vol_ratio != null ? Number(x.vol_ratio) : null,
+    chg5: x.change_5d != null ? Number(x.change_5d) : null,
+    chg1: x.change_1d != null ? Number(x.change_1d) : null,
+  });
+  const _pickPool = [
+    ...(data?.today_buys || []).map(b => _mkPick(b, true)),
+    ...(data?.screening_candidates || []).map(s => _mkPick(s, false)),
+  ].filter(p => p.name);
+  // dedup: 종목코드(없으면 이름) 기준 1건 — 매수신호 우선, 그다음 최고 스코어
+  const _pickMap = new Map();
+  for (const p of _pickPool) {
+    const k = p.code || p.name;
+    const cur = _pickMap.get(k);
+    if (!cur) { _pickMap.set(k, p); continue; }
+    if ((p.isBuy && !cur.isBuy) || (p.isBuy === cur.isBuy && p.score > cur.score)) _pickMap.set(k, p);
   }
-  const topPicks = topPicksRaw.slice(0, 3);
+  // 타이브레이커: 종합 스코어 → 모멘텀(5일) → 유동성(거래량비)
+  const _picks = [..._pickMap.values()].sort((a, b) =>
+    (b.score - a.score) || ((b.chg5 ?? 0) - (a.chg5 ?? 0)) || ((b.volRatio ?? 0) - (a.volRatio ?? 0))
+  ).slice(0, 3);
+  const _pickTags = (p) => {
+    const tags = [];
+    if (p.reasons) String(p.reasons).split(/[,|·/;]+/).map(s => s.trim()).filter(Boolean).forEach(t => tags.push(t));
+    if (p.isBuy && tags.length < 2) tags.push('매수 신호');
+    if (tags.length < 2 && (p.volRatio ?? 0) >= 1.3) tags.push('거래량 급증');
+    if (tags.length < 2 && (p.chg5 ?? 0) > 0) tags.push(`5일 +${Number(p.chg5).toFixed(1)}%`);
+    if (tags.length < 2 && (p.rsi ?? 0) >= 55) tags.push(`RSI ${Math.round(p.rsi)}`);
+    if (tags.length < 2 && (p.chg1 ?? 0) !== 0) tags.push(`전일 ${p.chg1 > 0 ? '+' : ''}${Number(p.chg1).toFixed(1)}%`);
+    return tags.slice(0, 2);
+  };
+  // 차등 스코어(동점 방지): 종합 + 모멘텀·유동성 미세 가중 → 소수 1자리
+  const topPicks = _picks.map((p, i) => ({
+    ...p, rank: i + 1, tags: _pickTags(p),
+    dispScore: Math.round((p.score + (p.chg5 ?? 0) * 0.01 + (p.volRatio ?? 0) * 0.001) * 10) / 10,
+  }));
+  // 유의미한 차등이 없으면 랭킹 대신 '관심 종목'(근거 없는 랭킹 금지)
+  const topPicksRanked = topPicks.length > 1 && new Set(topPicks.map(p => p.dispScore)).size === topPicks.length;
 
   return (
     <>
@@ -1026,6 +1087,29 @@ export default function PWADashboard({ latestReport }) {
                 );
               })()}
 
+              {/* [T-3 Tier 1] TOP PICK — 히어로(결론+액션) 직후. 첫 화면 스크롤 0 목표. */}
+              {topPicks.length > 0 && (
+                <section className="card v10 tp-card">
+                  <div className="v10-sect"><h3>{topPicksRanked ? '⭐ 오늘의 TOP PICK' : '👀 오늘의 관심 종목'}</h3><a onClick={() => setTab('recommend')}>추천 전체 →</a></div>
+                  <div className="v10-pick-note">{topPicksRanked ? '기술 스코어링 상위 · 실제 매수 신호와 별개' : '스코어 차등이 유의미하지 않아 순위 없이 표시'}</div>
+                  {topPicks.map((p) => (
+                    <div className="tp-row" key={p.code || p.name}>
+                      <div className="tp-l">
+                        {topPicksRanked && <div className="tp-medal" style={{ background: p.rank === 1 ? 'var(--color-warning)' : p.rank === 2 ? 'var(--color-ink-3)' : 'var(--color-warning-ink)' }}>{p.rank}</div>}
+                        <div className="tp-meta">
+                          <span className="tp-name">{p.name}{p.isBuy && <span className="tp-buy">매수신호</span>}</span>
+                          <span className="tp-tags">{p.tags.length ? p.tags.map((t, j) => <span className="tp-tag" key={j}>{t}</span>) : <span className="tp-tag muted">기술 스코어 상위</span>}</span>
+                        </div>
+                      </div>
+                      <div className="tp-r">
+                        {topPicksRanked && <span className="tp-score mono" title="종합 스코어(모멘텀·유동성 반영)">{p.dispScore.toFixed(1)}</span>}
+                        <button className="v10-mini-btn" onClick={() => setTab('recommend')}>AI<br />분석</button>
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              )}
+
               {/* [#4 MarketPulse] 시장 맥박 — 뉴스·변화를 lively하게. 실측 지표만(허위 헤드라인 금지) */}
               {(() => {
                 if (!data?.market) return null;
@@ -1088,9 +1172,10 @@ export default function PWADashboard({ latestReport }) {
                 const totalUk = (baseTotal == null && acctCashUk == null)
                   ? null
                   : Math.round(((baseTotal || 0) + (acctCashUk || 0)) * 100) / 100;
+                const rePctA = totalUk && assetSum?.breakdown?.realestate_uk != null ? Math.round((Number(assetSum.breakdown.realestate_uk) / totalUk) * 1000) / 10 : null;
                 return (
                   <>
-                  <section className="card v10">
+                  <HomeAccordion id="assets" title="💰 자산 구성" summary={`총 ${totalUk != null ? totalUk + '억' : '—'}${rePctA != null ? ` · 부동산 ${rePctA}%` : ''}`}>
                     <div className="v10-total" onClick={() => setShowAssetDetail(true)} style={{ cursor: 'pointer' }}><span className="v10-total-lbl">총자산</span><span className="v10-total-amt mono">{totalUk != null ? `${totalUk}억` : '—'}</span><span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--color-muted)' }}>상세 ▸</span></div>
                     {[
                       ['주식', 'var(--color-primary)', assetSum?.breakdown?.stock_uk, '/pwa?tab=recommend'],
@@ -1109,7 +1194,7 @@ export default function PWADashboard({ latestReport }) {
                     <button className="v10-diag-link" onClick={() => { window.location.href = '/pwa/ai-advisor'; }}>
                       🩺 AI 배분 정밀 진단 · 포트폴리오 주치의 <span>→</span>
                     </button>
-                  </section>
+                  </HomeAccordion>
                   {showAssetDetail && (() => {
                     const rows = [
                       ['주식', assetSum?.breakdown?.stock_uk, 'var(--color-primary)'],
@@ -1152,9 +1237,7 @@ export default function PWADashboard({ latestReport }) {
 
               {/* [브리핑] ③ 오늘의 브리핑 · 판단 근거 — 상단 '판단·액션'과 다른 '근거'를 제시.
                     경제지표 + 부동산 신고가·실거래 + 내 자산 활동(실데이터만, 허위 헤드라인 금지) */}
-              <section className="card v10">
-                <div className="v10-sect"><h3>📰 오늘의 브리핑 · 판단 근거</h3><a onClick={() => setTab('report')}>기록 →</a></div>
-
+              <HomeAccordion id="briefing" title="📰 오늘의 브리핑 · 판단 근거" summary={`국면 ${regime || '-'} · 시장온도 ${heat ?? '-'}`}>
                 {/* A) 시장·경제 지표 — 실측 매크로(경제 브리핑의 근거) */}
                 <div className="bf-block">
                   <div className="bf-h">🌐 시장·경제 지표</div>
@@ -1227,48 +1310,64 @@ export default function PWADashboard({ latestReport }) {
                     <span>승인대기 <b>{pendingList.length}</b></span>
                   </span>
                 </div>
-              </section>
+                <a className="acc-more" onClick={() => setTab('report')}>기록 전체 →</a>
+              </HomeAccordion>
 
-              {/* [성과비교] 시장 대비 내 성과 — 매수일 기준 구간 수익률 vs 지수. 조기 사용 효과로 지속 사용 유도 */}
+              {/* [T-1] 성과 카드 — 접힘형 기본 + 현재/원인/다음수 3블록. 수치 단독·귀책 프레이밍 금지. */}
               {(() => {
                 const perf = mounted ? computeMyPerf(data, assetSum, trader, fxRate) : null;
                 const months = perf?.sinceDate ? Math.max(1, Math.round((Date.now() - new Date(perf.sinceDate).getTime()) / (86400000 * 30.4))) : null;
+                const my = perf?.myPct;
+                const bench = benchPerf?.ok ? benchPerf.pct : null;
+                const excess = (my != null && bench != null) ? Math.round((my - bench) * 100) / 100 : null;
+                const bd = assetSum?.breakdown || {};
+                const tot = (Number(bd.stock_uk) || 0) + (Number(bd.etf_uk) || 0) + (Number(bd.realestate_uk) || 0) + (Number(bd.cash_uk) || 0);
+                const rePct = tot > 0 && bd.realestate_uk != null ? Math.round((Number(bd.realestate_uk) / tot) * 1000) / 10 : null;
+                const improved = excess != null && excess < 0 ? Math.round(excess * 0.28 * 100) / 100 : null;
+
+                // 성과 미산출(수치 없음) — 프레이밍 규칙 무관, 입력 유도만
+                if (!perf?.sinceDate || my == null) {
+                  return (
+                    <section className="card cmp-card">
+                      <div className="v10-sect"><h3>📈 시장 대비 내 성과</h3></div>
+                      <div className="cmp-cta">보유에 <b>매수일</b>을 입력하면 그때부터 <b>내 자산 vs 시장지수</b>를 비교해 드립니다. <button className="cmp-cta-link" onClick={() => setTab('portfolio')}>주식 보유 입력 →</button></div>
+                    </section>
+                  );
+                }
+                const summary = excess != null
+                  ? `시장 대비 ${excess >= 0 ? '+' : ''}${excess.toFixed(1)}%p · ${excess >= 0 ? '초과 성과' : '개선 시나리오 보기'}`
+                  : `내 자산 ${my >= 0 ? '+' : ''}${my.toFixed(1)}% · 지수 비교 준비중`;
                 return (
-                  <section className="card cmp-card">
-                    <div className="v10-sect"><h3>📈 시장 대비 내 성과</h3>{perf?.parts?.length ? <span className="cmp-scope">{perf.parts.join('·')} 기준</span> : null}</div>
-                    {!perf?.sinceDate ? (
-                      <div className="cmp-cta">보유 입력 시 <b>매수일</b>을 넣으면, 그때부터 지금까지 <b>내 자산 vs 시장지수</b>를 비교해 <b>ONE-HUB 조기 사용 효과</b>를 보여드립니다. <button className="cmp-cta-link" onClick={() => setTab('portfolio')}>주식 보유 입력 →</button></div>
-                    ) : perf.myPct == null ? (
-                      <div className="cmp-cta">실시간 시세가 연동된 보유(주식 계좌·ETF)가 있으면 성과 비교가 표시됩니다.</div>
-                    ) : (() => {
-                      const my = perf.myPct;
-                      const bench = benchPerf?.ok ? benchPerf.pct : null;
-                      const excess = bench != null ? Math.round((my - bench) * 100) / 100 : null;
-                      return (
-                        <>
-                          <div className="cmp-since">🗓️ {perf.sinceDate} 부터 <b>{months}개월</b> 관리 · 현재 평가 기준</div>
-                          <div className="cmp-rows">
-                            <div className="cmp-row">
-                              <span className="cmp-k">내 자산</span>
-                              <span className={`cmp-v ${my >= 0 ? 'up' : 'dn'}`}>{my >= 0 ? '+' : ''}{my.toFixed(2)}%</span>
-                            </div>
-                            <div className="cmp-row">
-                              <span className="cmp-k">{benchPerf?.label || (benchPerf?.symbol === 'spx' ? 'S&P 500' : 'KOSPI')} <span className="cmp-k-sub">같은 기간</span></span>
-                              <span className={`cmp-v ${bench == null ? 'na' : bench >= 0 ? 'up' : 'dn'}`}>{bench == null ? '—' : `${bench >= 0 ? '+' : ''}${bench.toFixed(2)}%`}</span>
-                            </div>
-                          </div>
-                          {excess != null ? (
-                            <div className={`cmp-verdict ${excess >= 0 ? 'win' : 'lose'}`}>
-                              {excess >= 0 ? '🎉' : '📉'} 시장 대비 <b>{excess >= 0 ? '+' : ''}{excess.toFixed(2)}%p</b> {excess >= 0 ? '초과 성과' : '밑도는 성과'} — {excess >= 0 ? '조기부터 관리한 효과가 나타나고 있습니다.' : '리밸런싱·차단 신호를 참고해 개선해 보세요.'}
-                            </div>
-                          ) : (
-                            <div className="cmp-note">지수 비교는 배포(온라인) 환경에서 표시됩니다. 현재는 내 수익률만 표시합니다.</div>
-                          )}
-                          <div className="cmp-foot">내 수익률은 현재 평가(주식 계좌·ETF 실측) 기준, 지수는 매수일 종가 대비입니다. 참고용이며 시세·환율에 따라 달라집니다.</div>
-                        </>
-                      );
-                    })()}
-                  </section>
+                  <HomeAccordion id="perf" title="📈 시장 대비 내 성과" summary={summary} defaultOpen={false}>
+                    <div className="pf-block">
+                      <div className="pf-k">현재</div>
+                      <div className="pf-cur">
+                        <span className="pf-cur-i">내 자산 <b className={my >= 0 ? 'up' : 'dn'}>{my >= 0 ? '+' : ''}{my.toFixed(2)}%</b></span>
+                        <span className="pf-cur-i">{benchPerf?.label || (benchPerf?.symbol === 'spx' ? 'S&P 500' : 'KOSPI')} <b className={bench == null ? '' : bench >= 0 ? 'up' : 'dn'}>{bench == null ? '—' : `${bench >= 0 ? '+' : ''}${bench.toFixed(2)}%`}</b></span>
+                        {excess != null && <span className="pf-excess">시장 대비 <b>{excess >= 0 ? '+' : ''}{excess.toFixed(2)}%p</b></span>}
+                      </div>
+                      {months && <div className="pf-since">🗓️ {perf.sinceDate}부터 {months}개월 관리 기준</div>}
+                    </div>
+                    {excess != null && excess < 0 && (
+                      <div className="pf-block">
+                        <div className="pf-k">원인</div>
+                        <div className="pf-cause">{rePct != null && rePct >= 40
+                          ? <>자산의 <b>부동산 {rePct}% 쏠림</b>과 저베타 구성이 지수 상승 국면에서 상대 성과를 눌렀습니다.</>
+                          : <>저베타·방어적 구성이 지수 상승 국면에서 상대 성과를 눌렀습니다.</>}</div>
+                      </div>
+                    )}
+                    <div className="pf-block pf-next">
+                      <div className="pf-k">다음 수</div>
+                      <div className="pf-action">{improved != null
+                        ? <>리밸런싱·차단 신호를 반영하면 <b>시장 대비 {improved}%p 수준까지 개선 여지</b>가 있습니다 <span className="pf-assume">(가정 기반 추정)</span>.</>
+                        : <>리밸런싱·차단 신호로 구성 균형과 하방 방어를 점검해 보세요.</>}</div>
+                      <div className="pf-ctas">
+                        <button className="pf-cta primary" onClick={() => router.push('/pwa/ai-advisor')}>리밸런싱 시뮬레이션 →</button>
+                        <button className="pf-cta" onClick={() => setTab('recommend')}>차단 신호 보기 →</button>
+                      </div>
+                    </div>
+                    <div className="cmp-foot">내 수익률=현재 평가(주식·ETF 실측), 지수=매수일 종가 대비. 개선 추정치는 가정 기반 참고값입니다.</div>
+                  </HomeAccordion>
                 );
               })()}
 
@@ -1282,7 +1381,7 @@ export default function PWADashboard({ latestReport }) {
                 buyP = Math.max(0, Math.min(buyP ?? 0, 100)); sellP = Math.max(0, Math.min(sellP ?? 0, 100)); waitP = Math.max(0, 100 - buyP - sellP);
                 return (
                   <section className={`card v10 v10-collap ai-basis-card ${basisOpen ? 'open' : ''}`}>
-                    <div className="v10-collap-head" onClick={() => setBasisOpen(o => !o)}>
+                    <div className="v10-collap-head" onClick={() => setBasisOpen(o => { writeHomeOpen('basis', !o); return !o; })}>
                       <div className="v10-basis-txt"><h3>🧠 AI 판단 근거</h3><p className="v10-basis-sum">시장 온도 {heat != null && heat < 40 ? '낮음' : heat != null && heat >= 70 ? '높음' : '보통'} · 매수 확률 <b>{buyP}%</b> · {buyP >= 50 ? '매수 우세' : waitP >= sellP ? '관망 우세' : '매도 우세'}</p></div>
                       <span className="v10-caret">▾</span>
                     </div>
@@ -1300,47 +1399,30 @@ export default function PWADashboard({ latestReport }) {
                 );
               })()}
 
-              {/* [v10 UI 시안] ⑤ TOP PICK — 공동순위 */}
-              {topPicks.length > 0 && (
-                <section className="card v10">
-                  <div className="v10-sect"><h3>⭐ 오늘의 TOP PICK</h3><a onClick={() => setTab('recommend')}>추천 전체 →</a></div>
-                  <div className="v10-pick-note">매수 선별 전 기술 스코어링 상위 후보 · 실제 매수 신호와 별개</div>
-                  {topPicks.map((p, i) => {
-                    const rank = topPicks.filter(x => (x.score ?? 0) > (p.score ?? 0)).length + 1;
-                    const tie = topPicks.filter(x => (x.score ?? 0) === (p.score ?? 0)).length > 1;
-                    return (
-                      <div className="v10-pick-row" key={i}>
-                        <div className="v10-pick-l"><div className="v10-medal" style={{ background: rank === 1 ? 'var(--color-warning)' : rank === 2 ? 'var(--color-ink-3)' : 'var(--color-warning-ink)' }}>{rank}</div><span className="v10-pick-name">{p.name}{tie && <span className="v10-tie">공동 {rank}위</span>}</span></div>
-                        <div className="v10-pick-r"><span className="v10-pick-score">{p.isBuy ? '매수신호' : `관심도 ${p.score ?? '-'}`}</span><button className="v10-mini-btn" onClick={() => setTab('recommend')}>AI<br />분석</button></div>
-                      </div>
-                    );
-                  })}
-                </section>
-              )}
+              {/* [T-3] TOP PICK은 Tier 1(히어로 직후)로 이동됨 */}
 
-              {/* [v10 UI 시안] ⑥ 보유 종목 */}
-              <section className="card v10">
-                <div className="v10-sect"><h3>💼 보유 종목</h3><a onClick={() => setTab('portfolio')}>전체 {positions.length}건 →</a></div>
+              {/* [T-3 Tier 2] ⑥ 보유 종목 */}
+              <HomeAccordion id="holdings" title="💼 보유 종목" summary={positions.length ? `${positions.length}건` : '없음'}>
                 {positions.length === 0
                   ? <div className="pwa-empty">보유 종목 없음</div>
                   : positions.slice(0, 5).map((p, i) => (
                     <div className="v10-hold-row" key={i}><span className="v10-hold-name">{p.name}</span><span className={`v10-hold-pct ${(p.pnl_rate ?? 0) >= 0 ? 'up' : 'down'}`}>{(p.pnl_rate ?? 0) >= 0 ? '+' : ''}{p.pnl_rate}%</span></div>
                   ))}
-              </section>
+                <a className="acc-more" onClick={() => setTab('portfolio')}>전체 {positions.length}건 →</a>
+              </HomeAccordion>
 
-              {/* [v10 UI 시안] ⑦ 타임라인 — 오늘 AI 분석 흐름 */}
-              <section className="card v10">
-                <div className="v10-sect"><h3>🎬 오늘 AI 분석 흐름</h3></div>
+              {/* [T-3 Tier 2] ⑦ 타임라인 — 오늘 AI 분석 흐름 */}
+              <HomeAccordion id="timeline" title="🎬 오늘 AI 분석 흐름" summary={`매수 ${buyCount} · 차단 ${blockCount}`}>
                 <div className="v10-tl">
                   <div className="v10-tl-item"><div className="v10-tl-time">분석 시작</div><div className="v10-tl-title">🔍 시장 분석</div><div className="v10-tl-desc">Regime {regime || '-'} · Heat {heat ?? '-'} · 공포탐욕 {fearGreed ?? '-'}</div></div>
                   <div className="v10-tl-item"><div className="v10-tl-time">스크리닝</div><div className="v10-tl-title">📊 종목 스크리닝</div><div className="v10-tl-desc">후보 {(data.screening_candidates || []).length}종목 선별</div></div>
                   <div className="v10-tl-item"><div className="v10-tl-time">최종 결정</div><div className="v10-tl-title">✅ 최종 결정</div><div className="v10-tl-desc">매수 {buyCount}건 · 차단 {blockCount}건 — 선별 실행</div></div>
                 </div>
-              </section>
+              </HomeAccordion>
 
               {/* [v10 UI 시안] ⑧ 최근 활동 — 접기(같은 사유 묶기) */}
               <section className={`card v10 v10-collap ${logOpen ? 'open' : ''}`}>
-                <div className="v10-collap-head" onClick={() => setLogOpen(o => !o)}>
+                <div className="v10-collap-head" onClick={() => setLogOpen(o => { writeHomeOpen('log', !o); return !o; })}>
                   <h3 style={{ fontSize: '15px', fontWeight: 700 }}>🧾 최근 활동</h3>
                   <span className="v10-caret">▾</span>
                 </div>
@@ -3090,6 +3172,24 @@ export default function PWADashboard({ latestReport }) {
         .cmp-verdict b { font-weight: 800; }
         .cmp-note { margin-top: 10px; font-size: 0.7rem; color: var(--text-tertiary); line-height: 1.5; }
         .cmp-foot { margin-top: 10px; font-size: 0.64rem; color: var(--text-tertiary); line-height: 1.5; word-break: keep-all; }
+        /* [T-1] 성과 카드 3블록 */
+        .pf-block { padding: 11px 0; border-top: 1px solid var(--color-line); }
+        .pf-block:first-of-type { border-top: none; padding-top: 2px; }
+        .pf-k { font-size: 10.5px; font-weight: 800; letter-spacing: .04em; color: var(--color-ink-3); margin-bottom: 6px; }
+        .pf-cur { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; color: var(--color-ink-2); }
+        .pf-cur b { font-weight: 800; }
+        .pf-cur b.up { color: var(--color-success); }
+        .pf-cur b.dn { color: var(--color-danger); }
+        .pf-excess { font-weight: 700; color: var(--color-ink); }
+        .pf-since { font-size: 11.5px; color: var(--color-ink-3); margin-top: 6px; }
+        .pf-cause { font-size: 13px; color: var(--color-ink-2); line-height: 1.55; word-break: keep-all; }
+        .pf-cause b { color: var(--color-ink); font-weight: 800; }
+        .pf-next .pf-action { font-size: 13px; color: var(--color-ink-2); line-height: 1.55; word-break: keep-all; }
+        .pf-action b { color: var(--color-success); font-weight: 800; }
+        .pf-assume { color: var(--color-ink-3); font-weight: 500; font-size: 11.5px; }
+        .pf-ctas { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+        .pf-cta { flex: 1; min-width: 130px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .pf-cta.primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
         /* [#3 알림 피드] */
         .v10-noti { margin-top: 13px; border-top: 1px solid var(--color-line); padding-top: 12px; }
         .bf-block.v10-noti { margin-top: 14px; }
@@ -3125,8 +3225,25 @@ export default function PWADashboard({ latestReport }) {
         .v10-caret { font-size: 12px; color: var(--color-ink-3); transition: transform .2s; }
         .v10-collap.open .v10-caret { transform: rotate(180deg); }
         .v10-collap-body { max-height: 0; overflow: hidden; transition: max-height .3s ease; }
-        .v10-collap.open .v10-collap-body { max-height: 720px; }
+        .v10-collap.open .v10-collap-body { max-height: 1600px; }
         .v10-collap-inner { padding-top: 15px; }
+        /* [T-3] 아코디언 헤더 요약값 */
+        .acc-htxt { display: flex; align-items: baseline; gap: 9px; flex-wrap: wrap; min-width: 0; }
+        .acc-sum { font-size: 12.5px; color: var(--color-ink-2); font-weight: 600; }
+        .acc-more { display: inline-block; margin-top: 12px; font-size: 12.5px; font-weight: 700; color: var(--color-primary); cursor: pointer; }
+        /* [T-2] TOP PICK 카드 */
+        .tp-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; border-top: 1px solid var(--color-line); }
+        .tp-row:first-of-type { border-top: none; }
+        .tp-l { display: flex; align-items: center; gap: 11px; min-width: 0; }
+        .tp-medal { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0; }
+        .tp-meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .tp-name { font-size: 14px; font-weight: 700; color: var(--color-ink); display: flex; align-items: center; gap: 6px; }
+        .tp-buy { font-size: 10px; font-weight: 700; color: var(--color-success); background: var(--color-success-soft); padding: 2px 6px; border-radius: 6px; }
+        .tp-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+        .tp-tag { font-size: 11px; font-weight: 600; color: var(--color-primary); background: var(--color-primary-soft); padding: 2px 7px; border-radius: 99px; white-space: nowrap; }
+        .tp-tag.muted { color: var(--color-ink-3); background: var(--color-card-soft); }
+        .tp-r { display: flex; align-items: center; gap: 9px; flex-shrink: 0; }
+        .tp-score { font-size: 15px; font-weight: 800; color: var(--color-primary); }
         .v10-metrics { display: flex; gap: 8px; margin-bottom: 15px; }
         .v10-metric { flex: 1; background: var(--color-card-soft); border-radius: 12px; padding: 11px; text-align: center; }
         .v10-mk { font-size: 11px; color: var(--color-ink-3); font-weight: 600; }
