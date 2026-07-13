@@ -178,10 +178,28 @@ export function StockForm({ onSaved, autofocusName = false }) {
 }
 
 // ── ETF ───────────────────────────────────────────────────────────
+function useEtfMaster(q) {
+  const [opts, setOpts] = useState([]);
+  useEffect(() => {
+    const t = String(q || "").trim();
+    if (t.length < 1) { setOpts([]); return; }
+    let alive = true;
+    const id = setTimeout(() => {
+      fetch(`/api/input/etf-search?q=${encodeURIComponent(t)}`).then((r) => r.json())
+        .then((d) => { if (alive) setOpts(Array.isArray(d?.results) ? d.results : []); })
+        .catch(() => { if (alive) setOpts([]); });
+    }, 180);
+    return () => { alive = false; clearTimeout(id); };
+  }, [q]);
+  return opts;
+}
+
 export function EtfForm({ onSaved }) {
   const [side, setSide] = useState("buy");
   const [market, setMarket] = useState("auto");
   const [ticker, setTicker] = useState("");
+  const [etfSel, setEtfSel] = useState(null); // [E-3] 마스터에서 확정된 ETF
+  const etfOpts = useEtfMaster(etfSel ? "" : ticker);
   const [shares, setShares] = useState("");
   const [price, setPrice] = useState("");
   const [ccy, setCcy] = useState("USD");
@@ -202,7 +220,7 @@ export function EtfForm({ onSaved }) {
       const onb = readOnb(); onb.etf_uk = Number(((Number(onb.etf_uk) || 0) + addUk).toFixed(4)); writeOnb(onb);
     }
     broadcast();
-    setMsg(""); setTicker(""); setShares(""); setPrice(""); setBuyDate("");
+    setMsg(""); setTicker(""); setEtfSel(null); setShares(""); setPrice(""); setBuyDate("");
     if (onSaved) onSaved("etf");
   };
 
@@ -219,8 +237,22 @@ export function EtfForm({ onSaved }) {
           ))}
         </div>
       )}
-      <label className="af-f"><span>티커</span>
-        <input value={ticker} onChange={(e) => setTicker(e.target.value)} placeholder={market === "kr" ? "069500" : market === "us" ? "SCHD" : "SCHD / 069500"} style={{ textTransform: "uppercase" }} /></label>
+      <div className="af-f af-ac"><span>ETF 검색 · 티커<em>자동완성</em></span>
+        <input value={ticker} autoComplete="off"
+          onChange={(e) => { setEtfSel(null); setTicker(e.target.value); }}
+          placeholder="KODEX 200 / 069500 / ㅋㄷㅅ / SCHD" />
+        {etfOpts.length > 0 && !etfSel && (
+          <div className="af-menu">
+            {etfOpts.map((o) => (
+              <div className="af-opt" key={o.ticker} onMouseDown={() => { setEtfSel(o); setTicker(o.ticker); }}>
+                <span className="af-opt-nm">{o.name}</span>
+                <span className="af-opt-meta">{o.ticker} · {o.market}{o.fx_hedged === 'H' ? ' · 환헤지' : ''}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {etfSel && <div className="af-bound">✓ {etfSel.name} <b>({etfSel.ticker})</b> · {etfSel.market}{etfSel.tax_type ? ` · ${etfSel.tax_type === 'KR_DOMESTIC' ? '국내주식형' : etfSel.tax_type === 'KR_LISTED_OVERSEAS' ? '국내상장 해외/기타' : '해외상장'}` : ''}</div>}
+      </div>
       <div className="af-row">
         <label className="af-f"><span>수량</span><input type="number" inputMode="decimal" value={shares} onChange={(e) => setShares(e.target.value)} placeholder="10" /></label>
         <label className="af-f"><span>계좌</span>

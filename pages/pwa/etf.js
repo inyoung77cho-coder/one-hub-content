@@ -410,7 +410,7 @@ export default function EtfDashboard() {
           ) : (
             <div className="todo-none">✅ {acctFilter === "전체" ? "현재 조정할 항목이 없습니다" : `${acctFilter} 계좌에 조치할 항목이 없습니다`} — 배분·세제 이슈 없이 밴드 내 보유 권장.</div>
           )}
-          <div className="todo-foot">집중도·중복·절세·연금 한도·리밸런싱 밴드를 종합해 제안합니다. 참고용이며 세무자문이 아닙니다.</div>
+          <div className="todo-foot">집중도·중복·절세·연금 한도·리밸런싱 밴드를 종합해 제안합니다. ⚠ <b>투자자문·세무자문이 아닙니다.</b> 실제 세액은 개인 상황에 따라 다르며, 최종 매매·실행 판단은 본인이 하세요.</div>
         </section>
       )}
 
@@ -495,6 +495,7 @@ export default function EtfDashboard() {
               <div className="rb-tax sub">상위 종목 집중도 확인용. 목표비중 설정 시 실행 가능한 리밸런싱(세금 포함) 제안이 표시됩니다.</div>
             </>
           )}
+          <div className="rb-tax sub" style={{ marginTop: 8 }}>⚠ 투자자문이 아닙니다. 제안은 참고용이며, 최종 매매·실행은 본인이 판단합니다.</div>
         </section>
       )}
 
