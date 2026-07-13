@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getLatestDailyReport } from '../../lib/reports';
 import LastUpdated from '../../components/LastUpdated';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
-import { recordDecision, matureLedger, computeShowdown, getTodayDecision } from '../../lib/verdictLedger';
+import { recordDecision, matureLedger, computeShowdown, getTodayDecision, reconcileAutoWatch } from '../../lib/verdictLedger';
 import { fetchAssetsTotal } from '../../lib/assetsTotal';
 import { fetchLiveEtfKrw } from '../../lib/etfLive';
 import { dedupBy } from '../../lib/useDedup';
@@ -152,6 +152,22 @@ function deriveStance(p) {
   return { label: "유지", color: "var(--color-ink-2)", reason: `${upside != null ? `목표가 ${won(tgt)}까지 +${upside.toFixed(0)}% 여력` : "추세 관찰 중"}${stp > 0 ? `, 손절선 ${won(stp)} 미접촉` : ""}` };
 }
 
+// [S-2] 보유 액션 긴급도 4단계 — 임계치는 설정값(하드코딩 금지).
+const HOLD_URG_CFG = { nearPct: 3, spikePct: 7 };
+function deriveUrgency(p, cfg = HOLD_URG_CFG) {
+  const n = (x) => (x == null || isNaN(Number(x)) ? null : Number(x));
+  const cur = n(p.current_price) ?? 0, tgt = n(p.target) ?? 0, stp = n(p.stop_loss) ?? 0;
+  const near = cfg.nearPct / 100;
+  const day = n(p.change_1d);
+  if (stp > 0 && cur > 0 && cur <= stp * (1 + near))
+    return { level: "urgent", rank: 0, badge: "손절 임박", color: "var(--color-danger)", bar: "var(--color-danger)" };
+  if (tgt > 0 && cur > 0 && cur >= tgt * (1 - near))
+    return { level: "chance", rank: 1, badge: "익절 검토", color: "var(--color-success)", bar: "var(--color-success)" };
+  if (day != null && Math.abs(day) >= cfg.spikePct)
+    return { level: "watch", rank: 2, badge: "점검 필요", color: "var(--color-warning-ink, var(--color-warning))", bar: "var(--color-warning)" };
+  return { level: "normal", rank: 3, badge: "유지", color: "var(--color-ink-3)", bar: null };
+}
+
 // [§3-4] 차단 사유 → 해제 조건(그래서 어떻게 되면 풀리나) 1줄
 function unblockCondition(reason, signal) {
   const r = `${reason || ""} ${signal || ""}`.toLowerCase();
@@ -250,6 +266,9 @@ export default function PWADashboard({ latestReport }) {
   const [decTick, setDecTick] = useState(0); // [나 vs AI] 추천 카드 판단 버튼 상태 리렌더 트리거
   const [trustSec, setTrustSec] = useState('vs'); // [S2.2] AI 트러스트 3섹션 서브내비(vs/verify/archive)
   const [recSort, setRecSort] = useState('interest'); // [S7.2] 추천 정렬(interest/upside)
+  const [holdSort, setHoldSort] = useState('urgency'); // [S-2] 보유 정렬(urgency/value)
+  const [autoWatchNote, setAutoWatchNote] = useState([]); // [S-6] 추천해제→자동 관망 편입 알림
+  const [buyNotice, setBuyNotice] = useState(null); // [S-6] 바로매수 핸드오프 { name, code }
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [showAssetDetail, setShowAssetDetail] = useState(false); // [팝업] 총자산 클릭 → 상세 breakdown
@@ -524,6 +543,15 @@ export default function PWADashboard({ latestReport }) {
       .then(d => { if (d && d.ok) setAccuracy(d); })
       .catch(() => {});
   }, [mounted, trader]);
+
+  // [S-6] 추천 리스트가 갱신될 때, 직전에 노출됐다가 사라진(해제된) 무액션 종목을
+  //   자동 '관망'(auto_watch)으로 편입 → 추천 종목의 '나 vs AI' 편입률 100%(데이터 유실 0).
+  useEffect(() => {
+    if (!mounted || !data?.screening_candidates) return;
+    const current = dedupBy(data.screening_candidates, (c) => c.code || c.name).map((s) => ({ code: s.code, name: s.name }));
+    const auto = reconcileAutoWatch(current, trader);
+    if (auto.length) setAutoWatchNote(auto);
+  }, [mounted, trader, data?.screening_candidates]);
 
   const loadPending = useCallback(async () => {
     setPendingLoading(true);
@@ -1583,6 +1611,13 @@ export default function PWADashboard({ latestReport }) {
                     </div>
                     {/* [S7.2] 샀어요 마이크로카피 — 채점 등록 안내 + 기록 탭 딥링크 */}
                     <div className="rec-micro">🥊 <b>샀어요</b>를 누르면 <b>나 vs AI 채점</b>에 등록되고 <b>3일·7일 뒤</b> 실제 수익으로 자동 비교됩니다 <button className="rec-micro-link" onClick={() => setTab('report')}>기록 보기 →</button></div>
+                    {/* [S-6] 추천 해제 종목 자동 관망 편입 알림 */}
+                    {autoWatchNote.length > 0 && (
+                      <div className="auto-watch-note">
+                        <span>ℹ️ 추천에서 해제된 <b>{autoWatchNote.length}개</b>({autoWatchNote.slice(0, 2).map((a) => a.name).join(', ')}{autoWatchNote.length > 2 ? ' 외' : ''})를 판단 미기록으로 <b>‘관망’</b> 자동 편입했습니다.</span>
+                        <button onClick={() => { setTab('report'); setAutoWatchNote([]); }}>결과 보기 →</button>
+                      </div>
+                    )}
                     {/* Top3 Hero 카드 — 관심도 + 스탠스 + 근거 1줄 + 기대 여력 인라인(원칙4) */}
                     <div className="top3-hero-row">
                       {top3.map((s, i) => {
@@ -1606,6 +1641,8 @@ export default function PWADashboard({ latestReport }) {
                             <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>판단근거 ›</button>
                             {/* [S-8] 나 vs AI 예고 */}
                             <div className="vs-teaser">AI는 <b style={{ color: m.verdict.color }}>{m.verdict.short}</b> · 당신의 선택은?</div>
+                            {/* [S-6] 바로 매수(Primary) — 실주문은 증권사에서, 체결 후 '샀어요'로 기록 */}
+                            <button className="buy-now-btn" onClick={(e) => { e.stopPropagation(); setBuyNotice({ name: s.name, code: s.code }); }}>⚡ 바로 매수</button>
                             {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (
                               <div className="dec-mini" onClick={(e) => e.stopPropagation()}>
                                 <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>{dec === 'take' ? '✓ 샀어요' : '샀어요'}</button>
@@ -1950,11 +1987,20 @@ export default function PWADashboard({ latestReport }) {
                 <span className="pwa-card-label">보유 종목</span>
                 {positions.length === 0
                   ? <div className="pwa-empty">보유 종목 없음</div>
-                  : <div className="position-cards">{positions.map((p,i) => (
-                      <div key={i} className="position-card">
-                        {/* [v10 UI §5④] 중복 'AI 분석 보기' 버튼 제거 — 상단은 손익 배지만, 분석 버튼은 하단 액션행에 1개로 통일 */}
+                  : (() => {
+                    const _u = (q) => deriveUrgency(q);
+                    const _sorted = holdSort === 'value' ? positions : [...positions].sort((a, b) => _u(a).rank - _u(b).rank);
+                    const _actionCnt = positions.filter((q) => _u(q).rank <= 2).length;
+                    return (<>
+                      <div className="hold-summary">
+                        <span>{_actionCnt > 0 ? <>오늘 조치가 필요한 종목 <b>{_actionCnt}개</b></> : '오늘은 조치할 종목이 없습니다'}</span>
+                        <button className="hold-sort-btn" onClick={() => setHoldSort((s) => (s === 'urgency' ? 'value' : 'urgency'))}>{holdSort === 'urgency' ? '긴급도순' : '기본순'} ⇅</button>
+                      </div>
+                      <div className="position-cards">{_sorted.map((p, i) => { const u = _u(p); return (
+                      <div key={p.code || i} className={`position-card u-${u.level}`} style={u.bar ? { borderLeft: `3px solid ${u.bar}` } : undefined}>
                         <div className="position-card-top">
-                          <span className="position-card-name">{p.name}</span>
+                          <span className="position-card-name" title={p.name}>{p.name}</span>
+                          <span className="hold-urg-badge" style={{ color: u.color, borderColor: u.color, opacity: u.level === 'normal' ? 0.55 : 1 }}>{u.badge}</span>
                           <span className={`position-card-badge mono ${p.pnl_rate>=0?'bull':'bear'}`}>
                             {p.pnl_rate>=0?'+':''}{p.pnl_rate}%
                           </span>
@@ -2027,7 +2073,7 @@ export default function PWADashboard({ latestReport }) {
                           parts.push(`손절 ${stop.toLocaleString()}${toStop != null ? ` (${toStop >= 0 ? '+' : ''}${toStop.toFixed(1)}%)` : ''}`);
                           parts.push(`목표 ${tgt.toLocaleString()} 도달 시 절반 익절 제안`);
                           return (
-                            <div className="pos-trigger">⏭ <b>다음 트리거</b> · 유지 · {parts.join(' · ')}
+                            <div className="pos-trigger">⏭ <b>다음 트리거</b> · <span style={{ color: u.color, fontWeight: 700 }}>{u.badge}</span> · {parts.join(' · ')}
                               {!(safeNum(p.stop_loss) > 0 && safeNum(p.target) > 0) && <span className="pt-est">추정 레벨</span>}
                             </div>
                           );
@@ -2087,8 +2133,10 @@ export default function PWADashboard({ latestReport }) {
                             <p className="position-card-ai-text">{p.entry_hypothesis}</p>
                           </div>
                         )}
-                      </div>))}
-                    </div>}
+                      </div>); })}
+                    </div>
+                    </>);
+                  })()}
               </section>
 
               {/* [주식 직접입력] KIS 외 증권사 보유 — 빠른입력과 동일한 공용 StockForm */}
@@ -2792,6 +2840,20 @@ export default function PWADashboard({ latestReport }) {
           </Link>
         </footer>
 
+        {/* [S-6] 바로 매수 핸드오프 — 실주문은 증권사, 체결 후 '샀어요' 자동 기록 경로 */}
+        {buyNotice && (
+          <div onClick={() => setBuyNotice(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 360, background: 'var(--color-card)', color: 'var(--color-text)', borderRadius: 16, padding: 18, boxShadow: '0 12px 40px rgba(0,0,0,.3)' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>⚡ 바로 매수 · {buyNotice.name} <span style={{ color: 'var(--color-ink-3)', fontWeight: 500 }}>({buyNotice.code})</span></div>
+              <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.55, wordBreak: 'keep-all' }}>실주문 자동연동은 준비 중입니다. <b>증권사 앱에서 매수 주문</b>을 완료하신 뒤 아래 <b>‘샀어요로 기록’</b>을 누르면 <b>나 vs AI</b> 채점에 반영됩니다.</div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+                <button onClick={() => { logDecision(buyNotice.code, buyNotice.name, 'take'); setBuyNotice(null); }} style={{ flex: 1, border: 'none', borderRadius: 10, padding: '11px 0', fontWeight: 800, background: 'var(--color-primary)', color: '#fff', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>샀어요로 기록</button>
+                <button onClick={() => setBuyNotice(null)} style={{ flex: '0 0 auto', border: '1px solid var(--color-line)', borderRadius: 10, padding: '11px 16px', fontWeight: 700, background: 'var(--color-card)', color: 'var(--color-ink-2)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>닫기</button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── [v9.0] AI 판단근거 Bottom Sheet ── */}
         {bottomSheet && (<>
           {/* Dimmer */}
@@ -3434,6 +3496,11 @@ export default function PWADashboard({ latestReport }) {
         /* [S-8] 나 vs AI 예고 */
         .vs-teaser { font-size: 0.64rem; font-weight: 700; color: var(--text-secondary); margin-top: 2px; }
         .vs-teaser b { font-weight: 800; }
+        /* [S-6] 바로 매수(Primary) + 자동 관망 알림 */
+        .buy-now-btn { width: 100%; margin-top: 4px; border: none; border-radius: 9px; padding: 8px 0; font-size: 0.74rem; font-weight: 800; background: var(--color-primary); color: #fff; cursor: pointer; font-family: var(--font-body); }
+        .auto-watch-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4; word-break: keep-all; }
+        .auto-watch-note b { color: var(--color-ink); font-weight: 800; }
+        .auto-watch-note button { flex-shrink: 0; font-family: var(--font-body); font-size: 0.7rem; font-weight: 700; color: var(--color-primary); background: none; border: none; cursor: pointer; }
         .rec-reason { font-size: 0.7rem; color: var(--text-secondary); margin-top: 3px; line-height: 1.4; word-break: keep-all; }
         .rec-row-r { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
         .rec-interest { font-size: 0.68rem; color: var(--text-secondary); }
@@ -3660,9 +3727,17 @@ export default function PWADashboard({ latestReport }) {
         /* [v8.5] 보유종목 카드 */
         .position-cards { display: flex; flex-direction: column; gap: 7px; }
         .position-card { background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 11px 13px; }
-        .position-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
-        .position-card-name { font-size: 0.86rem; color: var(--text-primary); font-weight: 600; }
-        .position-card-badge { font-size: 0.76rem; font-weight: 700; padding: 3px 9px; border-radius: var(--radius-pill); }
+        .position-card-top { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 7px; }
+        /* [S-1] 종목명 잘림 방지 — 최소폭 확보 + 2줄 허용(중간 절단 금지) */
+        .position-card-name { font-size: 0.86rem; color: var(--text-primary); font-weight: 600; flex: 1 1 auto; min-width: 7em; word-break: keep-all; line-height: 1.25; }
+        .position-card-badge { font-size: 0.76rem; font-weight: 700; padding: 3px 9px; border-radius: var(--radius-pill); flex-shrink: 0; }
+        /* [S-2] 보유 긴급도 배지 + 요약 + 정렬 */
+        .hold-urg-badge { font-size: 0.62rem; font-weight: 800; padding: 2px 8px; border-radius: 20px; border: 1px solid; flex-shrink: 0; white-space: nowrap; }
+        .hold-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 10px; }
+        .hold-summary b { color: var(--color-danger); font-weight: 800; }
+        .hold-sort-btn { font-family: var(--font-body); font-size: 0.7rem; font-weight: 700; color: var(--text-secondary); background: var(--inset-bg); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; cursor: pointer; flex-shrink: 0; }
+        .position-card.u-urgent { border-color: var(--color-danger); }
+        .position-card.u-chance { border-color: var(--color-success); }
         .position-card-badge.bull { background: color-mix(in srgb, var(--accent-buy) 16%, var(--card-bg)); }
         .position-card-badge.bear { background: color-mix(in srgb, var(--accent-sell) 16%, var(--card-bg)); }
         .position-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
