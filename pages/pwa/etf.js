@@ -6,6 +6,7 @@ import TopNav from "../../components/TopNav";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS } from "../../lib/etfHoldings";
 import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress, pensionCreditLimitCombined } from "../../lib/taxRules";
+import Term from "../../components/Term";
 import { EtfForm } from "../../components/shared/AssetForms";
 
 const won = (n) => {
@@ -350,9 +351,9 @@ export default function EtfDashboard() {
             <div className="big">{won(heroVal)}<span>원</span>{heroLive && <span className="big-live">⚡실시간</span>}</div>
             <div className="hsub">취득 {won(heroCost)} → 평가손익 <b>{won(heroPnl)}원</b> · <b>{pct(heroPnlPct)}</b>{heroLive && <span className="hsub-note"> · 수량×실측종가({liveCloseDate ? liveCloseDate.slice(5) : "최근"})</span>}</div>
             <div className="decomp">
-              <div className="drow"><span className="dk">ETF 자체수익 ($)</span><span className={`dv ${sign(s.etf_self_pct)}`}>{pct(s.etf_self_pct)}</span></div>
-              <div className="drow"><span className="dk">환차손익</span><span className={`dv ${sign(s.fx_pure_pct)}`}>{pct(s.fx_pure_pct)}</span></div>
-              <div className="drow"><span className="dk"><span className="term light" title="ETF 자체수익과 환차손익이 곱해져 생기는 상호작용분. (1+ETF수익)×(1+환수익)−1 에서 단순 합을 넘는 나머지입니다.">교차항</span></span><span className={`dv ${sign(s.cross_pct)}`}>{pct(s.cross_pct)}</span></div>
+              <div className="drow"><span className="dk"><Term term="자체수익">ETF 자체수익 ($)</Term></span><span className={`dv ${sign(s.etf_self_pct)}`}>{pct(s.etf_self_pct)}</span></div>
+              <div className="drow"><span className="dk"><Term term="환차손익">환차손익</Term></span><span className={`dv ${sign(s.fx_pure_pct)}`}>{pct(s.fx_pure_pct)}</span></div>
+              <div className="drow"><span className="dk"><Term term="교차항">교차항</Term></span><span className={`dv ${sign(s.cross_pct)}`}>{pct(s.cross_pct)}</span></div>
               <div className="drow total"><span className="dk">실질 원화수익</span><span className={`dv ${sign(s.total_pnl_pct)}`}>{pct(s.total_pnl_pct)}</span></div>
             </div>
             <div className="foot-note">달러 수익 {pct(s.etf_self_pct)} 위에 환율효과 {pct((s.fx_pure_pct||0) + (s.cross_pct||0))}가 더해진 원화 실질 수익입니다.</div>
@@ -423,9 +424,9 @@ export default function EtfDashboard() {
           <div className="score-grid">
             <div className="sc"><span>실질 수익률</span><b className={sign(s.total_pnl_pct)}>{pct(s.total_pnl_pct)}</b></div>
             <div className="sc"><span>종목 수</span><b>{positions.length}</b></div>
-            <div className="sc"><span>최대 섹터집중</span><b>{overlap.sectors?.[0] ? `${overlap.sectors[0].sector} ${(overlap.sectors[0].weight * 100).toFixed(0)}%` : "-"}</b></div>
+            <div className="sc"><span>최대 <Term term="집중도">섹터집중</Term></span><b>{overlap.sectors?.[0] ? `${overlap.sectors[0].sector} ${(overlap.sectors[0].weight * 100).toFixed(0)}%` : "-"}</b></div>
             <div className="sc"><span>예상 양도세</span><b className="neg">{won(tax.tax_all)}원</b></div>
-            <div className="sc"><span>손익통산 손실</span><b>{tax.losses?.map((l) => l.ticker).join(", ") || "없음"}</b></div>
+            <div className="sc"><span><Term term="손익통산">손익통산</Term> 손실</span><b>{tax.losses?.map((l) => l.ticker).join(", ") || "없음"}</b></div>
             <div className="sc"><span>배당(연)</span><b className="pos">${tax.dividend_usd}</b></div>
           </div>
         </section>
