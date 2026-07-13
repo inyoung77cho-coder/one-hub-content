@@ -50,35 +50,79 @@ function AfStyles() {
       .af-msg.ok { color: var(--color-success); }
       .af-save { width: 100%; margin-top: 2px; border: none; border-radius: 12px; padding: 13px 0; font-size: 0.92rem; font-weight: 800; color: #fff; background: var(--color-primary); cursor: pointer; font-family: var(--font-sans); }
       .af-save.sell { background: var(--color-danger); }
+      .af-ac { position: relative; }
+      .af-menu { position: absolute; top: 100%; left: 0; right: 0; z-index: 40; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 10px; margin-top: 4px; max-height: 220px; overflow-y: auto; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+      .af-opt { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; cursor: pointer; }
+      .af-opt:hover { background: var(--color-primary-soft); }
+      .af-opt-nm { font-size: 0.86rem; font-weight: 700; color: var(--color-ink); }
+      .af-opt-meta { font-size: 0.72rem; color: var(--color-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+      .af-bound { margin-top: 6px; font-size: 0.74rem; color: var(--color-success); font-weight: 600; word-break: keep-all; }
+      .af-bound b { font-weight: 800; }
     `}</style>
   );
 }
 
 // ── 주식(비KIS 직접입력) ──────────────────────────────────────────
+//   [S-3] 국내: 종목 마스터 자동완성 → 종목코드 자동 바인딩, 자유텍스트 저장 차단.
+//   [S-1] 평단 검증: 현재가 대비 이상치 경고 + 저장 차단, 총 매수금액 실시간 표시, 단위=원.
+function useMaster(q) {
+  const [opts, setOpts] = useState([]);
+  useEffect(() => {
+    const t = String(q || "").trim();
+    if (t.length < 1) { setOpts([]); return; }
+    let alive = true;
+    const id = setTimeout(() => {
+      fetch(`/api/input/master-search?q=${encodeURIComponent(t)}`).then((r) => r.json())
+        .then((d) => { if (alive) setOpts(Array.isArray(d?.results) ? d.results : []); })
+        .catch(() => { if (alive) setOpts([]); });
+    }, 180);
+    return () => { alive = false; clearTimeout(id); };
+  }, [q]);
+  return opts;
+}
+
 export function StockForm({ onSaved, autofocusName = false }) {
   const [market, setMarket] = useState("kr");
   const [name, setName] = useState("");
-  const [code, setCode] = useState("");
+  const [sel, setSel] = useState(null); // 국내: 마스터에서 확정된 {ticker,name,market,close_price}
+  const [code, setCode] = useState(""); // 해외: 수기 코드
   const [shares, setShares] = useState("");
   const [price, setPrice] = useState("");
   const [broker, setBroker] = useState(STOCK_BROKERS[0]);
   const [account, setAccount] = useState("일반");
   const [buyDate, setBuyDate] = useState("");
   const [msg, setMsg] = useState("");
-  const suggest = useSuggest("stock", name);
-  const ccy = market === "us" ? "USD" : "KRW";
+  const opts = useMaster(market === "kr" && !sel ? name : "");
+  const isKR = market === "kr";
+  const ccy = isKR ? "KRW" : "USD";
+
+  const pick = (o) => { setSel(o); setName(`${o.name} (${o.ticker})`); setMsg(""); };
+  const priceWarn = (() => {
+    if (!isKR || !sel?.close_price || !(Number(price) > 0)) return "";
+    const p = Number(price), c = Number(sel.close_price);
+    if (p > c * 10) return `평단이 현재가 ${c.toLocaleString()}원의 10배를 초과합니다 — 총 매수금액을 넣으신 건 아닌가요?`;
+    if (p < c / 10) return `평단이 현재가의 1/10 미만입니다 — 단위(원)를 확인하세요.`;
+    return "";
+  })();
+  const total = Number(shares) > 0 && Number(price) > 0 ? Number(shares) * Number(price) : null;
 
   const save = () => {
+    if (isKR && !sel) { setMsg("⚠️ 목록에서 종목을 선택하세요 (자유 입력은 저장할 수 없습니다)"); return; }
+    if (!(Number(shares) > 0)) { setMsg("⚠️ 수량을 입력하세요"); return; }
+    if (!(Number(price) > 0)) { setMsg("⚠️ 평단가(원)를 입력하세요"); return; }
+    if (priceWarn) { setMsg("⚠️ " + priceWarn); return; }
     const tr = getTrader();
-    const res = buyStock({ name, code, shares, avgPrice: price, ccy, broker, market, account, buyDate, trader: tr });
+    const res = buyStock({
+      name: isKR ? sel.name : name, code: isKR ? sel.ticker : code,
+      shares, avgPrice: price, ccy, broker, market, account, buyDate, trader: tr,
+    });
     if (!res.ok) { setMsg("⚠️ " + res.error); return; }
-    // 총자산 근사 반영(원화 기준만). 해외(USD)는 ETF와 동일하게 페이지 실측에 위임.
     if (ccy === "KRW") {
       const addUk = (Number(shares) * Number(price)) / 1e8;
       const onb = readOnb(); onb.stock_uk = Number(((Number(onb.stock_uk) || 0) + addUk).toFixed(4)); writeOnb(onb);
     }
     broadcast();
-    setMsg(""); setName(""); setCode(""); setShares(""); setPrice(""); setBuyDate("");
+    setMsg(""); setName(""); setSel(null); setCode(""); setShares(""); setPrice(""); setBuyDate("");
     if (onSaved) onSaved("stock");
   };
 
@@ -86,30 +130,47 @@ export function StockForm({ onSaved, autofocusName = false }) {
     <div className="af"><AfStyles />
       <div className="af-seg" role="group" aria-label="국내/해외">
         {[["kr", "🇰🇷 국내"], ["us", "🇺🇸 해외"]].map(([v, l]) => (
-          <button key={v} type="button" className={market === v ? "on" : ""} onClick={() => setMarket(v)}>{l}</button>
+          <button key={v} type="button" className={market === v ? "on" : ""} onClick={() => { setMarket(v); setSel(null); setName(""); setCode(""); }}>{l}</button>
         ))}
       </div>
-      <label className="af-f"><span>종목명<em>자동완성</em></span>
-        <input list="af-stock-suggest" value={name} autoFocus={autofocusName} onChange={(e) => setName(e.target.value)} placeholder={market === "us" ? "Apple / AAPL" : "삼성전자 / 005930"} />
-        <datalist id="af-stock-suggest">{suggest.map((o) => <option key={o} value={o} />)}</datalist>
-      </label>
+      {isKR ? (
+        <div className="af-f af-ac"><span>종목명 · 코드 · 초성<em>자동완성</em></span>
+          <input value={name} autoFocus={autofocusName} autoComplete="off"
+            onChange={(e) => { setSel(null); setName(e.target.value); }}
+            placeholder="삼성전자 / 005930 / ㅅㅅㅈㅈ" />
+          {opts.length > 0 && !sel && (
+            <div className="af-menu">
+              {opts.map((o) => (
+                <div className="af-opt" key={o.ticker} onMouseDown={() => pick(o)}>
+                  <span className="af-opt-nm">{o.name}</span>
+                  <span className="af-opt-meta">{o.ticker} · {o.market}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {sel && <div className="af-bound">✓ {sel.name} <b>({sel.ticker})</b> · {sel.market}{sel.close_price ? ` · 현재가 ${Number(sel.close_price).toLocaleString()}원` : ''}</div>}
+        </div>
+      ) : (
+        <div className="af-row">
+          <label className="af-f"><span>종목명</span><input value={name} onChange={(e) => setName(e.target.value)} placeholder="Apple" /></label>
+          <label className="af-f"><span>티커</span><input value={code} onChange={(e) => setCode(e.target.value)} placeholder="AAPL" /></label>
+        </div>
+      )}
       <div className="af-row">
-        <label className="af-f"><span>종목코드<em>선택</em></span><input value={code} onChange={(e) => setCode(e.target.value)} placeholder={market === "us" ? "AAPL" : "005930"} /></label>
         <label className="af-f"><span>수량(주)</span><input type="number" inputMode="numeric" value={shares} onChange={(e) => setShares(e.target.value)} placeholder="10" /></label>
+        <label className="af-f"><span>평단가 ({isKR ? "원" : "$"})</span><input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={isKR ? "70000" : "180"} /></label>
       </div>
       <div className="af-row">
-        <label className="af-f"><span>평단({ccy === "USD" ? "$" : "원"})</span><input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={market === "us" ? "180" : "70000"} /></label>
         <label className="af-f"><span>증권사</span>
           <select value={broker} onChange={(e) => setBroker(e.target.value)}>{STOCK_BROKERS.map((b) => <option key={b} value={b}>{b}</option>)}</select></label>
-      </div>
-      <div className="af-row">
         <label className="af-f"><span>계좌</span>
           <select value={account} onChange={(e) => setAccount(e.target.value)}>{ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}</select></label>
-        <label className="af-f"><span>매수일<em>성과비교용</em></span><input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} /></label>
       </div>
-      {Number(shares) > 0 && Number(price) > 0 && (
-        <div className="af-calc">평가액 ≈ <b>{ccy === "USD" ? `$${(Number(shares) * Number(price)).toLocaleString()}` : `${((Number(shares) * Number(price)) / 1e8).toFixed(2)}억`}</b> <span>(수량 × 평단)</span></div>
+      <label className="af-f"><span>매수일<em>성과비교용</em></span><input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} /></label>
+      {total != null && (
+        <div className="af-calc">총 매수금액 <b>{isKR ? `${total.toLocaleString()}원` : `$${total.toLocaleString()}`}</b> <span>(수량 × 평단, 검산용)</span></div>
       )}
+      {priceWarn && <div className="af-msg err">⚠ {priceWarn}</div>}
       {msg && <div className="af-msg err">{msg}</div>}
       <button className="af-save" onClick={save}>＋ 주식 보유 기록</button>
     </div>
