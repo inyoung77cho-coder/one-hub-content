@@ -200,7 +200,24 @@ export default function RealEstateDashboard() {
 
       {/* [S5] 내 단지 — 미등록: 위저드 CTA / 등록됨: 상세 요약(매수가 vs 현재 AVM) */}
       {!myProp ? (
-        <div className="cta-slim" onClick={openWiz}><span className="cta-txt">🏠 내 단지를 등록하면 <b>평가손익·갈아타기·스크리너</b>에 반영됩니다</span><span className="arr">→</span></div>
+        // [R-1] 등록 전 블러 프리뷰 — 라벨은 선명, 값만 가림 + 가치 제안 카드(3개·30초 CTA)
+        <div className="preview5">
+          <div className="pv-sample" aria-hidden="true">
+            <div className="pv-title">🏠 내 단지 <span className="pv-blur">▓▓▓▓</span></div>
+            <div className="pv-row"><span className="pv-lbl">내 단지 ONE Score</span><span className="pv-blur">88 · 고평가</span></div>
+            <div className="pv-row"><span className="pv-lbl">같은 동 갈아타기 갭</span><span className="pv-blur">+3.2억 · 추천</span></div>
+            <div className="pv-row"><span className="pv-lbl">목표 지역 가격 갭</span><span className="pv-blur">+5.8억 · 3년 최저</span></div>
+          </div>
+          <div className="pv-over">
+            <div className="pv-h">등록하면 이런 게 보입니다</div>
+            <ul className="pv-list">
+              <li>내 단지의 ONE Score와 고평가/저평가 판정</li>
+              <li>같은 동 내 갈아타기 가격 갭 분석</li>
+              <li>목표 지역과의 실시간 가격 갭 추적</li>
+            </ul>
+            <button className="pv-cta" onClick={openWiz}>내 단지 등록하기 · 30초 →</button>
+          </div>
+        </div>
       ) : (() => {
         const cur = rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명).find((o) => o.단지명 === myProp.name) : null;
         const curUk = cur ? Number(cur.avm_total_uk || 0) : null;
@@ -537,6 +554,19 @@ export default function RealEstateDashboard() {
         .cta-slim { display: flex; align-items: center; gap: 10px; background: var(--color-primary-soft); border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; font-size: 12.5px; color: var(--color-ink-2); font-weight: 600; cursor: pointer; line-height: 1.5; }
         .cta-txt { flex: 1; word-break: keep-all; }
         .cta-slim b { color: var(--color-primary); font-weight: 700; }
+        /* [R-1] 등록 전 블러 프리뷰 */
+        .preview5 { border: 1px solid var(--color-line); border-radius: 16px; overflow: hidden; margin-bottom: 14px; }
+        .pv-sample { padding: 15px; background: var(--color-card); }
+        .pv-title { font-size: 14px; font-weight: 800; color: var(--color-ink); margin-bottom: 10px; }
+        .pv-row { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-top: 1px solid var(--color-line); }
+        .pv-row:first-of-type { border-top: none; }
+        .pv-lbl { font-size: 13px; color: var(--color-ink-2); font-weight: 600; }
+        .pv-blur { font-size: 13px; font-weight: 800; color: var(--color-ink); filter: blur(5px); user-select: none; }
+        .pv-over { padding: 14px 15px; background: var(--color-primary-soft); border-top: 1px solid var(--color-primary); }
+        .pv-h { font-size: 13.5px; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
+        .pv-list { margin: 0 0 12px; padding-left: 18px; }
+        .pv-list li { font-size: 12.5px; color: var(--color-ink-2); line-height: 1.75; word-break: keep-all; }
+        .pv-cta { width: 100%; border: none; background: var(--color-primary); color: #fff; font-size: 13.5px; font-weight: 800; padding: 12px 0; border-radius: 11px; cursor: pointer; font-family: var(--font-sans); }
         .cta-slim .arr { color: var(--color-primary); font-weight: 800; flex-shrink: 0; }
         /* [S5] 갈아타기 갭 트래커 */
         .gap-selects { display: flex; align-items: flex-end; gap: 8px; }
