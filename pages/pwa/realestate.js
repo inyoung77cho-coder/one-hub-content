@@ -32,6 +32,7 @@ export default function RealEstateDashboard() {
   const [gapTarget, setGapTarget] = useState(""); // [R-5] 갈아탈 목표 평형(전용㎡)
   const [gapData, setGapData] = useState(null); // [R-5] 갭 분석 결과(gap-tracker)
   const [gapLoading, setGapLoading] = useState(false);
+  const [gapBData, setGapBData] = useState(null); // [R-5 시나리오B] 같은 동 단지 갈아타기 갭
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/re/${fn}`).then((r) => r.json());
@@ -99,6 +100,19 @@ export default function RealEstateDashboard() {
       .catch(() => { if (alive) { setGapData(null); setGapLoading(false); } });
     return () => { alive = false; };
   }, [myProp?.name, myProp?.pyeong, gapTarget]);
+  // [R-5 시나리오B] 같은 동 단지 갈아타기 — 후보 단지별 갭·판정(upgrade-gap)
+  useEffect(() => {
+    const nm = myProp?.name, ar = Number(myProp?.pyeong);
+    if (moveScope !== "dong" || !(nm && ar > 0)) { setGapBData(null); return; }
+    const dg = myProp?.name ? dongOf(myProp.name) : null;
+    let alive = true;
+    fetch(`/api/pwa/re/upgradeGap?from_complex=${encodeURIComponent(nm)}${dg ? `&dong=${encodeURIComponent(dg)}` : ""}&area=${ar}`)
+      .then((r) => r.json())
+      .then((d) => { if (alive) setGapBData(d && !d.error ? d : null); })
+      .catch(() => { if (alive) setGapBData(null); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moveScope, myProp?.name, myProp?.pyeong]);
   const pickMy = (v) => { setMyC(v); try { localStorage.setItem("onehub_re_my", v); } catch (e) {} };
   const pickTgt = (v) => { setTgtC(v); try { localStorage.setItem("onehub_re_target", v); } catch (e) {} };
   const changeBudget = (v) => { setBudget(v); try { localStorage.setItem("onehub_re_budget", v); } catch (e) {} };
@@ -360,6 +374,31 @@ export default function RealEstateDashboard() {
                       <span className={`scr-gap ${o.need != null && o.need <= 0 ? "ok" : ""}`}>{gapCell(o.need)}</span>
                     </div>
                   ))}
+                  {/* [R-5 시나리오B] 같은 동 단지 갈아타기 갭 분석 — 갭 저점 Top3 자동 추천 + 판정 */}
+                  {gapBData?.candidates?.length > 0 && (
+                    <div className="gap5">
+                      <div className="gap5-h">📊 같은 동 갈아타기 갭 분석 <span>갭 저점 순 Top {gapBData.candidates.length}</span></div>
+                      {gapBData.candidates.map((c) => {
+                        const v = c.verdict;
+                        const vc = v === "추천" ? "ok" : v === "보류" ? "no" : v === "관망" ? "mid" : "na";
+                        const ic = v === "추천" ? "🟢" : v === "보류" ? "🔴" : v === "관망" ? "🟡" : "⚪";
+                        return (
+                          <div className="gapb-cand" key={c.complex}>
+                            <div className="gapb-top"><b className="gapb-nm">{c.complex}</b><span className={`gap5-verdict ${vc} gapb-v`}>{ic} {v}</span></div>
+                            <div className="gap5-reason">{c.verdict_reason}</div>
+                            {c.band && (
+                              <div className="gap5-rows">
+                                <div className="g5r"><span>현재 격차</span><b>{c.current_gap_uk}억</b></div>
+                                <div className="g5r"><span>적정 밴드(평균±1σ)</span><b>{c.band.low_uk}~{c.band.high_uk}억</b></div>
+                                <div className="g5r"><span>표본</span><b>{c.deal_n}건</b></div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                      <div className="gap5-foot">⚠ {gapBData.tax_note} · {gapBData.disclaimer}</div>
+                    </div>
+                  )}
                   <div className="note">{myDong ? <><b>{myDong}</b> 내 이동 기준. </> : null}갈아타기 자금 = 목표 매매(AVM) − 내 단지 매매. 회귀 근사 · <Term term="시차">시차 없음(동시 반영)</Term> · 확정 아님.</div>
                 </>
               );
@@ -710,6 +749,12 @@ export default function RealEstateDashboard() {
         .g5r { font-size: 12px; color: var(--color-ink-3); } .g5r b { color: var(--color-ink); font-weight: 800; margin-left: 5px; }
         .gap5-spark { width: 100%; height: 44px; margin-top: 10px; display: block; }
         .gap5-foot { font-size: 10.5px; color: var(--color-ink-3); margin-top: 9px; line-height: 1.5; word-break: keep-all; }
+        /* [R-5 시나리오B] 같은 동 후보 갭 카드 */
+        .gapb-cand { padding: 10px 0; border-top: 1px solid var(--color-line); }
+        .gapb-cand:first-of-type { border-top: none; }
+        .gapb-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .gapb-nm { font-size: 13.5px; font-weight: 800; color: var(--color-ink); }
+        .gap5-verdict.gapb-v { font-size: 12px; padding: 2px 9px; }
         /* [R-6] 개인화 브리핑 */
         .pbrief { background: var(--color-card); border: 1px solid var(--color-primary); border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; }
         .pbrief-set { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--color-ink-2); flex-wrap: wrap; }
