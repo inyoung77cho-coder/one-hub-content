@@ -8,6 +8,7 @@ import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, set
 import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress, pensionCreditLimitCombined } from "../../lib/taxRules";
 import Term from "../../components/Term";
 import REBAL_PRESETS from "../../data/rebalance_presets.json";
+import EtfBulkImport from "../../components/EtfBulkImport";
 import { EtfForm } from "../../components/shared/AssetForms";
 
 const won = (n) => {
@@ -47,6 +48,8 @@ export default function EtfDashboard() {
   const [fcOpen, setFcOpen] = useState(false); // [S7.4] 예측 섹션 기본 접기
   const [pensionContrib, setPensionContrib] = useState(""); // [S4] 올해 연금 납입액(원, 세액공제 진행률)
   const [targetAlloc, setTargetAlloc] = useState(null); // [E-4] 목표 배분(onehub_target_alloc)
+  const [decompOpen, setDecompOpen] = useState(false); // [E-1] Tier3 수익 분해 접힘(기본)
+  const toggleDecomp = () => { const n = !decompOpen; setDecompOpen(n); try { localStorage.setItem("onehub_etf_decomp", n ? "1" : "0"); } catch {} };
   const applyPreset = (key) => {
     const p = REBAL_PRESETS.presets[key];
     if (!p) return;
@@ -64,6 +67,7 @@ export default function EtfDashboard() {
       if (pc != null) setPensionContrib(pc);
       const ta = localStorage.getItem("onehub_target_alloc");
       if (ta) setTargetAlloc(JSON.parse(ta));
+      setDecompOpen(localStorage.getItem("onehub_etf_decomp") === "1");
       const last = localStorage.getItem("onehub_etf_last_acct");
       if (last && ACCOUNTS.includes(last)) setForm((prev) => ({ ...prev, account: last }));
     } catch (e) {}
@@ -361,13 +365,20 @@ export default function EtfDashboard() {
           <>
             <div className="big">{won(heroVal)}<span>원</span>{heroLive && <span className="big-live">⚡실시간</span>}</div>
             <div className="hsub">취득 {won(heroCost)} → 평가손익 <b>{won(heroPnl)}원</b> · <b>{pct(heroPnlPct)}</b>{heroLive && <span className="hsub-note"> · 수량×실측종가({liveCloseDate ? liveCloseDate.slice(5) : "최근"})</span>}</div>
-            <div className="decomp">
-              <div className="drow"><span className="dk"><Term term="자체수익">ETF 자체수익 ($)</Term></span><span className={`dv ${sign(s.etf_self_pct)}`}>{pct(s.etf_self_pct)}</span></div>
-              <div className="drow"><span className="dk"><Term term="환차손익">환차손익</Term></span><span className={`dv ${sign(s.fx_pure_pct)}`}>{pct(s.fx_pure_pct)}</span></div>
-              <div className="drow"><span className="dk"><Term term="교차항">교차항</Term></span><span className={`dv ${sign(s.cross_pct)}`}>{pct(s.cross_pct)}</span></div>
-              <div className="drow total"><span className="dk">실질 원화수익</span><span className={`dv ${sign(s.total_pnl_pct)}`}>{pct(s.total_pnl_pct)}</span></div>
-            </div>
-            <div className="foot-note">달러 수익 {pct(s.etf_self_pct)} 위에 환율효과 {pct((s.fx_pure_pct||0) + (s.cross_pct||0))}가 더해진 원화 실질 수익입니다.</div>
+            {/* [E-1] Tier 3 — 수익 분해 접힘(헤더에 요약값 노출) */}
+            <button className="decomp-head" onClick={toggleDecomp} aria-expanded={decompOpen}>
+              <span>📊 수익 분해</span>
+              <span className="decomp-sum">환차 기여 <b>{pct((s.fx_pure_pct || 0) + (s.cross_pct || 0))}</b> · 실질 <b>{pct(s.total_pnl_pct)}</b> <span className={`decomp-caret ${decompOpen ? "open" : ""}`}>▾</span></span>
+            </button>
+            {decompOpen && (<>
+              <div className="decomp">
+                <div className="drow"><span className="dk"><Term term="자체수익">ETF 자체수익 ($)</Term></span><span className={`dv ${sign(s.etf_self_pct)}`}>{pct(s.etf_self_pct)}</span></div>
+                <div className="drow"><span className="dk"><Term term="환차손익">환차손익</Term></span><span className={`dv ${sign(s.fx_pure_pct)}`}>{pct(s.fx_pure_pct)}</span></div>
+                <div className="drow"><span className="dk"><Term term="교차항">교차항</Term></span><span className={`dv ${sign(s.cross_pct)}`}>{pct(s.cross_pct)}</span></div>
+                <div className="drow total"><span className="dk">실질 원화수익</span><span className={`dv ${sign(s.total_pnl_pct)}`}>{pct(s.total_pnl_pct)}</span></div>
+              </div>
+              <div className="foot-note">달러 수익 {pct(s.etf_self_pct)} 위에 환율효과 {pct((s.fx_pure_pct || 0) + (s.cross_pct || 0))}가 더해진 원화 실질 수익입니다.</div>
+            </>)}
           </>
         ) : (
           <div className="hsub">{err ? "데이터 로드 오류" : "불러오는 중…"}</div>
@@ -746,6 +757,7 @@ export default function EtfDashboard() {
         </div>
         {/* [폼 일원화] 빠른입력과 동일한 공용 EtfForm 사용 */}
         <EtfForm onSaved={() => { const tr = getTrader(); const l = getHoldings(tr); setHoldings(l); refreshQuotes(l); }} />
+        <EtfBulkImport onDone={() => { const tr = getTrader(); const l = getHoldings(tr); setHoldings(l); refreshQuotes(l); }} />
         {holdings.length > 0 ? (
           <div className="me-groups">
             {/* [S4·계좌 세분화] 계좌 유형별 그룹 — 세제가 다르므로 버킷별 평가·세제 안내 분리 · 상단 필터 반영 */}
@@ -851,7 +863,12 @@ export default function EtfDashboard() {
         .fx-note.stale b { color: var(--color-warning); }
         .hero .hsub { font-size: 12.5px; color: var(--hero-ink-soft); margin-top: 9px; }
         .hero .hsub b { color: var(--hero-accent); font-weight: 700; }
-        .decomp { background: var(--hero-fill); border: 1px solid var(--hero-fill-line); border-radius: 14px; padding: 14px; margin-top: 16px; }
+        .decomp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-top: 16px; padding: 11px 13px; background: var(--hero-fill); border: 1px solid var(--hero-fill-line); border-radius: 12px; color: var(--hero-ink); font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }
+        .decomp-sum { font-size: 12px; font-weight: 600; color: var(--hero-ink-faint); }
+        .decomp-sum b { color: var(--hero-ink); font-weight: 800; }
+        .decomp-caret { display: inline-block; transition: transform .2s; }
+        .decomp-caret.open { transform: rotate(180deg); }
+        .decomp { background: var(--hero-fill); border: 1px solid var(--hero-fill-line); border-radius: 14px; padding: 14px; margin-top: 8px; }
         .drow { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; }
         .drow .dk { font-size: 12.5px; color: var(--hero-ink-soft); font-weight: 500; }
         .drow .dv { font-size: 13px; font-weight: 700; color: var(--hero-accent); }
