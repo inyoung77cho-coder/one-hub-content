@@ -179,6 +179,25 @@ export default function RealEstateDashboard() {
         );
       })()}
 
+      {/* [R-6] 개인화 브리핑 — 내 선택 → 그래서 결과 → 검토 방향(CTA). 일반 시황보다 위. */}
+      {brief && !brief.error && (myProp?.name ? (() => {
+        const cur = rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명).find((o) => o.단지명 === myProp.name) : null;
+        const fd = (feed?.feed || []).find((f) => f.단지명 === myProp.name);
+        const chg = fd?.변동률;
+        return (
+          <div className="pbrief">
+            <div className="pb-step"><span className="pb-k">① 내 선택</span><span className="pb-v">보유 <b>{myProp.name}</b>{myProp.pyeong ? ` 전용 ${myProp.pyeong}㎡` : ""}{tgtC ? <> · 목표 <b>{tgtC}</b></> : <> · 목표 지역 <em>미설정</em></>}</span></div>
+            <div className="pb-step"><span className="pb-k">② 그래서</span><span className="pb-v">{chg != null ? <>내 단지 최근 실거래가 직전 대비 <b className={chg >= 0 ? "up" : "dn"}>{chg >= 0 ? "+" : ""}{chg}%</b>. 이 지역은 <b>{String(brief.phase || "").replace(/\s*국면\s*$/, "")}</b> 국면입니다.</> : <>이 지역은 <b>{String(brief.phase || "").replace(/\s*국면\s*$/, "")}</b> 국면 · 분기 {pct(brief.chg_q)}. 내 단지 실거래는 축적 중입니다.</>}</span></div>
+            <div className="pb-step"><span className="pb-k">③ 검토 방향</span><span className="pb-v">평형·단지 갈아타기 갭이 적정 밴드의 어디인지 확인할 시점입니다. <button className="pb-cta" onClick={() => { changeScope("complex"); try { document.querySelector(".scr-card")?.scrollIntoView({ behavior: "smooth" }); } catch (e) {} }}>갭 분석 열기 →</button></span></div>
+          </div>
+        );
+      })() : (
+        <div className="pbrief pbrief-set">
+          <span>🎯 <b>목표 지역·단지</b>를 정하면 매주 <b>갭 변화</b>를 개인 브리핑으로 알려드립니다.</span>
+          <button className="pb-cta" onClick={openWiz}>내 단지·목표 설정 →</button>
+        </div>
+      ))}
+
       {/* [S5] 내 단지 — 미등록: 위저드 CTA / 등록됨: 상세 요약(매수가 vs 현재 AVM) */}
       {!myProp ? (
         <div className="cta-slim" onClick={openWiz}><span className="cta-txt">🏠 내 단지를 등록하면 <b>평가손익·갈아타기·스크리너</b>에 반영됩니다</span><span className="arr">→</span></div>
@@ -434,7 +453,7 @@ export default function RealEstateDashboard() {
             <div className="urow" key={u.단지명}>
               <div>
                 <div className="uname">{u.단지명}</div>
-                <div className="usub">{uk(u.cur)} → 예측 <b>{uk(u.pred)}</b> · R² {Number(u.r2).toFixed(2)}</div>
+                <div className="usub">{uk(u.cur)} → 예측 <b>{uk(u.pred)}</b> · <Term term="설명력">설명력</Term> {Math.round(Number(u.r2) * 100)}%</div>
               </div>
               <div className="ugap">+{Number(u.gap).toFixed(1)}%</div>
             </div>
@@ -443,15 +462,16 @@ export default function RealEstateDashboard() {
         </section>
       )}
 
-      {/* 4) 거시 */}
+      {/* 4) 거시 — [R-7] 정책 설명 + 미구현(예측·실시간) 로드맵 배지 + 기준시점 명시 */}
       {mac && (
         <section className="card">
-          <div className="label">🌐 거시 환경 <span className="sub">{mac.연월}</span></div>
+          <div className="label">🌐 거시 환경 <span className="sub">기준 {mac.연월}</span></div>
           <div className="chips">
             <span className="chip">KOSPI <b>{Math.round(mac.kospi).toLocaleString()}</b></span>
             <span className="chip">기준금리 <b>{mac.base_rate}%</b></span>
-            <span className="chip">정책 <b>{mac.policy_stance}</b></span>
+            <span className="chip"><Term term="정책 점수">정책</Term> <b>{mac.policy_stance}</b></span>
           </div>
+          <div className="roadmap">🔜 <b>향후 업데이트 예정</b> · 거시 실시간 반영 · 정책 변화 예측<div className="rm-sub">현재는 최근 발표된 정책 stance만 표시하며, 예측 기능은 제공하지 않습니다. 정책 반영 기준: {mac.연월}</div></div>
           <div className="note">{mac.kospi_src || "연말 종가 보간(근사·월별 정밀치 아님)."}</div>
         </section>
       )}
@@ -660,6 +680,16 @@ export default function RealEstateDashboard() {
         .g5r { font-size: 12px; color: var(--color-ink-3); } .g5r b { color: var(--color-ink); font-weight: 800; margin-left: 5px; }
         .gap5-spark { width: 100%; height: 44px; margin-top: 10px; display: block; }
         .gap5-foot { font-size: 10.5px; color: var(--color-ink-3); margin-top: 9px; line-height: 1.5; word-break: keep-all; }
+        /* [R-6] 개인화 브리핑 */
+        .pbrief { background: var(--color-card); border: 1px solid var(--color-primary); border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; }
+        .pbrief-set { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--color-ink-2); flex-wrap: wrap; }
+        .pb-step { display: flex; gap: 9px; padding: 5px 0; font-size: 12.5px; line-height: 1.5; word-break: keep-all; }
+        .pb-k { flex-shrink: 0; font-weight: 800; color: var(--color-primary); font-size: 11.5px; padding-top: 1px; }
+        .pb-v { color: var(--color-ink-2); } .pb-v .up { color: var(--color-success); } .pb-v .dn { color: var(--color-danger); }
+        .pb-cta { border: none; background: var(--color-primary); color: #fff; font-size: 12px; font-weight: 800; padding: 6px 12px; border-radius: 9px; cursor: pointer; font-family: var(--font-sans); margin-left: 4px; }
+        /* [R-7] 미구현 로드맵 배지 */
+        .roadmap { margin-top: 11px; background: var(--color-card-soft); border: 1px dashed var(--color-line); border-radius: 10px; padding: 9px 12px; font-size: 12px; font-weight: 700; color: var(--color-ink-2); }
+        .roadmap .rm-sub { font-weight: 500; font-size: 11px; color: var(--color-ink-3); margin-top: 3px; line-height: 1.5; word-break: keep-all; }
         .foot { font-size: 0.68rem; color: var(--color-ink-3); text-align: center; margin-top: 16px; line-height: 1.5; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
