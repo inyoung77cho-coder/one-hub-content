@@ -33,6 +33,9 @@ export default function RealEstateDashboard() {
   const [gapData, setGapData] = useState(null); // [R-5] 갭 분석 결과(gap-tracker)
   const [gapLoading, setGapLoading] = useState(false);
   const [gapBData, setGapBData] = useState(null); // [R-5 시나리오B] 같은 동 단지 갈아타기 갭
+  const [gapCTarget, setGapCTarget] = useState(""); // [R-5 시나리오C] 목표 지역(법정동)
+  const [gapCData, setGapCData] = useState(null); // [R-5 시나리오C] 지역 변경 갭
+  const [gapCAlert, setGapCAlert] = useState(false); // [R-5 시나리오C] 관심 갭 알림 설정(클라)
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/re/${fn}`).then((r) => r.json());
@@ -113,6 +116,22 @@ export default function RealEstateDashboard() {
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moveScope, myProp?.name, myProp?.pyeong]);
+  // [R-5 시나리오C] 지역 변경 — 내 동 vs 목표 동 평균단가 갭·판정(region-gap)
+  useEffect(() => {
+    const fd = myProp?.name ? dongOf(myProp.name) : null;
+    const ar = Number(myProp?.pyeong) || 84;
+    if (moveScope !== "region" || !fd || !gapCTarget || fd === gapCTarget) { setGapCData(null); return; }
+    let alive = true;
+    fetch(`/api/pwa/re/regionGap?from_dong=${encodeURIComponent(fd)}&to_dong=${encodeURIComponent(gapCTarget)}&area=${ar}`)
+      .then((r) => r.json())
+      .then((d) => { if (alive) setGapCData(d && d.ok ? d : null); })
+      .catch(() => { if (alive) setGapCData(null); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [moveScope, myProp?.name, myProp?.pyeong, gapCTarget]);
+  useEffect(() => { try { setGapCTarget(localStorage.getItem("onehub_re_gapc_dong") || ""); setGapCAlert(localStorage.getItem("onehub_re_gapc_alert") === "1"); } catch (e) {} }, []);
+  const pickGapC = (v) => { setGapCTarget(v); try { localStorage.setItem("onehub_re_gapc_dong", v); } catch (e) {} };
+  const toggleGapCAlert = () => { setGapCAlert((a) => { const n = !a; try { localStorage.setItem("onehub_re_gapc_alert", n ? "1" : "0"); } catch (e) {} return n; }); };
   const pickMy = (v) => { setMyC(v); try { localStorage.setItem("onehub_re_my", v); } catch (e) {} };
   const pickTgt = (v) => { setTgtC(v); try { localStorage.setItem("onehub_re_target", v); } catch (e) {} };
   const changeBudget = (v) => { setBudget(v); try { localStorage.setItem("onehub_re_budget", v); } catch (e) {} };
@@ -428,6 +447,40 @@ export default function RealEstateDashboard() {
                   ) : (
                     <div className="gap-empty">예산 범위에 맞는 단지가 없습니다. 예산·전세가율을 조정해 보세요.</div>
                   )}
+                  {/* [R-5 시나리오C] 목표 지역 갭 추적 — 동 평균단가 기준 동일 평형 갭·판정·알림 */}
+                  {!myProp?.name ? (
+                    <div className="gap-empty" style={{ marginTop: 12 }}>목표 지역 갭 추적은 <b>내 단지</b> 등록 후 이용할 수 있습니다. <button className="scr-reg" onClick={openWiz}>내 단지 등록 →</button></div>
+                  ) : (() => {
+                    const myDongC = dongOf(myProp.name);
+                    const dongs = [...new Set(Object.values(dongMap || {}).filter(Boolean))].filter((d) => d !== myDongC).sort();
+                    return (
+                      <div className="gap5">
+                        <div className="gap5-h">🎯 목표 지역 갭 추적 <span>{myDongC || "내 동"} → 목표 동 · 전용 {myProp?.pyeong || 84}㎡</span></div>
+                        <select className="gap5-sel" value={gapCTarget} onChange={(e) => pickGapC(e.target.value)}>
+                          <option value="">목표 지역(동) 선택…</option>
+                          {dongs.map((d) => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        {gapCData && (() => {
+                          const v = gapCData.verdict;
+                          const vc = v === "추천" ? "ok" : v === "보류" ? "no" : v === "관망" ? "mid" : "na";
+                          const ic = v === "추천" ? "🟢" : v === "보류" ? "🔴" : v === "관망" ? "🟡" : "⚪";
+                          return (
+                            <div className="gap5-body">
+                              <div className={`gap5-verdict ${vc}`}>{ic} {v}</div>
+                              <div className="gap5-reason">{gapCData.verdict_reason}</div>
+                              <div className="gap5-rows">
+                                <div className="g5r"><span>추가 자금(동일 평형)</span><b>{gapCData.current_gap_uk}억</b></div>
+                                {gapCData.band && <div className="g5r"><span>적정 밴드(평균±1σ)</span><b>{gapCData.band.low_uk}~{gapCData.band.high_uk}억</b></div>}
+                                <div className="g5r"><span>표본</span><b>{gapCData.deal_n}건 · {gapCData.history?.length}개월</b></div>
+                              </div>
+                              <button className={`gapc-alert ${gapCAlert ? "on" : ""}`} onClick={toggleGapCAlert}>{gapCAlert ? "🔔 갭 알림 설정됨 — 밴드 하단 이탈 시 알림" : "🔕 갭 알림 설정하기"}</button>
+                              <div className="gap5-foot">⚠ {gapCData.tax_note} · {gapCData.disclaimer} · 알림은 앱 재방문 시 갱신(서버 푸시는 🔜 향후 업데이트).</div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    );
+                  })()}
                 </>
               );
             })()}
@@ -755,6 +808,8 @@ export default function RealEstateDashboard() {
         .gapb-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .gapb-nm { font-size: 13.5px; font-weight: 800; color: var(--color-ink); }
         .gap5-verdict.gapb-v { font-size: 12px; padding: 2px 9px; }
+        .gapc-alert { width: 100%; margin-top: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 10px; padding: 9px 0; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .gapc-alert.on { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-primary); }
         /* [R-6] 개인화 브리핑 */
         .pbrief { background: var(--color-card); border: 1px solid var(--color-primary); border-radius: 14px; padding: 13px 15px; margin-bottom: 14px; }
         .pbrief-set { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--color-ink-2); flex-wrap: wrap; }
