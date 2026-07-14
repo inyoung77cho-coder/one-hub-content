@@ -16,6 +16,7 @@ const ENDPOINTS = {
   feed: "/api/feed", // [v11 #16] 최근 실거래 변동 피드
   complexAreas: "/api/v2/complex-areas", // [S5+] 단지별 실거래 전용면적·평형·대표시세
   complexDongs: "/api/v2/complex-dongs", // [S5+] 단지→법정동 매핑(같은 동 필터)
+  gapTracker: "/api/v2/gap-tracker", // [R-5] 평형 갈아타기 갭 시계열·적정밴드·판정
 };
 
 // fn·key 외 추가 쿼리(complex 등)는 백엔드로 그대로 전달

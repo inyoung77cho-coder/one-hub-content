@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import TopNav from "../../components/TopNav";
 import { dedupBy } from "../../lib/useDedup";
 import { ReForm } from "../../components/shared/AssetForms";
+import Term from "../../components/Term";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -28,6 +29,9 @@ export default function RealEstateDashboard() {
   const [moveScope, setMoveScope] = useState("region"); // [S5+] 이동 범위: complex/dong/region
   const [dbAreas, setDbAreas] = useState({}); // [S5+] 단지→평형(전용면적) 백엔드 로딩(complex-areas)
   const [dongMap, setDongMap] = useState({}); // [S5+] 단지→법정동 백엔드 로딩(complex-dongs)
+  const [gapTarget, setGapTarget] = useState(""); // [R-5] 갈아탈 목표 평형(전용㎡)
+  const [gapData, setGapData] = useState(null); // [R-5] 갭 분석 결과(gap-tracker)
+  const [gapLoading, setGapLoading] = useState(false);
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/re/${fn}`).then((r) => r.json());
@@ -84,6 +88,17 @@ export default function RealEstateDashboard() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wizOpen, wiz.name, myProp?.name]);
+  // [R-5] 같은 단지 평형 갈아타기 갭 분석 — 내 평형 → 목표 평형 gap-tracker 호출
+  useEffect(() => {
+    const nm = myProp?.name, fa = Number(myProp?.pyeong), ta = Number(gapTarget);
+    if (!(nm && fa > 0 && ta > 0) || fa === ta) { setGapData(null); return; }
+    let alive = true; setGapLoading(true);
+    fetch(`/api/pwa/re/gapTracker?complex=${encodeURIComponent(nm)}&from_area=${fa}&to_area=${ta}`)
+      .then((r) => r.json())
+      .then((d) => { if (alive) { setGapData(d && !d.error ? d : null); setGapLoading(false); } })
+      .catch(() => { if (alive) { setGapData(null); setGapLoading(false); } });
+    return () => { alive = false; };
+  }, [myProp?.name, myProp?.pyeong, gapTarget]);
   const pickMy = (v) => { setMyC(v); try { localStorage.setItem("onehub_re_my", v); } catch (e) {} };
   const pickTgt = (v) => { setTgtC(v); try { localStorage.setItem("onehub_re_target", v); } catch (e) {} };
   const changeBudget = (v) => { setBudget(v); try { localStorage.setItem("onehub_re_budget", v); } catch (e) {} };
@@ -249,7 +264,49 @@ export default function RealEstateDashboard() {
                       </div>
                     );
                   })}
-                  <div className="note"><b>{myProp?.name}</b> 평형별 최근 실거래(raw_transactions) 기준. 갈아타기 자금 = 목표 평형 − 내 평형 실거래. 층·향·수리에 따라 실제가는 다릅니다(확정 아님).</div>
+                  {/* [R-5] 갭 분석 — 목표 평형 선택 → 적정 밴드(평균±σ)·추천/관망/보류·표본부족 보류 */}
+                  <div className="gap5">
+                    <div className="gap5-h">📊 갈아타기 갭 분석 <span>내 평형 → 목표 평형(3년 시계열)</span></div>
+                    <select className="gap5-sel" value={gapTarget} onChange={(e) => setGapTarget(e.target.value)}>
+                      <option value="">목표 평형 선택…</option>
+                      {areas.filter((a) => String(a.m2) !== String(myProp?.pyeong)).map((a) => (
+                        <option key={a.m2} value={a.m2}>전용 {a.m2}㎡ (약 {m2ToPyeong(a.m2)}평)</option>
+                      ))}
+                    </select>
+                    {gapLoading && <div className="gap5-load">갭 시계열 분석 중…</div>}
+                    {gapData && (() => {
+                      const v = gapData.verdict;
+                      const vc = v === "추천" ? "ok" : v === "보류" ? "no" : v === "관망" ? "mid" : "na";
+                      const ic = v === "추천" ? "🟢" : v === "보류" ? "🔴" : v === "관망" ? "🟡" : "⚪";
+                      return (
+                        <div className="gap5-body">
+                          <div className={`gap5-verdict ${vc}`}>{ic} {v}</div>
+                          <div className="gap5-reason">{gapData.verdict_reason}</div>
+                          <div className="gap5-rows">
+                            <div className="g5r"><span>현재 갭</span><b>{gapData.current_gap_uk}억</b></div>
+                            {gapData.band && <div className="g5r"><span>적정 밴드(평균±1σ)</span><b>{gapData.band.low_uk}~{gapData.band.high_uk}억</b></div>}
+                            <div className="g5r"><span>표본</span><b>{gapData.deal_n}건 · {gapData.history?.length}개월</b></div>
+                          </div>
+                          {gapData.history?.length > 1 && (() => {
+                            const gs = gapData.history.map((h) => h.gap_uk);
+                            const lo = Math.min(...gs, gapData.band?.low_uk ?? Infinity), hi = Math.max(...gs, gapData.band?.high_uk ?? -Infinity);
+                            const rng = hi - lo || 1, W = 260, H = 44;
+                            const pts = gapData.history.map((h, i) => `${(i / (gapData.history.length - 1)) * W},${H - ((h.gap_uk - lo) / rng) * H}`).join(" ");
+                            const bandTop = gapData.band ? H - ((gapData.band.high_uk - lo) / rng) * H : null;
+                            const bandBot = gapData.band ? H - ((gapData.band.low_uk - lo) / rng) * H : null;
+                            return (
+                              <svg className="gap5-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+                                {bandTop != null && <rect x="0" y={bandTop} width={W} height={Math.max(1, bandBot - bandTop)} fill="var(--color-primary)" opacity="0.12" />}
+                                <polyline points={pts} fill="none" stroke="var(--color-primary)" strokeWidth="1.5" />
+                              </svg>
+                            );
+                          })()}
+                          <div className="gap5-foot">⚠ {gapData.tax_note} · {gapData.disclaimer}</div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  <div className="note"><b>{myProp?.name}</b> 평형별 최근 실거래(국토부 실거래·raw_transactions) 기준. 갈아타기 자금 = 목표 평형 − 내 평형 실거래. 층·향·수리에 따라 실제가는 다릅니다(확정 아님).</div>
                 </>
               );
             })() : moveScope === "dong" ? (() => {
@@ -267,7 +324,7 @@ export default function RealEstateDashboard() {
                       <span className={`scr-gap ${o.need != null && o.need <= 0 ? "ok" : ""}`}>{gapCell(o.need)}</span>
                     </div>
                   ))}
-                  <div className="note">{myDong ? <><b>{myDong}</b> 내 이동 기준. </> : null}갈아타기 자금 = 목표 매매(AVM) − 내 단지 매매. 회귀 근사·lag=0·확정 아님.</div>
+                  <div className="note">{myDong ? <><b>{myDong}</b> 내 이동 기준. </> : null}갈아타기 자금 = 목표 매매(AVM) − 내 단지 매매. 회귀 근사 · <Term term="시차">시차 없음(동시 반영)</Term> · 확정 아님.</div>
                 </>
               );
             })() : (() => {
@@ -341,7 +398,7 @@ export default function RealEstateDashboard() {
               );
             });
           })()}
-          <div className="note">업데이트 {rank.ranking[0]?.updated} · AVM=자동가치추정 · <b>lag=0 상대가치 기준(전파모델 미사용·확정 아님)</b>. ONE Score는 구성요소 종합이며 블랙박스가 아닙니다.</div>
+          <div className="note">업데이트 {rank.ranking[0]?.updated} · AVM=자동가치추정 · <b><Term term="시차">시차 없음(동시 반영)</Term> 상대가치 기준(확정 아님)</b>. ONE Score는 구성요소 종합이며 블랙박스가 아닙니다.</div>
         </section>
       )}
 
@@ -382,7 +439,7 @@ export default function RealEstateDashboard() {
               <div className="ugap">+{Number(u.gap).toFixed(1)}%</div>
             </div>
           ))}
-          <div className="note">gap = 예측 대비 상승여력 · <b>회귀 근사 · lag=0 상대가치</b> · 전파모델(lag_map) 미사용 · 확정 아님. R² = 적합도.</div>
+          <div className="note">gap = 예측 대비 상승여력 · <b>회귀 근사 · <Term term="시차">시차 없음(동시 반영)</Term> 상대가치</b> · 확정 아님. <Term term="설명력">설명력</Term>=시장 흐름으로 설명되는 정도.</div>
         </section>
       )}
 
@@ -586,6 +643,23 @@ export default function RealEstateDashboard() {
         .chip { font-size: 12px; font-weight: 700; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 11px; padding: 9px 13px; }
         .chip b { color: var(--color-primary); margin-left: 3px; }
         .note { font-size: 11px; color: var(--color-ink-3); line-height: 1.55; margin-top: 13px; padding-top: 12px; border-top: 1px solid var(--color-line); }
+        /* [R-5] 갭 분석 카드 */
+        .gap5 { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--color-line); }
+        .gap5-h { font-size: 13px; font-weight: 800; color: var(--color-ink); }
+        .gap5-h span { font-weight: 500; font-size: 11px; color: var(--color-ink-3); margin-left: 6px; }
+        .gap5-sel { width: 100%; margin-top: 8px; padding: 9px 11px; border: 1px solid var(--color-line); border-radius: 10px; background: var(--color-bg); color: var(--color-ink); font-size: 13px; font-family: var(--font-sans); }
+        .gap5-load { font-size: 12px; color: var(--color-ink-3); margin-top: 8px; }
+        .gap5-body { margin-top: 10px; }
+        .gap5-verdict { display: inline-block; font-size: 15px; font-weight: 800; padding: 4px 12px; border-radius: 10px; }
+        .gap5-verdict.ok { color: var(--color-success); background: var(--color-success-soft); }
+        .gap5-verdict.no { color: var(--color-danger); background: var(--color-danger-soft); }
+        .gap5-verdict.mid { color: var(--color-warning-ink, var(--color-warning)); background: var(--color-warning-soft); }
+        .gap5-verdict.na { color: var(--color-ink-2); background: var(--color-card-soft); }
+        .gap5-reason { font-size: 12.5px; color: var(--color-ink-2); line-height: 1.5; margin-top: 7px; word-break: keep-all; }
+        .gap5-rows { display: flex; flex-wrap: wrap; gap: 6px 18px; margin-top: 9px; }
+        .g5r { font-size: 12px; color: var(--color-ink-3); } .g5r b { color: var(--color-ink); font-weight: 800; margin-left: 5px; }
+        .gap5-spark { width: 100%; height: 44px; margin-top: 10px; display: block; }
+        .gap5-foot { font-size: 10.5px; color: var(--color-ink-3); margin-top: 9px; line-height: 1.5; word-break: keep-all; }
         .foot { font-size: 0.68rem; color: var(--color-ink-3); text-align: center; margin-top: 16px; line-height: 1.5; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
