@@ -9,6 +9,8 @@ import { recordDecision, matureLedger, computeShowdown, getTodayDecision, reconc
 import { fetchAssetsTotal } from '../../lib/assetsTotal';
 import { fetchLiveEtfKrw } from '../../lib/etfLive';
 import { dedupBy } from '../../lib/useDedup';
+import { samplePolicy, verdictColor as sampleVerdictColor, canAutoML, ML_MIN_SAMPLE } from '../../lib/sampleSize';
+import SampleSizeBadge from '../../components/SampleSizeBadge';
 import { getStockHoldings, removeStock } from '../../lib/stockHoldings';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
@@ -2277,7 +2279,7 @@ export default function PWADashboard({ latestReport }) {
                       </div>
                       <span className="vs-mid">vs</span>
                       <div className="vs-side">
-                        <span className="vs-name">🤖 AI 단독</span>
+                        <span className="vs-name">🤖 AI 단독 <span className="vs-virtual">가상</span></span>
                         <span className="vs-ret" style={{ color: w.aiRet >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>{w.aiRet >= 0 ? '+' : ''}{w.aiRet}%</span>
                       </div>
                     </div>
@@ -2290,9 +2292,17 @@ export default function PWADashboard({ latestReport }) {
                 <section className="pwa-card vs-card">
                   <div className="vs-top">
                     <span className="pwa-card-label" style={{ margin: 0 }}>🥊 나 vs AI 대결 · 누구 판단이 옳았나</span>
-                    {overall && <span className="vs-overall" style={{ background: overall === 'me' ? 'var(--color-success-soft)' : overall === 'ai' ? 'var(--purple-soft, var(--color-primary-soft))' : 'var(--color-card-soft)', color: overall === 'me' ? 'var(--color-success-ink, var(--color-success))' : overall === 'ai' ? 'var(--purple)' : 'var(--color-ink-2)' }}>{overall === 'me' ? '🏆 내 판단 우세' : overall === 'ai' ? '🏆 AI 우세' : '⚖️ 접전'}</span>}
+                    {/* [A-1] 소표본에선 승자 선언 대신 '학습 중'. 30건 이상일 때만 우세 배지. */}
+                    {overall && samplePolicy(recorded).declareWinner && <span className="vs-overall" style={{ background: overall === 'me' ? 'var(--color-success-soft)' : overall === 'ai' ? 'var(--purple-soft, var(--color-primary-soft))' : 'var(--color-card-soft)', color: overall === 'me' ? 'var(--color-success-ink, var(--color-success))' : overall === 'ai' ? 'var(--purple)' : 'var(--color-ink-2)' }}>{overall === 'me' ? '🏆 내 판단 우세' : overall === 'ai' ? '🏆 AI 우세' : '⚖️ 접전'}</span>}
+                    {overall && !samplePolicy(recorded).declareWinner && <span className="vs-overall" style={{ background: 'var(--color-warning-soft)', color: 'var(--color-warning-ink, var(--color-warning))' }}>🌱 학습 중</span>}
                   </div>
-                  <div className="vs-def">AI 추천 종목 중 <b>내가 산 것</b>(내 판단)과 <b>AI가 전부 매매</b>했을 때(AI 단독)의 수익을 3일·7일로 비교합니다. 승인=매매 · 거절=관망으로 기록됩니다.</div>
+                  {/* [A-1] 스코어보드 — 첫 참여 전에도 '나 0 : 0 AI'로 게임 프레이밍. */}
+                  <div className="vs-score">
+                    <div className="vs-score-side"><span className="vs-score-who">🙋 나</span><span className="vs-score-num">{meWins}</span></div>
+                    <span className="vs-score-colon">:</span>
+                    <div className="vs-score-side"><span className="vs-score-num">{aiWins}</span><span className="vs-score-who">AI 🤖</span></div>
+                  </div>
+                  <div className="vs-def">AI 추천 종목 중 <b>내가 산 것</b>(내 판단·실제)과 <b>AI가 전부 매매</b>했다고 <b>가정한 가상 포지션</b>(AI 단독)의 수익을 3일·7일로 비교합니다. AI 쪽은 실제 체결이 아닌 <b>가상</b>입니다. 승인=매매 · 거절=관망으로 기록됩니다.</div>
                   {anyReady ? (
                     <>
                       <Row label="3일" w={w3} />
@@ -2317,12 +2327,57 @@ export default function PWADashboard({ latestReport }) {
                     </>
                   ) : (
                     <div className="vs-empty">
-                      <div className="vs-empty-ic">🥊</div>
-                      <div className="vs-empty-t">{recorded > 0 ? `판단 ${recorded}건 기록됨 · 성과 집계 중` : '아직 기록된 판단이 없습니다'}</div>
+                      <div className="vs-empty-ic">⚔</div>
+                      <div className="vs-empty-t">{recorded > 0 ? `판단 ${recorded}건 기록됨 · 성과 집계 중` : 'AI와의 첫 승부를 기다리고 있어요'}</div>
                       <div className="vs-empty-s">추천 탭에서 AI 매매 제안을 <b>승인(매매)</b> 또는 <b>거절(관망)</b>하면 판단이 기록되고, <b>3일·7일 뒤</b> 실제 수익으로 나 vs AI 승부가 자동 채점됩니다.</div>
-                      <button className="vs-empty-btn" onClick={() => setTab('recommend')}>추천 보러 가기 →</button>
+                      <button className="vs-empty-btn" onClick={() => setTab('recommend')}>⚔ AI와 첫 승부 시작하기</button>
                     </div>
                   )}
+                </section>
+              );
+            })()}
+
+            {/* [A-6] AI vs 나 손익 비교 — 승률·총이익·총손실·순손익·손익비. AI는 가상 포지션(가정 명시). */}
+            {(() => {
+              const w = computeShowdown(ledger, 7).ready ? computeShowdown(ledger, 7) : computeShowdown(ledger, 3);
+              if (!w.ready || !(w.details?.length)) return null;
+              const won = 10000; // 1건 100만원 → ret(%) × 10000 = 손익(원)
+              const dts = w.details;
+              const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
+              const aiProfit = sum(dts.filter(d => d.ret > 0), d => d.ret * won);
+              const aiLoss = sum(dts.filter(d => d.ret < 0), d => -d.ret * won);
+              const aiWins = dts.filter(d => d.ret > 0).length;
+              const takes = dts.filter(d => d.decision === 'take');
+              const myProfit = sum(takes.filter(d => d.ret > 0), d => d.ret * won);
+              const myLoss = sum(takes.filter(d => d.ret < 0), d => -d.ret * won);
+              const myWins = takes.filter(d => d.ret > 0).length;
+              const passes = dts.filter(d => d.decision === 'pass');
+              const avoidedLoss = sum(passes.filter(d => d.ret < 0), d => -d.ret * won);
+              const missedGain = sum(passes.filter(d => d.ret > 0), d => d.ret * won);
+              const plr = (p, l) => l > 0 ? (p / l).toFixed(2) : (p > 0 ? '∞' : '-');
+              const won0 = (n) => `${n >= 0 ? '' : '-'}${Math.abs(Math.round(n)).toLocaleString()}원`;
+              const pol = samplePolicy(dts.length);
+              const aiNet = aiProfit - aiLoss, myNet = myProfit - myLoss;
+              const col = (n) => n >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
+              return (
+                <section className="pwa-card">
+                  <span className="pwa-card-label">💰 AI vs 나 · 손익 비교</span>
+                  <div style={{ margin: '2px 0 4px' }}><SampleSizeBadge count={dts.length} label={pol.tier === 'learning' ? '학습 중' : undefined} /></div>
+                  <div className="pl-grid">
+                    <div className="pl-cell"><span className="pl-k">🙋 내 순손익 (실제 보유)</span><span className="pl-v" style={{ color: col(myNet) }}>{won0(myNet)}</span></div>
+                    <div className="pl-cell"><span className="pl-k">🤖 AI 순손익 (가상)</span><span className="pl-v" style={{ color: col(aiNet) }}>{won0(aiNet)}</span></div>
+                    <div className="pl-cell"><span className="pl-k">내 승률 · 손익비</span><span className="pl-v">{takes.length ? `${Math.round(myWins/takes.length*100)}%` : '-'} · {plr(myProfit, myLoss)}</span></div>
+                    <div className="pl-cell"><span className="pl-k">AI 승률 · 손익비</span><span className="pl-v">{Math.round(aiWins/dts.length*100)}% · {plr(aiProfit, aiLoss)}</span></div>
+                    <div className="pl-cell"><span className="pl-k">관망으로 피한 손실</span><span className="pl-v" style={{ color: 'var(--color-success)' }}>{won0(avoidedLoss)}</span></div>
+                    <div className="pl-cell"><span className="pl-k">관망으로 놓친 이익</span><span className="pl-v" style={{ color: 'var(--color-danger)' }}>{won0(missedGain)}</span></div>
+                    {/* [A-5] 오류 4분류 — 거짓 매수율(샀는데 내림) vs 기회 상실률(관망했는데 오름)을 분리. */}
+                    <div className="pl-cell"><span className="pl-k">거짓 매수율 <span style={{color:'var(--text-tertiary)'}}>(사서 손실)</span></span><span className="pl-v">{takes.length ? `${Math.round(takes.filter(d=>d.ret<0).length/takes.length*100)}%` : '-'}<span style={{fontSize:'0.6rem',color:'var(--text-tertiary)',fontWeight:600}}> {takes.filter(d=>d.ret<0).length}/{takes.length}</span></span></div>
+                    <div className="pl-cell"><span className="pl-k">기회 상실률 <span style={{color:'var(--text-tertiary)'}}>(관망 중 상승)</span></span><span className="pl-v">{passes.length ? `${Math.round(passes.filter(d=>d.ret>0).length/passes.length*100)}%` : '-'}<span style={{fontSize:'0.6rem',color:'var(--text-tertiary)',fontWeight:600}}> {passes.filter(d=>d.ret>0).length}/{passes.length}</span></span></div>
+                    {pol.declareWinner && (
+                      <div className="pl-cell wide"><span className="pl-k">종합</span><span className="pl-v" style={{ color: myNet > aiNet ? 'var(--color-success)' : myNet < aiNet ? 'var(--purple)' : 'var(--color-ink-2)' }}>{myNet > aiNet ? '🏆 내 판단이 더 벌었습니다' : myNet < aiNet ? '🤖 AI 가상이 더 벌었습니다' : '⚖️ 접전'}</span></div>
+                    )}
+                  </div>
+                  <p className="pl-foot">가정: 추천일 종가 매수 · 3일 후 매도 · 1건당 100만원 · 수수료·세금 미반영. AI 손익은 <b>실제 체결이 아닌 가상 포지션</b>입니다.{!pol.declareWinner && <> 표본 {dts.length}건 — <b>승자 선언은 30건 이상</b>부터 합니다.</>}</p>
                 </section>
               );
             })()}
@@ -2390,25 +2445,77 @@ export default function PWADashboard({ latestReport }) {
               );
             })()}
 
+            {/* [A-2] AI 개선노트 — 적중률보다 먼저. 틀린 것 → 고친 것 → 적용일 3단 서사(발전 스토리). */}
+            {accuracy?.ok && accuracy.by_reason?.length > 0 && (() => {
+              const reasons = accuracy.by_reason.filter(r => (r.total ?? 0) >= 2);
+              const weak = reasons.filter(r => (r.accuracy_pct ?? 0) < 50).sort((a, b) => (a.accuracy_pct ?? 0) - (b.accuracy_pct ?? 0));
+              const strong = reasons.filter(r => (r.accuracy_pct ?? 0) >= 65).sort((a, b) => (b.accuracy_pct ?? 0) - (a.accuracy_pct ?? 0));
+              // 적용일 = 이번 주 월요일(KST, 재학습 주기). 효과추적 = 직전 대비 표본 증가.
+              const kst = new Date(Date.now() + 9*60*60*1000);
+              const monday = new Date(kst); monday.setUTCDate(kst.getUTCDate() - ((kst.getUTCDay()+6)%7));
+              const applyDate = `${monday.getUTCFullYear()}-${String(monday.getUTCMonth()+1).padStart(2,'0')}-${String(monday.getUTCDate()).padStart(2,'0')}`;
+              const items = [];
+              weak.slice(0, 2).forEach(r => items.push({
+                wrong: `${r.reason} 근거로 차단했으나 이후 상승 — 적중 ${r.accuracy_pct}% (${r.success}/${r.total}건)`,
+                fix: `${r.reason} 신호 가중치 하향, 임계값 상향 조정`,
+                effect: `표본 ${r.total}건 기준 재검증 중`,
+              }));
+              strong.slice(0, 1).forEach(r => items.push({
+                wrong: `${r.reason} 신호는 검증에서 반복 적중`,
+                fix: `${r.reason} 가중치 유지·강화`,
+                effect: `적중 ${r.accuracy_pct}% (${r.success}/${r.total}건) — 신뢰 신호로 채택`,
+              }));
+              if (items.length === 0) items.push({ wrong: '아직 뚜렷한 오판 패턴이 잡히지 않음', fix: '가중치 변경 없이 관찰 유지', effect: '검증 데이터 축적 중' });
+              const total = accuracy.summary?.total_checked ?? 0;
+              // [A-5] 표본 50건 미만이면 자동 규칙조정 금지 — '조정했다'가 아니라 '관찰·검토 중'으로 표기.
+              const mlOn = canAutoML(total);
+              return (
+                <section className="pwa-card">
+                  <span className="pwa-card-label">📝 AI 개선노트 · 무엇을 틀렸고 어떻게 고쳤나</span>
+                  <p className="chlog-intro">누적 검증 <b>{total}건</b>{mlOn
+                    ? <> 을 반영해 규칙을 이렇게 조정했습니다. <b>정확도가 아니라 개선의 방향</b>을 봅니다.</>
+                    : <> — 아직 <b>{ML_MIN_SAMPLE}건 미만</b>이라 자동 규칙조정은 <b>보류(과적합 방지)</b>합니다. 아래는 <b>관찰·검토 후보</b>입니다.</>}</p>
+                  <div className="imp-list">
+                    {items.map((it, i) => (
+                      <div className="imp-row" key={i}>
+                        <div className="imp-step"><span className="imp-tag wrong">틀린 것</span><span className="imp-txt">{it.wrong}</span></div>
+                        <div className="imp-step"><span className="imp-tag fix">{mlOn ? '고친 것' : '고칠 후보'}</span><span className="imp-txt">{it.fix}</span></div>
+                        <div className="imp-step"><span className="imp-tag eff">효과 추적</span><span className="imp-txt">{it.effect}</span></div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="chlog-foot">※ {mlOn ? <>적용일 {applyDate}(매주 월 재학습). 규칙·가중치 변경을 사람 언어로 요약한 것입니다.</> : <>표본 {ML_MIN_SAMPLE}건 이상 쌓이고 백테스트를 통과해야 실제 규칙에 반영합니다. 현재는 후보만 표시합니다.</>}</p>
+                </section>
+              );
+            })()}
+
             {/* [기록] AI 학습 현황 — ML 자기검증: 누적 기록 + 사유별 학습 정확도 + 최근 검증 결과(기록 누적·발전 스토리) */}
             {accuracy?.ok && (() => {
               const s = accuracy.summary || {};
               const pct = s.accuracy_pct;
               const checked = s.total_checked ?? 0;
               const ready = pct != null && checked >= 5;
-              const pctColor = pct == null ? 'var(--text-secondary)'
+              // [A-2] 소표본 정책 — 30건 미만이면 판정색(빨강/초록) 금지·중립색. 숫자는 그대로 노출.
+              const pol = samplePolicy(checked);
+              const rawPctColor = pct == null ? 'var(--text-secondary)'
                 : pct >= 70 ? 'var(--color-success)' : pct >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
-              const rColor = (p) => (p ?? 0) >= 70 ? 'var(--color-success)' : (p ?? 0) >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
+              const pctColor = pol.showVerdictColor ? rawPctColor : 'var(--color-ink-2)';
+              const rColor = (p) => pol.showVerdictColor ? ((p ?? 0) >= 70 ? 'var(--color-success)' : (p ?? 0) >= 50 ? 'var(--color-warning)' : 'var(--color-danger)') : 'var(--color-ink-2)';
               const topReasons = (accuracy.by_reason || []).filter(r => (r.total ?? 0) > 0)
                 .sort((a, b) => (b.accuracy_pct ?? 0) - (a.accuracy_pct ?? 0)).slice(0, 3);
               const recent = (accuracy.recent || []).slice(0, 3);
               return (
                 <section className="pwa-card">
                   <span className="pwa-card-label">🧠 AI 학습 현황 · ML 자기검증</span>
+                  {/* [A-2] 학습 상태를 적중률보다 먼저·크게. 소표본이면 '학습 중'으로 프레이밍. */}
+                  <div style={{ margin: '2px 0 12px' }}>
+                    <SampleSizeBadge count={checked} size="lg" showGauge label={pol.tier === 'learning' ? '학습 중' : undefined} />
+                    <p style={{ fontSize: '0.74rem', color: 'var(--text-secondary)', lineHeight: 1.5, margin: '8px 0 0' }}>{pol.note}</p>
+                  </div>
                   <div className="ml-accum">
                     <div className="ml-accum-item"><b>{s.total_blocked ?? 0}</b><span>누적 판단 기록</span></div>
                     <div className="ml-accum-item"><b>{checked}</b><span>검증 완료</span></div>
-                    <div className="ml-accum-item"><b style={{ color: pctColor }}>{pct != null ? `${pct}%` : '—'}</b><span>적중률</span></div>
+                    <div className="ml-accum-item"><b style={{ color: pctColor }}>{pct != null ? `${pct}%` : '—'}</b><span>적중률{!pol.showVerdictColor && pct != null ? ' (참고)' : ''}</span></div>
                   </div>
                   {ready ? (
                     <>
@@ -2453,33 +2560,6 @@ export default function PWADashboard({ latestReport }) {
               );
             })()}
 
-            {/* [§3-5 피드백10] AI 개선노트 — 자기검증 결과로 규칙을 어떻게 조정했나(사람 언어) */}
-            {accuracy?.ok && accuracy.by_reason?.length > 0 && (() => {
-              const reasons = accuracy.by_reason.filter(r => (r.total ?? 0) >= 2);
-              const strong = reasons.filter(r => (r.accuracy_pct ?? 0) >= 65).sort((a, b) => (b.accuracy_pct ?? 0) - (a.accuracy_pct ?? 0));
-              const weak = reasons.filter(r => (r.accuracy_pct ?? 0) < 50).sort((a, b) => (a.accuracy_pct ?? 0) - (b.accuracy_pct ?? 0));
-              const notes = [];
-              strong.slice(0, 2).forEach(r => notes.push({ icon: '✅', kind: '유지·강화', text: `${r.reason} 필터 정확도 ${r.accuracy_pct}% — 신뢰도 높아 가중치 유지` }));
-              weak.slice(0, 2).forEach(r => notes.push({ icon: '🔧', kind: '재조정 검토', text: `${r.reason} 필터 정확도 ${r.accuracy_pct}% — 오판 줄이도록 임계값 재조정 검토` }));
-              if (notes.length === 0) notes.push({ icon: '🧭', kind: '관찰', text: `검증 데이터 축적 중 — 사유별 정확도가 안정되면 필터 가중치를 조정합니다` });
-              const total = accuracy.summary?.total_checked ?? 0;
-              return (
-                <section className="pwa-card">
-                  <span className="pwa-card-label">📝 AI 개선노트 · 이번 주 조정</span>
-                  <p className="chlog-intro">누적 검증 <b>{total}건</b>을 반영해 AI가 스스로 판단 규칙을 이렇게 조정하고 있습니다.</p>
-                  <div className="chlog-list">
-                    {notes.map((n, i) => (
-                      <div className="chlog-row" key={i}>
-                        <span className="chlog-ic">{n.icon}</span>
-                        <div className="chlog-body"><span className="chlog-kind">{n.kind}</span><span className="chlog-text">{n.text}</span></div>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="chlog-foot">※ 규칙·가중치 변경을 사람 언어로 요약. 실제 파라미터는 매주 자동 재학습 시 반영됩니다.</p>
-                </section>
-              );
-            })()}
-
             </>)}
 
             {/* [S2.2 G3] 리포트 아카이브 — 성적표 · 일간/주간/히스토리 */}
@@ -2495,18 +2575,29 @@ export default function PWADashboard({ latestReport }) {
               ) : (() => {
                 const accPct = accuracy?.summary?.accuracy_pct;
                 const accChecked = accuracy?.summary?.total_checked;
-                const winColor = (perf.win_rate ?? 0) >= 60 ? 'var(--color-success)' : (perf.win_rate ?? 0) >= 45 ? 'var(--color-warning)' : 'var(--color-danger)';
-                const accColor = accPct == null ? 'var(--text-secondary)' : accPct >= 60 ? 'var(--color-success)' : accPct >= 45 ? 'var(--color-warning)' : 'var(--color-danger)';
+                // [A-3] 소표본 정책 — 표본(거래 건수) 30 미만이면 판정색 금지, MDD·손익비 극단값 접기.
+                const nTrade = perf.total ?? ((perf.wins ?? 0) + (perf.losses ?? 0));
+                const pol = samplePolicy(nTrade);
+                const cv = pol.showVerdictColor; // 판정색 허용 여부
+                const winColor = !cv ? 'var(--color-ink-2)' : (perf.win_rate ?? 0) >= 60 ? 'var(--color-success)' : (perf.win_rate ?? 0) >= 45 ? 'var(--color-warning)' : 'var(--color-danger)';
+                const aPol = samplePolicy(accChecked ?? 0);
+                const accColor = accPct == null ? 'var(--text-secondary)' : !aPol.showVerdictColor ? 'var(--color-ink-2)' : accPct >= 60 ? 'var(--color-success)' : accPct >= 45 ? 'var(--color-warning)' : 'var(--color-danger)';
                 const rr = perf.rr_ratio;
-                const rrColor = rr == null ? 'var(--text-secondary)' : rr >= 1.5 ? 'var(--color-success)' : rr >= 1 ? 'var(--color-warning)' : 'var(--color-danger)';
+                const rrColor = !cv ? 'var(--color-ink-2)' : rr == null ? 'var(--text-secondary)' : rr >= 1.5 ? 'var(--color-success)' : rr >= 1 ? 'var(--color-warning)' : 'var(--color-danger)';
+                // 극단값(손익비·MDD)은 학습 중이면 값을 접고 '표본 N건'으로 대체 — 단일 이상치 왜곡 방지.
+                const rrTile = pol.collapseExtremes ? { k: '손익비 (R:R)', v: '표본 부족', sub: `거래 ${nTrade}건`, c: 'var(--color-ink-3)' }
+                  : { k: '손익비 (R:R)', v: rr != null ? `${rr}` : '-', sub: '이익/손실', c: rrColor };
+                const mddTile = pol.collapseExtremes ? { k: 'MDD', v: '표본 부족', sub: `거래 ${nTrade}건`, c: 'var(--color-ink-3)' }
+                  : { k: 'MDD', v: perf.mdd != null ? `-${perf.mdd}%` : '-', sub: '최대낙폭', c: 'var(--color-danger)' };
                 const tiles = [
                   { k: '승률', v: perf.win_rate != null ? `${perf.win_rate}%` : '-', sub: `${perf.wins ?? 0}승 ${perf.losses ?? 0}패`, c: winColor },
                   { k: '차단 적중률', v: accPct != null ? `${accPct}%` : '수집중', sub: accChecked != null ? `검증 ${accChecked}건` : '누적 필요', c: accColor },
-                  { k: '손익비 (R:R)', v: rr != null ? `${rr}` : '-', sub: '이익/손실', c: rrColor },
-                  { k: 'MDD', v: perf.mdd != null ? `-${perf.mdd}%` : '-', sub: '최대낙폭', c: 'var(--color-danger)' },
+                  rrTile,
+                  mddTile,
                 ];
                 return (
                   <>
+                    <div style={{ marginBottom: 10 }}><SampleSizeBadge count={nTrade} showGauge label={pol.tier === 'learning' ? '학습 중' : undefined} /></div>
                     <div className="scorecard">
                       {tiles.map((t) => (
                         <div className="sc-tile" key={t.k}>
@@ -2516,6 +2607,9 @@ export default function PWADashboard({ latestReport }) {
                         </div>
                       ))}
                     </div>
+                    {pol.collapseExtremes && (
+                      <p className="sc-warn">⚠ 거래 {nTrade}건 — 각 거래가 1/{nTrade} 비중이라 <b>손익비·MDD는 이상치 하나에 크게 흔들립니다</b>. 30건 이상 쌓이면 정식 통계로 표시합니다.</p>
+                    )}
                     <div className="sc-summary">
                       이번 주 수익률 <b style={{ color: (perf.avg_pnl_pct ?? 0) >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>{(perf.avg_pnl_pct ?? 0) >= 0 ? '+' : ''}{perf.avg_pnl_pct ?? 0}%</b> · AI는 <b>{perf.wins ?? 0}종목 매수</b>, <b>{perf.losses ?? 0}건 손절</b>했습니다.
                     </div>
@@ -2524,15 +2618,34 @@ export default function PWADashboard({ latestReport }) {
               })()}
             </section>
 
-            {latestReport && latestReport.insight && (
+            {latestReport && latestReport.insight && (() => {
+              // [A-3] '오늘의'는 실제로 오늘(KST) 생성분일 때만. 아니면 '최근 리포트 (N일 전)' + 경과일 명시.
+              const kst = new Date(Date.now() + 9*60*60*1000);
+              const todayStr = `${kst.getUTCFullYear()}-${String(kst.getUTCMonth()+1).padStart(2,'0')}-${String(kst.getUTCDate()).padStart(2,'0')}`;
+              const rd = String(latestReport.date || '');
+              // 리포트 날짜를 YYYY-MM-DD로 정규화(MM-DD만 오면 올해로 보정).
+              const rdFull = /^\d{4}-\d{2}-\d{2}$/.test(rd) ? rd : (/^\d{2}-\d{2}$/.test(rd) ? `${kst.getUTCFullYear()}-${rd}` : rd);
+              let daysAgo = null;
+              if (/^\d{4}-\d{2}-\d{2}$/.test(rdFull)) {
+                const a = Date.UTC(kst.getUTCFullYear(), kst.getUTCMonth(), kst.getUTCDate());
+                const [y,m,d] = rdFull.split('-').map(Number);
+                daysAgo = Math.round((a - Date.UTC(y, m-1, d)) / 86400000);
+              }
+              const isToday = rdFull === todayStr;
+              const label = isToday ? '📅 오늘의 리포트' : `🗂 최근 리포트${daysAgo != null && daysAgo > 0 ? ` · ${daysAgo}일 전` : ''}`;
+              return (
               <section className="pwa-card">
-                <span className="pwa-card-label">📅 오늘의 리포트 — {latestReport.date}</span>
+                <span className="pwa-card-label">{label} — {rdFull}</span>
+                {!isToday && daysAgo != null && daysAgo >= 1 && (
+                  <p className="sc-warn" style={{marginTop:6}}>⏳ 오늘({todayStr}) 리포트는 아직 생성 전입니다. 아래는 <b>{daysAgo}일 전</b> 생성분입니다.</p>
+                )}
                 <p className="pwa-analyze-text" style={{marginTop:8}}>{latestReport.insight}</p>
                 <p className="dim mono" style={{fontSize:'0.7rem', marginTop:8}}>
-                  {latestReport.regime} · 매매 {latestReport.trade_count}건 · 차단 {latestReport.block_count}건
+                  생성 {rdFull} · {latestReport.regime} · 매매 {latestReport.trade_count}건 · 차단 {latestReport.block_count}건
                 </p>
               </section>
-            )}
+              );
+            })()}
             {perf && (
               <section className="pwa-card">
                 <span className="pwa-card-label">📊 AI 성적표 · 최근 30일</span>
@@ -2654,6 +2767,7 @@ export default function PWADashboard({ latestReport }) {
                   ['/pwa/daily', '📅', '일간 리포트', '매일 장 마감 요약'],
                   ['/pwa/weekly', '📊', '주간 리포트', '국면 · 과열도 · 매매'],
                   ['/pwa/history', '🤖', 'AI 히스토리', 'AI 판단 기록 전체'],
+                  ['/pwa/accuracy', '🎯', 'AI 차단 정확도', '차단 신호 적중률 · 사유별 분석'],
                   ['/pwa/heat-history', '🌡️', '히트 히스토리', '시장 과열도 추이'],
                 ].map(([href, icon, title, desc]) => (
                   <Link href={href} key={href} className="report-row">
@@ -2684,20 +2798,7 @@ export default function PWADashboard({ latestReport }) {
                 </div>
               </section>
 
-              {/* AI 정확도 링크 */}
-              <Link href="/pwa/accuracy" style={{textDecoration:'none', color:'inherit'}}>
-                <section className="pwa-card" style={{cursor:'pointer'}}>
-                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-                    <div>
-                      <div style={{fontWeight:700, fontSize:14}}>🎯 AI 차단 정확도</div>
-                      <div style={{fontSize:12, color:'var(--text-muted)', marginTop:4}}>
-                        차단 신호 적중률 · 사유별 분석 · 최근 내역
-                      </div>
-                    </div>
-                    <span style={{fontSize:20, color:'var(--text-muted)'}}>›</span>
-                  </div>
-                </section>
-              </Link>
+              {/* [A-3] 중복 제거 — 'AI 차단 정확도'는 위 성적표 타일 + 상세 리포트 목록으로 일원화. */}
             </>)}
 
             </>)}
@@ -3892,6 +3993,20 @@ export default function PWADashboard({ latestReport }) {
         .vs-card { border: 1px solid var(--color-line); }
         .vs-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
         .vs-overall { font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+        /* [A-1] 나 vs AI 스코어보드 */
+        .vs-score { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 12px 0 4px; padding: 10px 0; background: var(--inset-bg); border-radius: 12px; }
+        .vs-score-side { display: flex; align-items: center; gap: 8px; }
+        .vs-score-who { font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); }
+        .vs-score-num { font-size: 1.7rem; font-weight: 900; font-family: var(--font-mono); color: var(--color-ink); min-width: 22px; text-align: center; }
+        .vs-score-colon { font-size: 1.3rem; font-weight: 900; color: var(--text-tertiary); }
+        .vs-virtual { font-size: 0.56rem; font-weight: 800; color: var(--purple, var(--color-primary)); background: var(--purple-soft, var(--color-primary-soft)); padding: 1px 5px; border-radius: 4px; vertical-align: middle; }
+        /* [A-6] AI vs 나 손익 비교 */
+        .pl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .pl-cell { background: var(--inset-bg); border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 3px; }
+        .pl-cell.wide { grid-column: 1 / -1; }
+        .pl-k { font-size: 0.64rem; color: var(--text-tertiary); font-weight: 700; }
+        .pl-v { font-size: 0.9rem; font-weight: 800; font-family: var(--font-mono); }
+        .pl-foot { font-size: 0.64rem; color: var(--text-tertiary); line-height: 1.5; margin-top: 8px; word-break: keep-all; }
         .vs-def { font-size: 0.74rem; color: var(--text-secondary); line-height: 1.55; margin: 10px 0 4px; word-break: keep-all; }
         .vs-def b { color: var(--text-primary); font-weight: 700; }
         .vs-row { margin-top: 12px; padding: 12px; background: var(--color-card-soft); border-radius: 14px; }
@@ -3931,6 +4046,15 @@ export default function PWADashboard({ latestReport }) {
         .chlog-kind { font-size: 0.62rem; font-weight: 800; color: var(--accent-buy); background: color-mix(in srgb, var(--accent-buy) 12%, transparent); padding: 1px 7px; border-radius: 5px; align-self: flex-start; }
         .chlog-text { font-size: 0.76rem; color: var(--text-secondary); line-height: 1.5; word-break: keep-all; }
         .chlog-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 10px; line-height: 1.5; }
+        /* [A-2] AI 개선노트 3단(틀린 것→고친 것→효과) */
+        .imp-list { display: flex; flex-direction: column; gap: 10px; }
+        .imp-row { background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 11px 13px; display: flex; flex-direction: column; gap: 7px; }
+        .imp-step { display: flex; gap: 8px; align-items: flex-start; }
+        .imp-tag { flex-shrink: 0; font-size: 0.6rem; font-weight: 800; padding: 2px 8px; border-radius: 5px; line-height: 1.4; white-space: nowrap; min-width: 58px; text-align: center; }
+        .imp-tag.wrong { color: var(--color-danger); background: color-mix(in srgb, var(--color-danger) 12%, transparent); }
+        .imp-tag.fix { color: var(--color-primary); background: color-mix(in srgb, var(--color-primary) 12%, transparent); }
+        .imp-tag.eff { color: var(--color-success); background: color-mix(in srgb, var(--color-success) 12%, transparent); }
+        .imp-txt { font-size: 0.76rem; color: var(--text-secondary); line-height: 1.5; word-break: keep-all; }
         /* [§3-5 item3] AI 성적표 타일 */
         .scorecard { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
         .sc-tile { background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 13px; display: flex; flex-direction: column; gap: 3px; }
@@ -3938,6 +4062,7 @@ export default function PWADashboard({ latestReport }) {
         .sc-v { font-size: 1.25rem; font-weight: 800; font-family: var(--font-mono); line-height: 1.1; }
         .sc-sub { font-size: 0.64rem; color: var(--text-tertiary); }
         .sc-summary { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.6; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+        .sc-warn { font-size: 0.7rem; color: var(--color-warning-ink, var(--color-warning)); background: var(--color-warning-soft); border-radius: 8px; padding: 8px 11px; line-height: 1.5; margin-top: 10px; word-break: keep-all; }
         .sc-summary b { font-weight: 700; color: var(--text-primary); }
 
         /* 액션/차단 리스트 */
