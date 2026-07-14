@@ -16,6 +16,7 @@ const MAP = {
   "stock-search": { base: ENG, path: "/api/stocks/search", methods: ["GET"], pwaKey: true },
   "master-search": { base: ENG, path: "/api/stocks/master-search", methods: ["GET"], pwaKey: true },
   "master-get": { base: ENG, path: "/api/stocks/master-get", methods: ["GET"], pwaKey: true },
+  "company-info": { base: ENG, path: "/api/stocks/company-info", methods: ["GET"], pwaKey: true },
   "kis-import": { base: ENG, path: "/api/import/kis-stock", methods: ["POST"], pwaKey: true },
   "etf-search": { base: ENG, path: "/api/etf/search", methods: ["GET"], pwaKey: true },
   "etf-add": { base: ENG, path: "/api/etf/positions", methods: ["POST"], pwaKey: true },

@@ -271,6 +271,7 @@ export default function PWADashboard({ latestReport }) {
   const [buyNotice, setBuyNotice] = useState(null); // [S-6] 바로매수 핸드오프 { name, code }
   const [decFeedback, setDecFeedback] = useState(null); // [S-5] 판단 기록 직후 즉시 피드백 { name, decision, date }
   const [manualPx, setManualPx] = useState({}); // [S-1] 직접입력 보유 이상치 검증용 현재가맵(code→close_price)
+  const [companyInfo, setCompanyInfo] = useState({}); // [S-7] 기업개요 캐시(code→summary)
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [showAssetDetail, setShowAssetDetail] = useState(false); // [팝업] 총자산 클릭 → 상세 breakdown
@@ -545,6 +546,17 @@ export default function PWADashboard({ latestReport }) {
       .then(d => { if (d && d.ok) setAccuracy(d); })
       .catch(() => {});
   }, [mounted, trader]);
+
+  // [S-7] 판단근거 시트 열릴 때 기업개요 온디맨드 로드(캐시)
+  useEffect(() => {
+    const code = bottomSheet?.code;
+    if (!code || companyInfo[code] !== undefined) return;
+    let alive = true;
+    fetch(`/api/input/company-info?code=${encodeURIComponent(code)}`).then((r) => r.json())
+      .then((d) => { if (alive) setCompanyInfo((m) => ({ ...m, [code]: d?.summary || null })); })
+      .catch(() => { if (alive) setCompanyInfo((m) => ({ ...m, [code]: null })); });
+    return () => { alive = false; };
+  }, [bottomSheet?.code]);
 
   // [S-1] 직접입력 보유의 평단 이상치 검증 — 마스터 현재가와 대조(±10배 이탈 시 배지)
   useEffect(() => {
@@ -2915,10 +2927,14 @@ export default function PWADashboard({ latestReport }) {
                 <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
                   {bottomSheet.name} <span style={{ fontSize: '0.8rem', fontWeight: 400, color: 'var(--text-tertiary)' }}>({bottomSheet.code})</span>
                 </div>
-                {/* [업체 정보] 종목명 밑 한 줄 요약 — 빠른 이해용(백엔드 업종/요약 있을 때) */}
-                {bottomSheet.priceMeta?.info && (
+                {/* [S-7] 종목명 밑 회사 소개(기업개요) 1~2줄 — 중복 설명 방지 위해 여기 1곳만 */}
+                {companyInfo[bottomSheet.code] ? (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.45, maxWidth: 280, wordBreak: 'keep-all', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>🏢 {companyInfo[bottomSheet.code]}</div>
+                ) : companyInfo[bottomSheet.code] === undefined ? (
+                  <div style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', marginTop: 3 }}>🏢 회사 소개 불러오는 중…</div>
+                ) : bottomSheet.priceMeta?.info ? (
                   <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', marginTop: 3, lineHeight: 1.4, maxWidth: 260, wordBreak: 'keep-all' }}>🏢 {bottomSheet.priceMeta.info}</div>
-                )}
+                ) : null}
               </div>
               <button onClick={() => setBottomSheet(null)}
                 style={{ background: 'none', border: 'none', fontSize: '1.3rem', cursor: 'pointer', color: 'var(--text-secondary)', lineHeight: 1, padding: '0 4px' }}>✕</button>
