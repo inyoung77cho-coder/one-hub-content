@@ -83,6 +83,7 @@ export default function RealEstateDashboard() {
           const areas = Array.isArray(d?.areas) ? d.areas.map((a) => ({
             m2: Math.round(Number(a.m2 ?? a.전용면적)),
             priceUk: a.rep_price_uk != null ? Number(a.rep_price_uk) : (a.rep_price_manwon != null ? Number(a.rep_price_manwon) / 10000 : null),
+            maxUk: a.max_price_uk != null ? Number(a.max_price_uk) : (a.max_price_manwon != null ? Number(a.max_price_manwon) / 10000 : null),
             n: a.n ?? null,
           })).filter((a) => a.m2 > 0) : null;
           setDbAreas((m) => ({ ...m, [nm]: areas && areas.length ? areas : null }));
@@ -137,6 +138,12 @@ export default function RealEstateDashboard() {
   const changeBudget = (v) => { setBudget(v); try { localStorage.setItem("onehub_re_budget", v); } catch (e) {} };
   const changeJeonse = (v) => { setJeonseRate(v); try { localStorage.setItem("onehub_re_jeonse", v); } catch (e) {} };
   const openWiz = () => { setWiz(myProp ? { name: myProp.name || "", pyeong: myProp.pyeong || "", dongfloor: myProp.dongfloor || "", buyUk: myProp.buyUk || "", buyMonth: myProp.buyMonth || "" } : { name: myC || "", pyeong: "", dongfloor: "", buyUk: "", buyMonth: "" }); setWizOpen(true); };
+  const [delConfirm, setDelConfirm] = useState(false); // [#8] 내 단지 삭제 2단계 확인
+  const deleteMyProp = () => {
+    if (!delConfirm) { setDelConfirm(true); setTimeout(() => setDelConfirm(false), 4000); return; }
+    try { ["onehub_re_my_property", "onehub_re_my", "onehub_re_scope", "onehub_re_target", "onehub_re_gapc_dong"].forEach((k) => localStorage.removeItem(k)); window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {}
+    setMyProp(null); setMyC(""); setDelConfirm(false); setWizOpen(false); setGapData(null); setGapBData(null); setGapCData(null);
+  };
   const saveWiz = () => {
     const name = String(wiz.name || "").trim();
     if (!name) return;
@@ -261,10 +268,13 @@ export default function RealEstateDashboard() {
           <section className="card myprop-card">
             <div className="mp-h">
               <div className="mp-title">🏠 내 단지 <b>{myProp.name}</b></div>
-              <button className="mp-edit" onClick={openWiz}>수정</button>
+              <div className="mp-actions">
+                <button className="mp-edit" onClick={openWiz}>수정</button>
+                <button className={`mp-del ${delConfirm ? "confirm" : ""}`} onClick={deleteMyProp}>{delConfirm ? "정말 삭제?" : "삭제"}</button>
+              </div>
             </div>
             <div className="mp-meta">
-              {myProp.pyeong && <span>{myProp.pyeong}평</span>}
+              {myProp.pyeong && <span>전용 {myProp.pyeong}㎡{(() => { const p = m2ToPyeong(Number(myProp.pyeong)); return p ? ` (${p}평)` : ""; })()}</span>}
               {myProp.dongfloor && <span>{myProp.dongfloor}</span>}
               {myProp.buyMonth && <span>{myProp.buyMonth} 매수</span>}
               {buyUk != null && <span>매수 {uk(buyUk)}</span>}
@@ -315,20 +325,27 @@ export default function RealEstateDashboard() {
                 <button className="scr-reg" onClick={openWiz}>내 단지 등록 →</button>
               </div>
             ) : moveScope === "complex" ? (() => {
-              const areas = areaOptsFor(myProp?.name);
+              // [#7] 실거래 최고가 기준(대표 중앙값은 표본 적으면 역전될 수 있어, 최고가를 1차 가격으로)
+              const areas = [...areaOptsFor(myProp?.name)].sort((a, b) => a.m2 - b.m2);
+              const pOf = (a) => a?.maxUk ?? a?.priceUk ?? null;
               const myArea = areas.find((a) => String(a.m2) === String(myProp?.pyeong));
-              const myPrice = myArea?.priceUk ?? myAvm ?? null;
+              const myPrice = pOf(myArea) ?? myAvm ?? null;
               if (!areas.length) return <div className="gap-empty"><b>{myProp?.name}</b>의 평형별 실거래가 아직 부족합니다(최근 거래 축적 시 표시). ‘같은 동·지역 변경’을 이용해 보세요.</div>;
+              let runMax = -Infinity;
               return (
                 <>
-                  <div className="scr-head"><span>평형(전용)</span><span>실거래</span><span>갈아타기 자금</span></div>
+                  <div className="scr-head"><span>평형(전용)</span><span>실거래 최고 · 대표</span><span>갈아타기 자금</span></div>
                   {areas.map((a) => {
-                    const diff = myPrice != null && a.priceUk != null ? a.priceUk - myPrice : null;
+                    const price = pOf(a);
+                    const diff = myPrice != null && price != null ? price - myPrice : null;
                     const mine = String(a.m2) === String(myProp?.pyeong);
+                    // 평수↑인데 최고가↓ = 표본 적음 이상치 → 경고
+                    const anomaly = price != null && runMax !== -Infinity && price < runMax;
+                    if (price != null && price > runMax) runMax = price;
                     return (
                       <div className="scr-row" key={a.m2}>
-                        <span className="scr-name">전용 {a.m2}㎡ <span className="scr-py">약 {m2ToPyeong(a.m2)}평</span>{mine && <span className="scr-mine">내 평형</span>}</span>
-                        <span className="scr-avm">{a.priceUk != null ? uk(a.priceUk) : "-"}</span>
+                        <span className="scr-name">전용 {a.m2}㎡ <span className="scr-py">약 {m2ToPyeong(a.m2)}평</span>{mine && <span className="scr-mine">내 평형</span>}{anomaly && <span className="scr-anom" title="평형이 큰데 실거래 최고가가 더 낮습니다. 표본이 적어 나타나는 이상치일 수 있습니다.">⚠ 표본 적음</span>}</span>
+                        <span className="scr-avm">{a.maxUk != null ? uk(a.maxUk) : (a.priceUk != null ? uk(a.priceUk) : "-")}{a.maxUk != null && a.priceUk != null && a.priceUk !== a.maxUk ? <span className="scr-rep"> · 대표 {uk(a.priceUk)}</span> : null}</span>
                         <span className={`scr-gap ${diff != null && diff <= 0 ? "ok" : ""}`}>{mine ? "—" : gapCell(diff)}</span>
                       </div>
                     );
@@ -375,7 +392,7 @@ export default function RealEstateDashboard() {
                       );
                     })()}
                   </div>
-                  <div className="note"><b>{myProp?.name}</b> 평형별 최근 실거래(국토부 실거래·raw_transactions) 기준. 갈아타기 자금 = 목표 평형 − 내 평형 실거래. 층·향·수리에 따라 실제가는 다릅니다(확정 아님).</div>
+                  <div className="note"><b>{myProp?.name}</b> 평형별 <b>실거래 최고가</b> 기준(대표=최근 중앙값 병기). 갈아타기 자금 = 목표 평형 − 내 평형. ⚠ 표본이 적은 평형은 대표가가 크기 순서와 어긋날 수 있어 <b>최고 실거래가</b>를 기준으로 정렬·표시합니다. 층·향·수리에 따라 실제가는 다릅니다(확정 아님).</div>
                 </>
               );
             })() : moveScope === "dong" ? (() => {
@@ -593,7 +610,7 @@ export default function RealEstateDashboard() {
             {/* [폼 일원화] 빠른입력과 동일한 공용 ReForm. 페이지에서는 실거래 DB 옵션(단지·평형)을 넘겨 드롭다운 제공 */}
             <ReForm
               initial={myProp}
-              nameOptions={(rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명).map((o) => o.단지명) : [])}
+              nameOptions={(() => { const base = rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명).map((o) => o.단지명) : []; const cur = myProp?.name || wiz?.name; return cur && !base.includes(cur) ? [cur, ...base] : base; })()}
               getAreaOptions={(nm) => areaOptsFor(nm).map((a) => ({ value: a.m2, label: `전용 ${a.m2}㎡ (약 ${m2ToPyeong(a.m2)}평)${a.priceUk ? ` · ${a.priceUk}억` : ""}` }))}
               saveLabel="저장"
               onSaved={(key, obj) => { setMyProp(obj); setMyC(obj.name); setWizOpen(false); }}
@@ -693,6 +710,11 @@ export default function RealEstateDashboard() {
         .mp-title { font-size: 0.86rem; font-weight: 700; color: var(--color-ink-2); }
         .mp-title b { color: var(--color-ink); font-weight: 800; margin-left: 4px; }
         .mp-edit { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 8px; padding: 5px 12px; font-size: 0.72rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .mp-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .mp-del { border: 1px solid var(--color-danger); background: var(--color-card); color: var(--color-danger); border-radius: 8px; padding: 5px 12px; font-size: 0.72rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; white-space: nowrap; }
+        .mp-del.confirm { background: var(--color-danger); color: #fff; }
+        .scr-anom { font-size: 0.6rem; font-weight: 800; color: var(--color-warning-ink, var(--color-warning)); background: var(--color-warning-soft); padding: 1px 6px; border-radius: 6px; margin-left: 5px; white-space: nowrap; }
+        .scr-rep { font-size: 0.66rem; font-weight: 500; color: var(--color-ink-3); }
         .mp-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
         .mp-meta span { font-size: 0.68rem; font-weight: 700; background: var(--color-card-soft); color: var(--color-ink-2); border-radius: 7px; padding: 4px 9px; }
         .mp-pnl { display: flex; gap: 10px; margin-top: 12px; }
