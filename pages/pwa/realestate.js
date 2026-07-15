@@ -2,6 +2,7 @@
 // ETF 대시보드와 동일 패턴. ONE Score 랭킹/시장 브리핑/저평가/거시. 확정 데이터는 진한색.
 import { useEffect, useState } from "react";
 import TopNav from "../../components/TopNav";
+import BottomNav from "../../components/BottomNav";
 import { dedupBy } from "../../lib/useDedup";
 import { ReForm } from "../../components/shared/AssetForms";
 import Term from "../../components/Term";
@@ -677,8 +678,10 @@ export default function RealEstateDashboard() {
 
       <div className="foot">📍 현재 <b>분당구 주요 동 단지</b> 실거래 기준입니다(전국·전 지역이 아닙니다). 실거래 기반 확정 지표 + 회귀 예측(근사) · 예측치는 참고용이며 투자판단은 본인 책임.</div>
 
+      <BottomNav active="assets" />
+
       <style jsx>{`
-        .re { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
+        .re { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 84px); font-family: var(--font-sans); color: var(--color-ink); }
         .partner-cta { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-decoration: none; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 14px 16px; margin: 4px 0 14px; box-shadow: var(--shadow-card); }
         .partner-cta .pc-l { display: flex; align-items: center; gap: 10px; }
         .partner-cta .pc-ic { font-size: 20px; }

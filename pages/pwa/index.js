@@ -12,6 +12,7 @@ import { dedupBy } from '../../lib/useDedup';
 import { samplePolicy, verdictColor as sampleVerdictColor, canAutoML, ML_MIN_SAMPLE } from '../../lib/sampleSize';
 import SampleSizeBadge from '../../components/SampleSizeBadge';
 import TraderSwitcher from '../../components/shared/TraderSwitcher';
+import BottomNav from '../../components/BottomNav';
 import { getStockHoldings, removeStock } from '../../lib/stockHoldings';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
@@ -3216,6 +3217,8 @@ export default function PWADashboard({ latestReport }) {
 
         {/* [S3] 빠른입력 — 공용 QuickAddSheet(자산군별 맞춤 폼). 대시보드·서브페이지 동일 사용 */}
         {qaOpen && <QuickAddSheet initialAsset="stock" onClose={() => setQaOpen(false)} />}
+        {/* [G5] 하단 앱 내비 — report 탭=AI, 그 외(dashboard/portfolio/analyze)=자산 */}
+        <BottomNav active={tab === 'report' ? 'ai' : 'assets'} />
       </div>
 
       <style jsx>{`
@@ -3224,7 +3227,7 @@ export default function PWADashboard({ latestReport }) {
         /* [v8.6] 라이트(기본) — Apple Finance / Toss / Notion 톤. */
         /* [v10 UI] 레거시 로컬 변수 → 디자인 토큰 브리지는 globals.css 로 이전(전역·비스코프)해
            styled-jsx 스코프 문제로 다크모드가 안 먹던 버그를 해결. 여기서는 레이아웃만. */
-        .pwa-wrapper { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--bg); color: var(--text-primary); font-family: var(--font-body); padding-bottom: 40px; transition: background 0.2s ease, color 0.2s ease; }
+        .pwa-wrapper { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--bg); color: var(--text-primary); font-family: var(--font-body); padding-bottom: 88px; transition: background 0.2s ease, color 0.2s ease; }
         button, input { font-family: inherit; }
         button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-info); outline-offset: 2px; }
         :global(.pwa-wrapper a:focus-visible) { outline: 2px solid var(--accent-info); outline-offset: 2px; }

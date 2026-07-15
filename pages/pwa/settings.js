@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import TopNav from "../../components/TopNav";
+import BottomNav from "../../components/BottomNav";
 import { setTraderGlobal } from "../../lib/trader";
 import QuickAddSheet from "../../components/shared/QuickAddSheet";
 
@@ -356,7 +357,7 @@ export default function Settings() {
       )}
 
       <style jsx>{`
-        .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--color-bg); padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
+        .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--color-bg); padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 84px); font-family: var(--font-sans); color: var(--color-ink); }
         .hd { display: flex; align-items: center; gap: 10px; padding: 12px 2px; } .hd h1 { font-size: 1.05rem; font-weight: 800; margin: 0; }
         .seg { display: flex; gap: 3px; background: var(--color-card-soft); border: 1px solid var(--color-line); padding: 3px; border-radius: var(--radius-pill); margin-bottom: 12px; }
         .seg button { flex: 1; padding: 8px 0; border: none; background: none; border-radius: var(--radius-pill); font-family: var(--font-sans); font-size: 0.82rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
@@ -395,6 +396,7 @@ export default function Settings() {
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
       {editAsset && <QuickAddSheet initialAsset={editAsset} onClose={() => setEditAsset(null)} />}
+      <BottomNav active="settings" />
     </div>
   );
 }
