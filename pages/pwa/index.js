@@ -1619,7 +1619,7 @@ export default function PWADashboard({ latestReport }) {
                 };
                 const top3 = sorted.slice(0, 3);
                 const rest = sorted.slice(3);
-                const MEDALS = ['🥇', '🥈', '🥉'];
+                // [R2/G10] 금·은·동 메달 제거 — 순위는 숫자(1·2·3)로 표시(과장·이모지 남발 완화)
                 const openSheet = (s) => {
                   const sc = deriveScores(s); // 종목별 실제 신호로 서브점수 재계산(상수 표기 방지)
                   setBottomSheet({
@@ -1672,7 +1672,7 @@ export default function PWADashboard({ latestReport }) {
                           <div key={s.code || i} className="top3-hero-card" onClick={() => openSheet(s)}>
                             {/* [S-8] AI 판단 등급 — 카드 최상단·최대 위계 */}
                             <div className="ai-verdict-badge" style={{ color: m.verdict.color, background: m.verdict.bg, borderColor: m.verdict.color }}>{m.verdict.label}</div>
-                            <div className="top3-medal">{MEDALS[i]}</div>
+                            <div className="top3-medal">{i + 1}</div>
                             <button
                               className="top3-name"
                               style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-body)', textAlign: 'center' }}
@@ -1690,8 +1690,8 @@ export default function PWADashboard({ latestReport }) {
                             <button className="buy-now-btn" onClick={(e) => { e.stopPropagation(); setBuyNotice({ name: s.name, code: s.code }); }}>매수하기 →</button>
                             {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (<>
                               <div className="dec-mini" onClick={(e) => e.stopPropagation()}>
-                                <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>{dec === 'take' ? '✓ 샀어요' : '샀어요'}</button>
-                                <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>{dec === 'pass' ? '✓ 관망' : '관망'}</button>
+                                <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>샀다고 기록</button>
+                                <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망으로 기록</button>
                               </div>
                               {dec && <div className="dec-dday">🏁 승부 진행 중 · D-3</div>}
                             </>); })()}
@@ -1720,8 +1720,8 @@ export default function PWADashboard({ latestReport }) {
                                   {/* [나 vs AI] 내 판단 기록 */}
                                   {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (
                                     <div className="dec-mini">
-                                      <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>{dec === 'take' ? '✓ 샀어요' : '샀어요'}</button>
-                                      <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>{dec === 'pass' ? '✓ 관망' : '관망'}</button>
+                                      <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>샀다고 기록</button>
+                                      <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망으로 기록</button>
                                     </div>
                                   ); })()}
                                 </div>
@@ -2993,7 +2993,7 @@ export default function PWADashboard({ latestReport }) {
         {/* [S-5] 판단 기록 직후 즉시 피드백 — 결과 확인일 명시 + 나 vs AI 링크 */}
         {decFeedback && (
           <div className="dec-feedback" onClick={() => { setTab('report'); setDecFeedback(null); }}>
-            <span>✅ 기록 완료 · <b>{decFeedback.name}</b> {decFeedback.decision === 'take' ? '샀어요' : '관망'}. <b>{decFeedback.date}</b>에 결과를 알려드릴게요</span>
+            <span>✅ 기록 완료 · <b>{decFeedback.name}</b> {decFeedback.decision === 'take' ? '샀다고 기록' : '관망으로 기록'}. <b>{decFeedback.date}</b>에 결과를 알려드릴게요</span>
             <span className="df-link">나 vs AI →</span>
           </div>
         )}
@@ -3206,8 +3206,8 @@ export default function PWADashboard({ latestReport }) {
                 <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
                   <div style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>🥊 내 판단 기록 <span style={{ fontWeight: 400, color: 'var(--text-tertiary)' }}>· 기록 탭에서 3·7일 뒤 AI와 승부</span></div>
                   <div className="dec-mini lg">
-                    <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(bottomSheet.code, bottomSheet.name, 'take', hint)}>{dec === 'take' ? '✓ 샀어요' : '🙋 샀어요'}</button>
-                    <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(bottomSheet.code, bottomSheet.name, 'pass', hint)}>{dec === 'pass' ? '✓ 관망함' : '🤔 관망'}</button>
+                    <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(bottomSheet.code, bottomSheet.name, 'take', hint)}>샀다고 기록</button>
+                    <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(bottomSheet.code, bottomSheet.name, 'pass', hint)}>관망으로 기록</button>
                   </div>
                 </div>
               );

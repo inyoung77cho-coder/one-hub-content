@@ -219,6 +219,20 @@ export default function Settings() {
             <div className="hint">항목별로 독립 편집합니다. 투자 성향을 바꾸면 목표 비중(AI자산 리밸런싱)이 자동 재파생됩니다.</div>
           </div>
 
+          {/* [H2/X7] 도움말 — 용어사전·온보딩 재실행. 전문용어를 배울 곳이 없던 문제 해소. */}
+          <div className="card">
+            <div className="k">도움말</div>
+            <div className="row">
+              <span className="l">용어사전</span>
+              <button className="tbtn" onClick={() => router.push("/pwa/glossary")}>열기</button>
+            </div>
+            <div className="row" style={{ marginTop: 8 }}>
+              <span className="l">온보딩 다시 하기</span>
+              <button className="tbtn" onClick={() => router.push("/pwa/onboarding")}>시작</button>
+            </div>
+            <div className="hint">어려운 용어는 용어사전에서 쉬운 말로 확인할 수 있어요. 화면 곳곳의 ⓘ도 같은 설명을 보여줍니다.</div>
+          </div>
+
           {/* 연동 */}
           <div className="card">
             <div className="k">연동</div>
@@ -228,7 +242,7 @@ export default function Settings() {
                 {teleConnected ? "연결됨" : "미연결"}
               </span>
             </div>
-            <div className="hint">매매신호·리포트가 텔레그램으로도 전송됩니다.</div>
+            <div className="hint">매매신호와 리포트를 텔레그램으로도 받습니다. 승인·주문은 앱에서 하세요.</div>
           </div>
         </>
       ) : (
