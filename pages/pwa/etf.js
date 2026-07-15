@@ -2,6 +2,7 @@
 // 독립 라우트. 확정값(수익3단분해·세금·중복도)은 진한색/실선. 예측(Forecast)은 시나리오 투영(참고용·확정 아님).
 // ★ 단일 점수 블랙박스 금지 — Portfolio Score는 구성요소를 펼쳐 보여준다(§11.2).
 import { useEffect, useState, useCallback } from "react";
+import { useRouter } from "next/router";
 import TopNav from "../../components/TopNav";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS } from "../../lib/etfHoldings";
@@ -29,6 +30,7 @@ const ACCT_TAX = ACCOUNTS.reduce((m, a) => { m[a] = `${ACCT_EMOJI[a] || ""} ${ac
 const ACCT_FILTERS = ["전체", ...ACCOUNTS];
 
 export default function EtfDashboard() {
+  const router = useRouter();
   const [report, setReport] = useState(null);
   const [tax, setTax] = useState(null);
   const [overlap, setOverlap] = useState(null);
@@ -72,7 +74,23 @@ export default function EtfDashboard() {
       if (last && ACCOUNTS.includes(last)) setForm((prev) => ({ ...prev, account: last }));
     } catch (e) {}
   }, []);
-  const changeAcctFilter = (f) => { setAcctFilter(f); try { localStorage.setItem("onehub_etf_acct_filter", f); } catch (e) {} };
+  // [D1] 계좌 필터를 ?acct= URL과 동기화 — 딥링크·뒤로가기 지원(상태를 URL이 소유). localStorage는 폴백.
+  const changeAcctFilter = (f) => {
+    setAcctFilter(f);
+    try { localStorage.setItem("onehub_etf_acct_filter", f); } catch (e) {}
+    try {
+      const q = { ...router.query };
+      if (f && f !== "전체") q.acct = f; else delete q.acct;
+      router.replace({ pathname: router.pathname, query: q }, undefined, { shallow: true });
+    } catch (e) {}
+  };
+  // [D1] 진입 시 ?acct= 가 있으면 그 값을 우선(localStorage보다 먼저) 반영.
+  useEffect(() => {
+    if (!router.isReady) return;
+    const a = router.query.acct;
+    if (typeof a === "string" && ACCT_FILTERS.includes(a)) setAcctFilter(a);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.query.acct]);
   const changePensionContrib = (v) => { setPensionContrib(v); try { localStorage.setItem("onehub_pension_contrib", v); } catch (e) {} };
 
   useEffect(() => {

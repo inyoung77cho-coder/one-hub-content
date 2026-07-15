@@ -59,6 +59,7 @@ function AfStyles() {
       .af-opt-meta { font-size: 0.72rem; color: var(--color-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
       .af-bound { margin-top: 6px; font-size: 0.74rem; color: var(--color-success); font-weight: 600; word-break: keep-all; }
       .af-bound b { font-weight: 800; }
+      .af-link { align-self: flex-start; margin-top: 6px; border: none; background: none; padding: 0; color: var(--color-primary); font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
     `}</style>
   );
 }
@@ -289,9 +290,10 @@ export function ReForm({ onSaved, initial = null, nameOptions = [], getAreaOptio
   const [buyUk, setBuyUk] = useState(initial?.buyUk || "");
   const [buyMonth, setBuyMonth] = useState(initial?.buyMonth || "");
   const [msg, setMsg] = useState("");
+  const [manualName, setManualName] = useState(false); // [E7] '목록에 없어요' 직접 입력 탈출구
   const suggest = useSuggest("realestate", name);
   const areaOpts = typeof getAreaOptions === "function" ? (getAreaOptions(name) || []) : [];
-  const useNameSelect = Array.isArray(nameOptions) && nameOptions.length > 0;
+  const useNameSelect = Array.isArray(nameOptions) && nameOptions.length > 0 && !manualName;
 
   const save = () => {
     const nm = String(name || "").trim();
@@ -310,16 +312,25 @@ export function ReForm({ onSaved, initial = null, nameOptions = [], getAreaOptio
 
   return (
     <div className="af"><AfStyles />
-      <label className="af-f"><span>단지명<em>{useNameSelect ? "실거래 DB" : "자동완성"}</em></span>
+      <label className="af-f"><span>단지명<em>{useNameSelect ? "실거래 DB" : "직접 입력"}</em></span>
         {useNameSelect ? (
-          <select value={name} onChange={(e) => { setName(e.target.value); setPyeong(""); }}>
-            <option value="">단지 선택</option>
-            {nameOptions.map((o) => <option key={o} value={o}>{o}</option>)}
-          </select>
+          <>
+            <select value={name} onChange={(e) => {
+              if (e.target.value === "__manual__") { setManualName(true); setName(""); setPyeong(""); return; }
+              setName(e.target.value); setPyeong("");
+            }}>
+              <option value="">단지 선택</option>
+              {nameOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+              <option value="__manual__">＋ 목록에 없어요 · 직접 입력</option>
+            </select>
+          </>
         ) : (
           <>
-            <input list="af-re-suggest" value={name} onChange={(e) => setName(e.target.value)} placeholder="단지명 입력·선택" />
+            <input list="af-re-suggest" value={name} onChange={(e) => setName(e.target.value)} placeholder="단지명 입력·선택" autoFocus={manualName} />
             <datalist id="af-re-suggest">{suggest.map((o) => <option key={o} value={o} />)}</datalist>
+            {Array.isArray(nameOptions) && nameOptions.length > 0 && (
+              <button type="button" className="af-link" onClick={() => { setManualName(false); setName(""); setPyeong(""); }}>← 실거래 DB 목록에서 선택</button>
+            )}
           </>
         )}
       </label>

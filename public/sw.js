@@ -1,6 +1,6 @@
 // public/sw.js — ONE-HUB v9.0 PWA Service Worker
 
-const CACHE_VERSION = 'onehub-v24';
+const CACHE_VERSION = 'onehub-v25';
 const CACHE_NAME = CACHE_VERSION;
 const STATIC_ASSETS = ['/pwa', '/icons/icon-192.png', '/icons/icon-512.png'];
 
@@ -74,7 +74,8 @@ self.addEventListener('push', (event) => {
     body: payload.body || '',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    data: { url: '/pwa', code: payload.code || null, name: payload.name || null },
+    // [H3] 딥링크 — 백엔드가 code/name(종목 분석) 또는 tab(임의 탭)·url(임의 경로)로 목적지 지정.
+    data: { url: payload.url || '/pwa', tab: payload.tab || null, code: payload.code || null, name: payload.name || null },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -87,6 +88,9 @@ self.addEventListener('notificationclick', (event) => {
   if (data.code && data.name) {
     const params = new URLSearchParams({ tab: 'analyze', code: data.code, name: data.name });
     targetUrl = '/pwa?' + params.toString();
+  } else if (data.tab) {
+    // [H3] 임의 탭 딥링크(예: report=AI 신뢰도, dashboard=종합자산)
+    targetUrl = '/pwa?tab=' + encodeURIComponent(data.tab);
   } else if (data.url) {
     targetUrl = data.url;
   }
