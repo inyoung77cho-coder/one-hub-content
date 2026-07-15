@@ -3387,7 +3387,9 @@ export default function PWADashboard({ latestReport }) {
         .mh-anomaly { border: 1px solid var(--color-danger); }
         .mh-l { min-width: 0; flex: 1; }
         .mh-r { font-size: 0.74rem; color: var(--text-secondary); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
-        .mh-del { flex-shrink: 0; width: 24px; height: 24px; border-radius: 6px; border: none; background: var(--color-danger-soft); color: var(--color-danger); font-size: 0.7rem; cursor: pointer; }
+        /* [G9] 터치 타깃 44×44 확보 — 시각 칩은 유지하되 탭 영역을 44px로(오터치 방지). */
+        .mh-del { flex-shrink: 0; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: none; background: none; color: var(--color-danger); font-size: 0.95rem; cursor: pointer; }
+        .mh-del:hover { background: var(--color-danger-soft); }
         /* [성과비교] 시장 대비 내 성과 */
         .cmp-scope { font-size: 0.66rem; font-weight: 700; color: var(--text-tertiary); }
         .cmp-cta { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.55; word-break: keep-all; background: var(--inset-bg); border-radius: 12px; padding: 13px 14px; }
