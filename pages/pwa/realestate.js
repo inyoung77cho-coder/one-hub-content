@@ -140,9 +140,15 @@ export default function RealEstateDashboard() {
   const openWiz = () => { setWiz(myProp ? { name: myProp.name || "", pyeong: myProp.pyeong || "", dongfloor: myProp.dongfloor || "", buyUk: myProp.buyUk || "", buyMonth: myProp.buyMonth || "" } : { name: myC || "", pyeong: "", dongfloor: "", buyUk: "", buyMonth: "" }); setWizOpen(true); };
   const [delConfirm, setDelConfirm] = useState(false); // [#8] 내 단지 삭제 2단계 확인
   const deleteMyProp = () => {
-    if (!delConfirm) { setDelConfirm(true); setTimeout(() => setDelConfirm(false), 4000); return; }
-    try { ["onehub_re_my_property", "onehub_re_my", "onehub_re_scope", "onehub_re_target", "onehub_re_gapc_dong"].forEach((k) => localStorage.removeItem(k)); window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {}
-    setMyProp(null); setMyC(""); setDelConfirm(false); setWizOpen(false); setGapData(null); setGapBData(null); setGapCData(null);
+    if (!delConfirm) { setDelConfirm(true); return; } // 명시적 취소 버튼으로만 해제(타임아웃 제거)
+    // [#8 보완] 내 단지 관련 로컬 키를 모두 정리하고, 기기 동기화에도 삭제가 전파되도록 이벤트 발화.
+    try {
+      ["onehub_re_my_property", "onehub_re_my", "onehub_re_target", "onehub_re_gapc_dong", "onehub_re_gapc_alert"]
+        .forEach((k) => localStorage.removeItem(k));
+      window.dispatchEvent(new Event("onehub-assets-change")); // syncManager가 삭제분을 서버에 push
+    } catch (e) {}
+    setMyProp(null); setMyC(""); setTgtC(""); setGapCTarget(""); setGapCAlert(false);
+    setDelConfirm(false); setWizOpen(false); setGapData(null); setGapBData(null); setGapCData(null);
   };
   const saveWiz = () => {
     const name = String(wiz.name || "").trim();
@@ -269,8 +275,17 @@ export default function RealEstateDashboard() {
             <div className="mp-h">
               <div className="mp-title">🏠 내 단지 <b>{myProp.name}</b></div>
               <div className="mp-actions">
-                <button className="mp-edit" onClick={openWiz}>수정</button>
-                <button className={`mp-del ${delConfirm ? "confirm" : ""}`} onClick={deleteMyProp}>{delConfirm ? "정말 삭제?" : "삭제"}</button>
+                {delConfirm ? (
+                  <>
+                    <button className="mp-del confirm" onClick={deleteMyProp}>정말 삭제</button>
+                    <button className="mp-edit" onClick={() => setDelConfirm(false)}>취소</button>
+                  </>
+                ) : (
+                  <>
+                    <button className="mp-edit" onClick={openWiz}>수정</button>
+                    <button className="mp-del" onClick={deleteMyProp}>삭제</button>
+                  </>
+                )}
               </div>
             </div>
             <div className="mp-meta">
@@ -339,13 +354,15 @@ export default function RealEstateDashboard() {
                     const price = pOf(a);
                     const diff = myPrice != null && price != null ? price - myPrice : null;
                     const mine = String(a.m2) === String(myProp?.pyeong);
-                    // 평수↑인데 최고가↓ = 표본 적음 이상치 → 경고
+                    // [#7 보완] 평수↑인데 최고가↓ = 대부분 '거래 건수가 적어' 생기는 이상치.
+                    //   거래 건수(n)를 함께 노출해 "왜 큰 평형이 더 싼가"를 스스로 납득하게 한다.
                     const anomaly = price != null && runMax !== -Infinity && price < runMax;
                     if (price != null && price > runMax) runMax = price;
+                    const thin = a.n != null && a.n < 3; // 표본 부족 기준(거래 3건 미만)
                     return (
                       <div className="scr-row" key={a.m2}>
-                        <span className="scr-name">전용 {a.m2}㎡ <span className="scr-py">약 {m2ToPyeong(a.m2)}평</span>{mine && <span className="scr-mine">내 평형</span>}{anomaly && <span className="scr-anom" title="평형이 큰데 실거래 최고가가 더 낮습니다. 표본이 적어 나타나는 이상치일 수 있습니다.">⚠ 표본 적음</span>}</span>
-                        <span className="scr-avm">{a.maxUk != null ? uk(a.maxUk) : (a.priceUk != null ? uk(a.priceUk) : "-")}{a.maxUk != null && a.priceUk != null && a.priceUk !== a.maxUk ? <span className="scr-rep"> · 대표 {uk(a.priceUk)}</span> : null}</span>
+                        <span className="scr-name">전용 {a.m2}㎡ <span className="scr-py">약 {m2ToPyeong(a.m2)}평</span>{mine && <span className="scr-mine">내 평형</span>}{anomaly && <span className="scr-anom" title={`평형이 큰데 실거래 최고가가 더 낮습니다. ${a.n != null ? `이 평형 거래 ${a.n}건으로 표본이 적어` : "표본이 적어"} 생기는 이상치일 수 있습니다.`}>⚠ {a.n != null ? `거래 ${a.n}건` : "표본 적음"}</span>}</span>
+                        <span className="scr-avm">{a.maxUk != null ? uk(a.maxUk) : (a.priceUk != null ? uk(a.priceUk) : "-")}{a.maxUk != null && a.priceUk != null && a.priceUk !== a.maxUk ? <span className="scr-rep"> · 대표 {uk(a.priceUk)}</span> : null}{a.n != null && !anomaly ? <span className="scr-n">{thin ? " · " : " · "}거래 {a.n}건</span> : null}</span>
                         <span className={`scr-gap ${diff != null && diff <= 0 ? "ok" : ""}`}>{mine ? "—" : gapCell(diff)}</span>
                       </div>
                     );
@@ -392,7 +409,7 @@ export default function RealEstateDashboard() {
                       );
                     })()}
                   </div>
-                  <div className="note"><b>{myProp?.name}</b> 평형별 <b>실거래 최고가</b> 기준(대표=최근 중앙값 병기). 갈아타기 자금 = 목표 평형 − 내 평형. ⚠ 표본이 적은 평형은 대표가가 크기 순서와 어긋날 수 있어 <b>최고 실거래가</b>를 기준으로 정렬·표시합니다. 층·향·수리에 따라 실제가는 다릅니다(확정 아님).</div>
+                  <div className="note"><b>{myProp?.name}</b> 평형별 <b>실거래 최고가</b> 기준(대표=최근 중앙값 병기). 갈아타기 자금 = 목표 평형 − 내 평형. ⚠ 큰 평형인데 최고가가 더 낮다면 대개 <b>그 평형의 거래 건수가 적어서</b>입니다(옆의 ‘거래 N건’ 확인) — 이상 신호가 아니라 표본 부족입니다. 층·향·수리에 따라 실제가는 다릅니다(확정 아님).</div>
                 </>
               );
             })() : moveScope === "dong" ? (() => {
@@ -597,7 +614,40 @@ export default function RealEstateDashboard() {
             <span className="chip">기준금리 <b>{mac.base_rate}%</b></span>
             <span className="chip"><Term term="정책 점수">정책</Term> <b>{mac.policy_stance}</b></span>
           </div>
-          <div className="roadmap">🔜 <b>향후 업데이트 예정</b> · 거시 실시간 반영 · 정책 변화 예측<div className="rm-sub">현재는 최근 발표된 정책 stance만 표시하며, 예측 기능은 제공하지 않습니다. 정책 반영 기준: {mac.연월}</div></div>
+          {/* [거시 해석] 금리·정책을 부동산 방향성으로 규칙 기반 해석(예측 아님) + 데이터 최신성 명시 */}
+          {(() => {
+            const baseRate = Number(mac.base_rate);
+            const stance = String(mac.policy_stance ?? "");
+            // 금리 방향(+상방/−하방) — 대출이자 부담 관점
+            let rateBias = 0, rateTxt = `기준금리 ${mac.base_rate}% · 중립 구간`;
+            if (baseRate >= 3.25) { rateBias = -1; rateTxt = `기준금리 ${mac.base_rate}% — 이자 부담이 커 매수여력을 누르는 하방 압력`; }
+            else if (baseRate > 0 && baseRate <= 2.5) { rateBias = 1; rateTxt = `기준금리 ${mac.base_rate}% — 이자 부담이 낮아 매수여력에 우호적(상방 여지)`; }
+            else if (baseRate > 0) { rateTxt = `기준금리 ${mac.base_rate}% — 중립 구간(뚜렷한 방향성 약함)`; }
+            // 정책 방향
+            let polBias = 0, polTxt = `정책 '${stance || "정보 없음"}' — 방향성 약함(중립)`;
+            if (/완화|부양|지원|공급확대|규제완화/.test(stance)) { polBias = 1; polTxt = `정책 '${stance}' — 완화·부양 기조로 수요에 우호적`; }
+            else if (/긴축|규제|억제|강화|대출제한/.test(stance)) { polBias = -1; polTxt = `정책 '${stance}' — 긴축·규제 기조로 수요를 누르는 방향`; }
+            const net = rateBias + polBias;
+            const dir = net >= 1 ? { t: "상방 우세", ic: "🟢", c: "up" } : net <= -1 ? { t: "하방 우세", ic: "🔴", c: "dn" } : { t: "중립·혼조", ic: "🟡", c: "mid" };
+            // 데이터 최신성(기준 연월 → 오늘 경과 개월)
+            const nowK = new Date(Date.now() + 9 * 3600 * 1000);
+            const ymParts = String(mac.연월 || "").split(/[-.\/]/).map((x) => Number(x));
+            const elapsed = (ymParts.length >= 2 && ymParts[0] > 1900 && ymParts[1] >= 1)
+              ? (nowK.getUTCFullYear() * 12 + nowK.getUTCMonth()) - (ymParts[0] * 12 + (ymParts[1] - 1)) : null;
+            const freshTxt = elapsed == null ? `기준 ${mac.연월}` : elapsed <= 0 ? `이번 달(${mac.연월}) 기준 · 최신` : `${mac.연월} 기준 · ${elapsed}개월 전 데이터`;
+            return (
+              <div className="macro-read">
+                <div className="mr-top">
+                  <span className="mr-lbl">🧭 규칙 기반 방향성</span>
+                  <span className={`mr-dir ${dir.c}`}>{dir.ic} 부동산 {dir.t}</span>
+                </div>
+                <div className="mr-row"><span className="mr-k">금리</span><span className="mr-v">{rateTxt}</span></div>
+                <div className="mr-row"><span className="mr-k">정책</span><span className="mr-v">{polTxt}</span></div>
+                <div className={`mr-fresh ${elapsed != null && elapsed >= 2 ? "stale" : ""}`}>📅 {freshTxt}{elapsed != null && elapsed >= 2 ? " — 월 단위로 갱신되며 실시간 시세와 차이가 있을 수 있습니다." : ""}</div>
+                <div className="mr-disc">※ 금리·정책을 <b>규칙으로 해석한 방향성</b>일 뿐 <b>가격 예측이 아닙니다</b>. 실제 가격은 단지·수급에 따라 다릅니다.</div>
+              </div>
+            );
+          })()}
           <div className="note">{mac.kospi_src || "연말 종가 보간(근사·월별 정밀치 아님)."}</div>
         </section>
       )}
@@ -606,7 +656,7 @@ export default function RealEstateDashboard() {
       {wizOpen && (
         <div className="wiz-scrim" onClick={() => setWizOpen(false)}>
           <div className="wiz" onClick={(e) => e.stopPropagation()}>
-            <div className="wiz-h">🏠 내 단지 등록<button className="wiz-x" onClick={() => setWizOpen(false)} aria-label="닫기">✕</button></div>
+            <div className="wiz-h">🏠 내 단지 {myProp ? "수정" : "등록"}<button className="wiz-x" onClick={() => setWizOpen(false)} aria-label="닫기">✕</button></div>
             {/* [폼 일원화] 빠른입력과 동일한 공용 ReForm. 페이지에서는 실거래 DB 옵션(단지·평형)을 넘겨 드롭다운 제공 */}
             <ReForm
               initial={myProp}
@@ -715,6 +765,7 @@ export default function RealEstateDashboard() {
         .mp-del.confirm { background: var(--color-danger); color: #fff; }
         .scr-anom { font-size: 0.6rem; font-weight: 800; color: var(--color-warning-ink, var(--color-warning)); background: var(--color-warning-soft); padding: 1px 6px; border-radius: 6px; margin-left: 5px; white-space: nowrap; }
         .scr-rep { font-size: 0.66rem; font-weight: 500; color: var(--color-ink-3); }
+        .scr-n { font-size: 0.64rem; font-weight: 600; color: var(--color-ink-3); }
         .mp-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
         .mp-meta span { font-size: 0.68rem; font-weight: 700; background: var(--color-card-soft); color: var(--color-ink-2); border-radius: 7px; padding: 4px 9px; }
         .mp-pnl { display: flex; gap: 10px; margin-top: 12px; }
@@ -840,8 +891,20 @@ export default function RealEstateDashboard() {
         .pb-v { color: var(--color-ink-2); } .pb-v .up { color: var(--color-success); } .pb-v .dn { color: var(--color-danger); }
         .pb-cta { border: none; background: var(--color-primary); color: #fff; font-size: 12px; font-weight: 800; padding: 6px 12px; border-radius: 9px; cursor: pointer; font-family: var(--font-sans); margin-left: 4px; }
         /* [R-7] 미구현 로드맵 배지 */
-        .roadmap { margin-top: 11px; background: var(--color-card-soft); border: 1px dashed var(--color-line); border-radius: 10px; padding: 9px 12px; font-size: 12px; font-weight: 700; color: var(--color-ink-2); }
-        .roadmap .rm-sub { font-weight: 500; font-size: 11px; color: var(--color-ink-3); margin-top: 3px; line-height: 1.5; word-break: keep-all; }
+        /* [거시 해석] 규칙 기반 방향성 카드 */
+        .macro-read { margin-top: 11px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 10px; padding: 11px 13px; }
+        .macro-read .mr-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 7px; }
+        .macro-read .mr-lbl { font-size: 12px; font-weight: 800; color: var(--color-ink); }
+        .macro-read .mr-dir { font-size: 12px; font-weight: 800; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+        .macro-read .mr-dir.up { color: var(--color-undervalued, var(--color-success)); background: var(--color-undervalued-soft, var(--color-success-soft)); }
+        .macro-read .mr-dir.dn { color: var(--color-overvalued, var(--color-danger)); background: var(--color-overvalued-soft, var(--color-danger-soft)); }
+        .macro-read .mr-dir.mid { color: var(--color-warning-ink, var(--color-warning)); background: var(--color-warning-soft); }
+        .macro-read .mr-row { display: flex; gap: 8px; padding: 3px 0; font-size: 12px; line-height: 1.5; word-break: keep-all; }
+        .macro-read .mr-k { flex-shrink: 0; width: 34px; font-weight: 800; color: var(--color-ink-2); }
+        .macro-read .mr-v { color: var(--color-ink-2); }
+        .macro-read .mr-fresh { margin-top: 7px; font-size: 11px; font-weight: 600; color: var(--color-ink-3); line-height: 1.5; word-break: keep-all; }
+        .macro-read .mr-fresh.stale { color: var(--color-warning-ink, var(--color-warning)); }
+        .macro-read .mr-disc { margin-top: 6px; font-size: 10.5px; color: var(--color-ink-3); line-height: 1.5; word-break: keep-all; }
         .foot { font-size: 0.68rem; color: var(--color-ink-3); text-align: center; margin-top: 16px; line-height: 1.5; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
