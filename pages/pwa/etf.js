@@ -538,7 +538,7 @@ export default function EtfDashboard() {
       {/* 2) Portfolio Score — 블랙박스 금지, 구성요소 공개 */}
       {s && tax && overlap && (
         <section className="card">
-          <div className="label">Portfolio Score <span className="sub">구성요소</span></div>
+          <div className="label"><Term term="Portfolio Score">Portfolio Score</Term> <span className="sub">구성요소</span></div>
           <div className="score-grid">
             <div className="sc"><span>실질 수익률</span><b className={sign(s.total_pnl_pct)}>{pct(s.total_pnl_pct)}</b></div>
             <div className="sc"><span>종목 수</span><b>{positions.length}</b></div>

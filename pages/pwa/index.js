@@ -1332,7 +1332,7 @@ export default function PWADashboard({ latestReport }) {
                           </span>
                         </button>
                       ))}
-                      <div className="bf-note">raw_transactions 실거래 기준 · 동일 단지·평형 직전 대비{reFeed.updated ? ` · ${reFeed.updated}` : ''}</div>
+                      <div className="bf-note">국토부 실거래가 기준 · 동일 단지·평형 직전 거래 대비{reFeed.updated ? ` · ${reFeed.updated}` : ''}</div>
                     </>
                   ) : (
                     <div className="bf-empty">관심·보유 단지를 등록하면 최근 실거래·신고가가 표시됩니다. <button className="bf-empty-link" onClick={() => router.push('/pwa/realestate')}>부동산 열기 →</button></div>
@@ -1685,8 +1685,8 @@ export default function PWADashboard({ latestReport }) {
                             <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>판단근거 ›</button>
                             {/* [S-8] 나 vs AI 예고 */}
                             <div className="vs-teaser">AI는 <b style={{ color: m.verdict.color }}>{m.verdict.short}</b> · 당신의 선택은?</div>
-                            {/* [S-6] 바로 매수(Primary) — 실주문은 증권사에서, 체결 후 '샀어요'로 기록 */}
-                            <button className="buy-now-btn" onClick={(e) => { e.stopPropagation(); setBuyNotice({ name: s.name, code: s.code }); }}>⚡ 바로 매수</button>
+                            {/* [S-6/R2] 매수하기 — 실주문은 증권사에서(즉시 체결 아님), 체결 후 '샀어요'로 기록. '바로 매수' 과장 완화. */}
+                            <button className="buy-now-btn" onClick={(e) => { e.stopPropagation(); setBuyNotice({ name: s.name, code: s.code }); }}>매수하기 →</button>
                             {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (<>
                               <div className="dec-mini" onClick={(e) => e.stopPropagation()}>
                                 <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>{dec === 'take' ? '✓ 샀어요' : '샀어요'}</button>
@@ -3001,7 +3001,7 @@ export default function PWADashboard({ latestReport }) {
         {buyNotice && (
           <div onClick={() => setBuyNotice(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 360, background: 'var(--color-card)', color: 'var(--color-text)', borderRadius: 16, padding: 18, boxShadow: '0 12px 40px rgba(0,0,0,.3)' }}>
-              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>⚡ 바로 매수 · {buyNotice.name} <span style={{ color: 'var(--color-ink-3)', fontWeight: 500 }}>({buyNotice.code})</span></div>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>매수하기 · {buyNotice.name} <span style={{ color: 'var(--color-ink-3)', fontWeight: 500 }}>({buyNotice.code})</span></div>
               <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.55, wordBreak: 'keep-all' }}>실주문 자동연동은 준비 중입니다. <b>증권사 앱에서 매수 주문</b>을 완료하신 뒤 아래 <b>‘샀어요로 기록’</b>을 누르면 <b>나 vs AI</b> 채점에 반영됩니다.</div>
               <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
                 <button onClick={() => { logDecision(buyNotice.code, buyNotice.name, 'take'); setBuyNotice(null); }} style={{ flex: 1, border: 'none', borderRadius: 10, padding: '11px 0', fontWeight: 800, background: 'var(--color-primary)', color: '#fff', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>샀어요로 기록</button>

@@ -527,7 +527,7 @@ export default function RealEstateDashboard() {
       {/* 2) ONE Score 랭킹 */}
       {rank?.ranking?.length > 0 && (
         <section className="card">
-          <div className="label">🏆 ONE Score 랭킹 <span className="sub">단지별 종합점수</span></div>
+          <div className="label">🏆 <Term term="ONE Score">ONE Score</Term> 랭킹 <span className="sub">단지별 종합점수</span></div>
           {/* [§3-7] 순위 중복 버그 수정 — one_score 내림차순 정렬 + 단지명 중복 제거 후 순번 부여 */}
           {(() => {
             const seen = new Set();
@@ -675,7 +675,7 @@ export default function RealEstateDashboard() {
         <span className="pc-arrow">→</span>
       </a>
 
-      <div className="foot">실거래 기반 확정 지표 + 회귀 예측(근사). 예측치는 참고용이며 투자판단은 본인 책임.</div>
+      <div className="foot">📍 현재 <b>분당구 주요 동 단지</b> 실거래 기준입니다(전국·전 지역이 아닙니다). 실거래 기반 확정 지표 + 회귀 예측(근사) · 예측치는 참고용이며 투자판단은 본인 책임.</div>
 
       <style jsx>{`
         .re { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
