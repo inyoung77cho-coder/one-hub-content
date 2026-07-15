@@ -244,7 +244,7 @@ export default function RealEstateDashboard() {
         </div>
       ))}
 
-      {/* [S5] 내 단지 — 미등록: 위저드 CTA / 등록됨: 상세 요약(매수가 vs 현재 AVM) */}
+      {/* [S5] 내 단지 — 미등록: 위저드 CTA / 등록됨: 상세 요약(매수가 vs 현재 추정시세) */}
       {!myProp ? (
         // [R-1] 등록 전 블러 프리뷰 — 라벨은 선명, 값만 가림 + 가치 제안 카드(3개·30초 CTA)
         <div className="preview5">
@@ -296,15 +296,15 @@ export default function RealEstateDashboard() {
             </div>
             {curUk != null ? (
               <div className="mp-pnl">
-                <div className="mp-now"><span>현재 AVM</span><b>{uk(curUk)}</b></div>
+                <div className="mp-now"><span><Term term="AI 추정 시세">현재 추정시세</Term></span><b>{uk(curUk)}</b></div>
                 <div className={`mp-diff ${pnl >= 0 ? "pos" : "neg"}`}>
                   <span>평가손익<em>추정</em></span><b>{pnl >= 0 ? "+" : ""}{uk(pnl)}{pnlPct != null ? ` · ${pct(pnlPct)}` : ""}</b>
                 </div>
               </div>
             ) : (
-              <div className="mp-nomatch">랭킹에 없는 단지입니다 — 갭·스크리너는 목록 단지 기준으로 계산됩니다. (AVM 매칭은 실거래 축적 시)</div>
+              <div className="mp-nomatch">랭킹에 없는 단지입니다 — 갭·스크리너는 목록 단지 기준으로 계산됩니다. (AI 추정 시세 매칭은 실거래 축적 시)</div>
             )}
-            <div className="mp-note">매수가·시점은 로컬에만 저장되며, 평가손익은 현재 AVM 기준 <b>추정</b>(확정 아님)입니다.</div>
+            <div className="mp-note">매수가·시점은 로컬에만 저장되며, 평가손익은 현재 <Term term="AI 추정 시세">AI 추정 시세</Term> 기준 <b>추정</b>(확정 아님)입니다.</div>
           </section>
         );
       })()}
@@ -419,7 +419,7 @@ export default function RealEstateDashboard() {
               if (!cands.length) return <div className="gap-empty">{myDong ? <><b>{myDong}</b> 내 다른 단지 데이터가 부족합니다.</> : "동 정보를 불러오지 못했습니다."} ‘지역 변경’을 이용해 보세요.</div>;
               return (
                 <>
-                  <div className="scr-head"><span>단지</span><span>매매(AVM)</span><span>갈아타기 자금</span></div>
+                  <div className="scr-head"><span>단지</span><span>매매(추정)</span><span>갈아타기 자금</span></div>
                   {cands.map((o, i) => (
                     <div className="scr-row" key={`${o.단지ID || o.단지명}-${i}`}>
                       <span className="scr-name">{o.단지명} <span className={`vtag ${vtag(o.valuation)}`}>{o.valuation}</span></span>
@@ -452,7 +452,7 @@ export default function RealEstateDashboard() {
                       <div className="gap5-foot">⚠ {gapBData.tax_note} · {gapBData.disclaimer}</div>
                     </div>
                   )}
-                  <div className="note">{myDong ? <><b>{myDong}</b> 내 이동 기준. </> : null}갈아타기 자금 = 목표 매매(AVM) − 내 단지 매매. 회귀 근사 · <Term term="시차">시차 없음(동시 반영)</Term> · 확정 아님.</div>
+                  <div className="note">{myDong ? <><b>{myDong}</b> 내 이동 기준. </> : null}갈아타기 자금 = 목표 매매(<Term term="AI 추정 시세">AI 추정 시세</Term>) − 내 단지 매매. 회귀 근사 · <Term term="시차">시차 없음(동시 반영)</Term> · 확정 아님.</div>
                 </>
               );
             })() : (() => {
@@ -468,7 +468,7 @@ export default function RealEstateDashboard() {
                   </div>
                   {matched.length > 0 ? (
                     <>
-                      <div className="scr-head"><span>단지</span><span>매매(AVM)</span><span>갭투자금</span></div>
+                      <div className="scr-head"><span>단지</span><span>매매(추정)</span><span>갭투자금</span></div>
                       {matched.map((o, i) => (
                         <div className="scr-row" key={`${o.단지ID || o.단지명}-${i}`}>
                           <span className="scr-name">{o.단지명} <span className={`vtag ${vtag(o.valuation)}`}>{o.valuation}</span></span>
@@ -476,7 +476,7 @@ export default function RealEstateDashboard() {
                           <span className={`scr-gap ${bg > 0 && o.gapInvest <= bg ? "ok" : ""}`}>{uk(o.gapInvest)}</span>
                         </div>
                       ))}
-                      <div className="note">갭투자금 = 매매(AVM) × (1 − 전세가율{Math.round(jr * 100)}%). 전세가율은 <b>사용자 가정치</b>(상대가치·추정·확정 아님).</div>
+                      <div className="note">갭투자금 = 매매(<Term term="AI 추정 시세">AI 추정 시세</Term>) × (1 − 전세가율{Math.round(jr * 100)}%). 전세가율은 <b>사용자 가정치</b>(상대가치·추정·확정 아님).</div>
                     </>
                   ) : (
                     <div className="gap-empty">예산 범위에 맞는 단지가 없습니다. 예산·전세가율을 조정해 보세요.</div>
@@ -560,7 +560,7 @@ export default function RealEstateDashboard() {
               );
             });
           })()}
-          <div className="note">업데이트 {rank.ranking[0]?.updated} · AVM=자동가치추정 · <b><Term term="시차">시차 없음(동시 반영)</Term> 상대가치 기준(확정 아님)</b>. ONE Score는 구성요소 종합이며 블랙박스가 아닙니다.</div>
+          <div className="note">업데이트 {rank.ranking[0]?.updated} · <Term term="AI 추정 시세">AI 추정 시세</Term>=실거래·회귀 기반 자동 추정 · <b><Term term="시차">시차 없음(동시 반영)</Term> 상대가치 기준(확정 아님)</b>. ONE Score는 구성요소 종합이며 블랙박스가 아닙니다.</div>
         </section>
       )}
 
@@ -665,7 +665,7 @@ export default function RealEstateDashboard() {
               saveLabel="저장"
               onSaved={(key, obj) => { setMyProp(obj); setMyC(obj.name); setWizOpen(false); }}
             />
-            <div className="wiz-note">입력값은 이 기기에만 저장됩니다(localStorage). 평가손익·갭은 현재 AVM 기준 <b>추정</b>입니다.</div>
+            <div className="wiz-note">입력값은 이 기기에만 저장됩니다(localStorage). 평가손익·갭은 현재 <Term term="AI 추정 시세">AI 추정 시세</Term> 기준 <b>추정</b>입니다.</div>
           </div>
         </div>
       )}

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { buyEtf, sellEtf, inferMarket, ACCOUNTS } from "../../lib/etfHoldings";
 import { buyStock, STOCK_BROKERS } from "../../lib/stockHoldings";
 import { getTrader } from "../../lib/trader";
+import { validateStockInput, validateRealtyInput } from "../../lib/validateAsset";
 
 function readOnb() { try { return JSON.parse(localStorage.getItem("onehub_onboard_assets") || "{}") || {}; } catch { return {}; } }
 function writeOnb(n) { try { localStorage.setItem("onehub_onboard_assets", JSON.stringify(n)); } catch {} }
@@ -108,9 +109,9 @@ export function StockForm({ onSaved, autofocusName = false }) {
 
   const save = () => {
     if (isKR && !sel) { setMsg("⚠️ 목록에서 종목을 선택하세요 (자유 입력은 저장할 수 없습니다)"); return; }
-    if (!(Number(shares) > 0)) { setMsg("⚠️ 수량을 입력하세요"); return; }
-    if (!(Number(price) > 0)) { setMsg("⚠️ 평단가(원)를 입력하세요"); return; }
-    if (priceWarn) { setMsg("⚠️ " + priceWarn); return; }
+    // [G4] 입력 합리성 검증 — 단일 소스(lib/validateAsset). 수량·평단·현재가 대비 이상치 차단.
+    const v = validateStockInput({ shares, price, closePrice: isKR ? sel?.close_price : null, ccy });
+    if (!v.ok) { setMsg("⚠️ " + v.error); return; }
     const tr = getTrader();
     const res = buyStock({
       name: isKR ? sel.name : name, code: isKR ? sel.ticker : code,
@@ -294,7 +295,10 @@ export function ReForm({ onSaved, initial = null, nameOptions = [], getAreaOptio
 
   const save = () => {
     const nm = String(name || "").trim();
-    if (!nm) { setMsg("단지명을 입력하세요"); return; }
+    // [G4] 입력 합리성 검증 — 매수가(억) 단위 오입력 방어(예: 15.2를 1520으로 입력 → 평가손익 오류).
+    const v = validateRealtyInput({ name: nm, buyUk, pyeong });
+    if (!v.ok) { setMsg(v.error); return; }
+    if (v.warn && typeof window !== "undefined" && !window.confirm(v.warn)) { setMsg(v.warn); return; }
     const obj = { name: nm, pyeong, dongfloor, buyUk, buyMonth };
     try { localStorage.setItem("onehub_re_my_property", JSON.stringify(obj)); localStorage.setItem("onehub_re_my", nm); } catch {}
     const uk = Number(buyUk) || 0;

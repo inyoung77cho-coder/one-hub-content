@@ -1287,7 +1287,7 @@ export default function PWADashboard({ latestReport }) {
                               </div>
                             );
                           })}
-                          <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 8 }}>주식=KIS 실시간 · ETF=평가액 · 부동산=AVM 추정. 미입력 자산군은 입력 시 반영됩니다.</div>
+                          <div style={{ fontSize: 11.5, color: 'var(--color-muted)', marginTop: 8 }}>주식=KIS 실시간 · ETF=평가액 · 부동산=AI 추정 시세. 미입력 자산군은 입력 시 반영됩니다.</div>
                         </div>
                       </div>
                     );
@@ -2157,12 +2157,12 @@ export default function PWADashboard({ latestReport }) {
                                       try {
                                         const res = await fetch('/api/pwa/sell', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: p.code, trader: trader }) });
                                         const d = await res.json();
-                                        alert(d.ok ? `${p.name} 매도 주문 완료` : `매도 실패: ${d.error}`);
+                                        alert(d.ok ? `${p.name} 매도 주문을 자동매매 엔진에 전송했습니다.` : `매도 실패: ${d.error}`);
                                       } catch(e) { alert('매도 요청 중 오류: ' + e.message); }
                                       setSellLoading(prev => { const n = { ...prev }; delete n[posKey]; return n; });
                                     }}
                                   >
-                                    {sellLoading[posKey] ? '처리 중...' : sellConfirm[posKey] ? '정말 매도?' : '매도'}
+                                    {sellLoading[posKey] ? '처리 중...' : sellConfirm[posKey] ? '⚠ 실제 매도주문 실행' : '매도'}
                                   </button>
                                 </div>
                               </div>
@@ -2203,7 +2203,8 @@ export default function PWADashboard({ latestReport }) {
                             <b className="mh-name">{h.name}{anomaly && <span className="mh-warn" title={`평단 ${Number(h.avgPrice).toLocaleString()}원이 현재가 ${Number(cp).toLocaleString()}원과 크게 차이납니다. 총매수금액을 평단에 넣었는지 확인 후 다시 입력하세요.`}>⚠ 데이터 확인 필요</span>}</b>
                             <span className="mh-meta">{h.broker} · {h.account} · {h.market === 'us' ? '🇺🇸 해외' : '🇰🇷 국내'}</span>
                           </div>
-                          <div className="mh-r">{h.shares}주 · 평단 {h.ccy === 'USD' ? '$' : ''}{Number(h.avgPrice).toLocaleString()}{h.ccy === 'KRW' ? '원' : ''}</div>
+                          {/* [B1] 국내(KRW) 평단은 원 단위 정수 표시(KIS 보유와 동일 규칙) — 소수점 노출 데이터 오류 방지. 정확값은 title. 해외(USD)는 소수 유지. */}
+                          <div className="mh-r" title={h.ccy === 'KRW' ? `정확 평단 ${Number(h.avgPrice).toLocaleString()}원` : undefined}>{h.shares}주 · 평단 {h.ccy === 'USD' ? '$' : ''}{h.ccy === 'KRW' ? Math.round(Number(h.avgPrice)).toLocaleString() : Number(h.avgPrice).toLocaleString()}{h.ccy === 'KRW' ? '원' : ''}</div>
                           <button className="mh-del" onClick={() => { removeStock({ id: h.id, trader }); setStManualTick(t => t + 1); }} aria-label={`${h.name} 삭제`}>✕</button>
                         </div>
                         );
@@ -3670,7 +3671,7 @@ export default function PWADashboard({ latestReport }) {
         .dec-dday { font-size: 0.62rem; font-weight: 800; color: var(--color-primary); margin-top: 4px; }
         .dec-feedback { position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%); z-index: 1200; display: flex; align-items: center; gap: 10px; max-width: 92vw; background: var(--color-ink, #1f2a37); color: #fff; padding: 11px 16px; border-radius: 12px; font-size: 0.76rem; font-weight: 600; box-shadow: 0 8px 30px rgba(0,0,0,.3); cursor: pointer; word-break: keep-all; line-height: 1.4; }
         .dec-feedback b { font-weight: 800; }
-        .dec-feedback .df-link { flex-shrink: 0; font-weight: 800; color: #7db3ff; }
+        .dec-feedback .df-link { flex-shrink: 0; font-weight: 800; color: var(--color-primary); }
         .rec-reason { font-size: 0.7rem; color: var(--text-secondary); margin-top: 3px; line-height: 1.4; word-break: keep-all; }
         .rec-row-r { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; }
         .rec-interest { font-size: 0.68rem; color: var(--text-secondary); }
