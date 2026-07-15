@@ -7,7 +7,7 @@ import QuickAddSheet from "./shared/QuickAddSheet";
 
 const TABS = [
   ["today", "🎯", "오늘", "/pwa/today"],
-  ["assets", "💼", "자산", "/pwa?tab=dashboard"],
+  ["assets", "💼", "자산", "/pwa/assets"],
   ["ai", "🛡️", "AI", "/pwa?tab=report"],
   ["settings", "⚙️", "설정", "/pwa/settings"],
 ];
