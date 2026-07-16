@@ -1689,8 +1689,8 @@ export default function PWADashboard({ latestReport }) {
                             <button className="buy-now-btn" onClick={(e) => { e.stopPropagation(); setBuyNotice({ name: s.name, code: s.code }); }}>매수하기 →</button>
                             {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (<>
                               <div className="dec-mini" onClick={(e) => e.stopPropagation()}>
-                                <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>샀다고 기록</button>
-                                <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망으로 기록</button>
+                                <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>샀어요</button>
+                                <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망</button>
                               </div>
                               {dec && <div className="dec-dday">🏁 승부 진행 중 · D-3</div>}
                             </>); })()}
@@ -1719,8 +1719,8 @@ export default function PWADashboard({ latestReport }) {
                                   {/* [나 vs AI] 내 판단 기록 */}
                                   {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (
                                     <div className="dec-mini">
-                                      <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>샀다고 기록</button>
-                                      <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망으로 기록</button>
+                                      <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>샀어요</button>
+                                      <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망</button>
                                     </div>
                                   ); })()}
                                 </div>
@@ -3666,17 +3666,48 @@ export default function PWADashboard({ latestReport }) {
         .vs-teaser b { font-weight: 800; }
         /* [S-6] 바로 매수(Primary) + 자동 관망 알림 */
         .buy-now-btn { width: 100%; margin-top: 4px; border: none; border-radius: 9px; padding: 8px 0; font-size: 0.74rem; font-weight: 800; background: var(--color-primary); color: #fff; cursor: pointer; font-family: var(--font-body); }
-        /* [M4] 좁은 화면(≤430px) 추천 3-up 카드 밀도 조정 — 오버플로 방지 */
+        /* ───────── [S11-M4] 추천 Top3 · 모바일 1열 가로형(A안) ─────────
+           115px 3열은 폭 부족(필요 225px) → 모바일은 카드당 전폭 1열, 번호-내용 가로 배치.
+           데스크톱(≥431px)은 기존 3열 유지. WO의 area 겹침(verdict·buy 중복)은 각 요소
+           고유 area로 교정 — tie/dday는 조건부라 미표시 시 행 자동 붕괴. */
         @media (max-width: 430px) {
-          .top3-hero-row { gap: 6px; }
-          .top3-hero-card { padding: 10px 4px; gap: 3px; }
-          .top3-name { font-size: 0.72rem; }
-          .top3-ai-pct { font-size: 0.64rem; }
-          .top3-ai-pct .tap-est { font-size: 0.56rem; }
-          .top3-reason { font-size: 0.6rem; }
-          .buy-now-btn { font-size: 0.68rem; padding: 7px 0; }
-          .dec-b { font-size: 0.58rem; padding: 5px 2px; }
-          .top3-why-btn { font-size: 0.58rem; padding: 3px 6px; }
+          .top3-hero-row { grid-template-columns: 1fr; gap: 10px; }
+          .top3-hero-card {
+            display: grid;
+            grid-template-columns: 26px minmax(0, 1fr) auto;
+            grid-template-areas:
+              "num  name    verdict"
+              "num  reason  reason"
+              "num  pct     why"
+              "num  tie     tie"
+              "num  dec     dec"
+              "num  buy     buy"
+              "num  dday    dday";
+            align-items: center;
+            text-align: left;
+            gap: 6px 8px;
+            padding: 12px 14px;
+          }
+          .top3-medal       { grid-area: num;     font-size: 1rem; font-weight: 800; color: var(--text-tertiary); align-self: start; padding-top: 2px; }
+          .top3-name        { grid-area: name;    text-align: left; font-size: 0.9rem; width: auto; }
+          .ai-verdict-badge { grid-area: verdict; align-self: center; justify-self: end; font-size: 0.66rem; padding: 4px 8px; white-space: nowrap; }
+          .top3-reason      { grid-area: reason;  justify-content: flex-start; text-align: left; min-height: 0; width: auto; }
+          .top3-ai-pct      { grid-area: pct;     text-align: left; font-size: 0.84rem; width: auto; }
+          .tie-note         { grid-area: tie;     text-align: left; }
+          .top3-why-btn     { grid-area: why;     justify-self: end; align-self: center; }
+          .dec-mini         { grid-area: dec;     margin-top: 2px; }
+          .buy-now-btn      { grid-area: buy; }
+          .dec-dday         { grid-area: dday;    justify-self: start; text-align: left; }
+          .vs-teaser        { display: none; }
+          /* 44pt 터치 타깃(G9) */
+          .dec-b        { min-height: 44px; font-size: 0.8rem; padding: 8px 6px; }
+          .buy-now-btn  { min-height: 44px; }
+          .top3-why-btn { min-height: 44px; display: inline-flex; align-items: center; }
+        }
+        /* 아주 좁은 화면(≤360px) — 결정 버튼 세로 스택 */
+        @media (max-width: 360px) {
+          .dec-mini { flex-direction: column; }
+          .dec-b    { width: 100%; }
         }
         .auto-watch-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4; word-break: keep-all; }
         .auto-watch-note b { color: var(--color-ink); font-weight: 800; }
