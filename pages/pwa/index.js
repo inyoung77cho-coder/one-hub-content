@@ -1680,7 +1680,7 @@ export default function PWADashboard({ latestReport }) {
                             {/* [S-8] 근거 한 줄 */}
                             <div className="top3-reason">{m.reason}</div>
                             {/* [S-4] 관심도·기대수익(소수1자리) + 동점 2차근거 */}
-                            <div className="top3-ai-pct mono">관심도 {sc} · 기대 +{m.upside.toFixed(1)}%</div>
+                            <div className="top3-ai-pct mono"><span>관심도 {sc}</span><span className="tap-est">기대 +{m.upside.toFixed(1)}%</span></div>
                             {tieNote(s) && <div className="tie-note">↳ {tieNote(s)}</div>}
                             <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>판단근거 ›</button>
                             {/* [S-8] 나 vs AI 예고 */}
@@ -3612,13 +3612,15 @@ export default function PWADashboard({ latestReport }) {
         .top3-medal { font-size: 1.4rem; line-height: 1; }
         .top3-name { font-size: 0.8rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; width: 100%; min-width: 0; display: block; }
         .top3-stars { font-size: 0.7rem; letter-spacing: -1px; color: var(--color-warning); }
-        .top3-ai-pct { font-size: 0.78rem; font-weight: 800; color: var(--color-primary); }
+        /* [M5] 관심도·기대를 세로 스택 → 좁은 카드(~103px) 가로 오버플로/불규칙 줄바꿈 제거 */
+        .top3-ai-pct { display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 0.72rem; font-weight: 800; color: var(--color-primary); line-height: 1.25; }
+        .top3-ai-pct .tap-est { font-size: 0.62rem; font-weight: 700; color: var(--color-success); }
         .top3-why-btn { font-size: 0.62rem; padding: 3px 8px; border-radius: 6px; background: var(--inset-bg); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; margin-top: 2px; }
         /* [§3-3] 추천 카드 인라인 근거·스탠스·기대여력 */
         /* [나 vs AI] 추천 카드 판단 버튼 */
         .dec-mini { display: flex; gap: 4px; margin-top: 6px; width: 100%; }
         .dec-mini.lg { gap: 8px; }
-        .dec-b { flex: 1; font-size: 0.64rem; font-weight: 700; padding: 5px 4px; border-radius: 7px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; transition: background .12s, color .12s, border-color .12s; }
+        .dec-b { flex: 1 1 0; min-width: 0; font-size: 0.64rem; font-weight: 700; padding: 5px 4px; border-radius: 7px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .12s, color .12s, border-color .12s; }
         .dec-mini.lg .dec-b { font-size: 0.8rem; padding: 9px 6px; border-radius: 9px; }
         .dec-b.take.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
         .dec-b.pass.on { background: var(--color-ink-2, var(--text-secondary)); color: #fff; border-color: var(--color-ink-2, var(--text-secondary)); }
@@ -3638,8 +3640,8 @@ export default function PWADashboard({ latestReport }) {
         .sig-dot.na { background: var(--color-card-soft); color: var(--color-ink-3); opacity: 0.5; }
         .rec-def b { color: var(--text-primary); font-weight: 700; }
         .top3-stance { font-size: 0.6rem; font-weight: 800; padding: 1px 7px; border-radius: 20px; border: 1px solid; line-height: 1.5; }
-        .top3-reason { font-size: 0.64rem; color: var(--text-secondary); line-height: 1.35; word-break: keep-all; min-height: 2.4em; display: flex; align-items: center; }
-        .top3-upside { font-size: 0.66rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
+        .top3-reason { font-size: 0.64rem; color: var(--text-secondary); line-height: 1.35; word-break: keep-all; min-height: 2.4em; display: flex; align-items: center; justify-content: center; text-align: center; }
+        .top3-upside { font-size: 0.66rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; gap: 4px; }
         .top3-upside b { color: var(--color-success); font-weight: 800; }
         .top3-upside .est { font-size: 0.54rem; color: var(--text-tertiary); border: 1px solid var(--border); border-radius: 4px; padding: 0 3px; }
         /* [간결화] 기대수익 강조(카드 값 축) */
@@ -3665,6 +3667,18 @@ export default function PWADashboard({ latestReport }) {
         .vs-teaser b { font-weight: 800; }
         /* [S-6] 바로 매수(Primary) + 자동 관망 알림 */
         .buy-now-btn { width: 100%; margin-top: 4px; border: none; border-radius: 9px; padding: 8px 0; font-size: 0.74rem; font-weight: 800; background: var(--color-primary); color: #fff; cursor: pointer; font-family: var(--font-body); }
+        /* [M4] 좁은 화면(≤430px) 추천 3-up 카드 밀도 조정 — 오버플로 방지 */
+        @media (max-width: 430px) {
+          .top3-hero-row { gap: 6px; }
+          .top3-hero-card { padding: 10px 4px; gap: 3px; }
+          .top3-name { font-size: 0.72rem; }
+          .top3-ai-pct { font-size: 0.64rem; }
+          .top3-ai-pct .tap-est { font-size: 0.56rem; }
+          .top3-reason { font-size: 0.6rem; }
+          .buy-now-btn { font-size: 0.68rem; padding: 7px 0; }
+          .dec-b { font-size: 0.58rem; padding: 5px 2px; }
+          .top3-why-btn { font-size: 0.58rem; padding: 3px 6px; }
+        }
         .auto-watch-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4; word-break: keep-all; }
         .auto-watch-note b { color: var(--color-ink); font-weight: 800; }
         .auto-watch-note button { flex-shrink: 0; font-family: var(--font-body); font-size: 0.7rem; font-weight: 700; color: var(--color-primary); background: none; border: none; cursor: pointer; }
