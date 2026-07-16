@@ -159,6 +159,20 @@ export default function AssetsMapPage() {
           <button className="as-add" onClick={() => setQaOpen(true)}>＋ 자산 추가·수정</button>
         </section>
 
+        {/* [A4] 쏠림 진단 — 충격 숫자(쏠림)에 원인+다음 수를 같은 카드에. 중립색(빨강 금지). */}
+        {domPct >= 55 && dominant && (
+          <section className="card as-a4">
+            <div className="as-h">시장 대비 · 왜 이런가</div>
+            <div className="as-a4-num">자산의 <b>{Math.round(domPct)}%</b>가 {dominant.label.replace(/^[^\s]+\s/, "")}입니다</div>
+            <p className="as-a4-why">한 자산군에 크게 쏠려 있으면 시장이 오르내릴 때 내 자산은 상대적으로 <b>덜 따라갑니다</b> — 손실이 아니라 ‘덜 오름’일 수 있어요.</p>
+            <p className="as-a4-next">다음 수: 분산하면 시장 흐름에 더 가깝게 움직일 여지가 있습니다 <span className="as-est">가정·추정</span>.</p>
+            <div className="as-a4-cta">
+              <button onClick={() => router.push("/pwa/etf")}>ETF 리밸런싱 →</button>
+              <button onClick={() => router.push("/pwa/realestate")}>부동산 살펴보기 →</button>
+            </div>
+          </section>
+        )}
+
         {/* ── 3층: 상세(기본 닫힘) ── */}
         <section className="card as-acc">
           {acc3.map((a) => (
@@ -228,6 +242,15 @@ export default function AssetsMapPage() {
         .as-caret { color: var(--color-ink-3); font-size: 0.8rem; width: 14px; text-align: center; }
         .as-accbody { padding: 0 0 12px; }
         .as-acclink { border: none; background: none; color: var(--color-primary); font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); padding: 4px 0; }
+        /* [A4] 쏠림 진단 — 중립 톤(빨강 없음) */
+        .as-a4 { border-left: 4px solid var(--color-ink-3); }
+        .as-a4-num { font-size: 1rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
+        .as-a4-num b { color: var(--color-ink); }
+        .as-a4-why, .as-a4-next { font-size: 0.82rem; line-height: 1.55; color: var(--color-ink-2); margin: 0 0 8px; word-break: keep-all; }
+        .as-a4-why b { color: var(--color-ink); font-weight: 700; }
+        .as-est { font-size: 0.68rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 5px; padding: 1px 6px; }
+        .as-a4-cta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+        .as-a4-cta button { flex: 1 1 0; min-width: 0; min-height: 40px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-primary); border-radius: 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .as-note { font-size: 0.7rem; color: var(--color-ink-3); text-align: center; margin-top: 6px; line-height: 1.5; word-break: keep-all; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
