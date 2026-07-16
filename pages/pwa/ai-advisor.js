@@ -151,7 +151,7 @@ export default function AIAdvisor() {
 
       {/* HERO — §3-2 AI 유동자산 배분 건강도 (부동산 제외). 점수 정의·스코프 상시 노출 */}
       <section className="hero">
-        <div className="hero-top"><span className="t">🩺 AI 유동자산 배분 건강도</span><span className="live">LIVE</span></div>
+        <div className="hero-top"><span className="t">🩺 AI 유동자산 배분 건강도</span></div>
         <div className="hero-cap">부동산(실물) 제외 · 유동자산 <span className="num">{s ? toManwon(s.liquid) : "—"}</span> 만원 기준 · 내 배분이 건강한지 진단합니다</div>
         {measured ? (
           <>

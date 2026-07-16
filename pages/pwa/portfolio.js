@@ -74,7 +74,7 @@ export default function Portfolio() {
   return (
     <div className="pf">
       <TopNav active="ai" />
-      <div className="pf-title"><h1>통합 자산</h1><span className="live">LIVE</span></div>
+      <div className="pf-title"><h1>통합 자산</h1></div>
 
       {err && <div className="err">일부 데이터 로드 오류: {err}</div>}
       {stock == null && etf == null && !err && <div className="loading">불러오는 중…</div>}

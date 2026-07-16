@@ -1114,7 +1114,6 @@ export default function PWADashboard({ latestReport }) {
                     <div className="hh-eyebrow">
                       <div className="hh-eyebrow-top">
                         <span className="hh-label">🧭 오늘의 통합 AI 판단</span>
-                        <span className="hh-live">LIVE</span>
                       </div>
                       <span className="hh-scope">주식 · ETF · 부동산 · 현금 통합</span>
                     </div>
@@ -1519,7 +1518,6 @@ export default function PWADashboard({ latestReport }) {
             <section className="rec-hero">
               <div className="rec-hero-top">
                 <span className="rec-hero-title">🔍 추천 관심종목</span>
-                <span className="rec-hero-live">LIVE</span>
               </div>
               <div className="rec-hero-upd"><LastUpdated timestamp={data?.ok ? new Date() : null} staleAfterSeconds={180} /></div>
               <p className="rec-hero-desc">AI 매수 선별 전 기술 스코어링 상위 후보입니다. 실제 매수 신호와는 별개입니다.</p>

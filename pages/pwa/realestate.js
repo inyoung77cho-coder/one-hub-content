@@ -196,7 +196,6 @@ export default function RealEstateDashboard() {
       <section className="hero">
         <div className="eyebrow">
           <span className="lbl">🏢 시장 브리핑{brief?.region ? ` · ${brief.region}` : ""}</span>
-          <span className="live">LIVE</span>
         </div>
         {brief && !brief.error ? (
           <>
