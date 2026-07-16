@@ -35,7 +35,7 @@ export default function MissionD() {
           <div className="left">
             <div className="name">{c.complex}</div>
             <div className="meta">
-              {c.avm_ready ? <>AVM {c.avm_uk}억{c.diff_pct != null && <span style={{ color: c.diff_pct < 0 ? "#16a34a" : "#dc2626" }}> · 괴리 {c.diff_pct > 0 ? "+" : ""}{c.diff_pct}%</span>}</>
+              {c.avm_ready ? <>AI 추정 시세 {c.avm_uk}억{c.diff_pct != null && <span style={{ color: c.diff_pct < 0 ? "var(--color-success)" : "var(--color-danger)" }}> · 괴리 {c.diff_pct > 0 ? "+" : ""}{c.diff_pct}%</span>}</>
                 : <span className="muted">AI 적정가 준비 중</span>}
             </div>
           </div>

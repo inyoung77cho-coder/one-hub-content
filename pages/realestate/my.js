@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 
 const ALERT_LABELS = {
-  flash_deal: "급매 알림 (AVM 대비 -5%)",
+  flash_deal: "급매 알림 (AI 추정 시세 대비 -5%)",
   gap_target: "Gap 목표 도달 알림",
   new_listing: "관심 단지 신규 거래",
   weekly_report: "주간 리포트 (금 18:00)",
