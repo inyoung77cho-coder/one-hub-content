@@ -1,31 +1,27 @@
-// [G3/H1] 트레이더 A/B 계정 스위처 — 헤더에 상시 노출.
-//   전 페이지가 같은 계정을 바라보도록 전역 단일 소스(lib/trader useTrader)를 사용한다.
-//   기존엔 설정 화면 깊숙이 숨어 있어(피드백 S4/H1) '지금 어느 계정인지'가 불명확했다.
+// [T1] 트레이더 A/B 표시 — 사용자 결정: A(기본)는 최소 표시, B일 때만 눈에 띄는 배지.
+//   기본 계정(A)에선 헤더를 어지럽히지 않고, 지인 계정(B)일 때만 '지금 B다'를 분명히 알린다.
+//   탭하면 전역 단일 소스(lib/trader)로 토글 → 전 페이지 즉시 반영(설정 토글과 양방향 동기).
 import { useTrader } from "../../lib/trader";
 
 export default function TraderSwitcher() {
   const [trader, choose] = useTrader();
+  const isB = trader === "B";
   return (
-    <div className="tsw" role="group" aria-label="트레이더 계정 선택">
-      <span className="tsw-k" aria-hidden="true">계정</span>
-      {["A", "B"].map((t) => (
-        <button
-          key={t}
-          type="button"
-          className={`tsw-b ${trader === t ? "on" : ""}`}
-          aria-pressed={trader === t}
-          aria-label={`트레이더 ${t}${trader === t ? " (선택됨)" : ""}`}
-          onClick={() => choose(t)}
-        >
-          {t}
-        </button>
-      ))}
+    <button
+      type="button"
+      className={`tsw ${isB ? "b" : "a"}`}
+      onClick={() => choose(isB ? "A" : "B")}
+      aria-label={`트레이더 ${trader} 계정 · 탭하면 ${isB ? "A" : "B"}로 전환`}
+      title={`트레이더 ${trader} · 탭하면 전환`}
+    >
+      {isB ? "트레이더 B" : "A"}
       <style jsx>{`
-        .tsw { display: inline-flex; align-items: center; gap: 2px; background: var(--color-card-soft, var(--inset-bg)); border-radius: 9px; padding: 2px; box-shadow: var(--shadow-card); }
-        .tsw-k { font-size: 9px; font-weight: 700; color: var(--color-ink-3); padding: 0 4px 0 5px; letter-spacing: -.2px; }
-        .tsw-b { min-width: 28px; height: 30px; border: none; background: none; border-radius: 7px; font-family: var(--font-sans, inherit); font-size: 13px; font-weight: 800; color: var(--color-ink-3); cursor: pointer; line-height: 1; transition: background .12s, color .12s; }
-        .tsw-b.on { background: var(--color-primary); color: #fff; }
+        .tsw { display: inline-flex; align-items: center; justify-content: center; height: 30px; border-radius: 8px; cursor: pointer; font-family: var(--font-sans, inherit); font-weight: 800; line-height: 1; transition: background .12s, color .12s, border-color .12s; }
+        /* A(기본): 최소 — 작은 회색 아웃라인 'A' */
+        .tsw.a { min-width: 30px; padding: 0 8px; font-size: 12px; background: none; border: 1px solid var(--color-line); color: var(--color-ink-3); }
+        /* B: 눈에 띄는 배지 — 경고색 채움 '트레이더 B' */
+        .tsw.b { padding: 0 12px; font-size: 12px; background: var(--color-warning, #f59e0b); border: 1px solid var(--color-warning, #f59e0b); color: #000; }
       `}</style>
-    </div>
+    </button>
   );
 }
