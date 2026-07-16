@@ -573,7 +573,7 @@ export default function RealEstateDashboard() {
               );
             });
           })()}
-          <div className="note">업데이트 {rank.ranking[0]?.updated} · <Term term="AI 추정 시세">AI 추정 시세</Term>=실거래·회귀 기반 자동 추정 · <b><Term term="시차">시차 없음(동시 반영)</Term> 상대가치 기준(확정 아님)</b>. ONE Score는 구성요소 종합이며 블랙박스가 아닙니다.</div>
+          <div className="note">⟳ {rank.ranking[0]?.updated} 기준 · <Term term="AI 추정 시세">AI 추정 시세</Term>는 실거래·흐름으로 자동 추정한 <b>참고값</b>(확정 아님)입니다. <Term term="ONE Score">단지 종합점수</Term>는 구성요소를 펼쳐 볼 수 있어요.</div>
         </section>
       )}
 
@@ -661,7 +661,7 @@ export default function RealEstateDashboard() {
               </div>
             );
           })()}
-          <div className="note">{mac.kospi_src || "연말 종가 보간(근사·월별 정밀치 아님)."}</div>
+          <div className="note">{mac.kospi_src || "연말 종가 기준입니다(월별 정밀치는 아니에요)."}</div>
         </section>
       )}
 

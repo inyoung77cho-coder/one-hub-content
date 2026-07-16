@@ -410,7 +410,7 @@ export default function EtfDashboard() {
         <div className="etf-verdict">
           <div className="ev-lead">
             <span className="ev-lbl">📌 이 포트폴리오의 결론</span>
-            <span className={`ev-metric ${sign(s.total_pnl_pct)}`}>환율 반영 수익 {pct(s.total_pnl_pct)}</span>
+            <span className={`ev-metric ${sign(s.total_pnl_pct)}`}>환율 반영 수익 {pct(s.total_pnl_pct)} <span className="ev-period">(누적)</span></span>
           </div>
           <div className="ev-decomp">ETF <b>{pct(s.etf_self_pct)}</b> + 환 <b>{pct(s.fx_pure_pct)}</b> + 교차 <b>{pct(s.cross_pct)}</b></div>
           {topRisk && <div className="ev-risk">⚠️ 핵심 리스크 · {topRisk}</div>}
