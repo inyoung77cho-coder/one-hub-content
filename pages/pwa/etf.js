@@ -48,6 +48,7 @@ export default function EtfDashboard() {
   const [nowTick, setNowTick] = useState(0);      // [실시간] 상대시간 표시용 1초 틱
   const [refreshing, setRefreshing] = useState(false); // [실시간] 수동 새로고침 진행중
   const [acctFilter, setAcctFilter] = useState("전체"); // [S4] 계좌 유형 필터([전체][일반][연금][ISA])
+  const [detailOpen, setDetailOpen] = useState(false); // [D4] 종목별 수익 분해 접기(페이지 길이 축약)
   const [fcOpen, setFcOpen] = useState(false); // [S7.4] 예측 섹션 기본 접기
   const [pensionContrib, setPensionContrib] = useState(""); // [S4] 올해 연금 납입액(원, 세액공제 진행률)
   const [targetAlloc, setTargetAlloc] = useState(null); // [E-4] 목표 배분(onehub_target_alloc)
@@ -711,7 +712,12 @@ export default function EtfDashboard() {
       {/* 5) 종목별 수익 분해 — 총투자액/총이익금 SummaryBar + 3열 정렬(시안) */}
       {positions.length > 0 && (
         <section className="card">
-          <div className="label">종목별 수익 분해</div>
+          {/* [D4] 상세는 기본 접힘 — 페이지 길이 축약(A1 동일 원칙) */}
+          <button className="etf-acc-h" onClick={() => setDetailOpen((o) => !o)} aria-expanded={detailOpen}>
+            <span className="label" style={{ margin: 0 }}>종목별 수익 분해 <span className="sub">{positions.length}종목</span></span>
+            <span className="etf-caret">{detailOpen ? "▾" : "▸"}</span>
+          </button>
+          {detailOpen && (<>
           {s && (
             <div className="ebd-sum">
               <div className="es-item"><span className="es-k">총 투자액</span><span className="es-v">{won(s.krw_cost)}</span></div>
@@ -766,6 +772,7 @@ export default function EtfDashboard() {
             );
           })}
           <div className="ebd-note">왼쪽은 투자액, 가운데는 자체수익(달러)·환차손익, 오른쪽은 원화 실질수익률과 이익금입니다. 수량을 입력하면 실측 종가로 <b>실시간 평가액</b>이 계산됩니다.</div>
+          </>)}
         </section>
       )}
 
@@ -853,6 +860,9 @@ export default function EtfDashboard() {
 
       <style jsx>{`
         .etf { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 84px); font-family: var(--font-sans); color: var(--color-ink); }
+        /* [D4] 접기 헤더 — 라벨 전체가 44px 타깃 */
+        .etf-acc-h { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); text-align: left; }
+        .etf-caret { color: var(--color-ink-3); font-size: 0.9rem; flex-shrink: 0; }
         .err { background: var(--color-danger-soft); color: var(--color-danger); padding: 10px 12px; border-radius: 10px; font-size: 0.82rem; margin-bottom: 12px; }
         .loading { color: var(--color-ink-2); padding: 24px; text-align: center; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow-card); }
