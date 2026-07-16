@@ -1468,7 +1468,7 @@ export default function PWADashboard({ latestReport }) {
               {/* [T-3 Tier 2] ⑥ 보유 종목 */}
               <HomeAccordion id="holdings" title="💼 보유 종목" summary={positions.length ? `${positions.length}건` : '없음'}>
                 {positions.length === 0
-                  ? <div className="pwa-empty">보유 종목 없음</div>
+                  ? <div className="pwa-empty">아직 보유 종목이 없어요 — 추가하면 여기에 표시됩니다</div>
                   : positions.slice(0, 5).map((p, i) => (
                     <div className="v10-hold-row" key={i}><span className="v10-hold-name">{p.name}</span><span className={`v10-hold-pct ${(p.pnl_rate ?? 0) >= 0 ? 'up' : 'down'}`}>{(p.pnl_rate ?? 0) >= 0 ? '+' : ''}{p.pnl_rate}%</span></div>
                   ))}
@@ -2031,7 +2031,7 @@ export default function PWADashboard({ latestReport }) {
               <section className="pwa-card">
                 <span className="pwa-card-label">보유 종목</span>
                 {positions.length === 0
-                  ? <div className="pwa-empty">보유 종목 없음</div>
+                  ? <div className="pwa-empty">아직 보유 종목이 없어요 — 추가하면 여기에 표시됩니다</div>
                   : (() => {
                     const _u = (q) => deriveUrgency(q);
                     const _sorted = holdSort === 'value' ? positions : [...positions].sort((a, b) => _u(a).rank - _u(b).rank);
@@ -2220,7 +2220,7 @@ export default function PWADashboard({ latestReport }) {
               <section className="pwa-card">
                 <span className="pwa-card-label">🤖 AI 판단 — 매수 차단 종목</span>
                 {(!data.today_blocked || data.today_blocked.length===0)
-                  ? <div className="pwa-empty">차단 종목 없음</div>
+                  ? <div className="pwa-empty">오늘은 막은 종목이 없어요 — 좋은 신호예요</div>
                   : (<>
                     <div className="blocked-list">{dedupBy(data.today_blocked, (b) => b.code || b.stock).slice(0,5).map((b,i) => (
                       <div key={i} className="blocked-card">
@@ -2589,12 +2589,12 @@ export default function PWADashboard({ latestReport }) {
                 const rr = perf.rr_ratio;
                 const rrColor = !cv ? 'var(--color-ink-2)' : rr == null ? 'var(--text-secondary)' : rr >= 1.5 ? 'var(--color-success)' : rr >= 1 ? 'var(--color-warning)' : 'var(--color-danger)';
                 // 극단값(손익비·MDD)은 학습 중이면 값을 접고 '표본 N건'으로 대체 — 단일 이상치 왜곡 방지.
-                const rrTile = pol.collapseExtremes ? { k: '손익비 (R:R)', v: '표본 부족', sub: `거래 ${nTrade}건`, c: 'var(--color-ink-3)' }
-                  : { k: '손익비 (R:R)', v: rr != null ? `${rr}` : '-', sub: '이익/손실', c: rrColor };
-                const mddTile = pol.collapseExtremes ? { k: 'MDD', v: '표본 부족', sub: `거래 ${nTrade}건`, c: 'var(--color-ink-3)' }
-                  : { k: 'MDD', v: perf.mdd != null ? `-${perf.mdd}%` : '-', sub: '최대낙폭', c: 'var(--color-danger)' };
+                const rrTile = pol.collapseExtremes ? { k: '손익비', v: `${nTrade}/30`, sub: '30건 모이면 공개', c: 'var(--color-ink-3)' }
+                  : { k: '손익비', v: rr != null ? `${rr}` : '-', sub: '이익/손실', c: rrColor };
+                const mddTile = pol.collapseExtremes ? { k: '최대 낙폭', v: `${nTrade}/30`, sub: '30건 모이면 공개', c: 'var(--color-ink-3)' }
+                  : { k: '최대 낙폭', v: perf.mdd != null ? `-${perf.mdd}%` : '-', sub: '고점 대비', c: 'var(--color-danger)' };
                 const tiles = [
-                  { k: '승률', v: perf.win_rate != null ? `${perf.win_rate}%` : '-', sub: `${perf.wins ?? 0}승 ${perf.losses ?? 0}패`, c: winColor },
+                  { k: '승률', v: pol.declareWinner ? (perf.win_rate != null ? `${perf.win_rate}%` : '-') : `${perf.wins ?? 0}승 ${perf.losses ?? 0}패`, sub: pol.declareWinner ? `${perf.wins ?? 0}승 ${perf.losses ?? 0}패` : '아직 판단 이르다', c: pol.declareWinner ? winColor : 'var(--color-ink-3)' },
                   { k: '차단 적중률', v: accPct != null ? `${accPct}%` : '수집중', sub: accChecked != null ? `검증 ${accChecked}건` : '누적 필요', c: accColor },
                   rrTile,
                   mddTile,
@@ -2641,7 +2641,7 @@ export default function PWADashboard({ latestReport }) {
               <section className="pwa-card">
                 <span className="pwa-card-label">{label} — {rdFull}</span>
                 {!isToday && daysAgo != null && daysAgo >= 1 && (
-                  <p className="sc-warn" style={{marginTop:6}}>⏳ 오늘({todayStr}) 리포트는 아직 생성 전입니다. 아래는 <b>{daysAgo}일 전</b> 생성분입니다.</p>
+                  <p className="sc-warn" style={{marginTop:6}}>오늘 리포트는 장 마감 후 나옵니다. 지금 보는 건 <b>{daysAgo}일 전</b> 리포트예요.</p>
                 )}
                 <p className="pwa-analyze-text" style={{marginTop:8}}>{latestReport.insight}</p>
                 <p className="dim mono" style={{fontSize:'0.7rem', marginTop:8}}>
@@ -2656,9 +2656,9 @@ export default function PWADashboard({ latestReport }) {
                 {perf.total < 5 ? (
                   <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-secondary)' }}>
                     <div style={{ fontSize: '1.5rem', marginBottom: 6 }}>📊</div>
-                    <div style={{ fontSize: '0.85rem' }}>데이터 수집 중</div>
+                    <div style={{ fontSize: '0.85rem' }}>5건째부터 공개합니다</div>
                     <div style={{ fontSize: '0.75rem', marginTop: 4, color: 'var(--text-muted)' }}>
-                      {perf.total}건 / 최소 5건 이상 거래 후 통계가 표시됩니다
+                      {perf.total}/5건 · 첫 승부를 시작하면 빨라져요
                     </div>
                   </div>
                 ) : (<>
