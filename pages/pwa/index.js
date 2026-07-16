@@ -751,7 +751,9 @@ export default function PWADashboard({ latestReport }) {
   const eventLabel = (t) => ({ BUY:'BUY', SELL:'SELL', BLOCK:'BLOCK', ANALYZE:'AI', HEAT_UPDATE:'HEAT', DAILY_SUMMARY:'SUM' }[t] || '-');
   const heatTier = (h) => h == null ? null : h >= 70 ? 'hot' : h >= 40 ? 'warm' : 'cold';
   const heatColor = (h) => { const t = heatTier(h); return t === 'hot' ? 'var(--accent-buy)' : t === 'warm' ? 'var(--accent-warn)' : 'var(--accent-sell)'; };
-  const heatLabel = (h) => { const t = heatTier(h); return t === 'hot' ? 'HOT' : t === 'warm' ? 'WARM' : 'COLD'; };
+  const heatLabel = (h) => { const t = heatTier(h); return t === 'hot' ? '과열' : t === 'warm' ? '따뜻' : '냉각'; };
+  // [S15-C1] 시장 국면(Regime) 한글 매핑 — 화면에 영문 코드 노출 금지
+  const rgKo = (r) => ({ BULL: '상승장', BEAR: '하락장', SIDE: '횡보', SIDEWAYS: '횡보', NEUTRAL: '중립' }[String(r || '').toUpperCase()] || r || '-');
   // [v9.0] 공포탐욕지수 등급 — alternative.me 표준 구간(0-24/25-44/45-55/56-74/75-100)
   const fgTier = (f) => f == null ? null : f >= 75 ? 'extreme_greed' : f >= 56 ? 'greed' : f >= 45 ? 'neutral' : f >= 25 ? 'fear' : 'extreme_fear';
   const fgColor = (f) => { const t = fgTier(f); return (t === 'extreme_greed' || t === 'greed') ? 'var(--accent-buy)' : t === 'neutral' ? 'var(--accent-warn)' : 'var(--accent-sell)'; };
@@ -1104,10 +1106,10 @@ export default function PWADashboard({ latestReport }) {
                   why = <>부동산 구조 리스크 <b>{riskGrade}</b>. 실물이라 즉시 조정은 어렵지만, 오늘 들어오는 <b>현금·매매 수익은 부동산 외 자산</b>(주식·ETF·현금)으로만 배분하세요. 신규 부동산 매입은 보류가 낫습니다.{buyCount === 0 ? ` 주식은 시장 온도 Heat ${heat ?? '-'}로 선별 관망 중입니다.` : ` 주식은 조건 충족 ${buyCount}종목에 매수 신호가 있습니다.`}</>;
                 } else if (rePct != null) {
                   concl = <>오늘은 <em>{stance}</em>. 자산 배분 균형은 <b>{riskGrade === '낮음' ? '양호' : '보통'}</b>합니다.</>;
-                  why = <>부동산 {rePct}%로 구조 리스크 <b>{riskGrade}</b>. 시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> · Regime <b>{regime || '-'}</b>. {buyCount > 0 ? `주식 ${buyCount}종목 매수 신호.` : `매수 조건 미달로 ${blockCount || 0}건을 걸렀습니다.`}</>;
+                  why = <>부동산 {rePct}%로 구조 리스크 <b>{riskGrade}</b>. 시장 온도 <b>{heat ?? '-'} ({heatLabel(heat) || '-'})</b> · 국면 <b>{rgKo(regime)}</b>. {buyCount > 0 ? `주식 ${buyCount}종목 매수 신호.` : `매수 조건 미달로 ${blockCount || 0}건을 걸렀습니다.`}</>;
                 } else {
                   concl = <>오늘은 <em>{stance}</em>. {buyCount > 0 ? `조건 충족 ${buyCount}종목 매수 신호.` : '매수 조건 미달, 선별 관망.'}</>;
-                  why = <>시장 온도 <b>Heat {heat ?? '-'} ({heatLabel(heat) || '-'})</b> · Regime <b>{regime || '-'}</b>. {blockCount > 0 ? `후보 ${blockCount}건은 기준 미달로 걸렀습니다. ` : ''}부동산·현금을 입력하면 자산 전체 기준 판단으로 넓혀집니다.</>;
+                  why = <>시장 온도 <b>{heat ?? '-'} ({heatLabel(heat) || '-'})</b> · 국면 <b>{rgKo(regime)}</b>. {blockCount > 0 ? `후보 ${blockCount}건은 기준 미달로 걸렀습니다. ` : ''}부동산·현금을 입력하면 자산 전체 기준 판단으로 넓혀집니다.</>;
                 }
                 return (
                   <section className="home-hero">
@@ -1141,7 +1143,7 @@ export default function PWADashboard({ latestReport }) {
                       <div className="hh-why-body">
                         <div className="hh-reason">{why}</div>
                         <div className="hh-foot">
-                          <span className="hh-chip">Regime <span className="v">{regime || '-'}</span></span>
+                          <span className="hh-chip">국면 <span className="v">{rgKo(regime)}</span></span>
                           <span className="hh-chip">Heat <span className="v">{heat ?? '-'}</span></span>
                           {fearGreed !== null && <span className="hh-chip">Fear&amp;Greed <span className="v">{fearGreed}</span></span>}
                           {rePct != null && <span className="hh-chip">부동산 <span className="v">{rePct}%</span></span>}
@@ -1480,7 +1482,7 @@ export default function PWADashboard({ latestReport }) {
               {/* [T-3 Tier 2] ⑦ 타임라인 — 오늘 AI 분석 흐름 */}
               <HomeAccordion id="timeline" title="🎬 오늘 AI 분석 흐름" summary={`매수 ${buyCount} · 차단 ${blockCount}`}>
                 <div className="v10-tl">
-                  <div className="v10-tl-item"><div className="v10-tl-time">분석 시작</div><div className="v10-tl-title">🔍 시장 분석</div><div className="v10-tl-desc">Regime {regime || '-'} · Heat {heat ?? '-'} · 공포탐욕 {fearGreed ?? '-'}</div></div>
+                  <div className="v10-tl-item"><div className="v10-tl-time">분석 시작</div><div className="v10-tl-title">시장 분석</div><div className="v10-tl-desc">국면 {rgKo(regime)} · 온도 {heat ?? '-'} · 공포탐욕 {fearGreed ?? '-'}</div></div>
                   <div className="v10-tl-item"><div className="v10-tl-time">스크리닝</div><div className="v10-tl-title">📊 종목 스크리닝</div><div className="v10-tl-desc">후보 {(data.screening_candidates || []).length}종목 선별</div></div>
                   <div className="v10-tl-item"><div className="v10-tl-time">최종 결정</div><div className="v10-tl-title">✅ 최종 결정</div><div className="v10-tl-desc">매수 {buyCount}건 · 차단 {blockCount}건 — 선별 실행</div></div>
                 </div>

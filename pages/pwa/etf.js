@@ -395,7 +395,7 @@ export default function EtfDashboard() {
                 <div className="drow"><span className="dk"><Term term="자체수익">ETF 자체수익 ($)</Term></span><span className={`dv ${sign(s.etf_self_pct)}`}>{pct(s.etf_self_pct)}</span></div>
                 <div className="drow"><span className="dk"><Term term="환차손익">환차손익</Term></span><span className={`dv ${sign(s.fx_pure_pct)}`}>{pct(s.fx_pure_pct)}</span></div>
                 <div className="drow"><span className="dk"><Term term="교차항">교차항</Term></span><span className={`dv ${sign(s.cross_pct)}`}>{pct(s.cross_pct)}</span></div>
-                <div className="drow total"><span className="dk">실질 원화수익</span><span className={`dv ${sign(s.total_pnl_pct)}`}>{pct(s.total_pnl_pct)}</span></div>
+                <div className="drow total"><span className="dk"><Term term="환율 반영 실제 수익">환율 반영 수익</Term></span><span className={`dv ${sign(s.total_pnl_pct)}`}>{pct(s.total_pnl_pct)}</span></div>
               </div>
               <div className="foot-note">달러 수익 {pct(s.etf_self_pct)} 위에 환율효과 {pct((s.fx_pure_pct || 0) + (s.cross_pct || 0))}가 더해진 원화 실질 수익입니다.</div>
             </>)}
@@ -410,7 +410,7 @@ export default function EtfDashboard() {
         <div className="etf-verdict">
           <div className="ev-lead">
             <span className="ev-lbl">📌 이 포트폴리오의 결론</span>
-            <span className={`ev-metric ${sign(s.total_pnl_pct)}`}>실질 원화수익 {pct(s.total_pnl_pct)}</span>
+            <span className={`ev-metric ${sign(s.total_pnl_pct)}`}>환율 반영 수익 {pct(s.total_pnl_pct)}</span>
           </div>
           <div className="ev-decomp">ETF <b>{pct(s.etf_self_pct)}</b> + 환 <b>{pct(s.fx_pure_pct)}</b> + 교차 <b>{pct(s.cross_pct)}</b></div>
           {topRisk && <div className="ev-risk">⚠️ 핵심 리스크 · {topRisk}</div>}
