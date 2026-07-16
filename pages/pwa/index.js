@@ -11,7 +11,7 @@ import { fetchLiveEtfKrw } from '../../lib/etfLive';
 import { dedupBy } from '../../lib/useDedup';
 import { samplePolicy, verdictColor as sampleVerdictColor, canAutoML, ML_MIN_SAMPLE } from '../../lib/sampleSize';
 import SampleSizeBadge from '../../components/SampleSizeBadge';
-import TraderSwitcher from '../../components/shared/TraderSwitcher';
+import TraderBadge from '../../components/shared/TraderBadge';
 import { getStockHoldings, removeStock } from '../../lib/stockHoldings';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
@@ -957,8 +957,8 @@ export default function PWADashboard({ latestReport }) {
             <span className="pwa-logo">ONE<span className="pwa-logo-dot">·</span>HUB</span>
           </button>
           <div className="pwa-header-actions">
-            {/* [G3/H1] 트레이더 A/B 계정 스위처 — 헤더 상시 노출(설정 깊이에 숨지 않음) */}
-            <TraderSwitcher />
+            {/* [T1] 트레이더 배지 — A는 미표시, B일 때만 헤더 배지 */}
+            <TraderBadge />
             {/* [S3] 빠른입력 — 어디서나 자산(주식/ETF/부동산/현금) 금액 빠르게 반영 */}
             <button
               className="pwa-quickadd-toggle"
