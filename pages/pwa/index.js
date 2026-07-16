@@ -9,6 +9,7 @@ import { recordDecision, matureLedger, computeShowdown, getTodayDecision, reconc
 import { fetchAssetsTotal } from '../../lib/assetsTotal';
 import { fetchLiveEtfKrw } from '../../lib/etfLive';
 import { dedupBy } from '../../lib/useDedup';
+import { useTabState } from '../../lib/pwa/useTabState';
 import { samplePolicy, verdictColor as sampleVerdictColor, canAutoML, ML_MIN_SAMPLE } from '../../lib/sampleSize';
 import SampleSizeBadge from '../../components/SampleSizeBadge';
 import TraderBadge from '../../components/shared/TraderBadge';
@@ -268,7 +269,8 @@ export default function PWADashboard({ latestReport }) {
   const [accuracy, setAccuracy] = useState(null); // [기록] AI 자기검증(차단 적중률) 누적 — ML 학습 현황 카드
   const [ledger, setLedger] = useState([]); // [나 vs AI] 내 판단(매매/관망) 원장 + 3·7일 성과
   const [decTick, setDecTick] = useState(0); // [나 vs AI] 추천 카드 판단 버튼 상태 리렌더 트리거
-  const [trustSec, setTrustSec] = useState('vs'); // [S2.2] AI 트러스트 3섹션 서브내비(vs/verify/archive)
+  // [S3/G2] AI 트러스트 3섹션 서브내비(vs/verify/archive)를 URL(?sec=)로 유지 — 뒤로가기·딥링크(F4) 지원
+  const [trustSec, setTrustSec] = useTabState('sec', ['vs', 'verify', 'archive'], 'vs');
   const [recSort, setRecSort] = useState('interest'); // [S7.2] 추천 정렬(interest/upside)
   const [holdSort, setHoldSort] = useState('urgency'); // [S-2] 보유 정렬(urgency/value)
   const [autoWatchNote, setAutoWatchNote] = useState([]); // [S-6] 추천해제→자동 관망 편입 알림
