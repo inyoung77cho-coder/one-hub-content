@@ -271,6 +271,11 @@ export default function RealEstateDashboard() {
         const buyUk = Number(myProp.buyUk || 0) || null;
         const pnl = curUk != null && buyUk != null ? curUk - buyUk : null;
         const pnlPct = pnl != null && buyUk ? (pnl / buyUk) * 100 : null;
+        // [E3/X4] 추정 신뢰도 — 내 평형의 실거래가 3건 미만이면 손익을 숨긴다(단지 AVM이 소형 평형에 끌려
+        //   대형 평형을 저평가 → '-37.8%' 같은 추정치로 겁주지 않기). 층·향·수리 미반영도 감안.
+        const myArea = (areaOptsFor(myProp.name) || []).find((a) => String(a.m2) === String(myProp?.pyeong));
+        const tradeN = myArea && myArea.n != null ? myArea.n : null;
+        const lowConf = tradeN == null || tradeN < 3;
         return (
           <section className="card myprop-card">
             <div className="mp-h">
@@ -298,14 +303,22 @@ export default function RealEstateDashboard() {
             {curUk != null ? (
               <div className="mp-pnl">
                 <div className="mp-now"><span><Term term="AI 추정 시세">현재 추정시세</Term></span><b>{uk(curUk)}</b></div>
-                <div className={`mp-diff ${pnl >= 0 ? "pos" : "neg"}`}>
-                  <span>평가손익<em>추정</em></span><b>{pnl >= 0 ? "+" : ""}{uk(pnl)}{pnlPct != null ? ` · ${pct(pnlPct)}` : ""}</b>
-                </div>
+                {lowConf ? (
+                  <div className="mp-diff hold">
+                    <span>평가손익</span><b>실거래가 더 쌓이면 알려드릴게요</b>
+                  </div>
+                ) : (
+                  <div className={`mp-diff ${pnl >= 0 ? "pos" : "neg"}`}>
+                    <span>평가손익<em>추정</em></span><b>{pnl >= 0 ? "+" : ""}{uk(pnl)}{pnlPct != null ? ` · ${pct(pnlPct)}` : ""}</b>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="mp-nomatch">랭킹에 없는 단지입니다 — 갭·스크리너는 목록 단지 기준으로 계산됩니다. (AI 추정 시세 매칭은 실거래 축적 시)</div>
             )}
-            <div className="mp-note">매수가·시점은 로컬에만 저장되며, 평가손익은 현재 <Term term="AI 추정 시세">AI 추정 시세</Term> 기준 <b>추정</b>(확정 아님)입니다.</div>
+            <div className="mp-note">{lowConf
+              ? <>내 평형은 최근 <b>실거래 {tradeN != null ? `${tradeN}건` : "부족"}</b>이라 손익 표시를 보류합니다 — 단지 <Term term="AI 추정 시세">AI 추정 시세</Term>가 거래 많은 평형에 끌려 대형 평형을 낮게 볼 수 있어서예요(확정 아님).</>
+              : <>매수가·시점은 로컬에만 저장되며, 평가손익은 현재 <Term term="AI 추정 시세">AI 추정 시세</Term> 기준 <b>추정</b>(확정 아님)입니다.</>}</div>
           </section>
         );
       })()}
@@ -777,6 +790,7 @@ export default function RealEstateDashboard() {
         .mp-now b, .mp-diff b { font-size: 1.05rem; font-weight: 800; }
         .mp-diff em { font-style: normal; font-size: 0.56rem; font-weight: 800; background: var(--color-warning-soft); color: var(--color-warning-ink); padding: 1px 5px; border-radius: 4px; margin-left: 5px; vertical-align: middle; }
         .mp-diff.pos b { color: var(--color-success); } .mp-diff.neg b { color: var(--color-danger); }
+        .mp-diff.hold b { font-size: 0.74rem; font-weight: 700; color: var(--color-ink-2); line-height: 1.4; word-break: keep-all; }
         .mp-nomatch { font-size: 0.72rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 10px; padding: 10px 12px; margin-top: 11px; line-height: 1.5; word-break: keep-all; }
         .mp-note { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 10px; line-height: 1.5; word-break: keep-all; }
         .mp-note b { color: var(--color-ink-2); font-weight: 700; }

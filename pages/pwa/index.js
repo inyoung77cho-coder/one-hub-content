@@ -11,7 +11,7 @@ import { fetchLiveEtfKrw } from '../../lib/etfLive';
 import { dedupBy } from '../../lib/useDedup';
 import { samplePolicy, verdictColor as sampleVerdictColor, canAutoML, ML_MIN_SAMPLE } from '../../lib/sampleSize';
 import SampleSizeBadge from '../../components/SampleSizeBadge';
-import TraderSwitcher from '../../components/shared/TraderSwitcher';
+import TraderBadge from '../../components/shared/TraderBadge';
 import BottomNav from '../../components/BottomNav';
 import { getStockHoldings, removeStock } from '../../lib/stockHoldings';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
@@ -958,8 +958,8 @@ export default function PWADashboard({ latestReport }) {
             <span className="pwa-logo">ONE<span className="pwa-logo-dot">·</span>HUB</span>
           </button>
           <div className="pwa-header-actions">
-            {/* [G3/H1] 트레이더 A/B 계정 스위처 — 헤더 상시 노출(설정 깊이에 숨지 않음) */}
-            <TraderSwitcher />
+            {/* [T1] 트레이더 배지 — A는 미표시, B일 때만 헤더 배지 */}
+            <TraderBadge />
             {/* [S3] 빠른입력 — 어디서나 자산(주식/ETF/부동산/현금) 금액 빠르게 반영 */}
             <button
               className="pwa-quickadd-toggle"
@@ -1690,8 +1690,8 @@ export default function PWADashboard({ latestReport }) {
                             <button className="buy-now-btn" onClick={(e) => { e.stopPropagation(); setBuyNotice({ name: s.name, code: s.code }); }}>매수하기 →</button>
                             {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (<>
                               <div className="dec-mini" onClick={(e) => e.stopPropagation()}>
-                                <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>샀다고 기록</button>
-                                <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망으로 기록</button>
+                                <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>샀어요</button>
+                                <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망</button>
                               </div>
                               {dec && <div className="dec-dday">🏁 승부 진행 중 · D-3</div>}
                             </>); })()}
@@ -1720,8 +1720,8 @@ export default function PWADashboard({ latestReport }) {
                                   {/* [나 vs AI] 내 판단 기록 */}
                                   {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (
                                     <div className="dec-mini">
-                                      <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>샀다고 기록</button>
-                                      <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망으로 기록</button>
+                                      <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>샀어요</button>
+                                      <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망</button>
                                     </div>
                                   ); })()}
                                 </div>
@@ -3615,13 +3615,14 @@ export default function PWADashboard({ latestReport }) {
         .top3-medal { font-size: 1.4rem; line-height: 1; }
         .top3-name { font-size: 0.8rem; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; width: 100%; min-width: 0; display: block; }
         .top3-stars { font-size: 0.7rem; letter-spacing: -1px; color: var(--color-warning); }
-        .top3-ai-pct { font-size: 0.78rem; font-weight: 800; color: var(--color-primary); }
+        /* [M5] 폭 대응 — 모바일 1열 가로형(@media 430px)에서 전폭 확보. 데스크톱은 중앙정렬 줄바꿈. */
+        .top3-ai-pct { font-size: 0.78rem; font-weight: 800; color: var(--color-primary); width: 100%; text-align: center; word-break: keep-all; line-height: 1.4; }
         .top3-why-btn { font-size: 0.62rem; padding: 3px 8px; border-radius: 6px; background: var(--inset-bg); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; margin-top: 2px; }
         /* [§3-3] 추천 카드 인라인 근거·스탠스·기대여력 */
         /* [나 vs AI] 추천 카드 판단 버튼 */
-        .dec-mini { display: flex; gap: 4px; margin-top: 6px; width: 100%; }
+        .dec-mini { display: flex; gap: 4px; margin-top: 6px; width: 100%; min-width: 0; }
         .dec-mini.lg { gap: 8px; }
-        .dec-b { flex: 1; font-size: 0.64rem; font-weight: 700; padding: 5px 4px; border-radius: 7px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; transition: background .12s, color .12s, border-color .12s; }
+        .dec-b { flex: 1 1 0; min-width: 0; font-size: 0.64rem; font-weight: 700; padding: 5px 4px; border-radius: 7px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .12s, color .12s, border-color .12s; }
         .dec-mini.lg .dec-b { font-size: 0.8rem; padding: 9px 6px; border-radius: 9px; }
         .dec-b.take.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
         .dec-b.pass.on { background: var(--color-ink-2, var(--text-secondary)); color: #fff; border-color: var(--color-ink-2, var(--text-secondary)); }
@@ -3641,8 +3642,8 @@ export default function PWADashboard({ latestReport }) {
         .sig-dot.na { background: var(--color-card-soft); color: var(--color-ink-3); opacity: 0.5; }
         .rec-def b { color: var(--text-primary); font-weight: 700; }
         .top3-stance { font-size: 0.6rem; font-weight: 800; padding: 1px 7px; border-radius: 20px; border: 1px solid; line-height: 1.5; }
-        .top3-reason { font-size: 0.64rem; color: var(--text-secondary); line-height: 1.35; word-break: keep-all; min-height: 2.4em; display: flex; align-items: center; }
-        .top3-upside { font-size: 0.66rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
+        .top3-reason { font-size: 0.64rem; color: var(--text-secondary); line-height: 1.35; word-break: keep-all; min-height: 2.4em; display: flex; align-items: center; justify-content: center; text-align: center; width: 100%; }
+        .top3-upside { font-size: 0.66rem; color: var(--text-secondary); display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%; }
         .top3-upside b { color: var(--color-success); font-weight: 800; }
         .top3-upside .est { font-size: 0.54rem; color: var(--text-tertiary); border: 1px solid var(--border); border-radius: 4px; padding: 0 3px; }
         /* [간결화] 기대수익 강조(카드 값 축) */
@@ -3668,6 +3669,49 @@ export default function PWADashboard({ latestReport }) {
         .vs-teaser b { font-weight: 800; }
         /* [S-6] 바로 매수(Primary) + 자동 관망 알림 */
         .buy-now-btn { width: 100%; margin-top: 4px; border: none; border-radius: 9px; padding: 8px 0; font-size: 0.74rem; font-weight: 800; background: var(--color-primary); color: #fff; cursor: pointer; font-family: var(--font-body); }
+        /* ───────── [S11-M4] 추천 Top3 · 모바일 1열 가로형(A안) ─────────
+           115px 3열은 폭 부족(필요 225px) → 모바일은 카드당 전폭 1열, 번호-내용 가로 배치.
+           데스크톱(≥431px)은 기존 3열 유지. WO의 area 겹침(verdict·buy 중복)은 각 요소
+           고유 area로 교정 — tie/dday는 조건부라 미표시 시 행 자동 붕괴. */
+        @media (max-width: 430px) {
+          .top3-hero-row { grid-template-columns: 1fr; gap: 10px; }
+          .top3-hero-card {
+            display: grid;
+            grid-template-columns: 26px minmax(0, 1fr) auto;
+            grid-template-areas:
+              "num  name    verdict"
+              "num  reason  reason"
+              "num  pct     why"
+              "num  tie     tie"
+              "num  dec     dec"
+              "num  buy     buy"
+              "num  dday    dday";
+            align-items: center;
+            text-align: left;
+            gap: 6px 8px;
+            padding: 12px 14px;
+          }
+          .top3-medal       { grid-area: num;     font-size: 1rem; font-weight: 800; color: var(--text-tertiary); align-self: start; padding-top: 2px; }
+          .top3-name        { grid-area: name;    text-align: left; font-size: 0.9rem; width: auto; }
+          .ai-verdict-badge { grid-area: verdict; align-self: center; justify-self: end; font-size: 0.66rem; padding: 4px 8px; white-space: nowrap; }
+          .top3-reason      { grid-area: reason;  justify-content: flex-start; text-align: left; min-height: 0; width: auto; }
+          .top3-ai-pct      { grid-area: pct;     text-align: left; font-size: 0.84rem; width: auto; }
+          .tie-note         { grid-area: tie;     text-align: left; }
+          .top3-why-btn     { grid-area: why;     justify-self: end; align-self: center; }
+          .dec-mini         { grid-area: dec;     margin-top: 2px; }
+          .buy-now-btn      { grid-area: buy; }
+          .dec-dday         { grid-area: dday;    justify-self: start; text-align: left; }
+          .vs-teaser        { display: none; }
+          /* 44pt 터치 타깃(G9) */
+          .dec-b        { min-height: 44px; font-size: 0.8rem; padding: 8px 6px; }
+          .buy-now-btn  { min-height: 44px; }
+          .top3-why-btn { min-height: 44px; display: inline-flex; align-items: center; }
+        }
+        /* 아주 좁은 화면(≤360px) — 결정 버튼 세로 스택 */
+        @media (max-width: 360px) {
+          .dec-mini { flex-direction: column; }
+          .dec-b    { width: 100%; }
+        }
         .auto-watch-note { display: flex; align-items: center; justify-content: space-between; gap: 8px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 10px; padding: 9px 12px; margin-bottom: 10px; font-size: 0.72rem; color: var(--text-secondary); line-height: 1.4; word-break: keep-all; }
         .auto-watch-note b { color: var(--color-ink); font-weight: 800; }
         .auto-watch-note button { flex-shrink: 0; font-family: var(--font-body); font-size: 0.7rem; font-weight: 700; color: var(--color-primary); background: none; border: none; cursor: pointer; }

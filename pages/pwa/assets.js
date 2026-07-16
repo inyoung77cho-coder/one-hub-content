@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import { getTrader, useTrader } from "../../lib/trader";
 import { fetchAssetsTotal } from "../../lib/assetsTotal";
-import TraderSwitcher from "../../components/shared/TraderSwitcher";
+import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
 import LastUpdated from "../../components/LastUpdated";
@@ -107,7 +107,7 @@ export default function AssetsMapPage() {
       <header className="as-hd">
         <button className="as-logo" onClick={() => router.push("/pwa/assets")} aria-label="종합자산">ONE<span className="as-dot">·</span>HUB</button>
         <div className="as-ic">
-          <TraderSwitcher />
+          <TraderBadge />
           <button className="as-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>
         </div>
       </header>

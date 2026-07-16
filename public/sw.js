@@ -1,6 +1,8 @@
-// public/sw.js — ONE-HUB v9.0 PWA Service Worker
+// public/sw.js — ONE-HUB PWA Service Worker
 
-const CACHE_VERSION = 'onehub-v25';
+// [V1] 배포마다 갱신 → 구 SW 강제 교체 트리거. 설정 화면에도 표기(사용자가 최신 여부 확인).
+const SW_VERSION = 'v10.0-20260717';
+const CACHE_VERSION = 'onehub-v26';
 const CACHE_NAME = CACHE_VERSION;
 const STATIC_ASSETS = ['/pwa', '/icons/icon-192.png', '/icons/icon-512.png'];
 

@@ -9,6 +9,7 @@ import TopNav from "../../components/TopNav";
 import BottomNav from "../../components/BottomNav";
 import { setTraderGlobal } from "../../lib/trader";
 import QuickAddSheet from "../../components/shared/QuickAddSheet";
+import { APP_VERSION, BUILD_STAMP } from "../../lib/version";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -194,13 +195,13 @@ export default function Settings() {
           <div className="card">
             <div className="k">계정</div>
             <div className="row">
-              <span className="l">트레이더 계좌</span>
+              <span className="l">지금 보는 계좌</span>
               <div className="tt">
                 <button className={trader === "A" ? "on" : ""} onClick={() => chooseTrader("A")}>A</button>
                 <button className={trader === "B" ? "on" : ""} onClick={() => chooseTrader("B")}>B</button>
               </div>
             </div>
-            <div className="hint">선택한 계좌가 자산·주문 화면의 기본 계좌로 사용됩니다.</div>
+            <div className="hint">화면의 모든 자산·주문이 선택한 계좌 기준으로 표시됩니다. B를 선택하면 상단에 표시가 나타납니다.</div>
           </div>
 
           {/* [S3.5] 온보딩 항목별 편집 — 전체 재입력 폐기, 항목마다 독립 수정(동일 빠른입력 폼 재사용) */}
@@ -231,6 +232,11 @@ export default function Settings() {
               <button className="tbtn" onClick={() => router.push("/pwa/onboarding")}>시작</button>
             </div>
             <div className="hint">어려운 용어는 용어사전에서 쉬운 말로 확인할 수 있어요. 화면 곳곳의 ⓘ도 같은 설명을 보여줍니다.</div>
+            {/* [V1] 빌드 스탬프 — 지금 보는 화면이 최신 배포인지 확인용 */}
+            <div className="row" style={{ marginTop: 8 }}>
+              <span className="l">버전</span>
+              <span className="l" style={{ color: "var(--color-ink-3)", fontVariantNumeric: "tabular-nums" }}>{APP_VERSION} · {BUILD_STAMP}</span>
+            </div>
           </div>
 
           {/* 연동 */}
