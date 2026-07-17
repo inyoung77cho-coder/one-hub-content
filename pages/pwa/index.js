@@ -305,9 +305,18 @@ export default function PWADashboard({ latestReport }) {
   useEffect(() => {
     if (!router.isReady) return;
     const { tab: tabParam, code, name } = router.query;
-    // [N2] 종합자산 지도는 /pwa/assets 하나로 통합 — 구 dashboard 탭으로 오는 경로는 전부 리다이렉트.
+    // [N2] 종합자산 지도는 /pwa/assets 하나로 통합 — 구 dashboard로 오는 경로를 전부 리다이렉트.
     //   지도가 2개면 총자산이 같아도 '어느 화면이 정답인지' 알 수 없어 신뢰가 무너진다.
     if (tabParam === 'dashboard') { router.replace('/pwa/assets'); return; }
+    // 탭 없이 /pwa 진입(PWA start_url)도 단일 지도로. 단, 온보딩 미완료자는 온보딩이 우선이라 제외.
+    if (!tabParam && !code) {
+      let onboarded = false;
+      try {
+        onboarded = !!window.localStorage.getItem('onehub_profile')
+          || window.localStorage.getItem('onehub_onboarded') === '1';
+      } catch (e) {}
+      if (onboarded) { router.replace('/pwa/assets'); return; }
+    }
     // [v10 UI] 딥링크(?tab=)로 진입 시 = 다른 페이지에서 넘어온 재방문 → 스플래시 건너뜀(버그#3)
     if (tabParam) { setTab(tabParam); setSplash(false); }
     if (code && name) {
@@ -342,11 +351,9 @@ export default function PWADashboard({ latestReport }) {
       // 프로필도 없고 온보딩도 안 했으면 최초 사용자 → 위저드 1회 진입(시안 onehub-onboarding)
       if (!saved && !onboarded && !router.query.tab && !router.query.code) {
         router.replace('/pwa/onboarding');
-      } else if (!router.query.tab && !router.query.code) {
-        // [N2] 온보딩을 마친 사용자가 탭 없이 /pwa로 들어오면 구 dashboard가 아니라
-        //   단일 종합자산 지도(/pwa/assets)로 보낸다. 구 dashboard는 더는 도달 경로가 없다.
-        router.replace('/pwa/assets');
       }
+      // [N2] 탭 없는 /pwa → 단일 지도 리다이렉트는 router.isReady 가 보장되는 쿼리 effect에서 처리한다.
+      //   이 effect는 마운트 1회라 router.query 가 아직 비어 있어(딥링크 ?tab=report 등을 오인) 여기서 하면 안 된다.
     } catch (e) { /* 무시 */ }
     // [v8.5] 최근 검색 종목 불러오기
     try {
