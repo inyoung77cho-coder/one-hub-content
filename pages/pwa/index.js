@@ -2308,7 +2308,7 @@ export default function PWADashboard({ latestReport }) {
                                 <span className="vs-dok">{d.correct ? '✓' : '✗'}</span>
                               </div>
                             ))}
-                            <p className="vs-foot">✓ = 판단 적중(산 게 오르거나 · 지나친 게 내림) · ✗ = 오판. AI 단독은 추천 전부를 매매했다고 가정합니다.</p>
+                            <p className="vs-foot">✓ = 판단 적중(산 게 오르거나 · 지나친 게 내림) · ✗ = 틀림. AI 단독은 추천 전부를 매매했다고 가정합니다.</p>
                           </div>
                         );
                       })()}
@@ -2453,7 +2453,7 @@ export default function PWADashboard({ latestReport }) {
                 fix: `${r.reason} 가중치 유지·강화`,
                 effect: `적중 ${r.accuracy_pct}% (${r.success}/${r.total}건) — 신뢰 신호로 채택`,
               }));
-              if (items.length === 0) items.push({ wrong: '아직 뚜렷한 오판 패턴이 잡히지 않음', fix: '가중치 변경 없이 관찰 유지', effect: '검증 데이터 축적 중' });
+              if (items.length === 0) items.push({ wrong: '아직 뚜렷하게 틀린 패턴이 잡히지 않음', fix: '가중치 변경 없이 관찰 유지', effect: '검증 데이터 축적 중' });
               const total = accuracy.summary?.total_checked ?? 0;
               // [A-5] 표본 50건 미만이면 자동 규칙조정 금지 — '조정했다'가 아니라 '관찰·검토 중'으로 표기.
               const mlOn = canAutoML(total);
@@ -2489,8 +2489,14 @@ export default function PWADashboard({ latestReport }) {
                 : pct >= 70 ? 'var(--color-success)' : pct >= 50 ? 'var(--color-warning)' : 'var(--color-danger)';
               const pctColor = pol.showVerdictColor ? rawPctColor : 'var(--color-ink-2)';
               const rColor = (p) => pol.showVerdictColor ? ((p ?? 0) >= 70 ? 'var(--color-success)' : (p ?? 0) >= 50 ? 'var(--color-warning)' : 'var(--color-danger)') : 'var(--color-ink-2)';
-              const topReasons = (accuracy.by_reason || []).filter(r => (r.total ?? 0) > 0)
+              // [N7] 소표본 게이트 — 5건 미만은 '행 자체를 숨긴다'. total>0 이면 통과시켜 정확도순으로
+              //   정렬하던 탓에 '100% (1/1건)'이 1위로 올라왔고, 같은 화면의 '표본 24건 — 단정하기 이릅니다'
+              //   경고와 정면으로 모순됐다(브랜드 자해). 5~29건은 '(참고)'로 표시.
+              const MIN_SHOW = 5;
+              const allReasons = (accuracy.by_reason || []).filter(r => (r.total ?? 0) > 0);
+              const topReasons = allReasons.filter(r => (r.total ?? 0) >= MIN_SHOW)
                 .sort((a, b) => (b.accuracy_pct ?? 0) - (a.accuracy_pct ?? 0)).slice(0, 3);
+              const hiddenReasons = allReasons.length - allReasons.filter(r => (r.total ?? 0) >= MIN_SHOW).length;
               const recent = (accuracy.recent || []).slice(0, 3);
               return (
                 <section className="pwa-card">
@@ -2509,15 +2515,24 @@ export default function PWADashboard({ latestReport }) {
                     <>
                       <div className="ml-bar"><div style={{ width: `${pct}%`, background: pctColor }} /></div>
                       <p className="ml-desc">AI는 매주 과거 판단을 <b>실제 주가 결과와 대조</b>해 스스로 채점합니다. 누적 <b>{s.total_blocked ?? 0}건</b>의 기록으로 사유별 정확도를 학습해 판단 로직을 지속 보정합니다.</p>
-                      {topReasons.length > 0 && (
+                      {(topReasons.length > 0 || hiddenReasons > 0) && (
                         <div className="ml-reasons">
-                          <div className="ml-reasons-h">🔬 근거별 학습 정확도 (ML이 신뢰하는 신호)</div>
-                          {topReasons.map((r, i) => (
-                            <div className="ml-reason" key={i}>
-                              <span className="ml-reason-t">{r.reason || '(미분류)'}</span>
-                              <span className="ml-reason-v" style={{ color: rColor(r.accuracy_pct) }}>{r.accuracy_pct ?? 0}%<em>{r.success}/{r.total}건</em></span>
-                            </div>
-                          ))}
+                          {/* [N7] 신뢰를 유도하는 수식어를 제목에서 제거 — 사실만 적는다. */}
+                          <div className="ml-reasons-h">근거별 정확도 <span className="ml-reasons-note">표본 {MIN_SHOW}건 이상만 표시</span></div>
+                          {topReasons.map((r, i) => {
+                            const ref = (r.total ?? 0) < 30; // 30건 미만은 참고 수준
+                            return (
+                              <div className="ml-reason" key={i}>
+                                <span className="ml-reason-t">{r.reason || '(미분류)'}</span>
+                                <span className="ml-reason-v" style={{ color: ref ? 'var(--text-secondary)' : rColor(r.accuracy_pct) }}>
+                                  {r.accuracy_pct ?? 0}%{ref && <em className="ml-ref">(참고)</em>}<em>{r.success}/{r.total}건</em>
+                                </span>
+                              </div>
+                            );
+                          })}
+                          {hiddenReasons > 0 && (
+                            <div className="ml-reason-hidden">표본 {MIN_SHOW}건 미만 · {hiddenReasons}개 신호는 아직 표시하지 않습니다</div>
+                          )}
                         </div>
                       )}
                       {recent.length > 0 && (
@@ -2531,12 +2546,12 @@ export default function PWADashboard({ latestReport }) {
                                 <div className="ml-rec-l"><span className="ml-rec-name">{r.stock}</span><span className="ml-rec-rsn">{(r.block_reason || '').split(' / ')[0]}</span></div>
                                 <div className="ml-rec-r">
                                   {r.price_change_pct != null && <span className="mono ml-rec-chg">{r.price_change_pct > 0 ? '+' : ''}{r.price_change_pct.toFixed(1)}%</span>}
-                                  <span className="ml-rec-badge" style={{ color: neu ? 'var(--text-secondary)' : ok ? 'var(--color-success)' : 'var(--color-danger)' }}>{neu ? '― 보류' : ok ? '✓ 적중' : '✗ 오판'}</span>
+                                  <span className="ml-rec-badge" style={{ color: neu ? 'var(--text-secondary)' : ok ? 'var(--color-success)' : 'var(--color-danger)' }}>{neu ? '― 보류' : ok ? '✓ 적중' : '✗ 틀림'}</span>
                                 </div>
                               </div>
                             );
                           })}
-                          <p className="ml-foot">적중=차단 후 하락 · 오판=차단 후 상승 · 보류=보합. 차단 3거래일 후 실제가로 자동 검증.</p>
+                          <p className="ml-foot">적중=차단 후 하락 · 틀림=차단 후 상승 · 보류=보합. 차단 3거래일 후 실제가로 자동 검증.</p>
                         </div>
                       )}
                     </>
@@ -4001,6 +4016,10 @@ export default function PWADashboard({ latestReport }) {
         .ml-desc b { color: var(--text-primary); font-weight: 700; }
         .ml-reasons { background: var(--inset-bg); border-radius: var(--radius-md); padding: 12px 13px; }
         .ml-reasons-h { font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 9px; }
+        /* [N7] 소표본 게이트 표기 */
+        .ml-reasons-note { font-weight: 600; color: var(--text-tertiary); margin-left: 6px; }
+        .ml-ref { font-style: normal; font-weight: 700; color: var(--text-tertiary); margin-left: 4px; font-size: 0.9em; }
+        .ml-reason-hidden { font-size: 0.66rem; color: var(--text-tertiary); padding-top: 8px; margin-top: 4px; border-top: 1px dashed var(--border); line-height: 1.5; word-break: keep-all; }
         .ml-reason { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 5px 0; }
         .ml-reason-t { font-size: 0.78rem; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .ml-reason-v { font-size: 0.78rem; font-weight: 800; font-family: var(--font-mono); white-space: nowrap; flex-shrink: 0; }

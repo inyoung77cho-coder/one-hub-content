@@ -198,7 +198,8 @@ export default function AssetsMapPage() {
       <BottomNav active="assets" />
 
       <style jsx>{`
-        .as { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 88px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
+        /* [N5-3] 하단 여백 = 하단탭(56) + FAB 상단(68+52) 여유. 88px이면 FAB가 마지막 문구를 가렸다. */
+        .as { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 140px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
         .as-hd { display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top, 0px) + 12px) 2px 10px; }
         .as-logo { font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--color-ink); background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
         .as-dot { color: var(--color-success); }
@@ -225,13 +226,15 @@ export default function AssetsMapPage() {
         .as-donut-t { font-size: 8px; fill: var(--color-ink-3); font-weight: 700; }
         .as-donut-v { font-size: 11px; fill: var(--color-ink); font-weight: 800; }
         .as-legend { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-        .as-row { display: grid; grid-template-columns: 12px 1fr auto auto 14px; align-items: center; gap: 7px; padding: 7px 2px; background: none; border: none; border-bottom: 1px solid var(--color-line); cursor: pointer; font-family: var(--font-sans); text-align: left; }
+        /* [N5-2] 범례 잘림 — 그리드 아이템 기본 min-width:auto 라 이름 칸이 안 줄어 잘렸다(M1과 동일 원인).
+           min-width:0 을 줘야 ellipsis 가 실제로 동작한다. 숫자는 tabular-nums 로 자릿수 정렬. */
+        .as-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto 14px; align-items: center; gap: 7px; padding: 7px 2px; background: none; border: none; border-bottom: 1px solid var(--color-line); cursor: pointer; font-family: var(--font-sans); text-align: left; }
         .as-row:last-child { border-bottom: none; }
-        .as-dotc { width: 9px; height: 9px; border-radius: 50%; }
-        .as-rl { font-size: 0.78rem; font-weight: 700; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .as-rv { font-size: 0.78rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+        .as-dotc { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+        .as-rl { min-width: 0; font-size: 0.78rem; font-weight: 700; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .as-rv { font-size: 0.78rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
         .as-rv em { font-style: normal; font-weight: 600; color: var(--color-ink-3); font-size: 0.72rem; }
-        .as-rp { font-size: 0.68rem; color: var(--color-ink-3); font-variant-numeric: tabular-nums; }
+        .as-rp { font-size: 0.68rem; color: var(--color-ink-3); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; min-width: 38px; }
         .as-add { width: 100%; margin-top: 14px; min-height: 44px; border: 1px dashed var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-ink-2); border-radius: 11px; font-size: 0.84rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .as-acc { padding: 4px 16px; }
         .as-accitem { border-bottom: 1px solid var(--color-line); }
