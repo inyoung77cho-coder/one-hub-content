@@ -31,6 +31,7 @@ export default function AssetsMapPage() {
   const [at, setAt] = useState(null);
   const [qaOpen, setQaOpen] = useState(false);
   const [open3, setOpen3] = useState({}); // 3층 아코디언 열림 상태(기본 전부 닫힘)
+  const [simOpen, setSimOpen] = useState(false); // [N9] 처방 시뮬 — 같은 카드 안에서 결과를 보여준다
 
   const load = useCallback(() => {
     const tr = getTrader();
@@ -93,6 +94,40 @@ export default function AssetsMapPage() {
       const seg = { color: r.color, dash: frac * C, offset: -acc * C, k: r.k };
       acc += frac;
       return seg;
+    });
+  })();
+
+  // [N9] 처방 = 숫자 + 수단 + 제약. 세 가지가 다 있어야 실행 가능한 말이 된다.
+  //   숫자: 쏠림 기준선(60%)까지 옮겨야 하는 금액을 원장 값에서 계산(재합산 아님 — breakdown 값만 사용).
+  //   수단: 자산군별로 실제로 쓸 수 있는 통로.
+  //   제약: 그 수단이 당장 안 되는 이유를 먼저 밝힌다(부동산 분할매도 불가·현금 부족).
+  const TARGET_PCT = 60;
+  const rx = (() => {
+    if (!(domPct >= 55) || !dominant || !(total > 0)) return null;
+    const name = dominant.label.replace(/^[^\s]+\s/, "");
+    const moveUk = Math.max(0, Number(dominant.val) - total * (TARGET_PCT / 100));
+    const cashUk = bd.cash_uk != null ? Number(bd.cash_uk) : null;
+    const cashPct = bd.cash_uk != null ? pctOf(bd.cash_uk) : null;
+    const means =
+      dominant.k === "realestate" ? "연금계좌 ETF(세액공제 한도 안에서)"
+      : dominant.k === "stock" ? "지수 ETF로 나눠 담기"
+      : dominant.k === "etf" ? "종목·계좌 분산(연금/ISA)"
+      : "투자 자산군으로 이동";
+    const limits = [];
+    if (dominant.k === "realestate") limits.push("부동산은 나눠 팔 수 없어 오늘 당장 옮기는 건 현실적이지 않습니다 — 실제 수단은 ‘앞으로 새로 넣는 돈을 부동산 아닌 곳에’ 쪽입니다");
+    if (cashPct != null && cashPct < 3) limits.push(`현금이 ${cashPct < 1 ? "1% 미만" : `${Math.round(cashPct)}%`}뿐이라 한 번에 옮길 여력이 적습니다`);
+    if (cashUk == null) limits.push("현금이 입력되지 않아 실제 여력은 이 계산보다 클 수 있습니다");
+    return { name, moveUk, means, limits, targetPct: TARGET_PCT };
+  })();
+
+  // [N9] 시뮬 = 처방대로 옮겼을 때의 비중(before → after). 결정적 산수이며 예측이 아니다.
+  const simRows = (() => {
+    if (!rx || !(rx.moveUk > 0)) return null;
+    return rows.filter((r) => r.val != null).map((r) => {
+      const after = r.k === dominant.k ? Number(r.val) - rx.moveUk
+        : r.k === "etf" ? Number(r.val) + rx.moveUk
+        : Number(r.val);
+      return { k: r.k, label: r.label, color: r.color, before: pctOf(r.val), after: total > 0 ? (after / total) * 100 : 0 };
     });
   })();
 
@@ -165,7 +200,39 @@ export default function AssetsMapPage() {
             <div className="as-h">시장 대비 · 왜 이런가</div>
             <div className="as-a4-num">자산의 <b>{Math.round(domPct)}%</b>가 {dominant.label.replace(/^[^\s]+\s/, "")}입니다</div>
             <p className="as-a4-why">한 자산군에 크게 쏠려 있으면 시장이 오르내릴 때 내 자산은 상대적으로 <b>덜 따라갑니다</b> — 손실이 아니라 ‘덜 오름’일 수 있어요.</p>
-            <p className="as-a4-next">다음 수: 분산하면 시장 흐름에 더 가깝게 움직일 여지가 있습니다 <span className="as-est">가정·추정</span>.</p>
+            {/* [N9] 처방: 숫자 + 수단 + 제약 */}
+            {rx && (
+              <div className="as-rx">
+                <p className="as-rx-do">
+                  {rx.moveUk > 0
+                    ? <>{rx.name} 비중을 {rx.targetPct}%까지 낮추려면 <b>{uk(rx.moveUk)}</b>을 다른 자산군으로 옮겨야 합니다. 수단은 <b>{rx.means}</b>입니다.</>
+                    : <>{rx.name} 비중은 이미 {rx.targetPct}% 근처입니다 — 지금 옮길 금액은 없습니다.</>}
+                  <span className="as-est">가정·추정</span>
+                </p>
+                {rx.limits.length > 0 && (
+                  <p className="as-rx-lim">다만, {rx.limits.join(". 그리고 ")}.</p>
+                )}
+                {simRows && (
+                  <button className="as-rx-sim" onClick={() => setSimOpen((v) => !v)} aria-expanded={simOpen}>
+                    {simOpen ? "시뮬 접기" : "이 안으로 시뮬 →"}
+                  </button>
+                )}
+                {simOpen && simRows && (
+                  <div className="as-sim">
+                    <div className="as-sim-h">{uk(rx.moveUk)}을 ETF로 옮기면 (산수일 뿐, 수익 예측 아님)</div>
+                    {simRows.map((s) => (
+                      <div className="as-sim-row" key={s.k}>
+                        <span className="as-dotc" style={{ background: s.color }} />
+                        <span className="as-sim-l">{s.label}</span>
+                        <span className="as-sim-v">{s.before.toFixed(1)}%</span>
+                        <span className="as-sim-ar">→</span>
+                        <span className="as-sim-v b">{s.after.toFixed(1)}%</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="as-a4-cta">
               <button onClick={() => router.push("/pwa/etf")}>ETF 리밸런싱 →</button>
               <button onClick={() => router.push("/pwa/realestate")}>부동산 살펴보기 →</button>
@@ -252,6 +319,20 @@ export default function AssetsMapPage() {
         .as-a4-why, .as-a4-next { font-size: 0.82rem; line-height: 1.55; color: var(--color-ink-2); margin: 0 0 8px; word-break: keep-all; }
         .as-a4-why b { color: var(--color-ink); font-weight: 700; }
         .as-est { font-size: 0.68rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 5px; padding: 1px 6px; }
+        /* [N9] 처방(숫자·수단·제약) + 인라인 시뮬 */
+        .as-rx { border-top: 1px dashed var(--color-line); margin-top: 10px; padding-top: 10px; }
+        .as-rx-do { font-size: 0.82rem; line-height: 1.55; color: var(--color-ink); margin: 0 0 6px; word-break: keep-all; }
+        .as-rx-do b { font-weight: 800; }
+        .as-rx-do .as-est { margin-left: 6px; }
+        .as-rx-lim { font-size: 0.76rem; line-height: 1.5; color: var(--color-ink-3); margin: 0 0 8px; word-break: keep-all; }
+        .as-rx-sim { border: none; background: none; padding: 4px 0; color: var(--color-primary); font-size: 0.8rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .as-sim { margin-top: 6px; background: var(--color-card-soft); border-radius: 10px; padding: 10px 12px; }
+        .as-sim-h { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-3); margin-bottom: 8px; word-break: keep-all; }
+        .as-sim-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 14px auto; align-items: center; gap: 8px; min-height: 26px; }
+        .as-sim-l { min-width: 0; font-size: 0.78rem; color: var(--color-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .as-sim-v { font-size: 0.78rem; color: var(--color-ink-3); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+        .as-sim-v.b { color: var(--color-ink); font-weight: 800; }
+        .as-sim-ar { font-size: 0.72rem; color: var(--color-ink-3); text-align: center; }
         .as-a4-cta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
         .as-a4-cta button { flex: 1 1 0; min-width: 0; min-height: 40px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-primary); border-radius: 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .as-note { font-size: 0.7rem; color: var(--color-ink-3); text-align: center; margin-top: 6px; line-height: 1.5; word-break: keep-all; }
