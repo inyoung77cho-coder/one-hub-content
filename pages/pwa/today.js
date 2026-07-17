@@ -193,7 +193,10 @@ export default function TodayPage() {
               )}
             </div>
           ) : (
-            <p className="td-vtext td-quiet">오늘은 큰 변화가 없습니다.{ledger?.total_uk != null ? <> 총자산 <b>{Number(ledger.total_uk).toFixed(2)}억</b>.</> : null}</p>
+            <p className="td-vtext td-quiet">오늘은 큰 변화가 없습니다.{ledger?.total_uk != null ? <> 총자산 <b>{Number(ledger.total_uk).toFixed(2)}억</b>.</> : null}
+              {/* [N1] 총자산을 말하는 곳이면 어디서든 불완전 사실을 함께 말한다 — 한 화면만 정직하면 의미가 없다 */}
+              {(ledger?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && <> ⚠ 증권사 연동 자산이 빠져 실제보다 적습니다.</>}
+            </p>
           )}
         </section>
 

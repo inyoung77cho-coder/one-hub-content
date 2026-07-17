@@ -157,6 +157,10 @@ export default function AssetsMapPage() {
         <section className="card as-hero">
           <p className="as-headline">{headline}</p>
           <div className="as-total"><span>총자산</span><b>{uk(total)}</b></div>
+          {/* [N1] 총자산이 불완전하면 숫자와 같은 카드에서 말한다. 다른 화면으로 미루지 않는다. */}
+          {(assets?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && (
+            <p className="as-incomplete">⚠ 증권사 연동 자산을 불러오지 못했습니다 — 이 총자산은 <b>실제보다 적습니다</b>. 잠시 후 다시 시도해 주세요.</p>
+          )}
         </section>
 
         <div className="as-actions">
@@ -354,6 +358,8 @@ export default function AssetsMapPage() {
         .as-a4-why, .as-a4-next { font-size: 0.82rem; line-height: 1.55; color: var(--color-ink-2); margin: 0 0 8px; word-break: keep-all; }
         .as-a4-why b { color: var(--color-ink); font-weight: 700; }
         .as-est { font-size: 0.68rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 5px; padding: 1px 6px; }
+        /* [N1] 총자산 불완전 고지 — 숫자 바로 아래. 눈에 띄되 공포를 팔지 않는다. */
+        .as-incomplete { margin: 8px 0 0; font-size: 0.74rem; line-height: 1.5; color: var(--color-warning); word-break: keep-all; }
         /* [N6] 이상 평단 확인 — 경고색(빨강) 아님. 사용자 잘못이라 단정하지 않는다. */
         .as-fix-q { font-size: 0.8rem; line-height: 1.55; color: var(--color-ink-2); margin: 0 0 10px; word-break: keep-all; }
         .as-fix-cta, .as-fix-edit { display: flex; gap: 8px; align-items: center; }

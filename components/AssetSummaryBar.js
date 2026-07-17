@@ -40,6 +40,10 @@ export default function AssetSummaryBar() {
       <div className="asb-top">
         <span className="asb-lbl">총자산</span>
         <span className="asb-total">{d ? `${d.total_uk}억` : err ? "—" : "…"}</span>
+        {/* [N1] 좁은 바에서도 불완전 사실은 숨기지 않는다 — 툴팁이 아니라 보이는 표식으로. */}
+        {(d?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && (
+          <span className="asb-warn" title="증권사 연동 자산을 불러오지 못해 실제보다 적습니다">⚠ 일부 누락</span>
+        )}
       </div>
       <div className="asb-chips">
         {chips.map(([label, key, val, href]) => (
@@ -54,6 +58,7 @@ export default function AssetSummaryBar() {
         .asb-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
         .asb-lbl { font-size: 0.72rem; color: var(--color-ink-2); font-weight: 700; }
         .asb-total { font-size: 1.5rem; font-weight: 800; color: var(--color-ink); }
+        .asb-warn { font-size: 0.66rem; font-weight: 700; color: var(--color-warning); white-space: nowrap; }
         .asb-chips { display: flex; gap: 6px; }
         /* [balance] 4칩 세로 스택 — 좁은 폭에서 라벨이 글자 단위로 깨지지 않도록 nowrap */
         .asb-chip { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 10px; padding: 9px 4px; cursor: pointer; text-align: center; }

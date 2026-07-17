@@ -33,5 +33,12 @@ grep -q "getLedger as getAssetLedger" pages/pwa/index.js; chk "index.js 원장 �
 NEW=$(grep -rhoE "onehub_(ledger|assets_cache|total)[a-z_]*" pages/ components/ lib/ --include=*.js | sort -u | wc -l)
 [ "$NEW" -eq 0 ]; chk "새 자산 localStorage 키 0 (실측 $NEW)" $?
 
+# ★ 백엔드 원장이 죽으면 KIS 보유가 통째로 빠져 총자산이 조용히 수억 줄어든다(실측: Upstream 404).
+#   숫자를 보여주는 곳이면 어디서든 '불완전'을 함께 말해야 한다.
+grep -q "BACKEND_UNAVAILABLE" lib/ledger.js; chk "백엔드 부재 경고 생성" $?
+grep -q "BACKEND_UNAVAILABLE" pages/pwa/assets.js; chk "자산 지도: 총자산 옆 불완전 고지" $?
+grep -q "BACKEND_UNAVAILABLE" pages/pwa/today.js; chk "오늘 탭: 총자산 옆 불완전 고지" $?
+grep -q "BACKEND_UNAVAILABLE" components/AssetSummaryBar.js; chk "요약 바: 불완전 표식" $?
+
 echo "  → N1 FAIL=$F"
 exit $F
