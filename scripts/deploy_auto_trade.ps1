@@ -1,5 +1,7 @@
 ﻿# ONE-HUB auto_trade 배포 게이트 (S17-0 Part3 W3-8)
 #   오늘부터 auto_trade/ 는 이 스크립트로만 배포한다. 손 SCP 금지.
+#   ★ 정본은 이 파일(one-hub-content/scripts/)이다. git 이 관리하므로 사라지지 않는다.
+#     C:\onehub\ 사본은 두지 않는다 — 2026-07-17 에 원인 불명으로 유실됐다.
 #   사람이 scp 를 직접 치는 한 같은 사고는 재발한다.
 #
 #   지시서 원안에서 교정한 좌표:
@@ -48,20 +50,27 @@ if ($fn -eq "version.py") {
   }
 }
 
-# ── 게이트 4: 장중 차단 ───────────────────────────────────
+# ── 게이트 4: 장중 차단 — market_calendar 가 판정한다 (S18 D-4 #22) ──
+#   시각을 하드코딩하지 않는다. 캘린더가 공휴일·수능일(10:00~16:30)·연초 개장일(10:00)·
+#   애프터마켓 시행까지 자동으로 따라간다. 이전 판은 요일+09:00~15:30 하드코딩이라
+#   공휴일을 장중으로 오판했고 -MarketClosed 우회가 필요했다.
+#   fail-safe: 캘린더 판정 실패 시 개장으로 간주해 배포를 막는다.
+#   (휴장일에 배포 못 하는 건 불편할 뿐이지만, 장중 배포는 실매매를 건드린다)
 $kst = (Get-Date).ToUniversalTime().AddHours(9)
-$isWeekday = $kst.DayOfWeek -notin 'Saturday', 'Sunday'
-$hm = [int]$kst.ToString("HHmm")
-if ($isWeekday -and $hm -ge 900 -and $hm -le 1530) {
+# 판정은 서버의 market_status.py 가 한다 — ssh 인라인 python 은 따옴표가 깨진다(실측).
+$status = (ssh -i $KEY $SRV "cd $DST; ./venv/bin/python3 market_status.py KRX 2>/dev/null" | Select-Object -Last 1)
+if (-not $status -or $status -eq "error") { $status = "open"; Write-Host "  경고: 캘린더 판정 실패 -> 개장으로 간주(fail-safe)" }
+Write-Host "  캘린더 판정: $status ($($kst.ToString('HH:mm')) KST)"
+if ($status -eq "open") {
   if ($MarketClosed) {
-    # 가드는 요일·시각만 안다 — 공휴일 휴장을 모른다. 사람 확인 시에만 우회하고 교차검증한다.
+    # 캘린더는 개장이라는데 사람이 휴장이라 한다 -> 캘린더가 틀렸을 수 있다. 체결로 교차검증.
     $t = ssh -i $KEY $SRV "sqlite3 /home/ubuntu/trading.db `"SELECT COUNT(*) FROM trades WHERE date(date)=date('now','+9 hours');`""
-    if ([int]$t -gt 0) { Write-Host "[중단] 오늘 체결 $t 건 → 휴장이 아님"; exit 1 }
-    Write-Host "  우회: 휴장일 확인됨(-MarketClosed) · 오늘 체결 0건 교차검증 OK"
+    if ([int]$t -gt 0) { Write-Host "[중단] 오늘 체결 $t 건 -> 휴장이 아님"; exit 1 }
+    Write-Host "  우회: -MarketClosed + 오늘 체결 0건 교차검증 OK (캘린더 갱신 필요할 수 있음)"
   } else {
-    Write-Host "[중단] 장중 배포 금지 ($($kst.ToString('HH:mm')) KST). 휴장일이면 -MarketClosed"; exit 1
+    Write-Host "[중단] 장중 배포 금지. 휴장일이면 -MarketClosed"; exit 1
   }
-} else { Write-Host "OK   장 마감 후 ($($kst.ToString('HH:mm')) KST)" }
+} else { Write-Host "OK   장중 아님 ($status)" }
 
 # ── 게이트 5: 배포 전 git 커밋 (현재 상태 고정) ───────────
 ssh -i $KEY $SRV "cd $DST ; git add -A ; git commit -q -m 'pre-deploy snapshot' --allow-empty"
