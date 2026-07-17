@@ -40,5 +40,13 @@ grep -q "BACKEND_UNAVAILABLE" pages/pwa/assets.js; chk "자산 지도: 총자산
 grep -q "BACKEND_UNAVAILABLE" pages/pwa/today.js; chk "오늘 탭: 총자산 옆 불완전 고지" $?
 grep -q "BACKEND_UNAVAILABLE" components/AssetSummaryBar.js; chk "요약 바: 불완전 표식" $?
 
+# ★ 백엔드 소스는 둘이다. /api/assets/total 은 백엔드에 구현된 적이 없고(실측 404),
+#   실제로 KIS 주식·ETF를 주는 건 /api/realestate/v2/total-asset 이다.
+#   구 lib/assetsTotal 에 있던 이 폴백을 원장 이관 때 빠뜨려 KIS 0.09억이 조용히 증발했었다.
+grep -q "realestate/v2/total-asset" lib/ledger.js; chk "백엔드 2차 폴백(살아있는 소스) 연결 ★" $?
+# 2차 응답은 '이미 억 단위'다. uk()를 다시 먹이면 1억분의 1이 된다.
+! grep -qE "uk\(b2\.|uk\(beUk" lib/ledger.js; chk "억 단위 이중변환 없음 ★" $?
+grep -q "beUk" lib/ledger.js; chk "백엔드 소스 단위 정규화(beUk)" $?
+
 echo "  → N1 FAIL=$F"
 exit $F
