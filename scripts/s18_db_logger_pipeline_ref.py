@@ -751,6 +751,20 @@ def _register_block_accuracy(stock, errors_ko, trader_id="A"):
     사유가 여럿이면 한 행에 모아 적는다.
     check_date/check_price/result 는 비워 둔다 — block_accuracy_checker 가 T+3 거래일에 채운다.
     """
+    # [S18] 휴장일 차단은 사후검증 대상이 아니다.
+    #   장이 안 선 날의 "차단"은 시장 판단이 아니라 그냥 데이터가 없는 것이다.
+    #   실측(2026-07-17 임시공휴일): 사용자가 /analyze 를 수동 실행하자 차단 4건이
+    #   block_accuracy 에 등록됐다. T+3 후 채점되면 표본이 오염된다.
+    #   스케줄 잡은 _weekday_only 가 막지만 수동 명령은 막지 않는다(막으면 안 된다) →
+    #   기록 지점에서 거른다. fail-safe: 캘린더를 못 읽으면 등록하지 않는다(오염보다 누락이 낫다).
+    try:
+        import market_calendar as _mc
+        from datetime import datetime as _dt
+        if not _mc.is_open("KRX", _dt.now(_mc.KST).date()):
+            return
+    except Exception as _e:
+        print(f"[block_accuracy] 캘린더 판정 불가 — 등록 보류: {_e}")
+        return
     price = stock.get("price", 0)
     code = str(stock.get("code", "") or "").strip()
     name = stock.get("name", "") or code
