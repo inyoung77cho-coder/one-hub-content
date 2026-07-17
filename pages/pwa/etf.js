@@ -222,9 +222,27 @@ export default function EtfDashboard() {
     const l = getHoldings(tr); setHoldings(l); refreshQuotes(l);
     setForm((f) => ({ ...f, ticker: "", shares: "", price: "" }));
   };
-  const delHolding = (tk, account) => { const tr = getTrader(); removeEtf({ ticker: tk, account, trader: tr }); setHoldings(getHoldings(tr)); };
+  // [S18 D-1] 삭제는 되돌릴 수 없다 — 확인 다이얼로그를 거친다.
+  //   종합자산은 onehub-assets-change 이벤트로 즉시 반영된다(원장이 구독 중).
+  const delHolding = (h) => {
+    const label = `${h.ticker} (${h.shares}주 · ${h.account || "일반"})`;
+    if (!window.confirm(`${label} 보유 기록을 삭제할까요?\n되돌릴 수 없습니다.`)) return;
+    const tr = getTrader();
+    removeEtf({ ticker: h.ticker, account: h.account, trader: tr });
+    setHoldings(getHoldings(tr));
+    try { window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {}
+  };
+  // [S18 D-1] 수정 = 기존값 프리필 후 매수 폼 재사용. 재입력을 요구하지 않는다.
+  //   buyEtf 는 같은 티커+통화+계좌+증권사를 가중평균으로 합친다 → 값을 "대체"하려면
+  //   삭제 후 재입력이 맞다. 그래서 프리필과 함께 그 사실을 안내한다(조용히 합쳐지면 오해).
+  const editHolding = (h) => {
+    setForm({ side: "buy", ticker: h.ticker, shares: String(h.shares), price: String(h.avgPrice),
+              ccy: h.avgCcy || "USD", account: h.account || "일반", market: h.market || "auto" });
+    setFormMsg("수정: 값을 고쳐 기록하면 가중평균으로 합쳐집니다. 값을 대체하려면 먼저 삭제하세요.");
+    try { document.querySelector(".me-form")?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
+  };
 
-  // [등록 ETF] 수량 입력 → 실측 종가로 실시간 평가액 재계산
+  // [등록 ETF] 수량 입력 → 실측 종가로 실시간 평가금액 재계산
   const onQtyChange = (ticker, val) => {
     const tr = getTrader();
     setPosQty(ticker, val, tr);
@@ -248,7 +266,7 @@ export default function EtfDashboard() {
   };
   const myTotal = holdings.reduce((acc, h) => { const m = holdingMetrics(h); return acc + (m.valueKrw || 0); }, 0);
 
-  // [등록 ETF] 수량(백엔드 제공 우선, 없으면 사용자 입력) + 실측 종가 기반 실시간 평가액
+  // [등록 ETF] 수량(백엔드 제공 우선, 없으면 사용자 입력) + 실측 종가 기반 실시간 평가금액
   const posLive = (p) => {
     const qty = p.qty ?? p.shares ?? p.quantity ?? posQty[String(p.ticker).toUpperCase()] ?? null;
     const q = quotes[p.ticker];
@@ -260,7 +278,7 @@ export default function EtfDashboard() {
     const pnlPct = invest ? (valueKrw / invest - 1) * 100 : null;
     return { qty, valueKrw, pnlPct };
   };
-  // 실시간 총평가액 = (수량 아는 등록 포지션) + (내 보유). 하나라도 있으면 표기.
+  // 실시간 총평가금액 = (수량 아는 등록 포지션) + (내 보유). 하나라도 있으면 표기.
   const liveTotal = (() => {
     let sum = 0, any = false;
     positions.forEach((p) => { const l = posLive(p); if (l.valueKrw != null) { sum += l.valueKrw; any = true; } });
@@ -768,7 +786,7 @@ export default function EtfDashboard() {
                     {profit != null && <span className={`eprofit ${sign(profit)}`}>{profit >= 0 ? "+" : ""}{won(profit)}</span>}
                   </span>
                 </div>
-                {/* [실시간 재계산] 수량(백엔드 제공 or 직접 입력) × 실측 종가 → 실시간 평가액 */}
+                {/* [실시간 재계산] 수량(백엔드 제공 or 직접 입력) × 실측 종가 → 실시간 평가금액 */}
                 <div className="eqty">
                   <span className="eqty-lbl">수량</span>
                   {qtyFromBackend != null ? (
@@ -786,7 +804,7 @@ export default function EtfDashboard() {
               </div>
             );
           })}
-          <div className="ebd-note">왼쪽은 투자액, 가운데는 자체수익(달러)·환차손익, 오른쪽은 원화 실질수익률과 이익금입니다. 수량을 입력하면 실측 종가로 <b>실시간 평가액</b>이 계산됩니다.</div>
+          <div className="ebd-note">왼쪽은 투자액, 가운데는 자체수익(달러)·환차손익, 오른쪽은 원화 실질수익률과 이익금입니다. 수량을 입력하면 실측 종가로 <b>실시간 평가금액</b>이 계산됩니다.</div>
           </>)}
         </section>
       )}
@@ -827,7 +845,10 @@ export default function EtfDashboard() {
                               {m.pnlPct != null && <span className={`me-pnl ${sign(m.pnlPct)}`}>{pct(m.pnlPct)}</span>}
                             </span>
                           </div>
-                          <button className="me-del" onClick={() => delHolding(h.ticker, h.account)} aria-label={`${h.ticker} 삭제`}>✕</button>
+                          <div className="me-act">
+                            <button className="me-edit" onClick={() => editHolding(h)} aria-label={`${h.ticker} 수정`}>수정</button>
+                            <button className="me-del" onClick={() => delHolding(h)} aria-label={`${h.ticker} 삭제`}>✕</button>
+                          </div>
                         </div>
                       );
                     })}
@@ -1071,6 +1092,9 @@ export default function EtfDashboard() {
         .me-val { font-size: 0.7rem; color: var(--color-ink-2); font-family: ui-monospace, monospace; }
         .me-pnl { font-size: 0.76rem; font-weight: 800; font-family: ui-monospace, monospace; }
         .me-pnl.pos { color: var(--color-success); } .me-pnl.neg { color: var(--color-danger); }
+        /* [S18 D-1] 보유 편집 — 수정·삭제를 한 쌍으로 */
+        .me-act { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+        .me-edit { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 7px; padding: 4px 8px; font-size: 0.68rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .me-del { flex-shrink: 0; width: 24px; height: 24px; border: none; background: var(--color-card); border-radius: 7px; color: var(--color-ink-3); font-size: 0.8rem; cursor: pointer; }
         .me-empty { margin-top: 12px; font-size: 0.74rem; color: var(--color-ink-2); line-height: 1.6; background: var(--color-card-soft); border-radius: 11px; padding: 12px 14px; word-break: keep-all; }
         .me-empty b { color: var(--color-ink); font-weight: 700; }
