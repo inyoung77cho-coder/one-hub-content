@@ -316,6 +316,10 @@ export default function PWADashboard({ latestReport }) {
           || window.localStorage.getItem('onehub_onboarded') === '1';
       } catch (e) {}
       if (onboarded) { router.replace('/pwa/assets'); return; }
+      // 최초 사용자(프로필·온보딩 모두 없음) → 위저드 1회 진입.
+      //   ★ 딥링크(?tab=·?code=)로 들어온 경우엔 절대 튕기지 않는다. isReady 이후라 판정이 정확하다.
+      router.replace('/pwa/onboarding');
+      return;
     }
     // [v10 UI] 딥링크(?tab=)로 진입 시 = 다른 페이지에서 넘어온 재방문 → 스플래시 건너뜀(버그#3)
     if (tabParam) { setTab(tabParam); setSplash(false); }
@@ -348,12 +352,10 @@ export default function PWADashboard({ latestReport }) {
       if (saved) {
         setProfile(p => ({ ...p, ...JSON.parse(saved) }));
       }
-      // 프로필도 없고 온보딩도 안 했으면 최초 사용자 → 위저드 1회 진입(시안 onehub-onboarding)
-      if (!saved && !onboarded && !router.query.tab && !router.query.code) {
-        router.replace('/pwa/onboarding');
-      }
-      // [N2] 탭 없는 /pwa → 단일 지도 리다이렉트는 router.isReady 가 보장되는 쿼리 effect에서 처리한다.
-      //   이 effect는 마운트 1회라 router.query 가 아직 비어 있어(딥링크 ?tab=report 등을 오인) 여기서 하면 안 된다.
+      // [N2] 온보딩 위저드 진입 판정도 쿼리 effect로 옮겼다.
+      //   이 effect는 마운트 1회라 router.query 가 아직 비어 있다. 여기서 !router.query.tab 를 보면
+      //   ?tab=report 딥링크로 들어와도 '탭 없음'으로 오인해 온보딩으로 튕긴다(실측으로 재현).
+      //   같은 함정을 N2 리다이렉트에서 한 번 고쳐놓고, 바로 위 이웃이 같은 결함인 걸 놓쳤다.
     } catch (e) { /* 무시 */ }
     // [v8.5] 최근 검색 종목 불러오기
     try {

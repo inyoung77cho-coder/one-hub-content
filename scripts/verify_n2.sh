@@ -22,5 +22,9 @@ for f in pages/pwa/*.js; do
 done
 [ "$CO" -eq 0 ]; chk "상단5탭·하단4탭 공존 0 (실측 $CO) ★" $?
 
+# ★ 딥링크가 온보딩으로 튕기지 않는다 — 마운트 effect(router.query 비어있음)에서 판정하면 튕긴다.
+!  grep -qE "router\.query\.tab && !router\.query\.code" pages/pwa/index.js; chk "온보딩 가드가 마운트 effect에 없음(딥링크 튕김 방지) ★" $?
+grep -q "router.replace('/pwa/onboarding')" pages/pwa/index.js; chk "온보딩 진입은 isReady 쿼리 effect에서" $?
+
 echo "  → N2 FAIL=$F"
 exit $F
