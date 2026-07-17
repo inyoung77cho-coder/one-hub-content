@@ -3259,15 +3259,6 @@ export default function PWADashboard({ latestReport }) {
         .pwa-trader-toggle button { background: none; border: none; color: var(--text-secondary); padding: 5px 13px; border-radius: var(--radius-pill); cursor: pointer; font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; }
         .pwa-trader-toggle button.active { background: var(--card-bg); color: var(--accent-info); box-shadow: var(--card-shadow); }
 
-        /* Tabs — 공유 TopNav(.tn-tabs/.tn-tab)와 기하·타이포 통일 */
-        .pwa-tabs { display: flex; align-items: center; }
-        .pwa-tab { flex: 1 1 0; min-width: 0; background: none; border: none; cursor: pointer; color: var(--color-ink-3); font-family: var(--font-sans); font-size: 12.5px; font-weight: 600; letter-spacing: -.4px; }
-        /* [v10 UI] 탭 = 흰 라운드 컨테이너 · 활성 = 네이비 pill (시안 통일, TopNav와 16px 인셋 일치) */
-        .pwa-tabs { background: var(--color-card); padding: 4px; border-radius: 16px; margin: 0 16px 10px; gap: 2px; box-shadow: var(--shadow-card); }
-        .pwa-tab { min-height: 36px; display: flex; align-items: center; justify-content: center; white-space: nowrap; line-height: 1; border-radius: 11px; }
-        .pwa-tab.active { background: var(--hero-grad-1); color: #fff; font-weight: 700; border-radius: 11px; box-shadow: none; }
-        @media (max-width: 380px) { .pwa-tab { font-size: 11.5px; letter-spacing: -.5px; } }
-        :global([data-theme="dark"]) .pwa-tab.active { background: var(--color-primary); }
         /* [v11 IA] 주식 서브탭 (2차 내비) */
         .pwa-subtabs { display: flex; align-items: center; gap: 8px; margin: 0 16px 12px; }
         .pwa-subtab { padding: 9px 20px; background: var(--card-bg); border: none; border-radius: var(--radius-pill, 999px); cursor: pointer; color: var(--text-secondary); font-family: var(--font-display); font-size: 0.78rem; font-weight: 700; box-shadow: var(--card-shadow); }
