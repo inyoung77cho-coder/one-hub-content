@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import { getTrader, useTrader } from "../../lib/trader";
 import { getLedger } from "../../lib/ledger";
+import { verifyStockAvg, updateStockAvg } from "../../lib/stockHoldings";
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
@@ -32,6 +33,8 @@ export default function AssetsMapPage() {
   const [qaOpen, setQaOpen] = useState(false);
   const [open3, setOpen3] = useState({}); // 3층 아코디언 열림 상태(기본 전부 닫힘)
   const [simOpen, setSimOpen] = useState(false); // [N9] 처방 시뮬 — 같은 카드 안에서 결과를 보여준다
+  const [fixId, setFixId] = useState(null);      // [N6] 평단 수정 중인 종목 id
+  const [fixVal, setFixVal] = useState("");      // [N6] 사용자가 직접 입력하는 평단(앱이 추정하지 않는다)
 
   const load = useCallback(() => {
     const tr = getTrader();
@@ -194,6 +197,35 @@ export default function AssetsMapPage() {
           <button className="as-add" onClick={() => setQaOpen(true)}>＋ 자산 추가·수정</button>
         </section>
 
+        {/* [N6] 이상 평단 확인 — 총자산에서 뺀 사실은 총자산이 보이는 곳에서 설명한다.
+            앱은 값을 고치지 않는다. 원본이 평단인지 총매입액인지는 입력한 사람만 알기 때문이다. */}
+        {(assets?.warnings || []).filter((w) => w.code === "AVG_PRICE_OUT_OF_RANGE").map((w) => (
+          <section className="card as-fix" key={w.id || w.name}>
+            <div className="as-h">확인이 필요합니다</div>
+            <p className="as-fix-q">
+              <b>{w.name}</b>의 평단이 <b>{Number(w.avgPrice).toLocaleString()}원</b>으로 입력돼 있습니다.
+              흔한 원인은 <b>총매입액을 평단 칸에 넣은 경우</b>지만, 실제로 맞는 값일 수도 있어 <b>총자산에서 잠시 뺐습니다</b>.
+              어느 쪽인지는 입력하신 분만 아셔서 저희가 임의로 고치지 않았습니다.
+            </p>
+            {fixId === w.id ? (
+              <div className="as-fix-edit">
+                <input className="as-fix-in" type="number" inputMode="numeric" value={fixVal} placeholder="1주당 평단(원)"
+                  onChange={(e) => setFixVal(e.target.value)} aria-label="평단 입력" />
+                <button className="as-fix-b p" onClick={() => {
+                  const r = updateStockAvg({ id: w.id, avgPrice: fixVal, trader: getTrader() });
+                  if (r.ok) { setFixId(null); setFixVal(""); load(); }
+                }}>저장</button>
+                <button className="as-fix-b" onClick={() => { setFixId(null); setFixVal(""); }}>취소</button>
+              </div>
+            ) : (
+              <div className="as-fix-cta">
+                <button className="as-fix-b p" onClick={() => { setFixId(w.id); setFixVal(""); }}>평단 수정</button>
+                <button className="as-fix-b" onClick={() => { verifyStockAvg({ id: w.id, trader: getTrader() }); load(); }}>이 값이 맞습니다</button>
+              </div>
+            )}
+          </section>
+        ))}
+
         {/* [A4] 쏠림 진단 — 충격 숫자(쏠림)에 원인+다음 수를 같은 카드에. 중립색(빨강 금지). */}
         {domPct >= 55 && dominant && (
           <section className="card as-a4">
@@ -319,6 +351,12 @@ export default function AssetsMapPage() {
         .as-a4-why, .as-a4-next { font-size: 0.82rem; line-height: 1.55; color: var(--color-ink-2); margin: 0 0 8px; word-break: keep-all; }
         .as-a4-why b { color: var(--color-ink); font-weight: 700; }
         .as-est { font-size: 0.68rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 5px; padding: 1px 6px; }
+        /* [N6] 이상 평단 확인 — 경고색(빨강) 아님. 사용자 잘못이라 단정하지 않는다. */
+        .as-fix-q { font-size: 0.8rem; line-height: 1.55; color: var(--color-ink-2); margin: 0 0 10px; word-break: keep-all; }
+        .as-fix-cta, .as-fix-edit { display: flex; gap: 8px; align-items: center; }
+        .as-fix-b { flex: 0 0 auto; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; padding: 9px 14px; font-size: 0.78rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .as-fix-b.p { border-color: var(--color-primary); color: var(--color-primary); }
+        .as-fix-in { flex: 1 1 0; min-width: 0; border: 1px solid var(--color-line); border-radius: 9px; padding: 9px 10px; font-size: 0.82rem; font-family: var(--font-sans); background: var(--color-card); color: var(--color-ink); font-variant-numeric: tabular-nums; }
         /* [N9] 처방(숫자·수단·제약) + 인라인 시뮬 */
         .as-rx { border-top: 1px dashed var(--color-line); margin-top: 10px; padding-top: 10px; }
         .as-rx-do { font-size: 0.82rem; line-height: 1.55; color: var(--color-ink); margin: 0 0 6px; word-break: keep-all; }

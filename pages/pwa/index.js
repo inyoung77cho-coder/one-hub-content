@@ -1632,6 +1632,15 @@ export default function PWADashboard({ latestReport }) {
                         <button key={k} className={`rec-sort-chip ${recSort===k?'on':''}`} onClick={() => setRecSort(k)}>{l}</button>
                       ))}
                     </div>
+                    {/* [N4] 정렬 근거를 화면이 직접 말한다.
+                        원 지적: "기대 7.3%가 4위" — 관심도순으로 정렬돼 있어서인데,
+                        화면이 그 사실을 어디에도 밝히지 않아 순서가 틀린 것처럼 보였다. */}
+                    {(() => {
+                      const sortBasisNote = recSort === 'upside'
+                        ? '기대수익순으로 정렬했습니다 — 관심도(기술점수)가 낮은 종목이 위에 올 수 있습니다.'
+                        : '관심도순으로 정렬했습니다 — 기대수익이 더 높은 종목이 아래에 있을 수 있습니다.';
+                      return <div className="rec-sort-basis">↳ {sortBasisNote}</div>;
+                    })()}
                     {/* [S7.2] 샀어요 마이크로카피 — 채점 등록 안내 + 기록 탭 딥링크 */}
                     {/* [S-5] 나 vs AI 참여 유도 — 버튼과 동등 위계. 기록 0이면 첫 참여 온보딩. */}
                     {(() => { const _has = (getLedger(trader) || []).length > 0; return (
@@ -3639,6 +3648,8 @@ export default function PWADashboard({ latestReport }) {
         /* [S7.2] 추천 정렬 칩 · 샀어요 마이크로카피 · 5신호 점등 */
         .rec-sort { display: flex; gap: 6px; margin-bottom: 10px; }
         .rec-sort-chip { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 999px; padding: 6px 13px; font-size: 0.74rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        /* [N4] 정렬 근거 한 줄 — 칩 바로 아래, 목록보다 먼저 읽히게 */
+        .rec-sort-basis { font-size: 0.68rem; color: var(--color-ink-3); line-height: 1.4; margin: 4px 0 8px; word-break: keep-all; }
         .rec-sort-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
         .rec-micro { font-size: 0.68rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 9px; padding: 8px 11px; margin-bottom: 12px; line-height: 1.5; word-break: keep-all; }
         .rec-micro b { color: var(--color-ink); font-weight: 700; }
