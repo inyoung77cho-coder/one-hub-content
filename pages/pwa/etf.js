@@ -303,20 +303,30 @@ export default function EtfDashboard() {
   if (maxSector) riskParts.push(`${maxSector.sector} ${(maxSector.weight * 100).toFixed(0)}% 집중`);
   if (overlapWarn) riskParts.push(overlapWarn);
   const topRisk = riskParts.length ? riskParts.join(" · ") : null;
+  // [S18 C-5] 섹터 상한은 목표 배분에서 파생된다. 숫자를 코드에 박지 않는다.
+  //   사용자는 목표 배분을 한 번도 고른 적이 없다(2026-07-17 확인) — 그런데도
+  //   상한 초과라고 지시하고 있었다. 근거 없는 지시는 신뢰를 깎는다.
+  //   목표가 없으면 제안 자체를 만들지 않는다(잠금). 상한값은 프리셋 파일에서 읽는다.
+  const sectorCap = Number(REBAL_PRESETS.sector_cap_pct) || null;
+  const hasTarget = !!targetAlloc;
+  const sectorOver = hasTarget && sectorCap && maxSector && maxSector.weight * 100 >= sectorCap;
   const rebalReasons = [];
-  if (maxSector && maxSector.weight * 100 >= 25) rebalReasons.push(`${maxSector.sector} ${(maxSector.weight * 100).toFixed(0)}% 집중 — 상한 초과분 축소`);
+  if (sectorOver) rebalReasons.push(`${maxSector.sector} ${(maxSector.weight * 100).toFixed(0)}% 집중 — 상한 ${sectorCap}% 초과분 축소`);
   if (overlapWarn) rebalReasons.push(`${overlapWarn} — 중복 종목 통합으로 실질 분산 확보`);
   if (tax?.losses?.length) rebalReasons.push(`손실 종목(${tax.losses.map((l) => l.ticker).join("·")}) 손익통산 — 절세 매도 후 재매수 검토`);
 
   // [E2·E3] 계좌별 '해야 할 일' + 리밸런싱 제안 — 보유·세제·중복·집중·리밸 데이터에서 결정론적으로 산출.
   //   각 항목에 대상 계좌(전체/일반/연금/ISA) 태그를 붙여, 상단 계좌 필터가 곧 '할 일' 필터가 되도록 한다.
   const etfTodos = [];
-  if (maxSector && maxSector.weight * 100 >= 25)
-    etfTodos.push({ acct: "전체", icon: "📊", title: `${maxSector.sector} ${(maxSector.weight * 100).toFixed(0)}% 집중 축소`, detail: "단일 섹터 비중이 25% 상한을 넘습니다. 초과분을 다른 섹터로 분산해 리스크를 낮추세요.", tone: "warn" });
+  // [S18 C-5] 목표 배분이 있을 때만 제안한다. 상한·근거를 함께 밝힌다.
+  if (sectorOver)
+    etfTodos.push({ acct: "전체", icon: "📊", title: `${maxSector.sector} ${(maxSector.weight * 100).toFixed(0)}% 집중 축소`, detail: `단일 섹터 비중이 상한 ${sectorCap}%를 넘습니다. 초과분을 다른 섹터로 분산해 리스크를 낮추세요.`, why: `근거: ${targetAlloc?.label || "목표 배분"} · 섹터 상한 ${sectorCap}%`, tone: "warn" });
   if (overlapWarn)
     etfTodos.push({ acct: "전체", icon: "🔁", title: "중복 종목 통합", detail: `${overlapWarn} — 겹치는 종목을 정리하면 같은 금액으로 실질 분산이 늘어납니다.`, tone: "warn" });
   const rebalActs = Array.isArray(rebal?.actions) ? rebal.actions.filter((a) => a.action !== "HOLD") : [];
-  if (rebalActs.length)
+  // [S18 C-5] 리밸런싱은 '목표가 있어야' 만들 수 있는 제안이다. 목표 없이 조정을 지시하지 않는다.
+  //   반면 손익통산·해외배당은 목표와 무관한 '세제 사실'이라 잠그지 않는다(아래 유지).
+  if (hasTarget && rebalActs.length)
     etfTodos.push({ acct: "전체", icon: "⚖️", title: `리밸런싱 ${rebalActs.length}건 실행`, detail: `${rebalActs.slice(0, 3).map((a) => `${a.ticker} ${a.action === "SELL" ? "축소" : "확대"} ${a.qty}주`).join(" · ")}${rebalActs.length > 3 ? " 외" : ""} · 예상 양도세 ${won(rebal?.est_tax_krw)}원. 밴드 내 종목은 보유 권장.`, tone: "info" });
   if (tax?.losses?.length)
     etfTodos.push({ acct: "일반", icon: "🧾", title: `손실 종목 손익통산(${tax.losses.map((l) => l.ticker).join("·")})`, detail: "일반계좌는 같은 해 이익·손실을 합산 과세합니다. 손실 종목을 함께 매도(손실수확)하면 과세표준이 줄어 양도세를 아낄 수 있습니다.", tone: "info" });
@@ -422,6 +432,15 @@ export default function EtfDashboard() {
           <div className="label">📋 해야 할 일 · 리밸런싱 제안
             <span className="sub">{acctFilter === "전체" ? "전 계좌" : `${acctFilter} 계좌`}</span>
           </div>
+          {/* [S18 C-5] 목표 배분이 없으면 '목표 기반 제안'은 잠근다.
+              근거 없는 지시는 신뢰를 깎는다 — 이 앱의 전부가 근거 투명성이다.
+              세제 사실(손익통산·해외배당)은 목표와 무관하므로 계속 표시된다. */}
+          {!hasTarget && (
+            <div className="todo-locked">
+              🔒 <b>리밸런싱 제안은 목표 배분을 정한 뒤 표시됩니다.</b>
+              <span>목표가 있어야 “무엇을 얼마나 조정할지”를 만들 수 있습니다. 아래 세제 알림은 목표와 무관해 그대로 표시됩니다.</span>
+            </div>
+          )}
           {todosForAcct.length > 0 ? (
             <div className="todo-list">
               {todosForAcct.map((t, i) => (
@@ -430,6 +449,7 @@ export default function EtfDashboard() {
                   <div className="todo-body">
                     <div className="todo-t">{t.title}<span className={`todo-acct ${(t.acct === "연금" || isPensionAcct(t.acct)) ? "pension" : t.acct === "ISA" ? "isa" : t.acct === "일반" ? "normal" : "all"}`}>{t.acct}</span></div>
                     <div className="todo-d">{t.detail}</div>
+                    {t.why && <div className="todo-why">{t.why}</div>}
                   </div>
                 </div>
               ))}
@@ -1070,6 +1090,11 @@ export default function EtfDashboard() {
         .todo-acct.pension { background: var(--color-success-soft); color: var(--color-success); }
         .todo-acct.isa { background: var(--color-primary-soft); color: var(--color-primary); }
         .todo-d { font-size: 0.75rem; color: var(--color-ink-2); line-height: 1.5; margin-top: 3px; word-break: keep-all; }
+        /* [S18 C-5] 제안 근거 배지 · 목표 미설정 잠금 안내 */
+        .todo-why { font-size: 0.68rem; font-weight: 700; color: var(--color-ink-3); margin-top: 4px; word-break: keep-all; }
+        .todo-locked { display: flex; flex-direction: column; gap: 4px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 10px; padding: 11px 12px; margin-bottom: 10px; }
+        .todo-locked b { font-size: 0.78rem; color: var(--color-ink); }
+        .todo-locked span { font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; word-break: keep-all; }
         .todo-none { font-size: 0.82rem; color: var(--color-ink-2); background: var(--color-success-soft); border-radius: 12px; padding: 13px 14px; line-height: 1.5; word-break: keep-all; }
         .todo-foot { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 10px; line-height: 1.5; word-break: keep-all; }
         /* [S4] 세법 툴팁/면책 */
