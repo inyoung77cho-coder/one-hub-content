@@ -204,8 +204,11 @@ export default function AssetsMapPage() {
             <div className="as-h">확인이 필요합니다</div>
             <p className="as-fix-q">
               <b>{w.name}</b>의 평단이 <b>{Number(w.avgPrice).toLocaleString()}원</b>으로 입력돼 있습니다.
-              흔한 원인은 <b>총매입액을 평단 칸에 넣은 경우</b>지만, 실제로 맞는 값일 수도 있어 <b>총자산에서 잠시 뺐습니다</b>.
-              어느 쪽인지는 입력하신 분만 아셔서 저희가 임의로 고치지 않았습니다.
+              흔한 원인은 <b>총매입액을 평단 칸에 넣은 경우</b>지만, 실제로 맞는 값일 수도 있습니다.
+              {w.dup_with_kis
+                ? <> 이 종목은 증권사 연동에도 있어 <b>총자산 합산에는 쓰지 않지만</b>, 목록·수익률에는 이 값이 그대로 보입니다.</>
+                : <> 그래서 <b>총자산에서 잠시 뺐습니다</b>.</>}
+              {" "}어느 쪽인지는 입력하신 분만 아셔서 저희가 임의로 고치지 않았습니다.
             </p>
             {fixId === w.id ? (
               <div className="as-fix-edit">
