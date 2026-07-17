@@ -3,6 +3,24 @@
 > WO2-S12 청크0. **읽기 전용 SSH 실측** 결과. 추측 코딩 금지의 근거 문서.
 > ⚠️ WO 문서들의 좌표에 오류가 있어 아래로 확정한다.
 
+## ★ 버전 · API 계약 (S17-0 Part3 확정 — 3자 일치의 기준)
+
+| 항목 | 값 | 확인 방법 |
+|---|---|---|
+| **APP_VERSION** | **`v10.0.0-ops`** | 단일 소스 `auto_trade/version.py`. `main.py`의 `APP_VERSION`은 **파생값**이니 기준으로 삼지 말 것 |
+| **api_contract** | **`2026-07`** | 엔진 `engine_status_api.py` `API_CONTRACT` ↔ 프론트 `components/EngineVersionBanner.js` `EXPECTED_CONTRACT`. **깨는 변경 시 같은 커밋에서 둘 다** 올린다(추가는 안 올림) |
+| 실시간 확인 | `curl -s http://localhost:5001/api/version` | `app_version`·`api_contract`·`endpoints`(url_map 자동생성)·`started_at` |
+| 버전 이력 | 8.0(06-15) → **8.2(06-19)** → 8.3 → 8.4 → 8.7(07-02) → 9.1(07-03) → **v10.0.0-ops(07-07)** | `.bak` 20개 실측. **단조 증가 — 롤백은 없었다** |
+
+> ⚠️ **`v8.2`는 2026-06-19 스냅샷이다.** S17-0 지시서가 이를 "현재 배포본"이라 한 것은
+> 한 달 전 기록을 현재로 오인한 것이다. "v9.x/v8.2 복원" 지시는 **이행 금지** — 신버전을 구버전으로 덮는 롤백이 된다.
+
+**배포는 `C:\onehub\deploy_auto_trade.ps1`로만. 손 SCP 금지.**
+게이트 7종(문법 · **버전후퇴 차단** · 장중 · `.bak` · git · 재시작 · 검증+자동롤백).
+실사격 확인: `v8.2` 배포 시도 → `[중단] 버전 후퇴 감지 (v10.0.0-ops -> v8.2)` exit 1.
+서버 `auto_trade/`에 **로컬 git** 도입(키·토큰 미추적) — 어떤 SCP도 `git diff`로 드러난다.
+`version_watch.sh` 크론(평일 09:00 KST)이 APP_VERSION 변경을 텔레그램으로 알린다.
+
 ## 접속
 
 | 항목 | 실측값 | WO 오기 |
