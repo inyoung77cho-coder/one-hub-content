@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
 시장 캘린더 — 단일 진실 공급원 (S18 Part5 E-1/E-2/E-3)
 
@@ -60,8 +60,23 @@ def _as_date(d) -> date:
 
 
 def is_open(market: str, d) -> bool:
-    """해당 날짜에 시장이 열리는가. 판정 실패 시 CalendarError."""
+    """해당 날짜에 시장이 열리는가. 판정 실패 시 CalendarError.
+
+    ★ KRX 는 KIS(증권사 자신의 휴장 캘린더)를 1차 소스로 쓴다.
+      2026-07-17 실증: KIS=휴장 / exchange_calendars(XKRX)=개장 — 임시공휴일(K5)을
+      라이브러리는 모른다. 정부가 갑자기 지정하기 때문이다.
+      KIS 가 모른다(None)고 하면 그때만 XKRX 로 폴백한다.
+      근로자의날(5/1)·연말휴장(12/31)은 양쪽이 일치함을 실측으로 확인했다.
+    """
     d = _as_date(d)
+    if market.upper() == "KRX":
+        try:
+            import kis_holiday
+            v = kis_holiday.is_open(d)
+            if v is not None:
+                return bool(v)
+        except Exception as e:
+            print(f"[market_calendar] KIS 휴장조회 불가 → XKRX 폴백: {e}")
     try:
         return bool(_cal(market).is_session(d.isoformat()))
     except CalendarError:
