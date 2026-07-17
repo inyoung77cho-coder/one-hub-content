@@ -2576,13 +2576,27 @@ export default function PWADashboard({ latestReport }) {
                 const rr = perf.rr_ratio;
                 const rrColor = !cv ? 'var(--color-ink-2)' : rr == null ? 'var(--text-secondary)' : rr >= 1.5 ? 'var(--color-success)' : rr >= 1 ? 'var(--color-warning)' : 'var(--color-danger)';
                 // 극단값(손익비·MDD)은 학습 중이면 값을 접고 '표본 N건'으로 대체 — 단일 이상치 왜곡 방지.
-                const rrTile = pol.collapseExtremes ? { k: '손익비', v: `${nTrade}/30`, sub: '30건 모이면 공개', c: 'var(--color-ink-3)' }
-                  : { k: '손익비', v: rr != null ? `${rr}` : '-', sub: '이익/손실', c: rrColor };
-                const mddTile = pol.collapseExtremes ? { k: '최대 낙폭', v: `${nTrade}/30`, sub: '30건 모이면 공개', c: 'var(--color-ink-3)' }
-                  : { k: '최대 낙폭', v: perf.mdd != null ? `-${perf.mdd}%` : '-', sub: '고점 대비', c: 'var(--color-danger)' };
+                // [S18 C-1] 잠긴 지표의 숫자 자리에 분수를 넣지 않는다.
+                //   기존 `${nTrade}/30` 은 손익비 자리에 박혀 "손익비 0.03"으로 읽혔다.
+                //   0.03은 파산 직전 수치다 — 잠긴 것뿐인데 최악의 오해를 만든다.
+                //   숫자 자리는 🔒, 진행도는 캡션으로만.
+                const rrTile = pol.collapseExtremes ? { k: '손익비', v: '🔒', sub: `표본 ${nTrade}/30 — 30건부터 공개`, c: 'var(--color-ink-3)' }
+                  : { k: '손익비', v: rr != null ? `${rr}` : '–', sub: '이익/손실', c: rrColor };
+                const mddTile = pol.collapseExtremes ? { k: '최대 낙폭', v: '🔒', sub: `표본 ${nTrade}/30 — 30건부터 공개`, c: 'var(--color-ink-3)' }
+                  : { k: '최대 낙폭', v: perf.mdd != null ? `-${perf.mdd}%` : '–', sub: '고점 대비', c: 'var(--color-danger)' };
+                // [S18 C-3] 적중률은 표본 50건까지 잠근다(삭제가 아니라 잠금 — 50건 도달 시 자동 공개).
+                //   근거: 자기검증 탭이 "50건 미만이라 자동 규칙조정 보류(과적합 방지)"라고 이미 선언한다.
+                //   규칙조정은 50건에서 보류하면서 성적표는 24건에 공개하는 건 자기모순이다.
+                //   ★ 미채점 건을 패로 세지 않는다 — 채점된 승부가 없으면 승률도 잠근다.
+                const accLocked = accChecked != null && accChecked < 50;
+                const noScored = !pol.declareWinner && !(perf.wins > 0 || perf.losses > 0);
                 const tiles = [
-                  { k: '승률', v: pol.declareWinner ? (perf.win_rate != null ? `${perf.win_rate}%` : '-') : `${perf.wins ?? 0}승 ${perf.losses ?? 0}패`, sub: pol.declareWinner ? `${perf.wins ?? 0}승 ${perf.losses ?? 0}패` : '아직 판단 이르다', c: pol.declareWinner ? winColor : 'var(--color-ink-3)' },
-                  { k: '차단 적중률', v: accPct != null ? `${accPct}%` : '수집중', sub: accChecked != null ? `검증 ${accChecked}건` : '누적 필요', c: accColor },
+                  noScored
+                    ? { k: '나 vs AI', v: '🔒', sub: '아직 채점된 승부가 없습니다', c: 'var(--color-ink-3)' }
+                    : { k: '나 vs AI', v: pol.declareWinner ? (perf.win_rate != null ? `${perf.win_rate}%` : '–') : `${perf.wins ?? 0}승 ${perf.losses ?? 0}패`, sub: pol.declareWinner ? `${perf.wins ?? 0}승 ${perf.losses ?? 0}패` : '아직 판단 이르다', c: pol.declareWinner ? winColor : 'var(--color-ink-3)' },
+                  accLocked
+                    ? { k: '차단 적중률', v: '🔒', sub: `표본 50건부터 공개 (현재 ${accChecked}건)`, c: 'var(--color-ink-3)' }
+                    : { k: '차단 적중률', v: accPct != null ? `${accPct}%` : '–', sub: accChecked != null ? `검증 ${accChecked}건` : '데이터를 불러오지 못했습니다', c: accColor },
                   rrTile,
                   mddTile,
                 ];

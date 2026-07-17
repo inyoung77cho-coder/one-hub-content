@@ -226,11 +226,15 @@ export default function TodayPage() {
 
         {/* ⑤ AI 학습 — 항상 */}
         <section className="card">
-          <div className="td-h">AI 학습</div>
+          {/* [S18 C-2] 이 진행도는 '내 판단 기록'(나 vs AI 채점 대상)이지 검증 표본이 아니다.
+              정식 통계 여부는 sample.verified(block_accuracy 검증 완료) 기준으로만 판정한다.
+              이 수가 30을 넘겼다고 "정식 통계 구간"이라 선언하면 다른 축의 숫자로 통계를
+              선언하는 셈이 된다 — 실제로 자기검증 탭은 같은 시각 "학습 중"이라고 말한다. */}
+          <div className="td-h">AI 학습 <span className="td-sub">나 vs AI 채점 기준</span></div>
           <div className="td-prog"><span className="td-prog-fill" style={{ width: `${pol.progressPct}%` }} /></div>
           <p className="td-vtext td-quiet">
-            {pol.count}/{pol.target}
-            {pol.remaining > 0 ? <> · {pol.remaining}건 남으면 정식 통계를 공개합니다</> : <> · 정식 통계 구간입니다</>}
+            누적 판단 기록 {pol.count}건
+            {pol.remaining > 0 ? <> · {pol.remaining}건 남으면 채점 통계를 공개합니다</> : <> · 채점 기준 {pol.target}건을 넘겼습니다</>}
           </p>
         </section>
       </DataState>
