@@ -17,6 +17,8 @@ grep -q "text-overflow: ellipsis" pages/pwa/assets.js; chk "범례 라벨 말줄
 grep -q "tabular-nums" pages/pwa/assets.js; chk "금액 자릿수 정렬" $?
 grep -qE "padding: 0 14px calc\(env\(safe-area-inset-bottom, 0px\) \+ 140px\)" pages/pwa/assets.js; chk "FAB 가림 방지 여백(140px)" $?
 
+grep -q "max-width: 430px" pages/pwa/assets.js; chk "범례 모바일 세로배치(폭 확보 — ellipsis는 잘림을 감출 뿐) ★" $?
+
 echo "── N7 소표본 게이트 ──"
 # 원 지적: 100% (1/1건)이 "ML이 신뢰하는 신호" 1위
 grep -q "MIN_SHOW" pages/pwa/index.js; chk "표본 하한 게이트 존재" $?

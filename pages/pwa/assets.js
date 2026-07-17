@@ -328,6 +328,14 @@ export default function AssetsMapPage() {
         .as-arrow.sm { font-size: 0.8rem; }
         .as-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 12px; }
         .as-map { display: flex; align-items: center; gap: 14px; }
+        /* [N5] 좁은 화면에서 도넛과 범례가 나란히 서면 범례 폭이 ~183px로 눌려
+           '🏠 부동산'이 52px 필요한데 40px만 받아 잘린다(실측 375px).
+           ellipsis 는 잘림을 감출 뿐 없애지 못한다 → 도넛을 위로 올려 폭을 되돌려준다. */
+        @media (max-width: 430px) {
+          .as-map { flex-direction: column; align-items: stretch; gap: 10px; }
+          .as-donut { align-self: center; }
+          .as-legend { width: 100%; }
+        }
         .as-donut { width: 116px; height: 116px; flex-shrink: 0; }
         .as-donut-t { font-size: 8px; fill: var(--color-ink-3); font-weight: 700; }
         .as-donut-v { font-size: 11px; fill: var(--color-ink); font-weight: 800; }
