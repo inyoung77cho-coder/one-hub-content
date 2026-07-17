@@ -10,6 +10,7 @@ import { getTrader, useTrader } from "../../lib/trader";
 import { getLedger as getAssetLedger } from "../../lib/ledger";
 import { getLedger as getDecisionLedger } from "../../lib/verdictLedger";
 import { samplePolicy } from "../../lib/sampleSize";
+import { pickInsight } from "../../lib/crossInsight";
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
@@ -108,6 +109,9 @@ export default function TodayPage() {
   // ── ⑤ AI 학습: 정식 통계까지 남은 표본.
   const pol = samplePolicy(mine.length);
 
+  // ── [N9] 자산군 교차 판단 — 하루 1개만. 규칙 기반·결정적(같은 데이터 = 같은 문장).
+  const insight = pickInsight(ledger, { regime: dash?.market?.regime, heat: dash?.market?.heat_score, blockedCount: blocked.length });
+
   return (
     <div className="td">
       <header className="td-hd">
@@ -150,6 +154,15 @@ export default function TodayPage() {
           </p>
           {blocked.length > 0 && (
             <button className="td-link" onClick={() => router.push("/pwa?tab=report&sec=verify")}>무엇을 왜 걸렀나 →</button>
+          )}
+          {/* [N9] 자산을 묶어 본 판단 — 하루 1개. 주식·ETF·부동산을 따로 보면 안 보이는 것. */}
+          {insight && (
+            <div className="td-x">
+              <div className="td-x-h">자산을 묶어 보면</div>
+              <p className="td-x-t">{insight.text}</p>
+              <button className="td-link" onClick={() => router.push(insight.cta.href)}>{insight.cta.label}</button>
+              <div className="td-x-d">{insight.disclaimer}</div>
+            </div>
           )}
         </section>
 
@@ -225,6 +238,11 @@ export default function TodayPage() {
         .td-vtext { font-size: 0.88rem; line-height: 1.55; color: var(--color-ink); word-break: keep-all; margin: 0; }
         .td-quiet { color: var(--color-ink-2); font-size: 0.82rem; }
         .td-link { margin-top: 10px; min-height: 44px; padding: 0 2px; border: none; background: none; color: var(--color-primary); font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        /* [N9] 교차 판단 — ② 아래 점선으로 구분. 하루 1개. */
+        .td-x { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--color-line); }
+        .td-x-h { font-size: 0.72rem; font-weight: 800; color: var(--color-primary); margin-bottom: 6px; }
+        .td-x-t { font-size: 0.84rem; line-height: 1.55; color: var(--color-ink); word-break: keep-all; margin: 0; }
+        .td-x-d { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 6px; line-height: 1.5; }
         .td-mlist { display: flex; flex-direction: column; gap: 2px; }
         .td-mrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--color-line); }
         .td-mrow:last-child { border-bottom: none; }
