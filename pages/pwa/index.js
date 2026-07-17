@@ -1610,6 +1610,7 @@ export default function PWADashboard({ latestReport }) {
                     scores: { macro: sc.macro, ml: sc.ml, technical: sc.technical, risk: sc.risk },
                     final_score: sc.final, // 4개 지표 가중 평균(서브점수와 일관)
                     interest: Math.round(s.score ?? 0), // 백엔드 관심도(스크리닝 원점수) — 별도 표기
+                    tie: tieNote(s), // [N8] 동점 2차 정렬 근거 — 카드에서 접고 여기서만 밝힌다
                     win_rate: s.win_rate ?? null,
                     // [v9.0][13] Why Now? -- 근거를 최대 5개까지 노출
                     reasons: [
@@ -1665,12 +1666,14 @@ export default function PWADashboard({ latestReport }) {
                             <div className="top3-reason">{m.reason}</div>
                             {/* [S-4] 관심도·기대수익(소수1자리) + 동점 2차근거 */}
                             <div className="top3-ai-pct mono">관심도 {sc} · 기대 +{m.upside.toFixed(1)}%</div>
-                            {tieNote(s) && <div className="tie-note">↳ {tieNote(s)}</div>}
+                            {/* [N8] 동점 2차근거는 카드에서 접는다 — '정렬 근거'이지 '판단 근거'가 아니라서
+                                카드 위계를 뺏을 이유가 없다. 판단근거 시트 안으로 옮김(openSheet.tie). */}
                             <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>판단근거 ›</button>
                             {/* [S-8] 나 vs AI 예고 */}
                             <div className="vs-teaser">AI는 <b style={{ color: m.verdict.color }}>{m.verdict.short}</b> · 당신의 선택은?</div>
-                            {/* [S-6/R2] 매수하기 — 실주문은 증권사에서(즉시 체결 아님), 체결 후 '샀어요'로 기록. '바로 매수' 과장 완화. */}
-                            <button className="buy-now-btn" onClick={(e) => { e.stopPropagation(); setBuyNotice({ name: s.name, code: s.code }); }}>매수하기 →</button>
+                            {/* [N8] 이 버튼은 주문을 넣지 않는다(실주문 연동 없음) — 라벨이 하는 일과 같아야 한다.
+                                '매수하기'는 앱이 지킬 수 없는 약속이라 '주문 방법'으로 낮춘다. */}
+                            <button className="buy-now-btn" onClick={(e) => { e.stopPropagation(); setBuyNotice({ name: s.name, code: s.code }); }}>주문 방법 →</button>
                             {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (<>
                               <div className="dec-mini" onClick={(e) => e.stopPropagation()}>
                                 <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>샀어요</button>
@@ -1699,7 +1702,6 @@ export default function PWADashboard({ latestReport }) {
                                     <span className="rec-verdict-inline" style={{ color: m.verdict.color, background: m.verdict.bg }}>{m.verdict.short}</span>
                                   </button>
                                   <div className="rec-reason">{m.reason}</div>
-                                  {tieNote(s) && <div className="tie-note sm">↳ {tieNote(s)}</div>}
                                   {/* [나 vs AI] 내 판단 기록 */}
                                   {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (
                                     <div className="dec-mini">
@@ -3000,7 +3002,7 @@ export default function PWADashboard({ latestReport }) {
         {buyNotice && (
           <div onClick={() => setBuyNotice(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 360, background: 'var(--color-card)', color: 'var(--color-text)', borderRadius: 16, padding: 18, boxShadow: '0 12px 40px rgba(0,0,0,.3)' }}>
-              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>매수하기 · {buyNotice.name} <span style={{ color: 'var(--color-ink-3)', fontWeight: 500 }}>({buyNotice.code})</span></div>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>주문 방법 · {buyNotice.name} <span style={{ color: 'var(--color-ink-3)', fontWeight: 500 }}>({buyNotice.code})</span></div>
               <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.55, wordBreak: 'keep-all' }}>실주문 자동연동은 준비 중입니다. <b>증권사 앱에서 매수 주문</b>을 완료하신 뒤 아래 <b>‘샀어요로 기록’</b>을 누르면 <b>나 vs AI</b> 채점에 반영됩니다.</div>
               <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
                 <button onClick={() => { logDecision(buyNotice.code, buyNotice.name, 'take'); setBuyNotice(null); }} style={{ flex: 1, border: 'none', borderRadius: 10, padding: '11px 0', fontWeight: 800, background: 'var(--color-primary)', color: '#fff', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>샀어요로 기록</button>
@@ -3184,6 +3186,14 @@ export default function PWADashboard({ latestReport }) {
                     <span style={{ color: 'var(--text-primary)', lineHeight: 1.4 }}>{r.text}</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* [N8] 정렬 근거(동점 2차) — 판단 근거와 섞지 않고 별도 라벨로 밝힌다 */}
+            {bottomSheet.tie && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 6 }}>정렬 근거</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)', lineHeight: 1.5, wordBreak: 'keep-all' }}>{bottomSheet.tie} — 관심도가 같을 때 이 기준으로 순서를 정했습니다.</div>
               </div>
             )}
 
@@ -3660,8 +3670,6 @@ export default function PWADashboard({ latestReport }) {
         .ai-verdict-badge { align-self: stretch; text-align: center; font-size: 0.82rem; font-weight: 800; padding: 6px 8px; border-radius: 9px; border: 1.5px solid; letter-spacing: -0.01em; margin-bottom: 2px; }
         .rec-verdict-inline { font-size: 0.62rem; font-weight: 800; padding: 1px 7px; border-radius: 20px; margin-left: 4px; }
         /* [S-4] 동점 2차 정렬 근거 */
-        .tie-note { font-size: 0.62rem; color: var(--color-primary); font-weight: 600; line-height: 1.3; word-break: keep-all; }
-        .tie-note.sm { font-size: 0.6rem; margin-top: 2px; }
         /* [S-8] 나 vs AI 예고 */
         .vs-teaser { font-size: 0.64rem; font-weight: 700; color: var(--text-secondary); margin-top: 2px; }
         .vs-teaser b { font-weight: 800; }
@@ -3680,7 +3688,6 @@ export default function PWADashboard({ latestReport }) {
               "num  name    verdict"
               "num  reason  reason"
               "num  pct     why"
-              "num  tie     tie"
               "num  dec     dec"
               "num  buy     buy"
               "num  dday    dday";
@@ -3694,7 +3701,6 @@ export default function PWADashboard({ latestReport }) {
           .ai-verdict-badge { grid-area: verdict; align-self: center; justify-self: end; font-size: 0.66rem; padding: 4px 8px; white-space: nowrap; }
           .top3-reason      { grid-area: reason;  justify-content: flex-start; text-align: left; min-height: 0; width: auto; }
           .top3-ai-pct      { grid-area: pct;     text-align: left; font-size: 0.84rem; width: auto; }
-          .tie-note         { grid-area: tie;     text-align: left; }
           .top3-why-btn     { grid-area: why;     justify-self: end; align-self: center; }
           .dec-mini         { grid-area: dec;     margin-top: 2px; }
           .buy-now-btn      { grid-area: buy; }
