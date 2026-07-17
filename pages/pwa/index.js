@@ -940,7 +940,11 @@ export default function PWADashboard({ latestReport }) {
 
       <div className={`pwa-wrapper pwa-shell theme-${theme}`} style={{ display: splash ? 'none' : undefined }}>
         <header className="pwa-header">
-          <button className="pwa-brand" onClick={() => setTab('dashboard')} aria-label="홈으로">
+          {/* [S18] 로고는 종합자산으로 간다.
+              기존 setTab('dashboard')는 N2에서 폐지된 구 대시보드 탭이라, 누르면 '예전 PWA'가
+              되살아났다(리다이렉트는 URL 진입만 막고 탭 전환은 못 막는다).
+              앱 전체에서 로고 = 종합자산(/pwa/assets) 하나로 통일한다. */}
+          <button className="pwa-brand" onClick={() => router.push('/pwa/assets')} aria-label="종합자산">
             <span className="pwa-logo">ONE<span className="pwa-logo-dot">·</span>HUB</span>
           </button>
           <div className="pwa-header-actions">

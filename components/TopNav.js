@@ -26,7 +26,8 @@ export default function TopNav({ active }) {
   return (
     <div className="tn">
       <header className="tn-hd">
-        <button type="button" className="tn-logo" onClick={() => router.push("/pwa?tab=dashboard")} aria-label="홈으로">ONE<span className="tn-dot">·</span>HUB</button>
+        {/* [S18] 로고 = 종합자산. 기존 ?tab=dashboard 는 N2에서 폐지된 구 대시보드라 '예전 PWA'가 되살아났다. */}
+        <button type="button" className="tn-logo" onClick={() => router.push("/pwa/assets")} aria-label="종합자산">ONE<span className="tn-dot">·</span>HUB</button>
         <div className="tn-ic">
           <TraderBadge />
           <button className="tn-add" aria-label="자산 빠른입력" title="자산 빠른입력" onClick={() => setQaOpen(true)}>＋</button>

@@ -29,6 +29,12 @@ const ACCT_TAX = ACCOUNTS.reduce((m, a) => { m[a] = `${ACCT_EMOJI[a] || ""} ${ac
 // [S4] 계좌 필터 칩
 const ACCT_FILTERS = ["전체", ...ACCOUNTS];
 
+// [S18] 해외 보유 판정 — 시장(market) 기준. 통화(avgCcy)로 가르면 안 된다.
+//   해외 ETF 를 원화로 매수 기록하면 avgCcy 가 KRW 라 국내로 잡혔다(실측 버그).
+//   통화는 "어떻게 샀나", 시장은 "무엇을 샀나" — 다른 축이다.
+//   market 이 없는 옛 기록은 티커로 추론한다(inferMarket: 숫자=kr, 그 외=us).
+const isOverseasHolding = (h) => (h?.market === "us") || (h?.market !== "kr" && inferMarket(h?.ticker) === "us");
+
 export default function EtfDashboard() {
   const router = useRouter();
   const [report, setReport] = useState(null);
@@ -463,7 +469,11 @@ export default function EtfDashboard() {
 
       {/* [E-4] 목표 배분 · 국내/해외 이탈도 → 처방(진단 단독 금지). 목표 미설정 시 프리셋 3종. */}
       {holdings.length > 0 && (() => {
-        const overseasKrw = holdings.reduce((a, h) => a + ((h.avgCcy === "USD") ? (holdingMetrics(h).valueKrw || 0) : 0), 0);
+        // [S18] 해외/국내는 '시장'으로 가른다 — 통화가 아니다.
+        //   기존: avgCcy === "USD" 로 판정 → 해외 ETF(SMH·VOO 등)를 원화로 매수 기록하면
+        //   국내로 잡혔다. 통화는 '어떻게 샀나'이고 시장은 '무엇을 샀나'다. 섞으면 안 된다.
+        //   market 필드가 없는 옛 기록은 티커로 추론한다(숫자=국내, 그 외=해외).
+        const overseasKrw = holdings.reduce((a, h) => a + (isOverseasHolding(h) ? (holdingMetrics(h).valueKrw || 0) : 0), 0);
         const domesticKrw = Math.max(0, myTotal - overseasKrw);
         const curO = myTotal > 0 ? Math.round(overseasKrw / myTotal * 1000) / 10 : null;
         const curD = myTotal > 0 ? Math.round(domesticKrw / myTotal * 1000) / 10 : null;
@@ -487,7 +497,7 @@ export default function EtfDashboard() {
               // 처방: 해외 초과 시 가장 큰 USD 보유 축소 수량 산출
               let rx = null;
               if (over && driftO > 0) {
-                const usd = holdings.filter((h) => h.avgCcy === "USD").map((h) => ({ h, v: holdingMetrics(h).valueKrw || 0, px: (quotes[h.ticker]?.price ?? 0) * (fxRate || 0) })).sort((a, b) => b.v - a.v)[0];
+                const usd = holdings.filter(isOverseasHolding).map((h) => ({ h, v: holdingMetrics(h).valueKrw || 0, px: (quotes[h.ticker]?.price ?? 0) * (fxRate || 0) })).sort((a, b) => b.v - a.v)[0];
                 const cutKrw = overseasKrw - (tgt.해외 / 100) * myTotal;
                 const qty = usd && usd.px > 0 ? Math.max(1, Math.round(cutKrw / usd.px)) : null;
                 if (usd && qty) rx = { name: usd.h.ticker, qty, amt: Math.round(qty * usd.px) };
@@ -520,7 +530,7 @@ export default function EtfDashboard() {
       {holdings.length > 1 && (() => {
         const genAcct = holdings.filter((h) => (h.account || "일반") === "일반");
         const taxAcct = holdings.filter((h) => isPensionAcct(h.account || "일반") || (h.account || "일반") === "ISA");
-        const overseasInGen = genAcct.filter((h) => h.avgCcy === "USD");
+        const overseasInGen = genAcct.filter(isOverseasHolding);   // [S18] 통화가 아니라 시장으로
         const domesticInTax = taxAcct.filter((h) => h.avgCcy === "KRW");
         const swap = overseasInGen.length > 0 && domesticInTax.length > 0;
         return (

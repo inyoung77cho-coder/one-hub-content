@@ -122,7 +122,7 @@ export default function TodayPage() {
   return (
     <div className="td">
       <header className="td-hd">
-        <button className="td-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">ONE<span className="td-dot">·</span>HUB</button>
+        <button className="td-logo" onClick={() => router.push("/pwa/assets")} aria-label="종합자산">ONE<span className="td-dot">·</span>HUB</button>
         <div className="td-ic">
           <TraderBadge />
           <button className="td-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>
