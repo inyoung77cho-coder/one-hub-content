@@ -305,6 +305,9 @@ export default function PWADashboard({ latestReport }) {
   useEffect(() => {
     if (!router.isReady) return;
     const { tab: tabParam, code, name } = router.query;
+    // [N2] 종합자산 지도는 /pwa/assets 하나로 통합 — 구 dashboard 탭으로 오는 경로는 전부 리다이렉트.
+    //   지도가 2개면 총자산이 같아도 '어느 화면이 정답인지' 알 수 없어 신뢰가 무너진다.
+    if (tabParam === 'dashboard') { router.replace('/pwa/assets'); return; }
     // [v10 UI] 딥링크(?tab=)로 진입 시 = 다른 페이지에서 넘어온 재방문 → 스플래시 건너뜀(버그#3)
     if (tabParam) { setTab(tabParam); setSplash(false); }
     if (code && name) {
@@ -339,6 +342,10 @@ export default function PWADashboard({ latestReport }) {
       // 프로필도 없고 온보딩도 안 했으면 최초 사용자 → 위저드 1회 진입(시안 onehub-onboarding)
       if (!saved && !onboarded && !router.query.tab && !router.query.code) {
         router.replace('/pwa/onboarding');
+      } else if (!router.query.tab && !router.query.code) {
+        // [N2] 온보딩을 마친 사용자가 탭 없이 /pwa로 들어오면 구 dashboard가 아니라
+        //   단일 종합자산 지도(/pwa/assets)로 보낸다. 구 dashboard는 더는 도달 경로가 없다.
+        router.replace('/pwa/assets');
       }
     } catch (e) { /* 무시 */ }
     // [v8.5] 최근 검색 종목 불러오기
@@ -980,13 +987,14 @@ export default function PWADashboard({ latestReport }) {
         {/* [S2 IA] 대시보드 · 주식 · ETF · 부동산 · 트러스트 (AI자산=대시보드 링크, 기록=트러스트로 이동) */}
         <nav className="pwa-tabs">
           {[
-            ['dashboard','종합자산'],
+            ['assets','종합자산'],
             ['stock','주식'],
             ['etf','ETF'],
             ['realestate','부동산'],
             ['trust','AI 신뢰도'],
           ].map(([t,label]) => {
-            const routes = { etf: '/pwa/etf', realestate: '/pwa/realestate' };
+            // [N2] 종합자산 = 단일 지도 /pwa/assets (구 dashboard 탭 폐지)
+            const routes = { assets: '/pwa/assets', etf: '/pwa/etf', realestate: '/pwa/realestate' };
             const stockTabs = ['recommend','portfolio','analyze'];   // 기록(report)은 트러스트로 이동
             const isActive = t === 'stock' ? stockTabs.includes(tab)
               : t === 'trust' ? tab === 'report'
