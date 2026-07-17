@@ -265,6 +265,12 @@
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://one-hub-content.vercel.app/weekly/2026-W29</loc>
+    <lastmod>2026-07-17</lastmod>
+    <changefreq>never</changefreq>
+    <priority>0.6</priority>
+  </url>
+  <url>
     <loc>https://one-hub-content.vercel.app/weekly/2026-W28</loc>
     <lastmod>2026-07-10</lastmod>
     <changefreq>never</changefreq>

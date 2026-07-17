@@ -78,9 +78,11 @@ export default function TodayPage() {
   const pendItems = pend?.ok ? (pend.items ?? []) : [];
 
   // ── ① 결정 대기: 승인 대기 + 손절선 임박. 없으면 블록 자체를 렌더하지 않는다.
+  // [S18 C-6] 손실률은 상태이지 이벤트가 아니다 — 평가손익률만으로 결정대기를 띄우지 않는다.
+  //   손절선이 있는 종목만, 그 선을 기준으로 발동한다(이탈 또는 2% 이내 근접).
   const nearStop = positions.filter((p) => {
-    const sl = Number(p.stop_loss) || 0, cur = Number(p.current_price) || 0, r = Number(p.pnl_rate);
-    return (sl > 0 && cur > 0 && cur <= sl * 1.03) || (Number.isFinite(r) && r <= -7);
+    const sl = Number(p.stop_loss) || 0, cur = Number(p.current_price) || 0;
+    return sl > 0 && cur > 0 && cur <= sl * 1.02;
   });
   const decideCount = pendItems.length + nearStop.length;
 
@@ -135,16 +137,23 @@ export default function TodayPage() {
           <section className="card td-decide">
             <div className="td-h">결정 대기 <b>{decideCount}건</b></div>
             {nearStop.slice(0, 3).map((p, i) => {
-              // 손절선이 설정된 종목만 '손절선 N원'을 말한다. 없으면 손실률로 사유를 밝힌다('0원' 오표시 방지).
+              // [S18 C-6] '부근'은 완곡어다. 현재가가 손절선 아래면 이미 이탈한 것이고,
+              //   보유 화면은 이미 '이탈'이라 정확히 말한다. 두 화면이 다른 말을 하면 안 된다.
               const sl = Number(p.stop_loss) || 0;
+              const cur = Number(p.current_price) || 0;
+              const breached = sl > 0 && cur > 0 && cur < sl;
+              const distPct = sl > 0 && cur > 0 ? ((cur / sl - 1) * 100) : null;
               return (
                 <div className="td-drow" key={p.code || i}>
                   <span className="td-dn">{p.name}<em className="td-dpct">{pctTxt(p.pnl_rate)}</em></span>
                   <span className="td-dsub">
-                    {sl > 0
-                      ? `손절선 ${sl.toLocaleString()}원 부근 — 오늘 판단이 필요합니다`
-                      : `손실이 ${Math.abs(Number(p.pnl_rate)).toFixed(1)}%까지 벌어졌습니다 — 오늘 판단이 필요합니다`}
+                    {breached
+                      ? `손절선 ${sl.toLocaleString()}원 이탈 — 매도 검토 필요`
+                      : `손절선까지 ${Math.abs(distPct).toFixed(1)}% — 오늘 판단이 필요합니다`}
                   </span>
+                  {/* [S18 C-6] AI 판단을 반드시 병기한다. 사유만 있고 AI 판단이 없으면
+                      사용자는 '앱이 겁주는 건지 AI가 팔라는 건지' 알 수 없다. */}
+                  {p.ai_verdict && <span className="td-dai">AI 판단: {p.ai_verdict}</span>}
                 </div>
               );
             })}
@@ -250,6 +259,8 @@ export default function TodayPage() {
         .td-dn { font-size: 0.88rem; font-weight: 800; color: var(--color-ink); display: flex; align-items: baseline; gap: 6px; }
         .td-dpct { font-style: normal; font-size: 0.8rem; font-weight: 800; color: var(--color-danger); }
         .td-dsub { font-size: 0.74rem; color: var(--color-ink-2); word-break: keep-all; line-height: 1.45; }
+        /* [S18 C-6] AI 판단 병기 — 사유와 나란히, 위계는 한 단계 아래 */
+        .td-dai { font-size: 0.7rem; font-weight: 700; color: var(--color-ink-3); word-break: keep-all; }
         .td-cta { width: 100%; margin-top: 10px; min-height: 44px; border: none; border-radius: 11px; background: var(--color-danger); color: #fff; font-size: 0.86rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .td-vtext { font-size: 0.88rem; line-height: 1.55; color: var(--color-ink); word-break: keep-all; margin: 0; }
         .td-quiet { color: var(--color-ink-2); font-size: 0.82rem; }

@@ -17,7 +17,11 @@ grep -q "걸렀습니다" pages/pwa/today.js; chk "관망일 콘텐츠(차단 N�
 #   (같은 시각 추천 탭에 관심 종목이 떠 있으면 두 화면이 서로를 반박한다)
 ! grep -qE "살 만한 게 (없|None)|살 게 없" pages/pwa/today.js; chk "B-1 시장 단정 오역 0 ★" $?
 # 없는 손절선을 0원이라 말하지 않는다(라이브에서 잡힌 오표시)
-grep -q "sl > 0" pages/pwa/today.js; chk "손절선 미설정 시 '0원' 오표시 방지" $?
+# [S18 C-6] '부근'은 완곡어다. 현재가<손절선이면 이미 '이탈'이고, 보유 화면은 그렇게 말한다.
+! grep -q "원 부근" pages/pwa/today.js; chk "C-6 '손절선 부근' 완곡표현 0 ★" $?
+grep -q "이탈 — 매도 검토 필요" pages/pwa/today.js; chk "C-6 '이탈' 카피" $?
+# 손실률은 상태이지 이벤트가 아니다 — pnl_rate 단독으로 결정대기를 띄우지 않는다
+! grep -qE "r <= -7|pnl_rate\) <= -7" pages/pwa/today.js; chk "C-6 손실률 단독 발동 제거" $?
 # 남의 단지 신고가를 내 것으로 오해시키지 않는다
 grep -q "내 단지 아님" pages/pwa/today.js; chk "신고가 오해 방지 라벨" $?
 
