@@ -5,7 +5,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
-import TopNav from "../../components/TopNav";
 import BottomNav from "../../components/BottomNav";
 import { setTraderGlobal } from "../../lib/trader";
 import QuickAddSheet from "../../components/shared/QuickAddSheet";
@@ -159,7 +158,6 @@ export default function Settings() {
 
   return (
     <div className="m pwa-shell">
-      <TopNav active="settings" />
       <div className="hd"><h1>⚙️ 설정</h1></div>
 
       {/* 뷰 전환 세그먼트 — 일반 / 운영자 */}

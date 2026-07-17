@@ -3,7 +3,6 @@
 // ★ 단일 점수 블랙박스 금지 — Portfolio Score는 구성요소를 펼쳐 보여준다(§11.2).
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
-import TopNav from "../../components/TopNav";
 import BottomNav from "../../components/BottomNav";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS } from "../../lib/etfHoldings";
@@ -340,7 +339,6 @@ export default function EtfDashboard() {
 
   return (
     <div className="etf pwa-shell">
-      <TopNav active="etf" />
 
       {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해 (시안: 다크 네이비 히어로) */}
       <section className="hero">

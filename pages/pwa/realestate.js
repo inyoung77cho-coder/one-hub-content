@@ -1,7 +1,6 @@
 // ONE-HUB v10 — 부동산 자산 대시보드 (PWA, onehub-realestate 5002 연동)
 // ETF 대시보드와 동일 패턴. ONE Score 랭킹/시장 브리핑/저평가/거시. 확정 데이터는 진한색.
 import { useEffect, useState } from "react";
-import TopNav from "../../components/TopNav";
 import BottomNav from "../../components/BottomNav";
 import { dedupBy } from "../../lib/useDedup";
 import { ReForm } from "../../components/shared/AssetForms";
@@ -190,7 +189,6 @@ export default function RealEstateDashboard() {
 
   return (
     <div className="re pwa-shell">
-      <TopNav active="realestate" />
 
       {/* 1) HERO — 시장 브리핑 (다크 네이비 히어로) */}
       <section className="hero">
