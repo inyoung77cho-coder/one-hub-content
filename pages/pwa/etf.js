@@ -887,6 +887,65 @@ export default function EtfDashboard() {
         ) : (
           <div className="me-empty">보유 ETF를 추가하면 <b>현재가·평가액·손익</b>이 자동으로 갱신됩니다. 미국 ETF는 티커(<b>SCHD</b>), 국내는 숫자코드(<b>069500</b>)로 입력하세요.</div>
         )}
+        {/* [S18 D-1] 매수·매도 기록 폼 — submitTrade 를 부르는 UI 가 아예 없었다.
+            함수(209행)·form state(49행)·editHolding 프리필까지 다 있는데 렌더될 폼이 없어
+            매수 기록도, 수정도 불가능했다("편집이 안 된다"의 뿌리).
+            editHolding 이 .me-form 으로 스크롤하는데 그 요소가 존재하지 않았다. */}
+        <div className="me-form">
+          <div className="mf-tabs">
+            {[["buy", "매수 기록"], ["sell", "매도 기록"]].map(([k, l]) => (
+              <button key={k} type="button" className={`mf-tab ${form.side === k ? "on" : ""}`}
+                onClick={() => { setForm((f) => ({ ...f, side: k })); setFormMsg(""); }}>{l}</button>
+            ))}
+          </div>
+          <div className="mf-grid">
+            <label className="mf-f mf-tk">
+              <span>티커</span>
+              <input value={form.ticker} placeholder="SCHD / 069500"
+                onChange={(e) => setForm((f) => ({ ...f, ticker: e.target.value }))} />
+            </label>
+            <label className="mf-f">
+              <span>수량</span>
+              <input type="number" inputMode="decimal" value={form.shares} placeholder="10"
+                onChange={(e) => setForm((f) => ({ ...f, shares: e.target.value }))} />
+            </label>
+            {form.side === "buy" && (
+              <label className="mf-f">
+                <span>평단</span>
+                <input type="number" inputMode="decimal" value={form.price} placeholder="78"
+                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} />
+              </label>
+            )}
+            {form.side === "buy" && (
+              <label className="mf-f">
+                <span>통화</span>
+                <select value={form.ccy} onChange={(e) => setForm((f) => ({ ...f, ccy: e.target.value }))}>
+                  <option value="USD">USD</option><option value="KRW">KRW</option>
+                </select>
+              </label>
+            )}
+            <label className="mf-f">
+              <span>계좌</span>
+              <select value={form.account} onChange={(e) => setForm((f) => ({ ...f, account: e.target.value }))}>
+                {ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}
+              </select>
+            </label>
+            {form.side === "buy" && (
+              <label className="mf-f">
+                <span>상장 시장</span>
+                <select value={form.market} onChange={(e) => setForm((f) => ({ ...f, market: e.target.value }))}>
+                  <option value="auto">자동(티커로 판단)</option>
+                  <option value="kr">국내 상장</option>
+                  <option value="us">해외 상장</option>
+                </select>
+              </label>
+            )}
+          </div>
+          <button className="mf-submit" onClick={submitTrade}>
+            {form.side === "buy" ? "매수 기록" : "매도 기록"}
+          </button>
+          {formMsg && <div className="mf-msg">{formMsg}</div>}
+        </div>
         <div className="me-foot">시세는 공개 소스(stooq)에서 5분 캐시로 자동 갱신 · USD는 오늘 환율({fxRate ? `${Math.round(fxRate).toLocaleString()}원` : "조회 중"})로 원화 환산 · 참고용</div>
       </section>
 
@@ -1098,6 +1157,18 @@ export default function EtfDashboard() {
         .me-del { flex-shrink: 0; width: 24px; height: 24px; border: none; background: var(--color-card); border-radius: 7px; color: var(--color-ink-3); font-size: 0.8rem; cursor: pointer; }
         .me-empty { margin-top: 12px; font-size: 0.74rem; color: var(--color-ink-2); line-height: 1.6; background: var(--color-card-soft); border-radius: 11px; padding: 12px 14px; word-break: keep-all; }
         .me-empty b { color: var(--color-ink); font-weight: 700; }
+        /* [S18 D-1] 매수·매도 기록 폼 */
+        .me-form { border-top: 1px solid var(--color-line); margin-top: 12px; padding-top: 12px; }
+        .mf-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+        .mf-tab { flex: 1 1 0; min-height: 36px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; font-size: 0.78rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .mf-tab.on { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-card-soft); }
+        .mf-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .mf-f { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .mf-f.mf-tk { grid-column: 1 / -1; }
+        .mf-f span { font-size: 0.68rem; font-weight: 700; color: var(--color-ink-3); }
+        .mf-f input, .mf-f select { width: 100%; min-height: 40px; box-sizing: border-box; border: 1px solid var(--color-line); border-radius: 9px; padding: 8px 10px; font-size: 0.82rem; font-family: var(--font-sans); background: var(--color-card); color: var(--color-ink); }
+        .mf-submit { width: 100%; min-height: 44px; margin-top: 10px; border: none; border-radius: 10px; background: var(--color-primary); color: var(--color-on-primary, #fff); font-size: 0.85rem; font-weight: 800; font-family: var(--font-sans); cursor: pointer; }
+        .mf-msg { margin-top: 8px; font-size: 0.74rem; line-height: 1.5; color: var(--color-ink-2); word-break: keep-all; }
         .me-foot { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 12px; line-height: 1.5; word-break: keep-all; }
         .foot { font-size: 0.68rem; color: var(--color-ink-3); text-align: center; margin-top: 16px; line-height: 1.5; }
         /* [S4] 계좌 유형 필터 칩 */
