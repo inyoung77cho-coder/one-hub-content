@@ -129,12 +129,20 @@ export default function TodayPage() {
         {decideCount > 0 && (
           <section className="card td-decide">
             <div className="td-h">결정 대기 <b>{decideCount}건</b></div>
-            {nearStop.slice(0, 3).map((p, i) => (
-              <div className="td-drow" key={p.code || i}>
-                <span className="td-dn">{p.name}<em className="td-dpct">{pctTxt(p.pnl_rate)}</em></span>
-                <span className="td-dsub">손절선 {Number(p.stop_loss || 0).toLocaleString()}원 부근 — 오늘 판단이 필요합니다</span>
-              </div>
-            ))}
+            {nearStop.slice(0, 3).map((p, i) => {
+              // 손절선이 설정된 종목만 '손절선 N원'을 말한다. 없으면 손실률로 사유를 밝힌다('0원' 오표시 방지).
+              const sl = Number(p.stop_loss) || 0;
+              return (
+                <div className="td-drow" key={p.code || i}>
+                  <span className="td-dn">{p.name}<em className="td-dpct">{pctTxt(p.pnl_rate)}</em></span>
+                  <span className="td-dsub">
+                    {sl > 0
+                      ? `손절선 ${sl.toLocaleString()}원 부근 — 오늘 판단이 필요합니다`
+                      : `손실이 ${Math.abs(Number(p.pnl_rate)).toFixed(1)}%까지 벌어졌습니다 — 오늘 판단이 필요합니다`}
+                  </span>
+                </div>
+              );
+            })}
             {pendItems.slice(0, 3).map((p, i) => (
               <div className="td-drow" key={p.code || `p${i}`}>
                 <span className="td-dn">{p.name || p.stock || p.code}</span>
