@@ -33,24 +33,8 @@ function safeNum(v) {
 
 // [v10 UI] 온보딩 입력 자산(onehub_onboard_assets)을 총자산 집계에 병합.
 //   백엔드 total-asset 값이 있으면 우선, 없으면 온보딩 입력값으로 폴백. total_uk 재계산.
-function mergeOnboardAssets(d) {
-  let onb = null;
-  try { onb = JSON.parse(window.localStorage.getItem('onehub_onboard_assets') || 'null'); } catch (e) {}
-  const b = { ...(d?.breakdown || {}) };
-  // 백엔드 집계 값 + 온보딩 입력 값을 합산(둘 다 없으면 null)
-  const add = (x, y) => {
-    if (x == null && y == null) return null;
-    return Math.round(((Number(x) || 0) + (Number(y) || 0)) * 100) / 100;
-  };
-  const stock_uk = add(b.stock_uk, onb && onb.stock_uk);
-  const etf_uk = add(b.etf_uk, onb && onb.etf_uk);
-  const realestate_uk = add(b.realestate_uk, onb && onb.realestate_uk);
-  const cash_uk = add(b.cash_uk, onb && onb.cash_uk); // 온보딩 보유 현금(주식계좌 예수금은 렌더에서 합산)
-  const parts = [stock_uk, etf_uk, realestate_uk, cash_uk].filter(v => v != null);
-  if (parts.length === 0 && (d?.total_uk == null)) return null;
-  const total_uk = Math.round(parts.reduce((s, v) => s + Number(v), 0) * 100) / 100;
-  return { total_uk, breakdown: { stock_uk, etf_uk, realestate_uk, cash_uk } };
-}
+// [N1] 자체 병합 함수(mergeOnboardAssets) 제거 — 호출처 0의 죽은 코드였고, lib/assetsTotal와
+//   다른 규칙(ETF 덧셈)을 담고 있어 총자산이 갈라지는 원인이 될 수 있었다. 총자산은 fetchAssetsTotal만 사용.
 
 // [AI 판단근거] 최종 점수 가중치(합=1.0) — 화면 산출식에도 동일하게 노출해 공신력 확보.
 const SCORE_WEIGHTS = { macro: 0.15, ml: 0.35, technical: 0.30, risk: 0.20 };

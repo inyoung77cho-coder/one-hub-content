@@ -3,6 +3,8 @@
 //   빠른입력과 상세 페이지의 입력 양식이 어긋나지 않게 한다. 현금만 간단 인라인.
 import { useEffect, useState } from "react";
 import { StockForm, EtfForm, ReForm } from "./AssetForms";
+import { manualStockUk } from "../../lib/assetsTotal";
+import { getTrader } from "../../lib/trader";
 
 const ASSETS = [
   ["stock", "주식", "var(--color-primary)"],
@@ -32,7 +34,8 @@ export default function QuickAddSheet({ initialAsset = "stock", onClose, onSaved
     let reName = "";
     try { const mp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); reName = mp?.name || ""; } catch (e) {}
     setCur({
-      stock: onb.stock_uk != null ? Number(onb.stock_uk) : null,
+      // [N1] 주식은 리스트(onehub_stock_holdings)에서 계산 — 폐기된 onb.stock_uk 누적기를 읽지 않는다.
+      stock: manualStockUk(getTrader()),
       etf: onb.etf_uk != null ? Number(onb.etf_uk) : null,
       realestate: onb.realestate_uk != null ? Number(onb.realestate_uk) : null,
       cash: onb.cash_uk != null ? Number(onb.cash_uk) : null,

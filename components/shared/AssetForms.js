@@ -119,10 +119,8 @@ export function StockForm({ onSaved, autofocusName = false }) {
       shares, avgPrice: price, ccy, broker, market, account, buyDate, trader: tr,
     });
     if (!res.ok) { setMsg("⚠️ " + res.error); return; }
-    if (ccy === "KRW") {
-      const addUk = (Number(shares) * Number(price)) / 1e8;
-      const onb = readOnb(); onb.stock_uk = Number(((Number(onb.stock_uk) || 0) + addUk).toFixed(4)); writeOnb(onb);
-    }
+    // [N1] onb.stock_uk 누적 기록 제거 — 총자산은 onehub_stock_holdings '리스트'에서 계산(lib/assetsTotal).
+    //   누적기는 삭제 시 차감되지 않아 드리프트했고, 주식 총액이 화면마다 달라지는 원인이었다.
     broadcast();
     setMsg(""); setName(""); setSel(null); setCode(""); setShares(""); setPrice(""); setBuyDate("");
     if (onSaved) onSaved("stock");
@@ -217,10 +215,8 @@ export function EtfForm({ onSaved }) {
       ? buyEtf({ ticker, market: mkt, shares, avgPrice: price, avgCcy: ccy, account, broker, buyDate, trader: tr })
       : sellEtf({ ticker, shares, account, trader: tr });
     if (!res?.ok) { setMsg("⚠️ " + (res?.error || "입력 오류")); return; }
-    if (side === "buy" && ccy === "KRW") {
-      const addUk = (Number(price) * Number(shares)) / 1e8;
-      const onb = readOnb(); onb.etf_uk = Number(((Number(onb.etf_uk) || 0) + addUk).toFixed(4)); writeOnb(onb);
-    }
+    // [N1] onb.etf_uk 누적 기록 제거 — 이 값은 etf.js가 기록하는 'ETF 실시간 미러'(등록+직접입력 전체)다.
+    //   여기서 더하면 미러를 오염시켜 ETF가 이중으로 잡혔다. 저장 후 etf.js가 미러를 재기록한다.
     broadcast();
     setMsg(""); setTicker(""); setEtfSel(null); setShares(""); setPrice(""); setBuyDate("");
     if (onSaved) onSaved("etf");

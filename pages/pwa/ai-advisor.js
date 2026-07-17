@@ -30,17 +30,18 @@ const SECTOR_COLOR = {
 };
 const sColor = (t) => SECTOR_COLOR[t] || "var(--color-ink-3)";
 
-// 단일 소스 스냅샷: 홈 총자산과 동일(백엔드 집계 + 온보딩 입력 합산 + 주식계좌 예수금).
-function buildAssets(ta, dash, onb) {
+// [N1] 단일 소스 스냅샷 — ta(fetchAssetsTotal)는 '이미' 단일 규칙으로 병합된 결과다.
+//   여기서 온보딩값을 또 더하면 이중(주식·ETF·부동산은 삼중) 합산이 된다. 그대로 사용한다.
+//   예수금(주식계좌 cash)만 원장에 없으므로 별도 합산.
+function buildAssets(ta, dash) {
   const b = ta?.breakdown || {};
   const won = (uk) => (uk != null ? Number(uk) * UK : 0);
-  const add = (bk, ok) => won(b[bk]) + (onb && onb[ok] != null ? Number(onb[ok]) * UK : 0);
   const acctCash = dash?.balance?.cash != null ? Number(dash.balance.cash) : 0;
   return {
-    stock: add("stock_uk", "stock_uk"),
-    etf: add("etf_uk", "etf_uk"),
-    realestate: add("realestate_uk", "realestate_uk"),
-    cash: (onb && onb.cash_uk != null ? Number(onb.cash_uk) * UK : 0) + acctCash,
+    stock: won(b.stock_uk),
+    etf: won(b.etf_uk),
+    realestate: won(b.realestate_uk),
+    cash: won(b.cash_uk) + acctCash,
   };
 }
 
@@ -53,18 +54,18 @@ export default function AIAdvisor() {
 
   useEffect(() => {
     const load = () => {
-      let onb = null, goal = "";
-      try { onb = JSON.parse(localStorage.getItem("onehub_onboard_assets") || "null"); } catch (e) {}
+      let goal = "";
       try { goal = localStorage.getItem("onehub_profile_goal") || ""; } catch (e) {}
       const tr = getTrader(); // [§3-8] 선택된 계좌(A/B) 반영
-      // [S1.1] 부동산 입력상태는 총자산 단일소스에서 (배너·총자산 100% 일치)
-      fetchAssetsTotal(tr).then((a) => setRealtyState(a?.realty_state || null)).catch(() => {});
+      // [N1] 총자산 소스를 fetchAssetsTotal(단일 규칙)로 교체 — 기존엔 원시 total-asset을 직접 받아
+      //   자체 규칙으로 온보딩을 또 더해(이중합산) 홈과 총자산이 달랐다. 부동산 입력상태도 같은 응답에서.
       Promise.all([
-        fetch(`/api/realestate/v2/total-asset?trader_id=${tr}`).then((r) => r.json()).catch(() => null),
+        fetchAssetsTotal(tr).catch(() => null),
         fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => null),
-      ]).then(([ta, dash]) => {
-        const assets = buildAssets(ta, dash, onb);
-        setS(computeSummary({ as_of: ta?.as_of, assets, tendencyOrStyle: goal, equityMeta: DEMO_EQUITY_META }));
+      ]).then(([a, dash]) => {
+        setRealtyState(a?.realty_state || null);
+        const assets = buildAssets(a, dash);
+        setS(computeSummary({ as_of: new Date().toISOString(), assets, tendencyOrStyle: goal, equityMeta: DEMO_EQUITY_META }));
       }).catch(() => setErr(true));
     };
     load();

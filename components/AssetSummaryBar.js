@@ -1,7 +1,9 @@
 // [v11 IA] 공유 총자산 요약 바 — 모든 자산 페이지 상단에 동일하게 표시(자산 통합성).
-//   기존 /api/v2/total-asset(주식+ETF+부동산 집계) 재사용. 미입력 자산군은 "준비중" 안전표시.
+//   [N1] 총자산은 lib/assetsTotal 단일 규칙만 사용. 미입력 자산군은 "준비중" 안전표시.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
+import { fetchAssetsTotal } from "../lib/assetsTotal";
+import { getTrader } from "../lib/trader";
 
 const COLOR = { stock: "var(--color-primary)", etf: "var(--color-etf)", realestate: "var(--color-success)", cash: "var(--color-warning)" };
 
@@ -10,27 +12,19 @@ export default function AssetSummaryBar() {
   const [d, setD] = useState(null);
   const [err, setErr] = useState(false);
   useEffect(() => {
-    // 온보딩 입력 자산 병합 — 백엔드 집계 값 + 온보딩 입력 값 합산
-    const merge = (j) => {
-      let onb = null;
-      try { onb = JSON.parse(localStorage.getItem("onehub_onboard_assets") || "null"); } catch (e) {}
-      const b = { ...(j?.breakdown || {}) };
-      const add = (x, y) => {
-        if (x == null && y == null) return null;
-        return Math.round(((Number(x) || 0) + (Number(y) || 0)) * 100) / 100;
-      };
-      const stock_uk = add(b.stock_uk, onb && onb.stock_uk);
-      const etf_uk = add(b.etf_uk, onb && onb.etf_uk);
-      const realestate_uk = add(b.realestate_uk, onb && onb.realestate_uk);
-      const cash_uk = add(b.cash_uk, onb && onb.cash_uk);
-      const parts = [stock_uk, etf_uk, realestate_uk, cash_uk].filter((v) => v != null);
-      if (parts.length === 0 && (j?.total_uk == null)) return null;
-      const total_uk = Math.round(parts.reduce((s, v) => s + Number(v), 0) * 100) / 100;
-      return { total_uk, breakdown: { stock_uk, etf_uk, realestate_uk, cash_uk } };
+    // [N1] 자체 병합 삭제 — 총자산은 lib/assetsTotal 단일 규칙만 사용(화면마다 총자산이 갈라지던 원인).
+    //   기존 자체 merge는 ETF 이중합산 + trader_id=A 하드코딩(B 계정 무시) 버그가 있었다.
+    const load = () => fetchAssetsTotal(getTrader())
+      .then((r) => { if (r?.ok) { setD(r); setErr(false); } else setErr(true); })
+      .catch(() => setErr(true));
+    load();
+    const on = () => load();
+    window.addEventListener("onehub-assets-change", on);
+    window.addEventListener("onehub-trader-change", on);
+    return () => {
+      window.removeEventListener("onehub-assets-change", on);
+      window.removeEventListener("onehub-trader-change", on);
     };
-    fetch("/api/realestate/v2/total-asset?trader_id=A")
-      .then((r) => r.json()).then((j) => { const m = merge(j); if (m) setD(m); else setErr(true); })
-      .catch(() => { const m = merge(null); if (m) setD(m); else setErr(true); });
   }, []);
 
   const b = d?.breakdown || {};
