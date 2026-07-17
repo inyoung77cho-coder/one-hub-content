@@ -7,7 +7,7 @@ import Link from "next/link";
 import TopNav from "../../components/TopNav";
 import { computeSummary, toManwon } from "../../lib/aiAssets";
 import { getTrader } from "../../lib/trader";
-import { fetchAssetsTotal } from "../../lib/assetsTotal";
+import { getLedger } from "../../lib/ledger";
 import { acctRule } from "../../lib/taxRules";
 
 const UK = 1e8; // 억 → 원
@@ -30,7 +30,7 @@ const SECTOR_COLOR = {
 };
 const sColor = (t) => SECTOR_COLOR[t] || "var(--color-ink-3)";
 
-// [N1] 단일 소스 스냅샷 — ta(fetchAssetsTotal)는 '이미' 단일 규칙으로 병합된 결과다.
+// [N1] 단일 소스 스냅샷 — ta(getLedger)는 '이미' 단일 원장이 낸 결과다.
 //   여기서 온보딩값을 또 더하면 이중(주식·ETF·부동산은 삼중) 합산이 된다. 그대로 사용한다.
 //   예수금(주식계좌 cash)만 원장에 없으므로 별도 합산.
 function buildAssets(ta, dash) {
@@ -57,10 +57,10 @@ export default function AIAdvisor() {
       let goal = "";
       try { goal = localStorage.getItem("onehub_profile_goal") || ""; } catch (e) {}
       const tr = getTrader(); // [§3-8] 선택된 계좌(A/B) 반영
-      // [N1] 총자산 소스를 fetchAssetsTotal(단일 규칙)로 교체 — 기존엔 원시 total-asset을 직접 받아
+      // [N1] 총자산 소스를 getLedger(단일 원장)로 교체 — 기존엔 원시 total-asset을 직접 받아
       //   자체 규칙으로 온보딩을 또 더해(이중합산) 홈과 총자산이 달랐다. 부동산 입력상태도 같은 응답에서.
       Promise.all([
-        fetchAssetsTotal(tr).catch(() => null),
+        getLedger(tr).catch(() => null),
         fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => null),
       ]).then(([a, dash]) => {
         setRealtyState(a?.realty_state || null);

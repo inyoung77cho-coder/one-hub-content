@@ -4,7 +4,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import { getTrader, useTrader } from "../../lib/trader";
-import { fetchAssetsTotal } from "../../lib/assetsTotal";
+import { getLedger } from "../../lib/ledger";
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
@@ -36,7 +36,7 @@ export default function AssetsMapPage() {
     const tr = getTrader();
     setStatus((s) => (assets ? "stale" : "loading"));
     Promise.all([
-      fetchAssetsTotal(tr).catch(() => ({ ok: false })),
+      getLedger(tr).catch(() => ({ ok: false })),
       fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => ({ ok: false })),
     ]).then(([a, d]) => {
       setAssets(a); setDash(d); setAt(new Date());

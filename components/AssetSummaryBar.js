@@ -2,7 +2,7 @@
 //   [N1] 총자산은 lib/assetsTotal 단일 규칙만 사용. 미입력 자산군은 "준비중" 안전표시.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
-import { fetchAssetsTotal } from "../lib/assetsTotal";
+import { getLedger } from "../lib/ledger";
 import { getTrader } from "../lib/trader";
 
 const COLOR = { stock: "var(--color-primary)", etf: "var(--color-etf)", realestate: "var(--color-success)", cash: "var(--color-warning)" };
@@ -12,9 +12,9 @@ export default function AssetSummaryBar() {
   const [d, setD] = useState(null);
   const [err, setErr] = useState(false);
   useEffect(() => {
-    // [N1] 자체 병합 삭제 — 총자산은 lib/assetsTotal 단일 규칙만 사용(화면마다 총자산이 갈라지던 원인).
+    // [N1] 자체 병합 삭제 — 총자산은 lib/ledger 단일 원장만 사용(화면마다 총자산이 갈라지던 원인).
     //   기존 자체 merge는 ETF 이중합산 + trader_id=A 하드코딩(B 계정 무시) 버그가 있었다.
-    const load = () => fetchAssetsTotal(getTrader())
+    const load = () => getLedger(getTrader())
       .then((r) => { if (r?.ok) { setD(r); setErr(false); } else setErr(true); })
       .catch(() => setErr(true));
     load();

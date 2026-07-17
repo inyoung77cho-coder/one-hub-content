@@ -3,7 +3,7 @@
 //   빠른입력과 상세 페이지의 입력 양식이 어긋나지 않게 한다. 현금만 간단 인라인.
 import { useEffect, useState } from "react";
 import { StockForm, EtfForm, ReForm } from "./AssetForms";
-import { manualStockUk } from "../../lib/assetsTotal";
+import { getLedger } from "../../lib/ledger";
 import { getTrader } from "../../lib/trader";
 
 const ASSETS = [
@@ -30,19 +30,27 @@ export default function QuickAddSheet({ initialAsset = "stock", onClose, onSaved
   // [I1] 2단 구조 — ① 현재 등록 상태 확인 ② 추가/수정. write-only 폼 위에 현재값을 먼저 보여준다.
   const [cur, setCur] = useState({ stock: null, etf: null, realestate: null, cash: null, reName: "" });
   useEffect(() => {
-    const onb = readOnb();
+    // [N1] '현재 등록'도 단일 원장에서 읽는다 — 시트와 자산 지도의 숫자가 어긋나지 않게.
+    //   (과거엔 onboard만 읽어 직접입력 주식이 '미등록'으로 보였다.)
+    let alive = true;
     let reName = "";
     try { const mp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); reName = mp?.name || ""; } catch (e) {}
-    setCur({
-      // [N1] 주식은 리스트(onehub_stock_holdings)에서 계산 — 폐기된 onb.stock_uk 누적기를 읽지 않는다.
-      stock: manualStockUk(getTrader()),
-      etf: onb.etf_uk != null ? Number(onb.etf_uk) : null,
-      realestate: onb.realestate_uk != null ? Number(onb.realestate_uk) : null,
-      cash: onb.cash_uk != null ? Number(onb.cash_uk) : null,
-      reName,
-    });
-    // 현금 탭 진입 시 현재값 프리필(수정 맥락 제공)
-    if (initialAsset === "cash" && onb.cash_uk != null) setAmount(String(onb.cash_uk));
+    getLedger(getTrader())
+      .then((L) => {
+        if (!alive) return;
+        const b = L?.breakdown || {};
+        setCur({
+          stock: b.stock_uk ?? null,
+          etf: b.etf_uk ?? null,
+          realestate: b.realestate_uk ?? null,
+          cash: b.cash_uk ?? null,
+          reName,
+        });
+        // 현금 탭 진입 시 현재값 프리필(수정 맥락 제공)
+        if (initialAsset === "cash" && b.cash_uk != null) setAmount(String(b.cash_uk));
+      })
+      .catch(() => { if (alive) setCur((c) => ({ ...c, reName })); });
+    return () => { alive = false; };
   }, [initialAsset]);
 
   const ukTxt = (v) => (v == null ? "미등록" : `${Number(v).toFixed(2)}억`);

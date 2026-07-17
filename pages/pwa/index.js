@@ -6,8 +6,8 @@ import { getLatestDailyReport } from '../../lib/reports';
 import LastUpdated from '../../components/LastUpdated';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
 import { recordDecision, matureLedger, computeShowdown, getTodayDecision, reconcileAutoWatch, getLedger } from '../../lib/verdictLedger';
-import { fetchAssetsTotal } from '../../lib/assetsTotal';
-import { fetchLiveEtfKrw } from '../../lib/etfLive';
+// [N1] 자산 원장. lib/verdictLedger 의 getLedger(판단 기록)와 이름이 겹쳐 별칭으로 구분한다.
+import { getLedger as getAssetLedger } from '../../lib/ledger';
 import { dedupBy } from '../../lib/useDedup';
 import { useTabState } from '../../lib/pwa/useTabState';
 import { samplePolicy, verdictColor as sampleVerdictColor, canAutoML, ML_MIN_SAMPLE } from '../../lib/sampleSize';
@@ -33,8 +33,8 @@ function safeNum(v) {
 
 // [v10 UI] 온보딩 입력 자산(onehub_onboard_assets)을 총자산 집계에 병합.
 //   백엔드 total-asset 값이 있으면 우선, 없으면 온보딩 입력값으로 폴백. total_uk 재계산.
-// [N1] 자체 병합 함수(mergeOnboardAssets) 제거 — 호출처 0의 죽은 코드였고, lib/assetsTotal와
-//   다른 규칙(ETF 덧셈)을 담고 있어 총자산이 갈라지는 원인이 될 수 있었다. 총자산은 fetchAssetsTotal만 사용.
+// [N1] 이 파일에 있던 자체 자산 병합 함수는 제거했다(다른 규칙으로 ETF를 더하던 죽은 코드).
+//   총자산은 lib/ledger 의 단일 원장 하나만 사용한다. 이 파일에서 자산을 직접 더하지 않는다.
 
 // [AI 판단근거] 최종 점수 가중치(합=1.0) — 화면 산출식에도 동일하게 노출해 공신력 확보.
 const SCORE_WEIGHTS = { macro: 0.15, ml: 0.35, technical: 0.30, risk: 0.20 };
@@ -402,8 +402,8 @@ export default function PWADashboard({ latestReport }) {
   // [S3] 빠른입력(QuickAddSheet) 저장 시 총자산 즉시 재조회(낙관적 갱신 이벤트 수신)
   useEffect(() => {
     const onAssets = () => {
-      fetchAssetsTotal(trader)
-        .then(a => setAssetSum(a?.total_uk != null ? { total_uk: a.total_uk, breakdown: a.breakdown, realty_state: a.realty_state, source: a.source } : null))
+      getAssetLedger(trader)
+        .then(a => setAssetSum(a?.total_uk != null ? a : null))
         .catch(() => {});
     };
     window.addEventListener('onehub-assets-change', onAssets);
@@ -488,28 +488,10 @@ export default function PWADashboard({ latestReport }) {
       .then(r => r.json())
       .then(d => { if (d.ok && Array.isArray(d.items)) setNotis(d.items); })
       .catch(() => {});
-    // [S1.1] 총자산 단일 소스(/api/assets/total, 미배포 시 기존 total-asset+온보딩 폴백)
-    fetchAssetsTotal(trader)
-      .then(async a => {
-        const base = a?.total_uk != null ? { total_uk: a.total_uk, breakdown: a.breakdown, realty_state: a.realty_state, source: a.source } : null;
-        setAssetSum(base);
-        // [D1] ETF 실시간 평가액을 대시보드가 직접 계산(ETF 페이지 방문 여부와 무관) → 총자산이 항상 최신 ETF 반영
-        if (!base) return;
-        try {
-          const live = await fetchLiveEtfKrw(trader);
-          if (live?.krw != null && live.krw > 0) {
-            const etfUk = Math.round((live.krw / 1e8) * 100) / 100;
-            const prevEtf = base.breakdown?.etf_uk ?? 0;
-            const total = base.total_uk != null ? Math.round((base.total_uk - prevEtf + etfUk) * 100) / 100 : etfUk;
-            setAssetSum({ ...base, total_uk: total, breakdown: { ...base.breakdown, etf_uk: etfUk } });
-            try {
-              const onb = JSON.parse(localStorage.getItem('onehub_onboard_assets') || '{}') || {};
-              onb.etf_uk = Math.round((live.krw / 1e8) * 10000) / 10000;
-              localStorage.setItem('onehub_onboard_assets', JSON.stringify(onb));
-            } catch (e) {}
-          }
-        } catch (e) {}
-      })
+    // [N1] 총자산 = 단일 원장(lib/ledger). ETF 실시간 평가·온보딩 미러링은 원장이 내부에서 처리하므로
+    //   여기서 다시 조정하지 않는다(과거 이중 조정·미러 오염의 원인).
+    getAssetLedger(trader)
+      .then(a => setAssetSum(a?.total_uk != null ? a : null))
       .catch(() => setAssetSum(null));
     fetch(`/api/realestate/v2/ai-summary?trader_id=${trader}`)
       .then(r => r.json())
