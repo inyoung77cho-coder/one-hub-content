@@ -18,7 +18,9 @@ grep -q "router.isReady" pages/pwa/index.js; chk "isReady 가드(딥링크 튕�
 CO=0
 for f in pages/pwa/*.js; do
   case "$f" in *.bak*) continue;; esac
-  if grep -q "<TopNav" "$f" && grep -q "<BottomNav" "$f"; then echo "     공존: $f"; CO=$((CO+1)); fi
+  # ★ 컴포넌트(<TopNav>)만 보면 안 된다 — index.js 는 상단 5탭을 인라인 <nav className="pwa-tabs">로
+  #   그리고 있었고, 그래서 이 검사를 통과하면서 메인 화면에 5탭+4탭이 공존했다(실측으로 발각).
+  if grep -qE "<TopNav|pwa-tabs\"" "$f" && grep -q "<BottomNav" "$f"; then echo "     공존: $f"; CO=$((CO+1)); fi
 done
 [ "$CO" -eq 0 ]; chk "상단5탭·하단4탭 공존 0 (실측 $CO) ★" $?
 

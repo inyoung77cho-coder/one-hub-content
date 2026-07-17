@@ -975,34 +975,9 @@ export default function PWADashboard({ latestReport }) {
           </div>
         </header>
 
-        {/* [S2 IA] 대시보드 · 주식 · ETF · 부동산 · 트러스트 (AI자산=대시보드 링크, 기록=트러스트로 이동) */}
-        <nav className="pwa-tabs">
-          {[
-            ['assets','종합자산'],
-            ['stock','주식'],
-            ['etf','ETF'],
-            ['realestate','부동산'],
-            ['trust','AI 신뢰도'],
-          ].map(([t,label]) => {
-            // [N2] 종합자산 = 단일 지도 /pwa/assets (구 dashboard 탭 폐지)
-            const routes = { assets: '/pwa/assets', etf: '/pwa/etf', realestate: '/pwa/realestate' };
-            const stockTabs = ['recommend','portfolio','analyze'];   // 기록(report)은 트러스트로 이동
-            const isActive = t === 'stock' ? stockTabs.includes(tab)
-              : t === 'trust' ? tab === 'report'
-              : tab === t;
-            const go = () => {
-              if (routes[t]) { window.location.href = routes[t]; return; }
-              if (t === 'stock') { setTab('portfolio'); return; }
-              if (t === 'trust') { setTab('report'); return; }
-              setTab(t);
-            };
-            return (
-              <button key={t} className={`pwa-tab ${isActive?'active':''}`} onClick={go}>
-                {label}
-              </button>
-            );
-          })}
-        </nav>
+        {/* [N2] 상단 5탭 제거 — 하단 4탭(BottomNav)과 공존해 '내비가 둘'인 상태가 원 지적이었다.
+            도달성은 유지된다: 종합자산·AI = 하단탭, 주식·ETF·부동산 = 자산 지도 범례.
+            주식 내부 이동은 아래 서브탭(보유·추천)이 담당한다. */}
         {/* [S2 IA] 주식 카테고리 서브탭 — 보유 · 추천 (기록은 트러스트 탭으로) */}
         {['recommend','portfolio'].includes(tab) && (
           <nav className="pwa-subtabs">
