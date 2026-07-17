@@ -1,8 +1,20 @@
 // public/sw.js — ONE-HUB PWA Service Worker
 
 // [V1] 배포마다 갱신 → 구 SW 강제 교체 트리거. 설정 화면에도 표기(사용자가 최신 여부 확인).
-const SW_VERSION = 'v10.0-20260717';
-const CACHE_VERSION = 'onehub-v26';
+const SW_VERSION = 'v10.1-20260717';
+const CACHE_VERSION = 'onehub-v27';
+
+// [N3] 알림 종류별 착지점 — 백엔드는 kind만 실어 보내면 된다.
+//   ★sample_30(정식 통계 열림)이 재방문 루프의 핵심: 오늘 탭 ⑤ 진행바 → 30건 도달 알림 → 열람.
+const LANDING = {
+  stop_loss: '/pwa/today',                  // 손절 임박 → 오늘 ① 결정 대기
+  approve: '/pwa/today',                    // 승인 대기 → 오늘 ① 결정 대기
+  judged: '/pwa?tab=report&sec=vs',         // 채점 완료 → 나 vs AI
+  daily: '/pwa?tab=report&sec=archive',     // 일일 리포트 → 아카이브
+  weekly: '/pwa?tab=report&sec=archive',    // 주간 리포트
+  realestate: '/pwa/realestate',            // 부동산 신고가
+  sample_30: '/pwa?tab=report&sec=verify',  // 30건 도달 = 정식 통계 열림
+};
 const CACHE_NAME = CACHE_VERSION;
 const STATIC_ASSETS = ['/pwa', '/icons/icon-192.png', '/icons/icon-512.png'];
 
@@ -76,8 +88,12 @@ self.addEventListener('push', (event) => {
     body: payload.body || '',
     icon: '/icons/icon-192.png',
     badge: '/icons/icon-192.png',
-    // [H3] 딥링크 — 백엔드가 code/name(종목 분석) 또는 tab(임의 탭)·url(임의 경로)로 목적지 지정.
-    data: { url: payload.url || '/pwa', tab: payload.tab || null, code: payload.code || null, name: payload.name || null },
+    // [H3/N3] 딥링크 — kind(알림 종류) → LANDING 매핑이 1순위. code/name·tab·url도 계속 지원.
+    data: {
+      url: payload.url || '/pwa', tab: payload.tab || null,
+      kind: payload.kind || null, complex: payload.complex || null,
+      code: payload.code || null, name: payload.name || null,
+    },
   };
 
   event.waitUntil(self.registration.showNotification(title, options));
@@ -87,7 +103,13 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
   let targetUrl = '/pwa';
-  if (data.code && data.name) {
+  if (data.kind && LANDING[data.kind]) {
+    // [N3] 종류별 착지 — 부동산 신고가는 단지까지 지정
+    targetUrl = LANDING[data.kind];
+    if (data.kind === 'realestate' && data.complex) {
+      targetUrl += `?complex=${encodeURIComponent(data.complex)}`;
+    }
+  } else if (data.code && data.name) {
     const params = new URLSearchParams({ tab: 'analyze', code: data.code, name: data.name });
     targetUrl = '/pwa?' + params.toString();
   } else if (data.tab) {

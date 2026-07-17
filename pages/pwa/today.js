@@ -1,60 +1,112 @@
-// [G5] '오늘' 액션 페이지 — 하단탭 IA의 기본 진입점(자산 분류가 아닌 '할 일' 기준, S1 해소).
-//   구성: ① 승인 대기(N건) ② 오늘의 통합 AI 판단 1문장 ③ 오늘의 액션 3개 ④ 오늘 매매 요약.
-//   기존 데이터(/api/pwa-dashboard·/api/pwa-pending) 재사용. 색은 디자인 토큰만.
+// [N3] '오늘' — 할 일 중심 액션 페이지. 5블록.
+//   설계 원칙: 관망일에도 최소 3블록(②④⑤)은 항상 렌더된다.
+//   "살 게 없다"만 말하고 끝내면 재방문 이유가 사라진다. 대신 'AI가 무엇을 왜 걸렀나'를 말한다.
+//   — 이건 이 앱의 브랜드(사후검증·투명한 실패 공개)와 정확히 일치하고, 다른 앱엔 없는 콘텐츠다.
+//   데이터는 전부 기존 소스: 원장(lib/ledger) · /api/pwa-dashboard · /api/pwa-pending ·
+//   /api/pwa/re/feed · lib/verdictLedger(판단 기록). 새로 만든 저장소 없음.
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import { getTrader, useTrader } from "../../lib/trader";
+import { getLedger as getAssetLedger } from "../../lib/ledger";
+import { getLedger as getDecisionLedger } from "../../lib/verdictLedger";
+import { samplePolicy } from "../../lib/sampleSize";
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
 import LastUpdated from "../../components/LastUpdated";
 
-const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || r || "—");
+const DAY = 86400000;
+const MATURE_DAYS = 3; // 판단 → 채점까지(나 vs AI)
+const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || null);
+const pctTxt = (v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(2)}%`;
+const mmdd = (ms) => { const d = new Date(ms); return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
+// 백엔드가 positions를 문자열로 주는 경우가 있어 방어적으로 파싱
+function parsePositions(dash) {
+  let p = dash?.balance?.positions;
+  if (typeof p === "string") { try { p = JSON.parse(p); } catch { p = null; } }
+  return Array.isArray(p) ? p : [];
+}
 
 export default function TodayPage() {
   const router = useRouter();
   const [trader] = useTrader();
   const [dash, setDash] = useState(null);
-  const [pending, setPending] = useState(null);
+  const [pend, setPend] = useState(null);
+  const [feed, setFeed] = useState(null);
+  const [ledger, setLedger] = useState(null);
+  const [decisions, setDecisions] = useState([]);
+  const [myComplex, setMyComplex] = useState("");
   const [status, setStatus] = useState("loading");
   const [at, setAt] = useState(null);
 
   const load = useCallback(() => {
     const tr = getTrader();
     setStatus((s) => (dash ? "stale" : "loading"));
+    try { const mp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); setMyComplex(mp?.name || ""); } catch (e) {}
+    try { setDecisions(getDecisionLedger(tr) || []); } catch (e) { setDecisions([]); }
     Promise.all([
-      fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => ({ ok: false })),
-      fetch(`/api/pwa-pending?trader=${tr}`).then((r) => r.json()).catch(() => ({ ok: false })),
-    ]).then(([d, p]) => {
-      setDash(d);
-      setPending(p);
-      setAt(new Date());
-      setStatus(d && d.ok === false ? (d ? "error" : "error") : "ok");
+      fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => null),
+      fetch(`/api/pwa-pending?trader=${tr}`).then((r) => r.json()).catch(() => null),
+      fetch(`/api/pwa/re/feed`).then((r) => r.json()).catch(() => null),
+      getAssetLedger(tr).catch(() => null),
+    ]).then(([d, p, f, L]) => {
+      setDash(d); setPend(p); setFeed(f); setLedger(L); setAt(new Date());
+      setStatus(d || L ? "ok" : "error");
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dash]);
 
   useEffect(() => {
     load();
-    const onTrader = () => load();
-    window.addEventListener("onehub-trader-change", onTrader);
-    return () => window.removeEventListener("onehub-trader-change", onTrader);
+    const on = () => load();
+    window.addEventListener("onehub-trader-change", on);
+    window.addEventListener("onehub-assets-change", on);
+    return () => {
+      window.removeEventListener("onehub-trader-change", on);
+      window.removeEventListener("onehub-assets-change", on);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const ok = dash && dash.ok !== false;
-  const regime = dash?.market?.regime;
+  const positions = parsePositions(dash);
+  const regime = regimeKo(dash?.market?.regime);
   const heat = dash?.market?.heat_score;
-  const buys = (dash?.recommend_stocks ?? []).filter((s) => (s.score ?? 0) >= 70);
+  const cands = dash?.recommend_stocks ?? [];
   const blocked = dash?.today_blocked ?? [];
-  const pendItems = pending?.ok ? (pending.items ?? []) : [];
-  const actions = buys.slice(0, 3);
+  const pendItems = pend?.ok ? (pend.items ?? []) : [];
 
-  const verdict = ok
-    ? `시장은 ${regimeKo(regime)} 국면 · 온도 ${heat ?? "—"}. ${buys.length > 0 ? `매수 후보 ${buys.length}건` : "뚜렷한 매수 후보 없음"}${blocked.length > 0 ? ` · 기준 미달 ${blocked.length}건 차단` : ""}.`
-    : "";
+  // ── ① 결정 대기: 승인 대기 + 손절선 임박. 없으면 블록 자체를 렌더하지 않는다.
+  const nearStop = positions.filter((p) => {
+    const sl = Number(p.stop_loss) || 0, cur = Number(p.current_price) || 0, r = Number(p.pnl_rate);
+    return (sl > 0 && cur > 0 && cur <= sl * 1.03) || (Number.isFinite(r) && r <= -7);
+  });
+  const decideCount = pendItems.length + nearStop.length;
 
-  const goAnalyze = (s) => router.push(`/pwa?tab=analyze&code=${encodeURIComponent(s.code || "")}&name=${encodeURIComponent(s.name || s.stock || "")}`);
+  // ── ② 통합 판단: '안 산 것'을 콘텐츠로. 관망일에도 항상 할 말이 있다.
+  const scanned = cands.length + blocked.length;
+  const blockLine = blocked.length > 0
+    ? `AI가 ${scanned > 0 ? `${scanned}종목 중 ` : ""}${blocked.length}종목을 걸렀습니다 — 살 만한 게 없다는 뜻입니다.`
+    : cands.length > 0
+    ? `AI가 매수 후보 ${cands.length}종목을 추렸습니다.`
+    : "오늘은 AI가 살펴본 종목 중 기준을 넘은 게 없습니다.";
+
+  // ── ③ 내 자산 오늘: 변화 있을 때만. 부동산 신고가는 '내 단지 아님' 라벨 필수(오해 방지).
+  const movers = positions
+    .filter((p) => Number.isFinite(Number(p.pnl_rate)) && Math.abs(Number(p.pnl_rate)) >= 3)
+    .sort((a, b) => Math.abs(Number(b.pnl_rate)) - Math.abs(Number(a.pnl_rate)))
+    .slice(0, 2);
+  const hi = (feed?.feed ?? []).find((f) => Number(f.변동률) > 0) || null;
+  const hasChange = movers.length > 0 || !!hi;
+
+  // ── ④ 채점 임박: 판단 후 3일. 가장 빠른 결과일.
+  const tr2 = trader || "A";
+  const mine = decisions.filter((d) => (d.trader || "A") === tr2);
+  const pendingJudge = mine.filter((d) => Date.now() - d.ts < MATURE_DAYS * DAY);
+  const soonest = pendingJudge.length ? Math.min(...pendingJudge.map((d) => d.ts)) + MATURE_DAYS * DAY : null;
+
+  // ── ⑤ AI 학습: 정식 통계까지 남은 표본.
+  const pol = samplePolicy(mine.length);
 
   return (
     <div className="td">
@@ -66,64 +118,89 @@ export default function TodayPage() {
         </div>
       </header>
 
-      <div className="td-title">🎯 오늘 <span className="td-sub">할 일 중심</span>{at && <span className="td-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}</div>
+      <div className="td-title">오늘 <span className="td-sub">할 일 중심</span>{at && <span className="td-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}</div>
 
-      <DataState status={status} hasData={!!dash} onRetry={load} skeletonLines={4} skeletonBlock>
-        {/* ① 승인 대기 — 없으면 섹션 숨김 */}
-        {pendItems.length > 0 && (
-          <section className="card td-approve">
-            <div className="td-h">⏳ 승인 대기 <b>{pendItems.length}건</b></div>
-            <div className="td-plist">
-              {pendItems.slice(0, 4).map((p, i) => (
-                <div className="td-prow" key={p.code || i}>
-                  <span className="td-pn">{p.name || p.stock || p.code}</span>
-                  {p.reason && <span className="td-pr">{p.reason}</span>}
-                </div>
-              ))}
-            </div>
-            <button className="td-cta" onClick={() => router.push("/pwa?tab=dashboard")}>승인 화면으로 →</button>
+      <DataState status={status} hasData={!!dash || !!ledger} onRetry={load} skeletonLines={4} skeletonBlock>
+        {/* ① 결정 대기 — 있을 때만 · 최상단 · 주의색 */}
+        {decideCount > 0 && (
+          <section className="card td-decide">
+            <div className="td-h">결정 대기 <b>{decideCount}건</b></div>
+            {nearStop.slice(0, 3).map((p, i) => (
+              <div className="td-drow" key={p.code || i}>
+                <span className="td-dn">{p.name}<em className="td-dpct">{pctTxt(p.pnl_rate)}</em></span>
+                <span className="td-dsub">손절선 {Number(p.stop_loss || 0).toLocaleString()}원 부근 — 오늘 판단이 필요합니다</span>
+              </div>
+            ))}
+            {pendItems.slice(0, 3).map((p, i) => (
+              <div className="td-drow" key={p.code || `p${i}`}>
+                <span className="td-dn">{p.name || p.stock || p.code}</span>
+                <span className="td-dsub">{p.reason || "AI 매수 제안 — 승인/거절이 필요합니다"}</span>
+              </div>
+            ))}
+            <button className="td-cta" onClick={() => router.push("/pwa?tab=portfolio")}>지금 판단 →</button>
           </section>
         )}
 
-        {/* ② 오늘의 통합 AI 판단 1문장 */}
-        <section className="card td-verdict">
-          <div className="td-h">🧭 오늘의 통합 판단</div>
-          <p className="td-vtext">{verdict || "데이터를 불러오지 못했습니다."}</p>
+        {/* ② 오늘의 통합 판단 — 항상. '안 산 것'이 콘텐츠 */}
+        <section className="card">
+          <div className="td-h">오늘의 통합 판단</div>
+          <p className="td-vtext">
+            {regime ? <>시장은 <b>{regime} 국면</b>{heat != null ? <> · 온도 {heat}</> : null}. </> : null}
+            {blockLine}
+          </p>
+          {blocked.length > 0 && (
+            <button className="td-link" onClick={() => router.push("/pwa?tab=report&sec=verify")}>무엇을 왜 걸렀나 →</button>
+          )}
         </section>
 
-        {/* ③ 오늘의 액션 3개 */}
+        {/* ③ 내 자산 오늘 — 변화 있을 때만 */}
         <section className="card">
-          <div className="td-h">✅ 오늘의 액션 {actions.length > 0 && <b>{actions.length}</b>}</div>
-          {actions.length > 0 ? (
-            <div className="td-alist">
-              {actions.map((s, i) => (
-                <button className="td-arow" key={s.code || i} onClick={() => goAnalyze(s)}>
-                  <span className="td-an">{s.name || s.stock}</span>
-                  <span className="td-ameta">관심도 {Math.round(s.score ?? 0)} · 분석 →</span>
-                </button>
+          <div className="td-h">내 자산 오늘</div>
+          {hasChange ? (
+            <div className="td-mlist">
+              {movers.map((p, i) => (
+                <div className="td-mrow" key={p.code || i}>
+                  <span className="td-mn">{p.name}</span>
+                  <span className={`td-mv ${Number(p.pnl_rate) >= 0 ? "up" : "dn"}`}>{pctTxt(p.pnl_rate)}</span>
+                </div>
               ))}
+              {hi && (
+                <div className="td-mrow">
+                  <span className="td-mn">{hi.단지명} <em className="td-note">신고가 {hi.거래금액_억}억</em></span>
+                  <span className="td-mv up">+{hi.변동률}%{hi.단지명 !== myComplex && <em className="td-not-mine">내 단지 아님</em>}</span>
+                </div>
+              )}
             </div>
           ) : (
-            <div className="td-empty">오늘은 기준을 넘은 매수 후보가 없습니다. 관망 구간입니다.</div>
-          )}
-          {blocked.length > 0 && (
-            <div className="td-blocked">🛡️ 기준 미달 {blocked.length}건은 자동 차단됐습니다.</div>
+            <p className="td-vtext td-quiet">오늘은 큰 변화가 없습니다.{ledger?.total_uk != null ? <> 총자산 <b>{Number(ledger.total_uk).toFixed(2)}억</b>.</> : null}</p>
           )}
         </section>
 
-        {/* ④ 오늘 매매 결과 요약 */}
-        <section className="card td-summary" onClick={() => router.push("/pwa?tab=report")}>
-          <div className="td-sumrow">
-            <span>📊 오늘 매매 · 나 vs AI 성적</span>
-            <span className="td-arrow">기록 보기 →</span>
-          </div>
+        {/* ④ 채점 임박 — 항상 */}
+        <section className="card td-judge" onClick={() => router.push("/pwa?tab=report&sec=vs")}>
+          <div className="td-h">나 vs AI</div>
+          {pendingJudge.length > 0 ? (
+            <p className="td-vtext"><b>{pendingJudge.length}건</b> 채점 중 · 가장 빠른 결과 <b>{soonest ? mmdd(soonest) : "-"}</b> <span className="td-arrow">기록 →</span></p>
+          ) : (
+            <p className="td-vtext td-quiet">아직 승부가 없어요 — 추천에서 판단을 남기면 3일 뒤 자동 채점됩니다. <span className="td-arrow">첫 승부 시작 →</span></p>
+          )}
+        </section>
+
+        {/* ⑤ AI 학습 — 항상 */}
+        <section className="card">
+          <div className="td-h">AI 학습</div>
+          <div className="td-prog"><span className="td-prog-fill" style={{ width: `${pol.progressPct}%` }} /></div>
+          <p className="td-vtext td-quiet">
+            {pol.count}/{pol.target}
+            {pol.remaining > 0 ? <> · {pol.remaining}건 남으면 정식 통계를 공개합니다</> : <> · 정식 통계 구간입니다</>}
+          </p>
         </section>
       </DataState>
 
       <BottomNav active="today" />
 
       <style jsx>{`
-        .td { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 84px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
+        .td { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 88px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
         .td-hd { display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top, 0px) + 12px) 2px 10px; }
         .td-logo { font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--color-ink); background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
         .td-dot { color: var(--color-success); }
@@ -133,25 +210,32 @@ export default function TodayPage() {
         .td-sub { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
         .td-fresh { margin-left: auto; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
-        .td-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+        .td-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 10px; }
         .td-h b { color: var(--color-primary); }
-        .td-approve { border-left: 4px solid var(--color-warning, #f59e0b); }
-        .td-plist { display: flex; flex-direction: column; gap: 8px; }
-        .td-prow { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--color-line); }
-        .td-prow:last-child { border-bottom: none; }
-        .td-pn { font-size: 0.86rem; font-weight: 700; color: var(--color-ink); }
-        .td-pr { font-size: 0.72rem; color: var(--color-ink-3); word-break: keep-all; line-height: 1.4; }
-        .td-cta { width: 100%; margin-top: 10px; min-height: 44px; border: none; border-radius: 11px; background: var(--color-primary); color: #fff; font-size: 0.86rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
-        .td-vtext { font-size: 0.9rem; line-height: 1.55; color: var(--color-ink); word-break: keep-all; margin: 0; }
-        .td-alist { display: flex; flex-direction: column; gap: 8px; }
-        .td-arow { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; padding: 10px 12px; border: 1px solid var(--color-line); border-radius: 11px; background: var(--color-card); cursor: pointer; font-family: var(--font-sans); text-align: left; }
-        .td-an { font-size: 0.9rem; font-weight: 700; color: var(--color-ink); }
-        .td-ameta { font-size: 0.74rem; font-weight: 600; color: var(--color-primary); white-space: nowrap; }
-        .td-empty { font-size: 0.8rem; color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; }
-        .td-blocked { margin-top: 10px; font-size: 0.74rem; color: var(--color-ink-3); }
-        .td-summary { cursor: pointer; }
-        .td-sumrow { display: flex; align-items: center; justify-content: space-between; font-size: 0.84rem; font-weight: 700; color: var(--color-ink); }
-        .td-arrow { color: var(--color-primary); font-weight: 800; font-size: 0.78rem; }
+        /* ① 결정 대기 — 주의색 강조 */
+        .td-decide { border-left: 4px solid var(--color-danger); }
+        .td-decide .td-h b { color: var(--color-danger); }
+        .td-drow { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--color-line); }
+        .td-drow:last-of-type { border-bottom: none; }
+        .td-dn { font-size: 0.88rem; font-weight: 800; color: var(--color-ink); display: flex; align-items: baseline; gap: 6px; }
+        .td-dpct { font-style: normal; font-size: 0.8rem; font-weight: 800; color: var(--color-danger); }
+        .td-dsub { font-size: 0.74rem; color: var(--color-ink-2); word-break: keep-all; line-height: 1.45; }
+        .td-cta { width: 100%; margin-top: 10px; min-height: 44px; border: none; border-radius: 11px; background: var(--color-danger); color: #fff; font-size: 0.86rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .td-vtext { font-size: 0.88rem; line-height: 1.55; color: var(--color-ink); word-break: keep-all; margin: 0; }
+        .td-quiet { color: var(--color-ink-2); font-size: 0.82rem; }
+        .td-link { margin-top: 10px; min-height: 44px; padding: 0 2px; border: none; background: none; color: var(--color-primary); font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .td-mlist { display: flex; flex-direction: column; gap: 2px; }
+        .td-mrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--color-line); }
+        .td-mrow:last-child { border-bottom: none; }
+        .td-mn { font-size: 0.84rem; font-weight: 700; color: var(--color-ink); min-width: 0; }
+        .td-note { font-style: normal; font-size: 0.72rem; font-weight: 600; color: var(--color-ink-3); margin-left: 4px; }
+        .td-mv { font-size: 0.84rem; font-weight: 800; white-space: nowrap; }
+        .td-mv.up { color: var(--color-success); } .td-mv.dn { color: var(--color-danger); }
+        .td-not-mine { display: block; font-style: normal; font-size: 0.62rem; font-weight: 700; color: var(--color-ink-3); text-align: right; }
+        .td-judge { cursor: pointer; }
+        .td-arrow { color: var(--color-primary); font-weight: 800; white-space: nowrap; }
+        .td-prog { height: 8px; border-radius: 999px; background: var(--color-card-soft, var(--color-line)); overflow: hidden; margin-bottom: 8px; }
+        .td-prog-fill { display: block; height: 100%; background: var(--color-primary); }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>
