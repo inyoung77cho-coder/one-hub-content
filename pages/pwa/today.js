@@ -43,6 +43,7 @@ export default function TodayPage() {
   const [notis, setNotis] = useState([]); // [알림카드 #5] 텔레그램/리포트 알림 피드
   const [opNotes, setOpNotes] = useState([]); // [알림카드 #6] 운영자 신고가(spot_price)
   const [notiOpen, setNotiOpen] = useState(null); // 펼친 알림 인덱스
+  const [notiAll, setNotiAll] = useState(false); // [알림필터] 전체(루틴 포함) 보기 토글
 
   const load = useCallback(() => {
     const tr = getTrader();
@@ -181,7 +182,7 @@ export default function TodayPage() {
         {/* [알림카드 #5·#6] 오늘 알림 상세 — 텔레그램 본문 + 운영자 신고가. 푸시 클릭 시 여기서 상세 확인. */}
         {(notis.length > 0 || opNotes.length > 0) && (
           <section className="card td-noti">
-            <div className="tn-hh">🔔 오늘 알림 · 상세 확인</div>
+            <div className="tn-hh">🔔 오늘 중요 알림</div>
             <div className="tn-list">
               {opNotes.slice(0, 3).map((s, i) => (
                 <div className="tn-item op" key={`op${i}`}>
@@ -193,30 +194,54 @@ export default function TodayPage() {
                   {s.created_at && <span className="tn-ts">{String(s.created_at).slice(5, 16)}</span>}
                 </div>
               ))}
-              {notis.slice(0, 6).map((n, i) => {
-                const title = n.title || n.message || "알림";
-                const body = n.body || n.detail || "";
-                const t = n.noti_type || n.type || "";
-                const src = n.source || "";
-                const isOp = /operator|운영자|manual/i.test(src);
-                const ic = isOp ? "🧑‍💼" : /buy|매수|신호/i.test(t + title) ? "📈" : /sell|매도|손절|익절/i.test(t + title) ? "📉" : /report|리포트/i.test(t + title) ? "📄" : /critical|error|오류|circuit/i.test(t + title) ? "⚠️" : "🔔";
-                const ts = n.sent_at || n.created_at || n.timestamp || null;
-                const when = ts ? String(ts).replace("T", " ").slice(5, 16) : null;
-                const open = notiOpen === i;
-                const hasDetail = body && body.trim() && body.trim() !== title.trim();
-                return (
-                  <div className={`tn-item ${n.is_read ? "" : "unread"}`} key={i} onClick={() => hasDetail && setNotiOpen(open ? null : i)} style={{ cursor: hasDetail ? "pointer" : "default" }}>
-                    <span className="tn-ic">{ic}</span>
-                    <div className="tn-b">
-                      <div className="tn-t">{title}{isOp && <span className="tn-src">운영자</span>}{hasDetail && <span className="tn-more">{open ? "▲" : "▾"}</span>}</div>
-                      {hasDetail && open && <div className="tn-d">{body}</div>}
-                    </div>
-                    {when && <span className="tn-ts">{when}</span>}
-                  </div>
-                );
-              })}
+              {(() => {
+                // [알림필터] 당일 중요 알림만 — 루틴(오늘 해야 하는 것/리포트/브리핑) 제외, 매매·신호·손절·승인·서킷·오류·신고가 우선.
+                const kd = new Date(Date.now() + 9 * 3600 * 1000);
+                const today = `${kd.getUTCFullYear()}-${String(kd.getUTCMonth() + 1).padStart(2, "0")}-${String(kd.getUTCDate()).padStart(2, "0")}`;
+                const RT = /오늘 해야 하는 것|전략 성과|최근 30일|Report|리포트|브리핑|Morning|Evening|Started|Status/i;
+                const IMP = /매수|매도|체결|손절|익절|승인|신호|차단|자율|서킷|circuit|오류|error|급등|급락|주문|신고가|OPEN|CLOSED/i;
+                const impNotis = notis.filter((n) => {
+                  const ts = String(n.sent_at || n.created_at || "");
+                  const txt = `${n.title || ""} ${n.noti_type || ""} ${n.body || ""}`;
+                  const isCrit = /critical|important/i.test(n.noti_type || "");
+                  const isRoutine = RT.test(n.title || "");
+                  return ts.startsWith(today) && (isCrit || IMP.test(txt)) && !isRoutine;
+                });
+                const shown = notiAll ? notis.slice(0, 12) : impNotis.slice(0, 5);
+                if (shown.length === 0) {
+                  return <div className="tn-empty">오늘은 중요 매매 알림이 없습니다 · 관망{notis.length > 0 ? <button className="tn-toggle inline" onClick={() => setNotiAll(true)}>전체 알림 {notis.length}건 보기 →</button> : null}</div>;
+                }
+                return (<>
+                  {shown.map((n) => {
+                    const title = n.title || n.message || "알림";
+                    const body = n.body || n.detail || "";
+                    const t = n.noti_type || n.type || "";
+                    const src = n.source || "";
+                    const isOp = /operator|운영자|manual/i.test(src);
+                    const ic = isOp ? "🧑‍💼" : /buy|매수|신호/i.test(t + title) ? "📈" : /sell|매도|손절|익절/i.test(t + title) ? "📉" : /critical|important|error|오류|circuit|서킷|자율/i.test(t + title) ? "⚠️" : /report|리포트/i.test(t + title) ? "📄" : "🔔";
+                    const ts = n.sent_at || n.created_at || n.timestamp || null;
+                    const when = ts ? String(ts).replace("T", " ").slice(5, 16) : null;
+                    const key = n.id != null ? n.id : title + when;
+                    const open = notiOpen === key;
+                    const hasDetail = body && body.trim() && body.trim() !== title.trim();
+                    return (
+                      <div className={`tn-item ${n.is_read ? "" : "unread"}`} key={key} onClick={() => hasDetail && setNotiOpen(open ? null : key)} style={{ cursor: hasDetail ? "pointer" : "default" }}>
+                        <span className="tn-ic">{ic}</span>
+                        <div className="tn-b">
+                          <div className="tn-t">{title}{isOp && <span className="tn-src">운영자</span>}{hasDetail && <span className="tn-more">{open ? "▲" : "▾"}</span>}</div>
+                          {hasDetail && open && <div className="tn-d">{body}</div>}
+                        </div>
+                        {when && <span className="tn-ts">{when}</span>}
+                      </div>
+                    );
+                  })}
+                  {(notiAll ? notis.length > 12 : notis.length > impNotis.length) && (
+                    <button className="tn-toggle" onClick={() => setNotiAll((v) => !v)}>{notiAll ? "중요 알림만 보기" : `전체 알림 ${notis.length}건 보기 →`}</button>
+                  )}
+                </>);
+              })()}
             </div>
-            <p className="tn-foot">📱 텔레그램 알림·운영자 신고가를 여기서 확인 · 항목을 누르면 상세가 펼쳐집니다.</p>
+            <p className="tn-foot">💡 매매·신호·손절·승인·서킷·오류·신고가 등 <b>당일 중요 알림</b>만 표시합니다 · 항목을 누르면 상세가 펼쳐집니다.</p>
           </section>
         )}
 
@@ -326,6 +351,9 @@ export default function TodayPage() {
         .tn-d { font-size: 0.74rem; color: var(--color-ink-2); line-height: 1.55; margin-top: 5px; white-space: pre-wrap; word-break: keep-all; background: var(--inset-bg, var(--color-card-soft)); border-radius: 8px; padding: 8px 10px; }
         .tn-ts { flex-shrink: 0; font-size: 10px; color: var(--color-ink-3); padding-top: 2px; font-family: ui-monospace, monospace; }
         .tn-foot { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 10px; line-height: 1.5; word-break: keep-all; }
+        .tn-empty { font-size: 0.78rem; color: var(--color-ink-2); padding: 10px 2px; line-height: 1.5; word-break: keep-all; }
+        .tn-toggle { width: 100%; margin-top: 8px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; padding: 8px 0; font-size: 0.74rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .tn-toggle.inline { width: auto; display: inline-block; margin-left: 8px; padding: 4px 10px; font-size: 0.7rem; }
         .td-drow { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--color-line); }
         .td-drow:last-of-type { border-bottom: none; }
         .td-dn { font-size: 0.88rem; font-weight: 800; color: var(--color-ink); display: flex; align-items: baseline; gap: 6px; }
