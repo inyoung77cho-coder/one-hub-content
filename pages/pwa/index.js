@@ -2296,6 +2296,10 @@ export default function PWADashboard({ latestReport }) {
                   </div>
                   {/* [AI-7] 채점 완료/대기 명시 — 미채점을 승패로 세지 않음. 기록 N건 중 채점 완료 vs 대기. */}
                   <div className="vs-score-sub">채점 완료 <b>{w3.n || 0}</b>건 · 대기 <b>{Math.max(0, recorded - (w3.n || 0))}</b>건{recorded > 0 && !tally.length ? ' — 3일 경과 후 승부가 채점됩니다(미채점은 패로 세지 않습니다)' : ''}</div>
+                  {/* [CI-1] 기록 성실도 — 게임의 기준은 수익률이 아니라 '판단 기록'. 침묵(자동관망)도 데이터. */}
+                  {(() => { const manual = ledger.filter((e) => e.source !== 'auto_watch').length; return (
+                    <div className="vs-integrity">📋 기록 <b>{recorded}건</b>{recorded > 0 ? <> · 직접 판단 <b>{manual}건</b>({Math.round(manual / recorded * 100)}%)</> : ''} · <span className="vs-integrity-note">순위는 수익률이 아니라 <b>판단 기록·성실도</b>로 매깁니다</span></div>
+                  ); })()}
                   <div className="vs-def">AI 추천 종목 중 <b>내가 산 것</b>(내 판단·실제)과 <b>AI가 전부 매매</b>했다고 <b>가정한 가상 포지션</b>(AI 단독)의 수익을 3일·7일로 비교합니다. AI 쪽은 실제 체결이 아닌 <b>가상</b>입니다. 승인=매매 · 거절=관망으로 기록됩니다.</div>
                   {anyReady ? (
                     <>
@@ -4077,6 +4081,8 @@ export default function PWADashboard({ latestReport }) {
         .vs-score-num { font-size: 1.7rem; font-weight: 900; font-family: var(--font-mono); color: var(--color-ink); min-width: 22px; text-align: center; }
         .vs-score-colon { font-size: 1.3rem; font-weight: 900; color: var(--text-tertiary); }
         .vs-score-sub { text-align: center; font-size: 0.68rem; color: var(--text-secondary); margin: 6px 0 2px; line-height: 1.5; word-break: keep-all; }
+        .vs-integrity { text-align: center; font-size: 0.68rem; color: var(--text-secondary); margin: 4px 0 2px; line-height: 1.5; word-break: keep-all; background: var(--inset-bg); border-radius: 8px; padding: 7px 10px; }
+        .vs-integrity-note { color: var(--text-tertiary); }
         .vs-virtual { font-size: 0.56rem; font-weight: 800; color: var(--purple, var(--color-primary)); background: var(--purple-soft, var(--color-primary-soft)); padding: 1px 5px; border-radius: 4px; vertical-align: middle; }
         /* [A-6] AI vs 나 손익 비교 */
         .pl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
