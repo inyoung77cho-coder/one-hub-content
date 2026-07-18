@@ -49,6 +49,21 @@ export default function EtfDashboard() {
   const [quotes, setQuotes] = useState({}); // { TICKER: {price, currency, date} }
   const [form, setForm] = useState({ side: "buy", ticker: "", shares: "", price: "", ccy: "USD", account: "일반", market: "auto" });
   const [formMsg, setFormMsg] = useState("");
+  // [양도세 올해 실현 누계] 브로커 매도내역 기준 실현 양도차익 기록(클라 원장) — 연 250만 공제 추적.
+  const [realized, setRealized] = useState([]); // [{id, ticker, gainKrw, date}]
+  const [addReal, setAddReal] = useState(false);
+  const [rTicker, setRTicker] = useState(""); const [rGain, setRGain] = useState(""); const [rDate, setRDate] = useState("");
+  useEffect(() => { try { const v = JSON.parse(localStorage.getItem("onehub_etf_realized") || "[]"); if (Array.isArray(v)) setRealized(v); } catch (e) {} }, []);
+  const saveRealized = (list) => { setRealized(list); try { localStorage.setItem("onehub_etf_realized", JSON.stringify(list)); } catch (e) {} };
+  const addRealized = () => {
+    const t = String(rTicker || "").trim().toUpperCase();
+    const g = Math.round(Number(rGain) * 10000); // 입력은 만원 → 원
+    const d = rDate || new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    if (!t || !Number.isFinite(g) || g === 0) return;
+    saveRealized([...realized, { id: Date.now(), ticker: t, gainKrw: g, date: d }]);
+    setRTicker(""); setRGain(""); setRDate(""); setAddReal(false);
+  };
+  const delRealized = (id) => saveRealized(realized.filter((r) => r.id !== id));
   const [posQty, setPosQtyState] = useState({}); // [등록 ETF] 티커별 사용자 입력 수량(백엔드 미제공 보완)
   const [quotesAt, setQuotesAt] = useState(null); // [실시간] 마지막 시세 갱신 시각(ms)
   const [nowTick, setNowTick] = useState(0);      // [실시간] 상대시간 표시용 1초 틱
@@ -750,6 +765,52 @@ export default function EtfDashboard() {
         </section>
       )}
 
+      {/* [#1 양도세 올해 실현 누계] 브로커 매도내역 기준 실현 양도차익 추적 — 연 250만 공제 사용/잔여·올해 세금 */}
+      {(() => {
+        const yr = new Date(Date.now() + 9 * 3600 * 1000).getUTCFullYear();
+        const yrItems = realized.filter((r) => String(r.date).startsWith(String(yr)));
+        const net = yrItems.reduce((s, r) => s + (Number(r.gainKrw) || 0), 0);
+        const DED = 2500000;
+        const used = Math.min(DED, Math.max(0, net));
+        const remain = Math.max(0, DED - Math.max(0, net));
+        const taxY = Math.max(0, Math.round((net - DED) * 0.22));
+        return (
+          <section className="card">
+            <div className="label">🧾 올해({yr}) 실현 양도차익 <span className="sub">브로커 매도내역 기준</span>
+              <button className="rz-add" onClick={() => setAddReal((v) => !v)}>{addReal ? "취소" : "＋ 기록"}</button>
+            </div>
+            {addReal && (
+              <div className="rz-form">
+                <input className="rz-in" placeholder="종목(예: SMH)" value={rTicker} onChange={(e) => setRTicker(e.target.value)} />
+                <input className="rz-in num" type="number" inputMode="decimal" placeholder="실현손익(만원, 손실 -)" value={rGain} onChange={(e) => setRGain(e.target.value)} />
+                <input className="rz-in" type="date" value={rDate} onChange={(e) => setRDate(e.target.value)} />
+                <button className="rz-save" onClick={addRealized}>추가</button>
+              </div>
+            )}
+            {yrItems.length > 0 ? (
+              <div className="rz-list">
+                {yrItems.map((r) => (
+                  <div className="rz-row" key={r.id}>
+                    <span className="rz-t">{r.ticker}</span>
+                    <span className={`rz-g ${r.gainKrw >= 0 ? "up" : "dn"}`}>{r.gainKrw >= 0 ? "+" : ""}{won(r.gainKrw)}원</span>
+                    <span className="rz-d">{String(r.date).slice(5)}</span>
+                    <button className="rz-x" onClick={() => delRealized(r.id)} aria-label="삭제">✕</button>
+                  </div>
+                ))}
+              </div>
+            ) : <div className="rz-empty">올해 실현 매도 기록이 없습니다. 브로커에서 판 ETF의 실현손익(만원)을 기록하면 <b>연 250만 공제 사용액</b>과 <b>올해 낼 양도세</b>를 추적합니다.</div>}
+            {yrItems.length > 0 && (
+              <div className="rz-sum">
+                <div className="rz-srow"><span>실현 누계(손익통산)</span><b className={net >= 0 ? "up" : "dn"}>{net >= 0 ? "+" : ""}{won(net)}원</b></div>
+                <div className="rz-srow"><span>연 250만 공제</span><b>사용 {won(used)} · 남은 {won(remain)}</b></div>
+                <div className="rz-srow big"><span>올해 실현 기준 양도세</span><b className="neg">{won(taxY)}원</b></div>
+              </div>
+            )}
+            <div className="tax-disclaim">※ 브로커 매도내역 기준 직접 입력. 미실현(현재 보유)은 위 ‘전량 매도 시’와 별개입니다. {TAX_DISCLAIMER}</div>
+          </section>
+        );
+      })()}
+
       {/* 5) 종목별 수익 분해 — 총투자액/총이익금 SummaryBar + 3열 정렬(시안) */}
       {positions.length > 0 && (
         <section className="card">
@@ -1028,6 +1089,24 @@ export default function EtfDashboard() {
         .chip { font-size: 0.72rem; font-weight: 700; background: var(--color-card-soft); color: var(--color-ink-2); padding: 6px 10px; border-radius: 9px; }
         .warn { margin-top: 10px; font-size: 0.74rem; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 7px 9px; border-radius: 8px; }
         .tax-line { display: flex; justify-content: space-between; align-items: baseline; font-size: 1.05rem; font-weight: 800; }
+        /* [#1] 올해 실현 양도차익 추적 */
+        .rz-add { float: right; border: 1px solid var(--color-primary); background: var(--color-card); color: var(--color-primary); border-radius: 8px; padding: 4px 10px; font-size: 0.7rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .rz-form { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+        .rz-in { flex: 1 1 100%; border: 1px solid var(--color-line); border-radius: 8px; padding: 8px 10px; font-size: 0.82rem; font-family: var(--font-sans); background: var(--color-card); color: var(--color-ink); }
+        .rz-in.num { flex: 1 1 45%; }
+        .rz-save { flex: 1 1 100%; border: none; background: var(--color-primary); color: #fff; border-radius: 8px; padding: 9px 0; font-size: 0.8rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .rz-list { display: flex; flex-direction: column; margin-bottom: 4px; }
+        .rz-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--color-line); font-size: 0.8rem; }
+        .rz-t { flex: 1; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; }
+        .rz-g { font-weight: 800; font-family: ui-monospace, monospace; } .rz-g.up { color: var(--color-success); } .rz-g.dn { color: var(--color-danger); }
+        .rz-d { font-size: 0.7rem; color: var(--color-ink-3); font-family: ui-monospace, monospace; }
+        .rz-x { border: none; background: none; color: var(--color-ink-3); cursor: pointer; font-size: 0.78rem; }
+        .rz-empty { font-size: 0.76rem; color: var(--color-ink-2); line-height: 1.55; padding: 6px 0; word-break: keep-all; }
+        .rz-sum { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-line); display: flex; flex-direction: column; gap: 6px; }
+        .rz-srow { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.8rem; color: var(--color-ink-2); }
+        .rz-srow b { font-family: ui-monospace, monospace; font-weight: 800; color: var(--color-ink); }
+        .rz-srow b.up { color: var(--color-success); } .rz-srow b.dn { color: var(--color-danger); } .rz-srow b.neg { color: var(--color-danger); }
+        .rz-srow.big { font-size: 0.92rem; font-weight: 800; } .rz-srow.big span { font-weight: 800; color: var(--color-ink); }
         .tax-line b { font-size: 1.3rem; }
         .tax-hint { font-size: 0.78rem; color: var(--color-ink-2); margin-top: 8px; line-height: 1.6; background: var(--color-card-soft); border-radius: 12px; padding: 12px 14px; }
         .tax-hint.sub { background: var(--color-success-soft); color: var(--color-success-ink); font-weight: 600; }
