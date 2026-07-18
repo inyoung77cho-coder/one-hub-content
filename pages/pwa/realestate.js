@@ -58,6 +58,7 @@ export default function RealEstateDashboard() {
       const bg = localStorage.getItem("onehub_re_budget"); if (bg != null) setBudget(bg);
       const jr = localStorage.getItem("onehub_re_jeonse"); if (jr != null) setJeonseRate(jr);
       const sc = localStorage.getItem("onehub_re_scope"); if (sc) setMoveScope(sc);
+      const ua = localStorage.getItem("onehub_re_my_avm"); if (ua != null && ua !== "" && Number(ua) > 0) setUserAvm(Number(ua));
     } catch (e) {}
   }, []);
   // [S3] 빠른입력(FAB) 저장 시 내 단지 즉시 재로드
@@ -139,15 +140,26 @@ export default function RealEstateDashboard() {
   const changeJeonse = (v) => { setJeonseRate(v); try { localStorage.setItem("onehub_re_jeonse", v); } catch (e) {} };
   const openWiz = () => { setWiz(myProp ? { name: myProp.name || "", pyeong: myProp.pyeong || "", dongfloor: myProp.dongfloor || "", buyUk: myProp.buyUk || "", buyMonth: myProp.buyMonth || "" } : { name: myC || "", pyeong: "", dongfloor: "", buyUk: "", buyMonth: "" }); setWizOpen(true); };
   const [delConfirm, setDelConfirm] = useState(false); // [#8] 내 단지 삭제 2단계 확인
+  // [AI-2/AI-3] 내 평형 시세 직접 입력(억) + '단지 평균으로 보기' opt-in
+  const [userAvm, setUserAvm] = useState(null);
+  const [avmEditing, setAvmEditing] = useState(false);
+  const [avmDraft, setAvmDraft] = useState("");
+  const [showComplexAvm, setShowComplexAvm] = useState(false);
+  const saveUserAvm = () => {
+    const v = Number(avmDraft);
+    if (v > 0) { setUserAvm(v); try { localStorage.setItem("onehub_re_my_avm", String(v)); window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {} }
+    setAvmEditing(false);
+  };
+  const clearUserAvm = () => { setUserAvm(null); setShowComplexAvm(false); try { localStorage.removeItem("onehub_re_my_avm"); } catch (e) {} };
   const deleteMyProp = () => {
     if (!delConfirm) { setDelConfirm(true); return; } // 명시적 취소 버튼으로만 해제(타임아웃 제거)
     // [#8 보완] 내 단지 관련 로컬 키를 모두 정리하고, 기기 동기화에도 삭제가 전파되도록 이벤트 발화.
     try {
-      ["onehub_re_my_property", "onehub_re_my", "onehub_re_target", "onehub_re_gapc_dong", "onehub_re_gapc_alert"]
+      ["onehub_re_my_property", "onehub_re_my", "onehub_re_target", "onehub_re_gapc_dong", "onehub_re_gapc_alert", "onehub_re_my_avm"]
         .forEach((k) => localStorage.removeItem(k));
       window.dispatchEvent(new Event("onehub-assets-change")); // syncManager가 삭제분을 서버에 push
     } catch (e) {}
-    setMyProp(null); setMyC(""); setTgtC(""); setGapCTarget(""); setGapCAlert(false);
+    setMyProp(null); setMyC(""); setTgtC(""); setGapCTarget(""); setGapCAlert(false); setUserAvm(null); setShowComplexAvm(false);
     setDelConfirm(false); setWizOpen(false); setGapData(null); setGapBData(null); setGapCData(null);
   };
   const saveWiz = () => {
@@ -264,15 +276,22 @@ export default function RealEstateDashboard() {
         </div>
       ) : (() => {
         const cur = rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명).find((o) => o.단지명 === myProp.name) : null;
-        const curUk = cur ? Number(cur.avm_total_uk || 0) : null;
+        const 단지Avm = cur ? Number(cur.avm_total_uk || 0) || null : null; // 단지 대표 AVM(작은 평형에 끌림) — 손익 기준으로는 부적합
+        // [AI-1~3] ★버그수정: 손익 기준을 '단지 AVM'이 아니라 '내 평형 실거래 대표가'로.
+        //   시범삼성 192㎡: 단지AVM 16.49억 vs 매수 26.5억 = -37.8%(허위) → 평형 실거래 28.8억 = +8.7%(사실).
+        const myArea = (areaOptsFor(myProp.name) || []).find((a) => String(a.m2) === String(myProp?.pyeong));
+        const tradeN = myArea && myArea.n != null ? myArea.n : null;
+        const perPyeongUk = myArea ? (myArea.priceUk ?? myArea.maxUk ?? null) : null; // 평형별 실거래 대표가
+        const SPARSE = 3; // 내 평형 실거래 3건 미만 = 신뢰 시세 산출 불가
+        const sparse = tradeN == null || tradeN < SPARSE;
+        // 현재 시세 우선순위: ① 사용자 직접입력 ② 평형별 실거래(충분) ③ (opt-in)단지 평균 ④ 없음→잠금
+        const priceSource = userAvm != null ? "user" : (!sparse && perPyeongUk != null ? "pyeong" : (showComplexAvm && 단지Avm != null ? "complex" : null));
+        const curUk = priceSource === "user" ? userAvm : priceSource === "pyeong" ? perPyeongUk : priceSource === "complex" ? 단지Avm : null;
         const buyUk = Number(myProp.buyUk || 0) || null;
         const pnl = curUk != null && buyUk != null ? curUk - buyUk : null;
         const pnlPct = pnl != null && buyUk ? (pnl / buyUk) * 100 : null;
-        // [E3/X4] 추정 신뢰도 — 내 평형의 실거래가 3건 미만이면 손익을 숨긴다(단지 AVM이 소형 평형에 끌려
-        //   대형 평형을 저평가 → '-37.8%' 같은 추정치로 겁주지 않기). 층·향·수리 미반영도 감안.
-        const myArea = (areaOptsFor(myProp.name) || []).find((a) => String(a.m2) === String(myProp?.pyeong));
-        const tradeN = myArea && myArea.n != null ? myArea.n : null;
-        const lowConf = tradeN == null || tradeN < 3;
+        const srcLabel = priceSource === "user" ? "직접 입력" : priceSource === "pyeong" ? `전용 ${myProp.pyeong}㎡ 실거래 ${tradeN}건 기준` : priceSource === "complex" ? "⚠ 단지 평균(내 평형 아님)" : null;
+        const locked = curUk == null; // 신뢰 시세 없음 → AI-3 신뢰도 카드
         return (
           <section className="card myprop-card">
             <div className="mp-h">
@@ -297,25 +316,49 @@ export default function RealEstateDashboard() {
               {myProp.buyMonth && <span>{myProp.buyMonth} 매수</span>}
               {buyUk != null && <span>매수 {uk(buyUk)}</span>}
             </div>
-            {curUk != null ? (
-              <div className="mp-pnl">
-                <div className="mp-now"><span><Term term="AI 추정 시세">현재 추정시세</Term></span><b>{uk(curUk)}</b></div>
-                {lowConf ? (
-                  <div className="mp-diff hold">
-                    <span>평가손익</span><b>실거래가 더 쌓이면 알려드릴게요</b>
-                  </div>
-                ) : (
-                  <div className={`mp-diff ${pnl >= 0 ? "pos" : "neg"}`}>
-                    <span>평가손익<em>추정</em></span><b>{pnl >= 0 ? "+" : ""}{uk(pnl)}{pnlPct != null ? ` · ${pct(pnlPct)}` : ""}</b>
-                  </div>
-                )}
-              </div>
+            {!locked ? (
+              <>
+                <div className="mp-pnl">
+                  <div className="mp-now"><span>현재 시세<em>{srcLabel}</em></span><b>{uk(curUk)}</b></div>
+                  {buyUk != null ? (
+                    <div className={`mp-diff ${pnl >= 0 ? "pos" : "neg"}`}>
+                      <span>평가손익<em>추정</em></span><b>{pnl >= 0 ? "+" : ""}{uk(pnl)}{pnlPct != null ? ` · ${pct(pnlPct)}` : ""}</b>
+                    </div>
+                  ) : (
+                    <div className="mp-diff hold"><span>평가손익</span><b>매수가 입력 시 표시</b></div>
+                  )}
+                </div>
+                <div className="mp-src-actions">
+                  {priceSource === "user"
+                    ? <button className="mp-src-btn" onClick={clearUserAvm}>실거래 시세로 되돌리기</button>
+                    : <button className="mp-src-btn" onClick={() => { setAvmDraft(curUk != null ? String(curUk) : ""); setAvmEditing(true); }}>내 시세 직접 입력</button>}
+                  {priceSource === "complex" && <span className="mp-src-warn">단지 평균이라 내 평형과 다를 수 있어요</span>}
+                </div>
+              </>
             ) : (
-              <div className="mp-nomatch">랭킹에 없는 단지입니다 — 갭·스크리너는 목록 단지 기준으로 계산됩니다. (AI 추정 시세 매칭은 실거래 축적 시)</div>
+              // [AI-3] 신뢰도 카드 — 내 평형 실거래가 부족할 때만. SK하이닉스 확인 카드와 동일 톤.
+              <div className="mp-trust">
+                <div className="mp-trust-h">🔍 확인이 필요합니다</div>
+                <div className="mp-trust-b"><b>{myProp.name} 전용 {myProp.pyeong}㎡</b>는 최근 실거래가 <b>{tradeN != null ? `${tradeN}건` : "부족"}</b>이라 신뢰할 수 있는 시세를 낼 수 없습니다. {buyUk != null ? <>매수가({uk(buyUk)})와 비교한 손익도 표시하지 않았습니다.</> : null}</div>
+                <div className="mp-trust-btns">
+                  <button className="mp-trust-primary" onClick={() => { setAvmDraft(perPyeongUk != null ? String(perPyeongUk) : 단지Avm != null ? String(단지Avm) : ""); setAvmEditing(true); }}>내 시세 직접 입력</button>
+                  {단지Avm != null && <button className="mp-trust-second" onClick={() => setShowComplexAvm(true)}>단지 평균으로 보기</button>}
+                </div>
+              </div>
             )}
-            <div className="mp-note">{lowConf
-              ? <>내 평형은 최근 <b>실거래 {tradeN != null ? `${tradeN}건` : "부족"}</b>이라 손익 표시를 보류합니다 — 단지 <Term term="AI 추정 시세">AI 추정 시세</Term>가 거래 많은 평형에 끌려 대형 평형을 낮게 볼 수 있어서예요(확정 아님).</>
-              : <>매수가·시점은 로컬에만 저장되며, 평가손익은 현재 <Term term="AI 추정 시세">AI 추정 시세</Term> 기준 <b>추정</b>(확정 아님)입니다.</>}</div>
+            {avmEditing && (
+              <div className="mp-avm-edit">
+                <span className="mp-avm-lbl">내 평형 시세(억)</span>
+                <input className="mp-avm-in" type="number" inputMode="decimal" placeholder={perPyeongUk != null ? String(perPyeongUk) : "예: 28.8"} value={avmDraft} onChange={(e) => setAvmDraft(e.target.value)} autoFocus />
+                <button className="mp-avm-save" onClick={saveUserAvm}>적용</button>
+                <button className="mp-avm-cancel" onClick={() => setAvmEditing(false)}>취소</button>
+              </div>
+            )}
+            <div className="mp-note">{locked
+              ? <>단지 <Term term="AI 추정 시세">AI 추정 시세</Term>는 거래 많은 소형 평형에 끌려 대형 평형을 낮게 볼 수 있어, 실거래가 부족한 평형은 손익을 <b>추정하지 않습니다</b>(확정 아님).</>
+              : priceSource === "pyeong"
+              ? <>평가손익은 <b>내 평형({myProp.pyeong}㎡) 실거래 {tradeN}건</b> 대표가 기준 <b>추정</b>입니다. 단지 대표 AI 추정({단지Avm != null ? uk(단지Avm) : "-"})은 평형이 섞여 손익 기준으로 쓰지 않습니다. 층·향·수리 미반영(확정 아님).</>
+              : <>매수가·시점은 로컬에만 저장됩니다. 평가손익은 위 <b>{srcLabel}</b> 기준 <b>추정</b>(확정 아님)입니다.</>}</div>
           </section>
         );
       })()}
@@ -789,6 +832,24 @@ export default function RealEstateDashboard() {
         .mp-diff.pos b { color: var(--color-success); } .mp-diff.neg b { color: var(--color-danger); }
         .mp-diff.hold b { font-size: 0.74rem; font-weight: 700; color: var(--color-ink-2); line-height: 1.4; word-break: keep-all; }
         .mp-nomatch { font-size: 0.72rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 10px; padding: 10px 12px; margin-top: 11px; line-height: 1.5; word-break: keep-all; }
+        .mp-now em { font-style: normal; font-size: 0.56rem; font-weight: 700; color: var(--color-ink-3); margin-left: 5px; }
+        /* [AI-2/3] 시세 출처 액션 + 직접입력 */
+        .mp-src-actions { display: flex; align-items: center; gap: 9px; margin-top: 9px; flex-wrap: wrap; }
+        .mp-src-btn { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 8px; padding: 6px 12px; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .mp-src-warn { font-size: 0.64rem; color: var(--color-warning-ink, var(--color-warning)); }
+        /* [AI-3] 신뢰도 카드(확인이 필요합니다) */
+        .mp-trust { margin-top: 11px; background: var(--color-warning-soft); border: 1px solid var(--color-warning-ink, var(--color-warning)); border-radius: 12px; padding: 13px 14px; }
+        .mp-trust-h { font-size: 0.86rem; font-weight: 800; color: var(--color-warning-ink, var(--color-warning)); margin-bottom: 6px; }
+        .mp-trust-b { font-size: 0.76rem; color: var(--color-ink-2); line-height: 1.55; word-break: keep-all; }
+        .mp-trust-btns { display: flex; gap: 8px; margin-top: 11px; flex-wrap: wrap; }
+        .mp-trust-primary { border: none; background: var(--color-primary); color: #fff; border-radius: 9px; padding: 8px 15px; font-size: 0.78rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .mp-trust-second { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; padding: 8px 15px; font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        /* [AI-3] 내 시세 직접입력 인라인 */
+        .mp-avm-edit { display: flex; align-items: center; gap: 7px; margin-top: 10px; flex-wrap: wrap; background: var(--color-card-soft); border-radius: 10px; padding: 9px 11px; }
+        .mp-avm-lbl { font-size: 0.7rem; font-weight: 700; color: var(--color-ink-2); }
+        .mp-avm-in { flex: 1; min-width: 90px; border: 1px solid var(--color-line); border-radius: 8px; padding: 7px 10px; font-size: 0.86rem; font-family: var(--font-sans); background: var(--color-card); color: var(--color-ink); }
+        .mp-avm-save { border: none; background: var(--color-primary); color: #fff; border-radius: 8px; padding: 7px 13px; font-size: 0.76rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .mp-avm-cancel { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 8px; padding: 7px 11px; font-size: 0.76rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .mp-note { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 10px; line-height: 1.5; word-break: keep-all; }
         .mp-note b { color: var(--color-ink-2); font-weight: 700; }
         /* [S5] 투자아파트 스크리너 */
