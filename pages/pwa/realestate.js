@@ -2,6 +2,7 @@
 // ETF 대시보드와 동일 패턴. ONE Score 랭킹/시장 브리핑/저평가/거시. 확정 데이터는 진한색.
 import { useEffect, useState } from "react";
 import BottomNav from "../../components/BottomNav";
+import AppHeader from "../../components/AppHeader";
 import { dedupBy } from "../../lib/useDedup";
 import { ReForm } from "../../components/shared/AssetForms";
 import Term from "../../components/Term";
@@ -214,6 +215,7 @@ export default function RealEstateDashboard() {
 
   return (
     <div className="re pwa-shell">
+      <AppHeader />
 
       {/* 1) HERO — 시장 브리핑 (다크 네이비 히어로) */}
       <section className="hero">

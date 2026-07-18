@@ -12,6 +12,7 @@ import { dedupBy } from '../../lib/useDedup';
 import { useTabState } from '../../lib/pwa/useTabState';
 import { samplePolicy, verdictColor as sampleVerdictColor, canAutoML, ML_MIN_SAMPLE } from '../../lib/sampleSize';
 import SampleSizeBadge from '../../components/SampleSizeBadge';
+import AppHeader from '../../components/AppHeader';
 import TraderBadge from '../../components/shared/TraderBadge';
 import BottomNav from '../../components/BottomNav';
 import { getStockHoldings, removeStock } from '../../lib/stockHoldings';
@@ -263,6 +264,8 @@ export default function PWADashboard({ latestReport }) {
   const [manualPx, setManualPx] = useState({}); // [S-1] 직접입력 보유 이상치 검증용 현재가맵(code→close_price)
   const [companyInfo, setCompanyInfo] = useState({}); // [S-7] 기업개요 캐시(code→summary)
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
+  const [opNotes, setOpNotes] = useState([]); // [알림카드] 운영자 신고가(spot_price) — 내 단지
+  const [notiOpen, setNotiOpen] = useState(null); // [알림카드] 펼친 알림 인덱스(상세 본문)
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
   const [showAssetDetail, setShowAssetDetail] = useState(false); // [팝업] 총자산 클릭 → 상세 breakdown
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
@@ -490,6 +493,16 @@ export default function PWADashboard({ latestReport }) {
       .then(r => r.json())
       .then(d => { if (d.ok && Array.isArray(d.items)) setNotis(d.items); })
       .catch(() => {});
+    // [알림카드 item6] 운영자 신고가(spot_price) — 내 단지 기준. 운영자가 기입한 내용도 카드에 포함.
+    try {
+      const mp = JSON.parse(localStorage.getItem('onehub_re_my_property') || 'null');
+      if (mp?.name) {
+        fetch(`/api/input/re-spot?complex_name=${encodeURIComponent(mp.name)}`)
+          .then(r => r.json())
+          .then(d => { if (d?.ok && Array.isArray(d.items)) setOpNotes(d.items); })
+          .catch(() => {});
+      }
+    } catch (e) {}
     // [N1] 총자산 = 단일 원장(lib/ledger). ETF 실시간 평가·온보딩 미러링은 원장이 내부에서 처리하므로
     //   여기서 다시 조정하지 않는다(과거 이중 조정·미러 오염의 원인).
     getAssetLedger(trader)
@@ -947,45 +960,8 @@ export default function PWADashboard({ latestReport }) {
       )}
 
       <div className={`pwa-wrapper pwa-shell theme-${theme}`} style={{ display: splash ? 'none' : undefined }}>
-        <header className="pwa-header">
-          {/* [S18] 로고는 종합자산으로 간다.
-              기존 setTab('dashboard')는 N2에서 폐지된 구 대시보드 탭이라, 누르면 '예전 PWA'가
-              되살아났다(리다이렉트는 URL 진입만 막고 탭 전환은 못 막는다).
-              앱 전체에서 로고 = 종합자산(/pwa/assets) 하나로 통일한다. */}
-          <button className="pwa-brand" onClick={() => router.push('/pwa/assets')} aria-label="종합자산">
-            <span className="pwa-logo">ONE<span className="pwa-logo-dot">·</span>HUB</span>
-          </button>
-          <div className="pwa-header-actions">
-            {/* [T1] 트레이더 배지 — A는 미표시, B일 때만 헤더 배지 */}
-            <TraderBadge />
-            {/* [S3] 빠른입력 — 어디서나 자산(주식/ETF/부동산/현금) 금액 빠르게 반영 */}
-            <button
-              className="pwa-quickadd-toggle"
-              onClick={() => setQaOpen(true)}
-              aria-label="자산 빠른입력"
-              title="자산 빠른입력"
-            >
-              ＋
-            </button>
-            {/* [v9.1 PWA-01] 검색: 중앙 FAB → 우측 상단 아이콘으로 이동 */}
-            <button
-              className={`pwa-search-toggle ${tab==='analyze'?'active':''}`}
-              onClick={() => setTab('analyze')}
-              aria-label="AI 종목 검색"
-              title="AI 종목 검색"
-            >
-              🔍
-            </button>
-            <button
-              className="pwa-theme-toggle"
-              onClick={() => router.push('/pwa/settings')}
-              aria-label="설정"
-              title="설정 · 테마 · 시스템 상태"
-            >
-              ⚙️
-            </button>
-          </div>
-        </header>
+        {/* [UI 통일] 공통 헤더 — ONE·HUB + 🔍만(＋·⚙️는 하단 BottomNav). */}
+        <AppHeader onSearch={() => setTab('analyze')} />
 
         {/* [N2] 상단 5탭 제거 — 하단 4탭(BottomNav)과 공존해 '내비가 둘'인 상태가 원 지적이었다.
             도달성은 유지된다: 종합자산·AI = 하단탭, 주식·ETF·부동산 = 자산 지도 범례.
@@ -1042,6 +1018,47 @@ export default function PWADashboard({ latestReport }) {
             )}
             {pushError && (
               <div className="pwa-error" style={{ marginBottom: 10 }}>알림 설정 오류: {pushError}</div>
+            )}
+            {/* [알림카드 #5·#6] 오늘 알림 확인 — 텔레그램 상세 본문 + 운영자 신고가. 푸시 클릭 시 여기서 상세 확인. */}
+            {(notis.length > 0 || opNotes.length > 0) && (
+              <section className="pwa-card noti-card" id="noti-card">
+                <span className="pwa-card-label">🔔 오늘 알림 · 상세 확인</span>
+                <div className="noti-list">
+                  {opNotes.slice(0, 3).map((s, i) => (
+                    <div className="noti-item op" key={`op${i}`}>
+                      <span className="noti-ic">🏢</span>
+                      <div className="noti-b">
+                        <div className="noti-t">운영자 신고가 · {s.complex_name}{s.area_m2 ? ` ${Math.round(s.area_m2)}㎡` : ''}<span className="noti-src">운영자</span></div>
+                        <div className="noti-d open">{s.price_manwon ? `${(s.price_manwon / 10000).toFixed(2)}억` : ''} · {s.kind || '신고'}{s.reporter ? ` · ${s.reporter}` : ''}{s.status === 'tentative' ? ' · 미확정(참고)' : ''}</div>
+                      </div>
+                      {s.created_at && <span className="noti-ts mono">{String(s.created_at).slice(5, 16)}</span>}
+                    </div>
+                  ))}
+                  {notis.slice(0, 6).map((n, i) => {
+                    const title = n.title || n.message || n.text || '알림';
+                    const body = n.body || n.detail || '';
+                    const t = n.noti_type || n.type || '';
+                    const src = n.source || '';
+                    const isOp = /operator|운영자|manual/i.test(src);
+                    const ic = isOp ? '🧑‍💼' : /buy|매수|신호/i.test(t + title) ? '📈' : /sell|매도|손절|익절/i.test(t + title) ? '📉' : /report|리포트/i.test(t + title) ? '📄' : /critical|error|오류|circuit/i.test(t + title) ? '⚠️' : '🔔';
+                    const ts = n.sent_at || n.created_at || n.timestamp || null;
+                    const when = ts ? String(ts).replace('T', ' ').slice(5, 16) : null;
+                    const open = notiOpen === i;
+                    const hasDetail = body && body.trim() && body.trim() !== title.trim();
+                    return (
+                      <div className={`noti-item ${n.is_read ? '' : 'unread'}`} key={i} onClick={() => hasDetail && setNotiOpen(open ? null : i)} style={{ cursor: hasDetail ? 'pointer' : 'default' }}>
+                        <span className="noti-ic">{ic}</span>
+                        <div className="noti-b">
+                          <div className="noti-t">{title}{isOp && <span className="noti-src">운영자</span>}{hasDetail && <span className="noti-more">{open ? '▲' : '▾'}</span>}</div>
+                          {hasDetail && open && <div className="noti-d open">{body}</div>}
+                        </div>
+                        {when && <span className="noti-ts mono">{when}</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="noti-foot">📱 텔레그램으로 받은 알림과 운영자 신고가를 여기서 확인합니다 · 항목을 누르면 상세가 펼쳐집니다.</p>
+              </section>
             )}
             {!data && !error && (
               <div className="pwa-loading">
@@ -1313,29 +1330,7 @@ export default function PWADashboard({ latestReport }) {
                   )}
                 </div>
 
-                {/* C) 내 자산 활동 — 텔레그램/리포트/큐 동기화 알림(입출금·체결·리포트 등 실데이터) */}
-                {notis.length > 0 && (
-                  <div className="bf-block v10-noti">
-                    <div className="v10-noti-h">💰 내 자산 활동</div>
-                    {notis.slice(0, 4).map((n, i) => {
-                      const title = n.title || n.message || n.body || n.text || '알림';
-                      const t = n.type || n.category || '';
-                      const ic = /buy|매수|signal|신호/i.test(t + title) ? '📈'
-                        : /sell|매도|손절|익절/i.test(t + title) ? '📉'
-                        : /report|리포트/i.test(t + title) ? '📄'
-                        : /error|오류|실패|circuit/i.test(t + title) ? '⚠️' : '🔔';
-                      const ts = n.created_at || n.timestamp || n.time || n.date || null;
-                      const when = ts ? String(ts).replace('T', ' ').slice(5, 16) : null;
-                      return (
-                        <div className="v10-noti-row" key={i}>
-                          <span className="v10-noti-ic">{ic}</span>
-                          <span className="v10-noti-tx">{title}</span>
-                          {when && <span className="v10-noti-ts mono">{when}</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                {/* C) 내 자산 활동 알림은 상단 '🔔 오늘 알림 · 상세 확인' 카드로 이동(#5·#6) — 중복 제거 */}
 
                 {/* D) 오늘 AI 실행 — 판단이 실제 행동으로 이어진 근거(집계) */}
                 <div className="bf-exec">
@@ -3457,6 +3452,21 @@ export default function PWADashboard({ latestReport }) {
         .pf-cta { flex: 1; min-width: 130px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .pf-cta.primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
         /* [#3 알림 피드] */
+        /* [알림카드 #5·#6] 오늘 알림 상세 카드 */
+        .noti-card { margin-bottom: 12px; }
+        .noti-list { display: flex; flex-direction: column; }
+        .noti-item { display: flex; gap: 9px; align-items: flex-start; padding: 10px 2px; border-bottom: 1px solid var(--color-line); }
+        .noti-item:last-child { border-bottom: none; }
+        .noti-ic { flex-shrink: 0; font-size: 15px; line-height: 1.4; }
+        .noti-b { flex: 1; min-width: 0; }
+        .noti-t { font-size: 0.8rem; font-weight: 700; color: var(--color-ink); line-height: 1.45; word-break: keep-all; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .noti-src { font-size: 0.58rem; font-weight: 800; color: var(--color-primary); background: var(--color-primary-soft); padding: 1px 6px; border-radius: 5px; }
+        .noti-more { font-size: 0.6rem; color: var(--text-tertiary); }
+        .noti-d { font-size: 0.74rem; color: var(--color-ink-2); line-height: 1.55; margin-top: 5px; white-space: pre-wrap; word-break: keep-all; background: var(--inset-bg); border-radius: 8px; padding: 8px 10px; }
+        .noti-ts { flex-shrink: 0; font-size: 10px; color: var(--color-ink-3); padding-top: 2px; }
+        .noti-item.unread .noti-t::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-danger); margin-right: 2px; }
+        .noti-item.op { background: var(--color-warning-soft); border-radius: 8px; margin-bottom: 4px; padding: 10px; border-bottom: none; }
+        .noti-foot { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 10px; line-height: 1.5; word-break: keep-all; }
         .v10-noti { margin-top: 13px; border-top: 1px solid var(--color-line); padding-top: 12px; }
         .bf-block.v10-noti { margin-top: 14px; }
         .v10-noti-h { font-size: 12px; font-weight: 700; color: var(--color-ink-2); margin-bottom: 8px; }

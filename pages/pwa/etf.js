@@ -4,6 +4,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import BottomNav from "../../components/BottomNav";
+import AppHeader from "../../components/AppHeader";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS } from "../../lib/etfHoldings";
 import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress, pensionCreditLimitCombined } from "../../lib/taxRules";
@@ -373,6 +374,7 @@ export default function EtfDashboard() {
 
   return (
     <div className="etf pwa-shell">
+      <AppHeader />
 
       {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해 (시안: 다크 네이비 히어로) */}
       <section className="hero">
