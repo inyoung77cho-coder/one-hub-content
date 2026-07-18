@@ -117,8 +117,11 @@ export default function Onboarding() {
         {/* progress header */}
         <div className="phead">
           <div className="phead-top">
-            <div className="brand">ONE<span className="bdot">·</span>HUB</div>
-            <button className="skip" onClick={finish}>나중에 하기</button>
+            <button className="brand brand-btn" onClick={() => router.push("/pwa/assets")} aria-label="종합자산">ONE<span className="bdot">·</span>HUB</button>
+            <div className="phead-r">
+              <button className="ob-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색" title="AI 종목 검색">🔍</button>
+              <button className="skip" onClick={finish}>나중에 하기</button>
+            </div>
           </div>
           <div className="acc-lbl"><span className="t">AI 판단 정확도</span><span className="p">{step >= 5 ? 100 : gauge}%</span></div>
           <div className="acc-track"><div className="acc-fill" style={{ width: `${step >= 5 ? 100 : gauge}%` }} /></div>
@@ -338,6 +341,9 @@ export default function Onboarding() {
         .phead { background: var(--hero-grad-1); padding: 18px 18px 20px; color: var(--hero-ink); }
         .phead-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
         .brand { font-weight: 800; font-size: 15px; letter-spacing: -.3px; }
+        .brand-btn { background: none; border: none; padding: 0; cursor: pointer; color: inherit; font-family: inherit; }
+        .phead-r { display: flex; align-items: center; gap: 8px; }
+        .ob-search { width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,.12); border: none; display: grid; place-items: center; font-size: 13px; cursor: pointer; }
         .bdot { color: var(--color-success); }
         .skip { font-size: 12px; color: var(--hero-ink-faint); background: none; border: none; font-family: inherit; cursor: pointer; }
         .acc-lbl { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }

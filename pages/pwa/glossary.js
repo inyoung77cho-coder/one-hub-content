@@ -1,7 +1,7 @@
 // [H2] 용어사전 페이지 — data/glossary.json 단일 원천을 렌더(하드코딩 금지).
 //   전문용어를 배울 곳이 없던 문제(X7) 해소. 검색 + 전체 목록. Term(ⓘ)과 동일 소스.
 import { useState } from "react";
-import TopNav from "../../components/TopNav";
+import AppHeader from "../../components/AppHeader";
 import GLOSSARY from "../../data/glossary.json";
 
 export default function GlossaryPage() {
@@ -14,7 +14,7 @@ export default function GlossaryPage() {
 
   return (
     <div className="gl pwa-shell">
-      <TopNav active="settings" />
+      <AppHeader />
       <div className="gl-hd"><h1>📖 용어사전</h1><span className="gl-sub">{entries.length}개 용어 · 쉬운 말로</span></div>
 
       <div className="gl-search">

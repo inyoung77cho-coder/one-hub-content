@@ -111,13 +111,7 @@ export default function TodayPage() {
     ? `AI가 매수 후보 ${cands.length}종목을 추렸습니다.`
     : "오늘은 AI가 살펴본 종목 중 매수 기준을 넘은 게 없습니다.";
 
-  // ── ③ 내 자산 오늘: 변화 있을 때만. 부동산 신고가는 '내 단지 아님' 라벨 필수(오해 방지).
-  const movers = positions
-    .filter((p) => Number.isFinite(Number(p.pnl_rate)) && Math.abs(Number(p.pnl_rate)) >= 3)
-    .sort((a, b) => Math.abs(Number(b.pnl_rate)) - Math.abs(Number(a.pnl_rate)))
-    .slice(0, 2);
-  const hi = (feed?.feed ?? []).find((f) => Number(f.변동률) > 0) || null;
-  const hasChange = movers.length > 0 || !!hi;
+  // [삭제] '내 자산 오늘'(movers/hi/hasChange) 제거 — 아래 렌더 주석 참고.
 
   // ── ④ 채점 임박: 판단 후 3일. 가장 빠른 결과일.
   const tr2 = trader || "A";
@@ -266,31 +260,9 @@ export default function TodayPage() {
           )}
         </section>
 
-        {/* ③ 내 자산 오늘 — 변화 있을 때만 */}
-        <section className="card">
-          <div className="td-h">내 자산 오늘</div>
-          {hasChange ? (
-            <div className="td-mlist">
-              {movers.map((p, i) => (
-                <div className="td-mrow" key={p.code || i}>
-                  <span className="td-mn">{p.name}</span>
-                  <span className={`td-mv ${Number(p.pnl_rate) >= 0 ? "up" : "dn"}`}>{pctTxt(p.pnl_rate)}</span>
-                </div>
-              ))}
-              {hi && (
-                <div className="td-mrow">
-                  <span className="td-mn">{hi.단지명} <em className="td-note">신고가 {hi.거래금액_억}억</em></span>
-                  <span className="td-mv up">+{hi.변동률}%{hi.단지명 !== myComplex && <em className="td-not-mine">내 단지 아님</em>}</span>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="td-vtext td-quiet">오늘은 큰 변화가 없습니다.{ledger?.total_uk != null ? <> 총자산 <b>{Number(ledger.total_uk).toFixed(2)}억</b>.</> : null}
-              {/* [N1] 총자산을 말하는 곳이면 어디서든 불완전 사실을 함께 말한다 — 한 화면만 정직하면 의미가 없다 */}
-              {(ledger?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && <> ⚠ 증권사 연동 자산이 빠져 실제보다 적습니다.</>}
-            </p>
-          )}
-        </section>
+        {/* [삭제] '내 자산 오늘' 섹션 제거 — ① 남의 부동산 신고가(내 단지 아님)를 섞고 ② '오늘'이라면서
+            총손익(당일변동 아님)을 보여줘 자산 화면과 어긋남 ③ 손절임박은 위 '결정 대기', 전체 포트는
+            '자산' 화면과 중복. 중요한 변동은 결정 대기·알림 카드로 대체. */}
 
         {/* ④ 채점 임박 — 항상 */}
         <section className="card td-judge" onClick={() => router.push("/pwa?tab=report&sec=vs")}>
