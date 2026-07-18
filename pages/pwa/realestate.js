@@ -190,6 +190,19 @@ export default function RealEstateDashboard() {
   const areaOptsFor = (name) => (Array.isArray(dbAreas[name]) && dbAreas[name].length ? dbAreas[name] : (areaMap[name] || []));
   // 전용㎡ → 대략 평(공급 관례 근사): 전용㎡ ÷ 3.3058 후 전용률 0.74 역산 ≈ ㎡/2.45
   const m2ToPyeong = (m2) => Math.round(Number(m2) / 3.3058 / 0.74);
+  // [PI-2/AI-2] 내 단지·평형의 '팔 값'(신뢰 시세) 단일 계산 — 사용자입력 > 평형별 실거래(3건+) > 없음(잠금).
+  //   갈아타기 갭·손실확정은 이 팔 값 위에서만 계산한다(못 믿는 시세면 갭도 잠금).
+  const myPyeongPrice = () => {
+    const area = myProp?.name ? (areaOptsFor(myProp.name) || []).find((a) => String(a.m2) === String(myProp?.pyeong)) : null;
+    const tradeN = area && area.n != null ? area.n : null;
+    const perUk = area ? (area.priceUk ?? area.maxUk ?? null) : null;
+    const sparse = tradeN == null || tradeN < 3;
+    if (userAvm != null) return { uk: userAvm, source: "user", tradeN, locked: false };
+    if (!sparse && perUk != null) return { uk: perUk, source: "pyeong", tradeN, locked: false };
+    return { uk: null, source: null, tradeN, locked: true };
+  };
+  // [PI-1] 분당구 법정동 폴백(complex-dongs 미도달 시 드롭다운 공백 방지). raw_transactions 실측 13개.
+  const BUNDANG_DONGS = ["정자동", "야탑동", "구미동", "서현동", "이매동", "수내동", "금곡동", "분당동", "삼평동", "판교동", "백현동", "운중동", "대장동"];
   // 법정동: 백엔드(complex-dongs) 우선 → 랭킹 필드 → 브리핑 지역
   const dongOf = (name) => {
     if (dongMap[name]) return dongMap[name];
@@ -540,7 +553,9 @@ export default function RealEstateDashboard() {
                     <div className="gap-empty" style={{ marginTop: 12 }}>목표 지역 갭 추적은 <b>내 단지</b> 등록 후 이용할 수 있습니다. <button className="scr-reg" onClick={openWiz}>내 단지 등록 →</button></div>
                   ) : (() => {
                     const myDongC = dongOf(myProp.name);
-                    const dongs = [...new Set(Object.values(dongMap || {}).filter(Boolean))].filter((d) => d !== myDongC).sort();
+                    // [PI-1] complex-dongs 전체맵 우선 + 분당 폴백 병합 → 드롭다운이 비지 않게.
+                    const fromMap = Object.values(dongMap || {}).filter(Boolean);
+                    const dongs = [...new Set([...fromMap, ...BUNDANG_DONGS])].filter((d) => d && d !== myDongC).sort();
                     return (
                       <div className="gap5">
                         <div className="gap5-h">🎯 목표 지역 갭 추적 <span>{myDongC || "내 동"} → 목표 동 · 전용 {myProp?.pyeong || 84}㎡</span></div>
@@ -561,6 +576,63 @@ export default function RealEstateDashboard() {
                                 {gapCData.band && <div className="g5r"><span>적정 밴드(평균±1σ)</span><b>{gapCData.band.low_uk}~{gapCData.band.high_uk}억</b></div>}
                                 <div className="g5r"><span>표본</span><b>{gapCData.deal_n}건 · {gapCData.history?.length}개월</b></div>
                               </div>
+                              {/* [PI-2~4] 갈아타기 정밀 계산 — 내 매수가를 아는 ONE-HUB만의 화면 */}
+                              {(() => {
+                                const sp = myPyeongPrice();
+                                const buyUk = Number(myProp?.buyUk || 0) || null;
+                                const gap = gapCData.current_gap_uk;
+                                const won = (u) => u == null ? "-" : `${u >= 0 ? "" : "-"}${Math.abs(u).toFixed(2)}억`;
+                                if (sp.locked || sp.uk == null) {
+                                  return <div className="mv-locked">🔒 내 평형(전용 {myProp?.pyeong}㎡) 실거래가 부족해 <b>팔 값</b>을 확정할 수 없어 갈아타기 금액을 계산하지 않습니다. 내 단지 카드에서 <b>내 시세 직접 입력</b> 후 이용하세요.</div>;
+                                }
+                                const sellUk = sp.uk;
+                                const buyTargetUk = gap != null ? Math.round((sellUk + gap) * 100) / 100 : null;
+                                const lossUk = buyUk != null ? Math.round((sellUk - buyUk) * 100) / 100 : null;
+                                const acqTax = buyTargetUk == null ? null : (() => {
+                                  const p = buyTargetUk; let r;
+                                  if (p <= 6) r = 0.01; else if (p <= 9) r = Math.min(0.03, Math.max(0.01, (p * 2 / 3 - 3) / 100)); else r = 0.03;
+                                  return Math.round(p * r * 100) / 100;
+                                })();
+                                const isLoss = lossUk != null && lossUk < 0;
+                                const cgt = lossUk == null ? null : isLoss ? { v: 0, txt: "손실이라 양도세 없음(이월결손 가능)" } : { v: null, txt: "양도차익 발생 — 보유기간·주택수에 따라 달라 세무사 상담 필요" };
+                                const netUk = (buyTargetUk != null && acqTax != null) ? Math.round((sellUk - buyTargetUk - acqTax - (cgt?.v || 0)) * 100) / 100 : null;
+                                return (
+                                  <div className="movecalc">
+                                    <div className="mv-h">🎯 갈아타기 정밀 계산 <span className="mv-src">팔 값: {sp.source === "user" ? "직접 입력" : `전용 ${myProp?.pyeong}㎡ 실거래 ${sp.tradeN}건`}</span></div>
+                                    <div className="mv-row"><span>내 단지 팔 값</span><b>{won(sellUk)}</b></div>
+                                    <div className="mv-row"><span>목표 지역 살 값 <em>동 평균·동일 평형</em></span><b>{won(buyTargetUk)}</b></div>
+                                    <div className="mv-row hl"><span>갭(추가 자금)</span><b>{gap != null ? (gap >= 0 ? `+${won(gap)}` : won(gap)) : "-"}</b></div>
+                                    {buyUk != null && (
+                                      <div className={`mv-row ${isLoss ? "neg" : "pos"}`}><span>내 매수가({won(buyUk)}) 대비 {isLoss ? "손실 확정액" : "평가 이익"}</span><b>{lossUk >= 0 ? "+" : ""}{won(lossUk)}</b></div>
+                                    )}
+                                    <div className="mv-row"><span>취득세 <em>주택 개략</em></span><b>{acqTax != null ? won(acqTax) : "-"}</b></div>
+                                    <div className="mv-row"><span>양도세</span><b>{cgt == null ? "-" : cgt.v === 0 ? "0원" : "상담 필요"}</b></div>
+                                    {cgt && <div className="mv-note-s">※ {cgt.txt}</div>}
+                                    <div className={`mv-net ${netUk == null ? "" : netUk >= 0 ? "pos" : "neg"}`}>
+                                      <span>순 이동액{cgt && cgt.v == null ? " (양도세 미반영)" : ""}</span>
+                                      <b>{netUk == null ? "-" : netUk >= 0 ? `+${won(netUk)} 손에 남음` : `${won(netUk)} 더 필요`}</b>
+                                    </div>
+                                    <div className="mv-disc">계산기입니다 · <b>세무 자문이 아닙니다</b>. 취득세=주택 표준세율 개략(지방교육세·농특세 별도), 중개보수 미반영. 최종은 세무사·중개사 확인.</div>
+                                  </div>
+                                );
+                              })()}
+                              {/* [PI-5] 유지 vs 이동 — 상대가치 비교(점값 예측 아님) */}
+                              {(() => {
+                                const myRow = rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명).find((o) => o.단지명 === myProp?.name) : null;
+                                const myVal = myRow?.valuation || null; const myScore = myRow?.one_score;
+                                const v = gapCData.verdict;
+                                const moveTxt = v === "추천" ? "지금 진입 유리(밴드 하단)" : v === "보류" ? "지금은 비쌈(밴드 상단)" : v === "관망" ? "통상 범위" : "표본 부족 — 판단 보류";
+                                return (
+                                  <div className="holdmove">
+                                    <div className="hm-h">🤔 그래도 옮기나 — 유지 vs 이동</div>
+                                    <div className="hm-cols">
+                                      <div className="hm-col"><span className="hm-k">내 단지 유지</span><span className="hm-v">{myVal || "상대가치 정보 없음"}{myScore != null ? ` · ONE ${myScore}` : ""}</span></div>
+                                      <div className="hm-col"><span className="hm-k">목표 지역 이동</span><span className="hm-v">{moveTxt}</span></div>
+                                    </div>
+                                    <div className="hm-disc">※ 미래 가격 예측이 아니라 <b>현재 상대가치</b> 비교입니다(동시 반영·lag 0). 최종 판단은 본인이 하세요.</div>
+                                  </div>
+                                );
+                              })()}
                               <button className={`gapc-alert ${gapCAlert ? "on" : ""}`} onClick={toggleGapCAlert}>{gapCAlert ? "🔔 갭 알림 설정됨 — 밴드 하단 이탈 시 알림" : "🔕 갭 알림 설정하기"}</button>
                               <div className="gap5-foot">⚠ {gapCData.tax_note} · {gapCData.disclaimer} · 알림은 앱 재방문 시 갱신(서버 푸시는 🔜 향후 업데이트).</div>
                             </div>
@@ -950,6 +1022,30 @@ export default function RealEstateDashboard() {
         .g5r { font-size: 12px; color: var(--color-ink-3); } .g5r b { color: var(--color-ink); font-weight: 800; margin-left: 5px; }
         .gap5-spark { width: 100%; height: 44px; margin-top: 10px; display: block; }
         .gap5-foot { font-size: 10.5px; color: var(--color-ink-3); margin-top: 9px; line-height: 1.5; word-break: keep-all; }
+        /* [PI-2~4] 갈아타기 정밀 계산 */
+        .movecalc { margin-top: 12px; background: var(--color-card); border: 1px solid var(--color-primary); border-radius: 12px; padding: 13px 14px; }
+        .mv-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 9px; display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+        .mv-src { font-size: 0.62rem; font-weight: 600; color: var(--color-ink-3); }
+        .mv-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 5px 0; font-size: 0.78rem; color: var(--color-ink-2); border-bottom: 1px dashed var(--color-line); }
+        .mv-row b { font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; white-space: nowrap; }
+        .mv-row em { font-style: normal; font-size: 0.6rem; color: var(--color-ink-3); margin-left: 4px; }
+        .mv-row.hl b { color: var(--color-primary); }
+        .mv-row.neg b { color: var(--color-danger); } .mv-row.pos b { color: var(--color-success); }
+        .mv-note-s { font-size: 0.66rem; color: var(--color-ink-3); padding: 5px 0 0; line-height: 1.5; word-break: keep-all; }
+        .mv-net { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 10px; padding: 11px 12px; border-radius: 10px; background: var(--color-card-soft); }
+        .mv-net span { font-size: 0.76rem; font-weight: 700; color: var(--color-ink-2); }
+        .mv-net b { font-size: 1rem; font-weight: 900; font-family: ui-monospace, monospace; }
+        .mv-net.pos b { color: var(--color-success); } .mv-net.neg b { color: var(--color-danger); }
+        .mv-disc { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 9px; line-height: 1.55; word-break: keep-all; }
+        .mv-locked { margin-top: 12px; background: var(--color-warning-soft); border: 1px solid var(--color-warning-ink, var(--color-warning)); border-radius: 12px; padding: 12px 14px; font-size: 0.76rem; color: var(--color-ink-2); line-height: 1.55; word-break: keep-all; }
+        /* [PI-5] 유지 vs 이동 */
+        .holdmove { margin-top: 12px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 12px; padding: 12px 14px; }
+        .hm-h { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); margin-bottom: 9px; }
+        .hm-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .hm-col { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 9px; padding: 9px 10px; display: flex; flex-direction: column; gap: 4px; }
+        .hm-k { font-size: 0.64rem; font-weight: 700; color: var(--color-ink-3); }
+        .hm-v { font-size: 0.76rem; font-weight: 700; color: var(--color-ink); word-break: keep-all; }
+        .hm-disc { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 9px; line-height: 1.55; word-break: keep-all; }
         /* [R-5 시나리오B] 같은 동 후보 갭 카드 */
         .gapb-cand { padding: 10px 0; border-top: 1px solid var(--color-line); }
         .gapb-cand:first-of-type { border-top: none; }

@@ -591,6 +591,12 @@ export default function EtfDashboard() {
           <div className="label">종목 중복 노출 (Heat Map)
             <span className="sub">실 보유 기반</span>
           </div>
+          {/* [PI-6] 겉보기 vs 실효 — 여러 ETF가 같은 섹터에 겹치면 실제 노출은 겉보기보다 높다 */}
+          {overlap.sectors?.[0] && (
+            <div style={{ background: "var(--color-warning-soft)", border: "1px solid var(--color-warning-ink, var(--color-warning))", borderRadius: 10, padding: "10px 12px", margin: "0 0 12px", fontSize: "0.76rem", color: "var(--color-ink-2)", lineHeight: 1.55, wordBreak: "keep-all" }}>
+              ⚠️ 여러 ETF가 <b>{overlap.sectors[0].sector}</b>에 겹칩니다 — <b>실효 비중 {(overlap.sectors[0].weight * 100).toFixed(0)}%</b>. 개별 ETF 라벨의 겉보기 비중이 아니라, <b>같은 섹터에 실제로 얼마나 노출됐는지</b>입니다(겉보기보다 높을 수 있음).
+            </div>
+          )}
           <div className="heat">
             {overlap.stocks?.slice(0, 8).map((st) => (
               <div className="hrow" key={st.ticker}>
