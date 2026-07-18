@@ -132,7 +132,7 @@ export default function Home({ reports, stats }) {
                     오늘 판단 <b>{latest.trade_count > 0 ? `실행 ${latest.trade_count}건` : '진입 자제'}</b>
                   </span>
                 )}
-                <span className="tchip">누적 운영 <b>{stats.totalDays}일</b></span>
+                <span className="tchip">누적 운영 <b>{stats.totalDays}일</b>{stats.watchDays > 0 ? ` (매매 ${stats.tradeDays} · 관망 ${stats.watchDays})` : ''}</span>
               </div>
             </div>
           </section>
@@ -331,9 +331,9 @@ export default function Home({ reports, stats }) {
                 <div className="stat"><div className="num">{stats.totalAnalyzed}</div><div className="lbl">누적 분석</div></div>
                 <div className="stat"><div className="num">{stats.totalBlocked}</div><div className="lbl">AI 차단</div></div>
                 <div className="stat"><div className="num">{stats.totalTrades}</div><div className="lbl">최종 실행</div></div>
-                <div className="stat"><div className="num">{stats.totalDays}</div><div className="lbl">운영 일수</div></div>
+                <div className="stat"><div className="num">{stats.totalDays}</div><div className="lbl">운영 일수{stats.watchDays > 0 ? <><br /><span style={{ fontSize: '0.68rem', fontWeight: 600, opacity: 0.7 }}>매매 {stats.tradeDays} · 관망 {stats.watchDays}</span></> : null}</div></div>
               </div>
-              <p className="trust-note">※ 모든 수치는 운영일지 데이터(매일 15:30 KST 갱신)에서 자동 집계됩니다.</p>
+              <p className="trust-note">※ 모든 수치는 운영일지 데이터(매일 15:30 KST 갱신)에서 자동 집계됩니다.{stats.watchDays > 0 ? ' ‘관망’은 엔진이 가동됐으나 선별 결과 매매하지 않은 날입니다(중단 아님).' : ''}</p>
             </div>
           </section>
 
@@ -733,6 +733,10 @@ export async function getStaticProps() {
     totalTrades: reports.reduce((s, r) => s + (r.trade_count || 0), 0),
     totalBlocked: reports.reduce((s, r) => s + (r.block_count || 0), 0),
     totalAnalyzed: reports.reduce((s, r) => s + (r.block_count || 0) + (r.trade_count || 0), 0),
+    // [AI-8] 정직한 트랙레코드 — '운영일'을 매매일/관망일로 분해. 관망일(선별 결과 매매 없음)을
+    //   숨기지 않는다. 봇은 가동됐으나 BEAR 국면 등으로 매매하지 않은 날이 있음(자율모드 OFF 아님).
+    tradeDays: reports.filter((r) => (r.trade_count || 0) > 0).length,
+    watchDays: reports.filter((r) => (r.trade_count || 0) === 0).length,
   };
 
   return { props: { reports, stats } };
