@@ -112,19 +112,20 @@ export default function Home({ reports, stats }) {
                 {latest && <> · 오늘 {emoji(latest.regime)} {label(latest.regime)}</>}
               </p>
               <h1>
-                주식 · ETF · 부동산을<br />
-                <em>AI가 함께 운영</em>합니다.
+                당신은 <em>AI를 이길 수</em> 있나요?
               </h1>
               <p className="lead">
-                흩어진 세 자산을 한 곳에서 분석하고 배분합니다. AI가 시장을 읽고 후보를 선별하면 최종 결정은 사람이
-                하며, 그 판단 과정을 매일 투명하게 공개합니다.
+                매일 AI가 종목을 고릅니다. 당신도 고르세요. 같은 <b>가상 1천만원</b>으로 시작해,
+                3일 뒤 누가 더 벌었는지 <b>지갑 잔고</b>로 겨룹니다. — 주식·ETF·부동산을 AI와 함께
+                운영하는 ONE-HUB의, 가장 재밌는 시작.
               </p>
               <div className="hero-cta">
-                <a className="btn btn-white btn-lg" href="/pwa">🚀 ONE-HUB 앱 시작하기</a>
+                <a className="btn btn-white btn-lg" href="/pwa?tab=report&sec=vs">⚔️ AI와 대결 시작</a>
                 <a className="btn btn-line btn-lg" href={latest ? `/daily/${latest.date}` : '/daily'}>
-                  📋 오늘의 판단 보기
+                  먼저 구경하기
                 </a>
               </div>
+              <p className="hero-disclaim">※ 가상 게임머니로 하는 <b>판단 연습</b>입니다. 실제 투자·주문이 아니며, 최종 판단은 본인 책임입니다(투자자문 아님).</p>
               <div className="hero-teaser">
                 <span className="tchip">통합 자산 <b>주식 · ETF · 부동산</b></span>
                 {latest && (
@@ -133,6 +134,29 @@ export default function Home({ reports, stats }) {
                   </span>
                 )}
                 <span className="tchip">누적 운영 <b>{stats.totalDays}일</b>{stats.watchDays > 0 ? ` (매매 ${stats.tradeDays} · 관망 ${stats.watchDays})` : ''}</span>
+              </div>
+            </div>
+          </section>
+
+          {/* [HI-2] ⚔️ 나 vs AI 게임 — 최상단 훅. 관찰 → 참여로. (단일사용자: 당신 vs AI, PWA 게임 연결) */}
+          <section className="gamehook">
+            <div className="container">
+              <div className="gh-card">
+                <div className="gh-top"><span className="gh-lbl">⚔️ 나 vs AI · 가상 대결</span><span className="gh-virtual">가상·모의</span></div>
+                <div className="gh-versus">
+                  <div className="gh-side"><span className="gh-who">🙋 나</span><span className="gh-seed">1,000만</span></div>
+                  <span className="gh-x">VS</span>
+                  <div className="gh-side"><span className="gh-who">AI 🤖</span><span className="gh-seed">1,000만</span></div>
+                </div>
+                <p className="gh-desc">같은 <b>가상 시드머니</b>로 출발합니다. AI가 오늘 고른 종목에 당신도 <b>사거나 지나치고</b>,
+                  3일 뒤 <b>내 지갑 vs AI 지갑</b> 잔고로 승부를 봅니다. "3승 2패"가 아니라 <b>"얼마 벌었나"</b>로.</p>
+                <div className="gh-steps">
+                  <span className="gh-step">① 오늘 AI 선택 보기</span>
+                  <span className="gh-step">② 나라면 매수/관망</span>
+                  <span className="gh-step">③ 3일 뒤 지갑 대결</span>
+                </div>
+                <a className="btn btn-white btn-lg gh-cta" href="/pwa?tab=report&sec=vs">지금 대결 시작 →</a>
+                <p className="gh-foot">🎮 가상·모의 게임 · 실제 자산 아님 · 재미로 판단을 남길수록 AI가 더 정확해집니다(당신의 판단이 학습 데이터).</p>
               </div>
             </div>
           </section>
@@ -334,6 +358,12 @@ export default function Home({ reports, stats }) {
                 <div className="stat"><div className="num">{stats.totalDays}</div><div className="lbl">운영 일수{stats.watchDays > 0 ? <><br /><span style={{ fontSize: '0.68rem', fontWeight: 600, opacity: 0.7 }}>매매 {stats.tradeDays} · 관망 {stats.watchDays}</span></> : null}</div></div>
               </div>
               <p className="trust-note">※ 모든 수치는 운영일지 데이터(매일 15:30 KST 갱신)에서 자동 집계됩니다.{stats.watchDays > 0 ? ' ‘관망’은 엔진이 가동됐으나 선별 결과 매매하지 않은 날입니다(중단 아님).' : ''}</p>
+              {/* [HI-4] 트랙레코드 ↔ 게임 연결 — 참여자 집계(사람 승률)는 다중사용자 인프라 후. 지금은 도전 프레임만. */}
+              <div className="tr-game">
+                <div className="tr-game-t">⚔️ AI는 완벽하지 않습니다 — 그래서 당신이 이길 수 있습니다</div>
+                <div className="tr-game-d">AI가 {stats.totalBlocked}건을 걸렀지만 모두 옳지는 않았습니다. 같은 가상 시드로 AI와 붙어, 당신의 판단이 더 나았는지 지갑으로 확인하세요.</div>
+                <a className="btn btn-line btn-lg tr-game-cta" href="/pwa?tab=report&sec=vs">⚔️ AI와 대결 시작 →</a>
+              </div>
             </div>
           </section>
 
@@ -606,6 +636,25 @@ export default function Home({ reports, stats }) {
         .hero-teaser{display:flex;gap:10px;margin-top:34px;flex-wrap:wrap}
         .tchip{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:10px 15px;font-size:13px;color:#C7D4EC}
         .tchip b{color:#fff;font-weight:700}
+        .hero-disclaim{margin-top:18px;font-size:12px;color:#8fa0c0;line-height:1.6}
+        .hero-disclaim b{color:#C7D4EC;font-weight:700}
+        /* [HI-2] 나 vs AI 게임 훅 섹션 */
+        .gamehook{padding:0 0 8px;background:var(--hero1)}
+        .gh-card{max-width:560px;margin:0 auto;transform:translateY(-28px);background:#fff;border-radius:20px;padding:22px 20px;box-shadow:0 18px 50px rgba(10,20,50,.28)}
+        .gh-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+        .gh-lbl{font-size:15px;font-weight:800;color:#0E1B3A}
+        .gh-virtual{font-size:11px;font-weight:800;color:#2F6BFF;background:rgba(47,107,255,.1);padding:3px 10px;border-radius:999px;white-space:nowrap}
+        .gh-versus{display:flex;align-items:center;justify-content:center;gap:20px;margin:16px 0 6px;padding:14px 0;background:#F3F6FC;border-radius:14px}
+        .gh-side{display:flex;flex-direction:column;align-items:center;gap:3px}
+        .gh-who{font-size:14px;font-weight:800;color:#0E1B3A}
+        .gh-seed{font-size:20px;font-weight:900;color:#2F6BFF;font-family:ui-monospace,monospace}
+        .gh-x{font-size:15px;font-weight:900;color:#9AA7C2}
+        .gh-desc{font-size:14px;color:#3A4666;line-height:1.65;margin:12px 0;word-break:keep-all}
+        .gh-desc b{color:#0E1B3A;font-weight:800}
+        .gh-steps{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+        .gh-step{font-size:12px;font-weight:700;color:#3A4666;background:#EEF2FB;border-radius:8px;padding:6px 10px}
+        .gh-cta{width:100%;justify-content:center;background:#2F6BFF !important;color:#fff !important;text-align:center}
+        .gh-foot{font-size:11.5px;color:#8894AE;margin-top:12px;line-height:1.6;word-break:keep-all}
         @media(max-width:640px){.hero h1{font-size:34px}}
 
         .defband{background:var(--card);border-bottom:1px solid var(--line)}
@@ -659,6 +708,11 @@ export default function Home({ reports, stats }) {
         .stat .num{font-size:40px;font-weight:800;letter-spacing:-1px;color:#7FE9C0}
         .stat .lbl{font-size:13px;color:#9DB6E6;font-weight:600;margin-top:6px}
         .trust-note{text-align:center;font-size:12px;color:#5F7290;margin-top:26px}
+        /* [HI-4] 트랙레코드 게임 연결 */
+        .tr-game{max-width:560px;margin:22px auto 0;text-align:center;background:#F3F6FC;border:1px solid #E1E8F5;border-radius:16px;padding:20px 18px}
+        .tr-game-t{font-size:16px;font-weight:800;color:#0E1B3A;line-height:1.5;word-break:keep-all}
+        .tr-game-d{font-size:13.5px;color:#3A4666;line-height:1.6;margin:8px 0 14px;word-break:keep-all}
+        .tr-game-cta{display:inline-flex;background:#2F6BFF !important;color:#fff !important;border:none !important}
         @media(max-width:640px){.stats{grid-template-columns:1fr 1fr;gap:28px 16px}}
 
         .previews{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
