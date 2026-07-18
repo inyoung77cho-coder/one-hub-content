@@ -799,6 +799,14 @@ export default function PWADashboard({ latestReport }) {
   const watchCount = data?.recent_decisions?.filter(e => e.event_type === 'ANALYZE').length ?? 0;
   const sellCount = data?.today_sells?.length ?? 0;
   const passCount = blockCount; // PASS = AI가 차단한 종목 수
+  // [AI-5] 추천(관심)이면서 매수 차단인 종목 식별 — 추천 카드에 '최종 판단'을 병기해 관심+차단 모순 해소.
+  const blockedCodeSet = new Set((data?.today_blocked ?? data?.blocked_stocks ?? []).map(b => String(b?.code ?? b?.stock ?? '')).filter(Boolean));
+  const isBlockedCode = (code) => code != null && blockedCodeSet.has(String(code));
+  // [AI-5] 차단 종목을 '샀어요'로 기록할 땐 오염 방지 경고 후 확인.
+  const logTake = (code, name) => {
+    if (isBlockedCode(code) && typeof window !== 'undefined' && !window.confirm(`AI는 ${name || code}을(를) 매수 차단했습니다(AI 매도신호). 그래도 '샀어요'로 기록할까요?`)) return;
+    logDecision(code, name, 'take');
+  };
   const heat = data?.market?.heat_score ?? null;
   const fearGreed = data?.market?.fear_greed ?? null;
   const vix = data?.market?.vix ?? null;
@@ -1646,6 +1654,8 @@ export default function PWADashboard({ latestReport }) {
                           <div key={s.code || i} className="top3-hero-card" onClick={() => openSheet(s)}>
                             {/* [S-8] AI 판단 등급 — 카드 최상단·최대 위계 */}
                             <div className="ai-verdict-badge" style={{ color: m.verdict.color, background: m.verdict.bg, borderColor: m.verdict.color }}>{m.verdict.label}</div>
+                            {/* [AI-5] 관심(추천)이면서 매수 차단이면 '최종 판단'을 우선 노출 — 보유 화면과 같은 말. */}
+                            {isBlockedCode(s.code) && <div className="rec-final-block">⚠️ 최종: 매수 차단 · AI 매도신호</div>}
                             <div className="top3-medal">{i + 1}</div>
                             <button
                               className="top3-name"
@@ -1666,7 +1676,7 @@ export default function PWADashboard({ latestReport }) {
                             <button className="buy-now-btn" onClick={(e) => { e.stopPropagation(); setBuyNotice({ name: s.name, code: s.code }); }}>주문 방법 →</button>
                             {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (<>
                               <div className="dec-mini" onClick={(e) => e.stopPropagation()}>
-                                <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>샀어요</button>
+                                <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logTake(s.code, s.name)}>샀어요</button>
                                 <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망</button>
                               </div>
                               {dec && <div className="dec-dday">🏁 승부 진행 중 · D-3</div>}
@@ -1689,13 +1699,15 @@ export default function PWADashboard({ latestReport }) {
                                 <div className="rec-row-l">
                                   <button className="rec-name" onClick={() => { setTab('analyze'); runAnalyze(s.code, s.name); }}>
                                     {s.name} <span className="mono dim rec-code">{s.code}</span>
-                                    <span className="rec-verdict-inline" style={{ color: m.verdict.color, background: m.verdict.bg }}>{m.verdict.short}</span>
+                                    {isBlockedCode(s.code)
+                                      ? <span className="rec-verdict-inline" style={{ color: 'var(--color-danger)', background: 'var(--color-danger-soft)' }}>⚠ 최종 차단</span>
+                                      : <span className="rec-verdict-inline" style={{ color: m.verdict.color, background: m.verdict.bg }}>{m.verdict.short}</span>}
                                   </button>
-                                  <div className="rec-reason">{m.reason}</div>
+                                  <div className="rec-reason">{isBlockedCode(s.code) ? <>관심도 상위이나 <b>AI 최종 매수 차단(매도신호)</b> — 보유 화면과 동일 판단입니다.</> : m.reason}</div>
                                   {/* [나 vs AI] 내 판단 기록 */}
                                   {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (
                                     <div className="dec-mini">
-                                      <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'take')}>샀어요</button>
+                                      <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logTake(s.code, s.name)}>샀어요</button>
                                       <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망</button>
                                     </div>
                                   ); })()}
@@ -2373,7 +2385,10 @@ export default function PWADashboard({ latestReport }) {
               const heat   = data.market?.heat_score ?? '-';
               const fearGreed = data.market?.fear_greed ?? '-';
               const candidates = data.screening_candidates ?? [];
-              const blocked = (data.blocked_stocks ?? []).slice(0, 3);
+              // [AI-6] 차단 건수는 전 화면 공통 소스(blockCount=data.market.block_count)로 단일화.
+              //   기존엔 blocked_stocks 슬라이스 length라 오늘/종합/보유(=4)와 어긋나 자기검증만 0/3으로 표시됐다.
+              const blockedNames = (data.today_blocked ?? data.blocked_stocks ?? []);
+              const blocked = dedupBy(blockedNames, (b) => b.code || b.stock || b.name).slice(0, 3);
               const buys = (data.recommend_stocks ?? []).filter(s => (s.score ?? 0) >= 70).slice(0, 2);
               const kst = new Date(Date.now() + 9*60*60*1000);
               const fmtTime = (d, offsetMin) => {
@@ -2392,15 +2407,15 @@ export default function PWADashboard({ latestReport }) {
                   title: `${candidates.length > 0 ? candidates.length : 131}종목 스크리닝`,
                   desc: `후보: ${candidates.length}종목 선별`,
                 },
-                ...(blocked.length > 0 ? [{
+                ...(blockCount > 0 ? [{
                   icon: '🤖', time: '08:52',
                   title: 'AI 심층 분석',
-                  desc: blocked.map(b => `${b.name ?? b.code} → 차단`).join(' · ') + (buys.length > 0 ? ' / ' + buys.map(b => `${b.name ?? b.code} → 추천`).join(' · ') : ''),
+                  desc: (blocked.length > 0 ? blocked.map(b => `${b.name ?? b.stock ?? b.code} → 차단`).join(' · ') + (blockCount > blocked.length ? ` 외 ${blockCount - blocked.length}건` : '') : `${blockCount}종목 차단`) + (buys.length > 0 ? ' / ' + buys.map(b => `${b.name ?? b.code} → 추천`).join(' · ') : ''),
                 }] : []),
                 {
                   icon: '✅', time: '08:53',
                   title: '최종 결정',
-                  desc: `매수 ${(data.recommend_stocks ?? []).filter(s => (s.score ?? 0) >= 70).length}건 / 차단 ${blocked.length}건 — ${regime === 'BEAR' ? '관망 결정' : '선별 실행'}`,
+                  desc: `매수 ${buyCount}건 / 차단 ${blockCount}건 — ${regime === 'BEAR' ? '관망 결정' : '선별 실행'}`,
                 },
               ];
               return (
@@ -3666,6 +3681,8 @@ export default function PWADashboard({ latestReport }) {
         /* [S-8] AI 판단 배지 — 카드 최상단 최대 위계 */
         .ai-verdict-badge { align-self: stretch; text-align: center; font-size: 0.82rem; font-weight: 800; padding: 6px 8px; border-radius: 9px; border: 1.5px solid; letter-spacing: -0.01em; margin-bottom: 2px; }
         .rec-verdict-inline { font-size: 0.62rem; font-weight: 800; padding: 1px 7px; border-radius: 20px; margin-left: 4px; }
+        /* [AI-5] 추천∩차단 최종 판단 병기 */
+        .rec-final-block { margin: 4px 8px 0; font-size: 0.64rem; font-weight: 800; color: var(--color-danger); background: var(--color-danger-soft); border-radius: 7px; padding: 3px 8px; text-align: center; line-height: 1.4; }
         /* [S-4] 동점 2차 정렬 근거 */
         /* [S-8] 나 vs AI 예고 */
         .vs-teaser { font-size: 0.64rem; font-weight: 700; color: var(--text-secondary); margin-top: 2px; }
