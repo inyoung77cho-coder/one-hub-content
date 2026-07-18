@@ -6,6 +6,7 @@ import { getLatestDailyReport } from '../../lib/reports';
 import LastUpdated from '../../components/LastUpdated';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
 import { recordDecision, matureLedger, computeShowdown, getTodayDecision, reconcileAutoWatch, getLedger } from '../../lib/verdictLedger';
+import { getSeed, setSeed, resetSeed, SEED_OPTIONS, computeWallets, streakNarrative, wonG } from '../../lib/gameWallet';
 // [N1] 자산 원장. lib/verdictLedger 의 getLedger(판단 기록)와 이름이 겹쳐 별칭으로 구분한다.
 import { getLedger as getAssetLedger } from '../../lib/ledger';
 import { dedupBy } from '../../lib/useDedup';
@@ -254,6 +255,13 @@ export default function PWADashboard({ latestReport }) {
   const [accuracy, setAccuracy] = useState(null); // [기록] AI 자기검증(차단 적중률) 누적 — ML 학습 현황 카드
   const [ledger, setLedger] = useState([]); // [나 vs AI] 내 판단(매매/관망) 원장 + 3·7일 성과
   const [decTick, setDecTick] = useState(0); // [나 vs AI] 추천 카드 판단 버튼 상태 리렌더 트리거
+  const [gameSeed, setGameSeed] = useState(null); // [G-시리즈] 가상 게임 시드머니(있으면 게임 시작됨)
+  useEffect(() => {
+    const load = () => setGameSeed(getSeed());
+    load();
+    window.addEventListener('onehub-game-change', load);
+    return () => window.removeEventListener('onehub-game-change', load);
+  }, []);
   // [S3/G2] AI 트러스트 3섹션 서브내비(vs/verify/archive)를 URL(?sec=)로 유지 — 뒤로가기·딥링크(F4) 지원
   const [trustSec, setTrustSec] = useTabState('sec', ['vs', 'verify', 'archive'], 'vs');
   const [recSort, setRecSort] = useState('interest'); // [S7.2] 추천 정렬(interest/upside)
@@ -2241,6 +2249,57 @@ export default function PWADashboard({ latestReport }) {
 
             {/* [나 vs AI 대결] AI 추천 중 내가 산 것 vs AI 단독매매, 3일·7일 수익 승부 */}
             {trustSec === 'vs' && (<>
+            {/* [G-시리즈] 가상 시드머니 대결 — 시드 미설정=온보딩(GI-2) / 설정=게임 대시보드(GI-6) */}
+            {!gameSeed ? (
+              <section className="pwa-card game-onb">
+                <span className="pwa-card-label">⚔ AI와 가상 대결 시작</span>
+                <div className="gonb-sub">같은 <b>가상 시드머니</b>로 출발해, 내 판단 지갑과 AI 지갑의 <b>잔고 차이</b>로 승부합니다. <b>실제 돈이 아닌 판단 연습용 가상 대결</b>입니다.</div>
+                <div className="gonb-opts">
+                  {SEED_OPTIONS.map((o) => (
+                    <button key={o.v} className="gonb-opt" onClick={() => setSeed(o.v)}>{o.label}<span>가상</span></button>
+                  ))}
+                </div>
+                <div className="gonb-foot">🎮 가상·모의 게임입니다 · 판단은 본인 책임이며 투자자문이 아닙니다.</div>
+              </section>
+            ) : (() => {
+              const sd3 = computeShowdown(ledger, 3);
+              const g = computeWallets(sd3);
+              if (!g) return null;
+              const pending = ledger.filter((e) => Date.now() - e.ts < 3 * 86400000);
+              const narr = streakNarrative(g.settled);
+              const pct = g.myBalance + g.aiBalance > 0 ? (g.myBalance / (g.myBalance + g.aiBalance)) * 100 : 50;
+              return (
+                <section className="pwa-card game-dash">
+                  <div className="gd-top"><span className="pwa-card-label" style={{ margin: 0 }}>⚔ 나 vs AI · 가상 지갑 대결</span><span className="gd-virtual">가상·모의</span></div>
+                  {narr && <div className="gd-narr">📖 {narr}</div>}
+                  <div className="gd-wallets">
+                    <div className="gd-w me"><span className="gd-wl">🙋 내 지갑</span><b className="gd-wb">{wonG(g.myBalance)}</b>{g.myGain !== 0 && <span className={`gd-wg ${g.myGain >= 0 ? 'up' : 'dn'}`}>{g.myGain >= 0 ? '+' : ''}{wonG(g.myGain)}</span>}</div>
+                    <div className="gd-vs">VS</div>
+                    <div className="gd-w ai"><span className="gd-wl">AI 지갑 🤖</span><b className="gd-wb">{wonG(g.aiBalance)}</b>{g.aiGain !== 0 && <span className={`gd-wg ${g.aiGain >= 0 ? 'up' : 'dn'}`}>{g.aiGain >= 0 ? '+' : ''}{wonG(g.aiGain)}</span>}</div>
+                  </div>
+                  <div className="gd-bar"><div className="gd-bar-me" style={{ width: `${Math.max(6, Math.min(94, pct))}%` }} /></div>
+                  <div className="gd-lead">{g.leader === 'me' ? <b className="up">🏆 내가 {wonG(Math.abs(g.diff))} 앞섬</b> : g.leader === 'ai' ? <b className="dn">🤖 AI가 {wonG(Math.abs(g.diff))} 앞섬</b> : <b>⚖️ 접전</b>} · 판당 베팅 {wonG(g.bet)}(가상)</div>
+                  {pending.length > 0 && (
+                    <div className="gd-pending">
+                      <div className="gd-ph">⏳ 진행 중 대결 {pending.length}건 (3일 후 정산)</div>
+                      {pending.slice(0, 4).map((e, i) => {
+                        const dday = Math.max(0, 3 - Math.floor((Date.now() - e.ts) / 86400000));
+                        return <div className="gd-prow" key={i}><span className="gd-pn">{e.name}</span><span className="gd-pj">나:{e.decision === 'take' ? '매수' : '관망'} · AI:{e.decision === 'take' ? '동일 베팅' : '매수'}</span><span className="gd-dday">D-{dday}</span></div>;
+                      })}
+                    </div>
+                  )}
+                  {g.settled.length > 0 && (
+                    <div className="gd-recent">
+                      <div className="gd-ph">🏁 최근 결과</div>
+                      {g.settled.slice(0, 4).map((s, i) => (
+                        <div className="gd-rrow" key={i}><span className="gd-rw">{s.winner === 'me' ? '🏆' : s.winner === 'ai' ? '💀' : '⚖️'}</span><span className="gd-pn">{s.name}</span><span className={`gd-rret ${s.ret >= 0 ? 'up' : 'dn'}`}>{s.ret >= 0 ? '+' : ''}{s.ret}%</span><span className="gd-rwin">{s.winner === 'me' ? '나 승' : s.winner === 'ai' ? 'AI 승' : '무'}</span></div>
+                      ))}
+                    </div>
+                  )}
+                  <div className="gd-foot">🎮 가상·모의 게임 · 실제 자산 아님 · 판단은 본인 책임(투자자문 아님) · <button className="gd-reset" onClick={() => { if (typeof window === 'undefined' || window.confirm('게임을 초기화할까요? (가상 지갑만 리셋, 판단 기록은 유지)')) resetSeed(); }}>시드 변경</button></div>
+                </section>
+              );
+            })()}
             {(() => {
               const w3 = computeShowdown(ledger, 3);
               const w7 = computeShowdown(ledger, 7);
@@ -3013,8 +3072,12 @@ export default function PWADashboard({ latestReport }) {
         {/* [S-5] 판단 기록 직후 즉시 피드백 — 결과 확인일 명시 + 나 vs AI 링크 */}
         {decFeedback && (
           <div className="dec-feedback" onClick={() => { setTab('report'); setDecFeedback(null); }}>
-            <span>✅ 기록 완료 · <b>{decFeedback.name}</b> {decFeedback.decision === 'take' ? '샀다고 기록' : '관망으로 기록'}. <b>{decFeedback.date}</b>에 결과를 알려드릴게요</span>
-            <span className="df-link">나 vs AI →</span>
+            {gameSeed ? (
+              <span>⚔️ <b>대결 성립!</b> {decFeedback.name} · {decFeedback.decision === 'take' ? '나 매수' : '나 관망'} vs AI · 가상 <b>{wonG(Math.round(gameSeed * 0.1))}</b> 걸림 · <b>{decFeedback.date}</b> 정산</span>
+            ) : (
+              <span>✅ 기록 완료 · <b>{decFeedback.name}</b> {decFeedback.decision === 'take' ? '샀다고 기록' : '관망으로 기록'}. <b>{decFeedback.date}</b>에 결과를 알려드릴게요</span>
+            )}
+            <span className="df-link">{gameSeed ? '지갑 대결 →' : '나 vs AI →'}</span>
           </div>
         )}
 
@@ -4085,6 +4148,39 @@ export default function PWADashboard({ latestReport }) {
         .vs-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
         .vs-overall { font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
         /* [A-1] 나 vs AI 스코어보드 */
+        /* [G-시리즈] 가상 지갑 대결 게임 */
+        .game-onb { border: 1px solid var(--color-primary); }
+        .gonb-sub { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.6; margin: 6px 0 12px; word-break: keep-all; }
+        .gonb-opts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+        .gonb-opt { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 14px 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--inset-bg); color: var(--color-ink); font-size: 0.84rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .gonb-opt span { font-size: 0.56rem; font-weight: 800; color: var(--purple, var(--color-primary)); background: var(--purple-soft, var(--color-primary-soft)); padding: 1px 6px; border-radius: 4px; }
+        .gonb-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 12px; line-height: 1.5; word-break: keep-all; }
+        .game-dash { border: 1px solid var(--color-primary); }
+        .gd-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .gd-virtual { font-size: 0.6rem; font-weight: 800; color: var(--purple, var(--color-primary)); background: var(--purple-soft, var(--color-primary-soft)); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+        .gd-narr { font-size: 0.76rem; color: var(--color-ink-2); background: var(--inset-bg); border-radius: 9px; padding: 8px 11px; margin: 10px 0 0; line-height: 1.5; word-break: keep-all; }
+        .gd-wallets { display: flex; align-items: center; gap: 8px; margin: 12px 0 8px; }
+        .gd-w { flex: 1; display: flex; flex-direction: column; gap: 3px; align-items: center; background: var(--inset-bg); border-radius: 12px; padding: 12px 6px; text-align: center; }
+        .gd-wl { font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); }
+        .gd-wb { font-size: 1.05rem; font-weight: 900; font-family: var(--font-mono); color: var(--color-ink); }
+        .gd-wg { font-size: 0.68rem; font-weight: 800; font-family: var(--font-mono); }
+        .gd-wg.up { color: var(--color-success); } .gd-wg.dn { color: var(--color-danger); }
+        .gd-vs { font-size: 0.72rem; font-weight: 900; color: var(--text-tertiary); flex-shrink: 0; }
+        .gd-bar { height: 8px; border-radius: 4px; background: var(--purple-soft, var(--color-primary-soft)); overflow: hidden; margin-bottom: 8px; }
+        .gd-bar-me { height: 100%; background: var(--color-success); border-radius: 4px; transition: width .4s; }
+        .gd-lead { text-align: center; font-size: 0.74rem; color: var(--text-secondary); line-height: 1.5; word-break: keep-all; }
+        .gd-lead b.up { color: var(--color-success); } .gd-lead b.dn { color: var(--purple, var(--color-danger)); }
+        .gd-pending, .gd-recent { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+        .gd-ph { font-size: 0.7rem; font-weight: 800; color: var(--color-ink-2); margin-bottom: 6px; }
+        .gd-prow, .gd-rrow { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 0.74rem; }
+        .gd-pn { flex: 1; font-weight: 700; color: var(--color-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .gd-pj { font-size: 0.66rem; color: var(--text-tertiary); }
+        .gd-dday { font-size: 0.66rem; font-weight: 800; color: var(--color-warning-ink, var(--color-warning)); }
+        .gd-rw { flex-shrink: 0; }
+        .gd-rret { font-family: var(--font-mono); font-weight: 800; } .gd-rret.up { color: var(--color-success); } .gd-rret.dn { color: var(--color-danger); }
+        .gd-rwin { font-size: 0.64rem; font-weight: 700; color: var(--text-secondary); }
+        .gd-foot { font-size: 0.64rem; color: var(--text-tertiary); margin-top: 12px; line-height: 1.6; word-break: keep-all; }
+        .gd-reset { border: none; background: none; color: var(--color-primary); font-weight: 700; cursor: pointer; font-size: 0.64rem; text-decoration: underline; font-family: var(--font-sans); padding: 0; }
         .vs-score { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 12px 0 4px; padding: 10px 0; background: var(--inset-bg); border-radius: 12px; }
         .vs-score-side { display: flex; align-items: center; gap: 8px; }
         .vs-score-who { font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); }
