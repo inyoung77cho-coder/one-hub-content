@@ -40,6 +40,9 @@ export default function TodayPage() {
   const [myComplex, setMyComplex] = useState("");
   const [status, setStatus] = useState("loading");
   const [at, setAt] = useState(null);
+  const [notis, setNotis] = useState([]); // [알림카드 #5] 텔레그램/리포트 알림 피드
+  const [opNotes, setOpNotes] = useState([]); // [알림카드 #6] 운영자 신고가(spot_price)
+  const [notiOpen, setNotiOpen] = useState(null); // 펼친 알림 인덱스
 
   const load = useCallback(() => {
     const tr = getTrader();
@@ -55,6 +58,14 @@ export default function TodayPage() {
       setDash(d); setPend(p); setFeed(f); setLedger(L); setAt(new Date());
       setStatus(d || L ? "ok" : "error");
     });
+    // [알림카드 #5·#6] 텔레그램 알림 + 운영자 신고가
+    fetch(`/api/notifications?trader=${tr}`).then((r) => r.json())
+      .then((n) => { if (n?.ok && Array.isArray(n.items)) setNotis(n.items); }).catch(() => {});
+    try {
+      const mp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null");
+      if (mp?.name) fetch(`/api/input/re-spot?complex_name=${encodeURIComponent(mp.name)}`).then((r) => r.json())
+        .then((s) => { if (s?.ok && Array.isArray(s.items)) setOpNotes(s.items); }).catch(() => {});
+    } catch (e) {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dash]);
 
@@ -167,6 +178,48 @@ export default function TodayPage() {
           </section>
         )}
 
+        {/* [알림카드 #5·#6] 오늘 알림 상세 — 텔레그램 본문 + 운영자 신고가. 푸시 클릭 시 여기서 상세 확인. */}
+        {(notis.length > 0 || opNotes.length > 0) && (
+          <section className="card td-noti">
+            <div className="tn-hh">🔔 오늘 알림 · 상세 확인</div>
+            <div className="tn-list">
+              {opNotes.slice(0, 3).map((s, i) => (
+                <div className="tn-item op" key={`op${i}`}>
+                  <span className="tn-ic">🏢</span>
+                  <div className="tn-b">
+                    <div className="tn-t">운영자 신고가 · {s.complex_name}{s.area_m2 ? ` ${Math.round(s.area_m2)}㎡` : ""}<span className="tn-src">운영자</span></div>
+                    <div className="tn-d">{s.price_manwon ? `${(s.price_manwon / 10000).toFixed(2)}억` : ""} · {s.kind || "신고"}{s.status === "tentative" ? " · 미확정(참고)" : ""}</div>
+                  </div>
+                  {s.created_at && <span className="tn-ts">{String(s.created_at).slice(5, 16)}</span>}
+                </div>
+              ))}
+              {notis.slice(0, 6).map((n, i) => {
+                const title = n.title || n.message || "알림";
+                const body = n.body || n.detail || "";
+                const t = n.noti_type || n.type || "";
+                const src = n.source || "";
+                const isOp = /operator|운영자|manual/i.test(src);
+                const ic = isOp ? "🧑‍💼" : /buy|매수|신호/i.test(t + title) ? "📈" : /sell|매도|손절|익절/i.test(t + title) ? "📉" : /report|리포트/i.test(t + title) ? "📄" : /critical|error|오류|circuit/i.test(t + title) ? "⚠️" : "🔔";
+                const ts = n.sent_at || n.created_at || n.timestamp || null;
+                const when = ts ? String(ts).replace("T", " ").slice(5, 16) : null;
+                const open = notiOpen === i;
+                const hasDetail = body && body.trim() && body.trim() !== title.trim();
+                return (
+                  <div className={`tn-item ${n.is_read ? "" : "unread"}`} key={i} onClick={() => hasDetail && setNotiOpen(open ? null : i)} style={{ cursor: hasDetail ? "pointer" : "default" }}>
+                    <span className="tn-ic">{ic}</span>
+                    <div className="tn-b">
+                      <div className="tn-t">{title}{isOp && <span className="tn-src">운영자</span>}{hasDetail && <span className="tn-more">{open ? "▲" : "▾"}</span>}</div>
+                      {hasDetail && open && <div className="tn-d">{body}</div>}
+                    </div>
+                    {when && <span className="tn-ts">{when}</span>}
+                  </div>
+                );
+              })}
+            </div>
+            <p className="tn-foot">📱 텔레그램 알림·운영자 신고가를 여기서 확인 · 항목을 누르면 상세가 펼쳐집니다.</p>
+          </section>
+        )}
+
         {/* ② 오늘의 통합 판단 — 항상. '안 산 것'이 콘텐츠 */}
         <section className="card">
           <div className="td-h">오늘의 통합 판단</div>
@@ -258,6 +311,21 @@ export default function TodayPage() {
         /* ① 결정 대기 — 주의색 강조 */
         .td-decide { border-left: 4px solid var(--color-danger); }
         .td-decide .td-h b { color: var(--color-danger); }
+        /* [알림카드 #5·#6] 오늘 알림 상세 */
+        .td-noti .tn-hh { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 10px; }
+        .tn-list { display: flex; flex-direction: column; }
+        .tn-item { display: flex; gap: 9px; align-items: flex-start; padding: 10px 2px; border-bottom: 1px solid var(--color-line); }
+        .tn-item:last-child { border-bottom: none; }
+        .tn-item.op { background: var(--color-warning-soft); border-radius: 8px; padding: 10px; border-bottom: none; margin-bottom: 4px; }
+        .tn-ic { flex-shrink: 0; font-size: 15px; line-height: 1.4; }
+        .tn-b { flex: 1; min-width: 0; }
+        .tn-t { font-size: 0.8rem; font-weight: 700; color: var(--color-ink); line-height: 1.45; word-break: keep-all; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .tn-item.unread .tn-t::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-danger); }
+        .tn-src { font-size: 0.58rem; font-weight: 800; color: var(--color-primary); background: var(--color-primary-soft); padding: 1px 6px; border-radius: 5px; }
+        .tn-more { font-size: 0.6rem; color: var(--color-ink-3); }
+        .tn-d { font-size: 0.74rem; color: var(--color-ink-2); line-height: 1.55; margin-top: 5px; white-space: pre-wrap; word-break: keep-all; background: var(--inset-bg, var(--color-card-soft)); border-radius: 8px; padding: 8px 10px; }
+        .tn-ts { flex-shrink: 0; font-size: 10px; color: var(--color-ink-3); padding-top: 2px; font-family: ui-monospace, monospace; }
+        .tn-foot { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 10px; line-height: 1.5; word-break: keep-all; }
         .td-drow { display: flex; flex-direction: column; gap: 2px; padding: 8px 0; border-bottom: 1px solid var(--color-line); }
         .td-drow:last-of-type { border-bottom: none; }
         .td-dn { font-size: 0.88rem; font-weight: 800; color: var(--color-ink); display: flex; align-items: baseline; gap: 6px; }
