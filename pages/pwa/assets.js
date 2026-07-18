@@ -15,11 +15,11 @@ import QuickAddSheet from "../../components/shared/QuickAddSheet";
 const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || null);
 const uk = (v) => (v == null ? "-" : `${Number(v).toFixed(2)}억`);
 
-// 자산군 메타(라벨·색·링크)
+// 자산군 메타(라벨·색·링크) — [순서변경] 주식 hooking → 부동산·주식 AI가 유료 전환점 → ETF → 현금
 const CLASSES = [
   ["stock", "📈 주식", "var(--color-primary)", "/pwa?tab=portfolio"],
-  ["etf", "💹 ETF", "var(--color-etf, var(--color-primary))", "/pwa/etf"],
   ["realestate", "🏠 부동산", "var(--color-success)", "/pwa/realestate"],
+  ["etf", "💹 ETF", "var(--color-etf, var(--color-primary))", "/pwa/etf"],
   ["cash", "💵 현금", "var(--color-warning)", null],
 ];
 

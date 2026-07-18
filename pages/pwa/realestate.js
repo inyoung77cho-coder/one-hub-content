@@ -49,6 +49,23 @@ export default function RealEstateDashboard() {
     setPName(""); setPVal(""); setPMemo(""); setAddProp(false);
   };
   const delReProp = (id) => saveReProps(reProps.filter((p) => p.id !== id));
+  // [item1] 부동산 검색 — 상단 🔍를 종목검색이 아니라 단지/관심지역 검색으로.
+  const [reSearchOpen, setReSearchOpen] = useState(false);
+  const [reSearchQ, setReSearchQ] = useState("");
+  const [reSearchRes, setReSearchRes] = useState([]);
+  useEffect(() => {
+    if (!reSearchOpen) return;
+    const q = reSearchQ.trim();
+    if (q.length < 1) { setReSearchRes([]); return; }
+    let alive = true;
+    const t = setTimeout(() => {
+      fetch(`/api/input/re-search?q=${encodeURIComponent(q)}`).then((r) => r.json())
+        .then((d) => { if (alive) setReSearchRes(Array.isArray(d?.results) ? d.results : (Array.isArray(d?.items) ? d.items : [])); })
+        .catch(() => { if (alive) setReSearchRes([]); });
+    }, 250);
+    return () => { alive = false; clearTimeout(t); };
+  }, [reSearchQ, reSearchOpen]);
+  const pickReSearch = (name) => { setReSearchOpen(false); setReSearchQ(""); try { setMyC(name); } catch (e) {} setWiz({ name, pyeong: "", dongfloor: "", buyUk: "", buyMonth: "" }); setWizOpen(true); };
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/re/${fn}`).then((r) => r.json());
@@ -242,7 +259,40 @@ export default function RealEstateDashboard() {
 
   return (
     <div className="re pwa-shell">
-      <AppHeader />
+      <AppHeader onSearch={() => setReSearchOpen(true)} />
+
+      {/* [item1] 부동산 찾기 — 단지 검색 + 대장 아파트 + 관심지역(동) */}
+      {reSearchOpen && (
+        <div className="resr-scrim" onClick={() => setReSearchOpen(false)}>
+          <div className="resr" onClick={(e) => e.stopPropagation()}>
+            <div className="resr-h">🔍 부동산 찾기<button className="resr-x" onClick={() => setReSearchOpen(false)} aria-label="닫기">✕</button></div>
+            <input className="resr-in" autoFocus placeholder="단지명 검색 (예: 시범, 파크뷰)" value={reSearchQ} onChange={(e) => setReSearchQ(e.target.value)} />
+            {reSearchQ.trim() ? (
+              <div className="resr-list">
+                {reSearchRes.length ? reSearchRes.slice(0, 12).map((nm, i) => (
+                  <button className="resr-row" key={i} onClick={() => pickReSearch(nm)}>🏠 {nm}<span className="resr-go">내 단지로 →</span></button>
+                )) : <div className="resr-empty">검색 결과 없음 · 다른 이름으로 시도해 보세요.</div>}
+              </div>
+            ) : (
+              <>
+                <div className="resr-sec">🏆 대장 아파트 <span>ONE Score 상위</span></div>
+                <div className="resr-chips">
+                  {(rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명).sort((a, b) => (b.one_score ?? 0) - (a.one_score ?? 0)).slice(0, 6) : []).map((c, i) => (
+                    <button className="resr-chip" key={i} onClick={() => pickReSearch(c.단지명)}>{c.단지명}{c.one_score != null && <em>{c.one_score}</em>}</button>
+                  ))}
+                </div>
+                <div className="resr-sec">📍 관심지역 <span>동 선택 → 갈아타기 목표</span></div>
+                <div className="resr-chips">
+                  {[...new Set([...Object.values(dongMap || {}).filter(Boolean), ...BUNDANG_DONGS])].slice(0, 14).map((d, i) => (
+                    <button className="resr-chip dong" key={i} onClick={() => { setMoveScope("region"); pickGapC(d); setReSearchOpen(false); try { document.querySelector(".scr-card")?.scrollIntoView({ behavior: "smooth" }); } catch (e) {} }}>{d}</button>
+                  ))}
+                </div>
+                <div className="resr-note">DB에 축적된 실거래 단지·관심지역을 찾습니다. <b>단지</b>=내 단지 등록, <b>동</b>=목표 지역으로 이동합니다.</div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* 1) HERO — 시장 브리핑 (다크 네이비 히어로) */}
       <section className="hero">
@@ -1030,6 +1080,23 @@ export default function RealEstateDashboard() {
         .scr-gap { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; text-align: right; min-width: 56px; }
         .scr-gap.ok { color: var(--color-success); }
         /* [S5] 등록 위저드 바텀시트 */
+        /* [item1] 부동산 찾기 모달 */
+        .resr-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 210; display: flex; align-items: flex-start; justify-content: center; padding-top: calc(env(safe-area-inset-top, 0px) + 40px); }
+        .resr { width: 100%; max-width: 460px; margin: 0 12px; background: var(--color-card); border-radius: 18px; padding: 16px; box-shadow: var(--shadow-float); max-height: 80vh; overflow-y: auto; }
+        .resr-h { display: flex; align-items: center; justify-content: space-between; font-size: 0.95rem; font-weight: 800; color: var(--color-ink); margin-bottom: 12px; }
+        .resr-x { border: none; background: none; font-size: 1rem; color: var(--color-ink-3); cursor: pointer; }
+        .resr-in { width: 100%; border: 1px solid var(--color-line); border-radius: 10px; padding: 11px 13px; font-size: 0.9rem; font-family: var(--font-sans); background: var(--color-card); color: var(--color-ink); }
+        .resr-list { margin-top: 10px; display: flex; flex-direction: column; }
+        .resr-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 11px 4px; border-bottom: 1px solid var(--color-line); background: none; border-left: none; border-right: none; border-top: none; font-size: 0.84rem; font-weight: 700; color: var(--color-ink); cursor: pointer; font-family: var(--font-sans); text-align: left; }
+        .resr-go { font-size: 0.68rem; font-weight: 700; color: var(--color-primary); flex-shrink: 0; }
+        .resr-empty { padding: 16px 4px; font-size: 0.8rem; color: var(--color-ink-3); text-align: center; }
+        .resr-sec { margin: 14px 0 8px; font-size: 0.76rem; font-weight: 800; color: var(--color-ink-2); }
+        .resr-sec span { font-size: 0.62rem; font-weight: 600; color: var(--color-ink-3); margin-left: 5px; }
+        .resr-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+        .resr-chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink); border-radius: 999px; padding: 7px 13px; font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .resr-chip em { font-style: normal; font-size: 0.62rem; font-weight: 800; color: var(--color-primary); }
+        .resr-chip.dong { background: var(--color-card); }
+        .resr-note { margin-top: 14px; font-size: 0.66rem; color: var(--color-ink-3); line-height: 1.5; word-break: keep-all; }
         .wiz-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200; display: flex; align-items: flex-end; justify-content: center; }
         .wiz { width: 100%; max-width: 480px; background: var(--color-card); border-radius: 20px 20px 0 0; padding: 20px 18px calc(env(safe-area-inset-bottom, 0px) + 20px); box-shadow: var(--shadow-float); }
         .wiz-h { display: flex; align-items: center; justify-content: space-between; font-size: 1rem; font-weight: 800; color: var(--color-ink); margin-bottom: 16px; }
