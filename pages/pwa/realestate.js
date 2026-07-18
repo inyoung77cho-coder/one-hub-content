@@ -37,6 +37,18 @@ export default function RealEstateDashboard() {
   const [gapCTarget, setGapCTarget] = useState(""); // [R-5 시나리오C] 목표 지역(법정동)
   const [gapCData, setGapCData] = useState(null); // [R-5 시나리오C] 지역 변경 갭
   const [gapCAlert, setGapCAlert] = useState(false); // [R-5 시나리오C] 관심 갭 알림 설정(클라)
+  // [#1 다수 부동산] 대표 단지 외 추가 보유 부동산 목록. 각 {id,name,valueUk(평가금액),memo}
+  const [reProps, setReProps] = useState([]);
+  const [addProp, setAddProp] = useState(false); // 추가 폼 열림
+  const [pName, setPName] = useState(""); const [pVal, setPVal] = useState(""); const [pMemo, setPMemo] = useState("");
+  const saveReProps = (list) => { setReProps(list); try { localStorage.setItem("onehub_re_properties", JSON.stringify(list)); window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {} };
+  const addReProp = () => {
+    const name = String(pName || "").trim(); const v = Number(pVal);
+    if (!name || !(v > 0)) return;
+    saveReProps([...reProps, { id: Date.now(), name, valueUk: v, memo: String(pMemo || "").trim() }]);
+    setPName(""); setPVal(""); setPMemo(""); setAddProp(false);
+  };
+  const delReProp = (id) => saveReProps(reProps.filter((p) => p.id !== id));
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/re/${fn}`).then((r) => r.json());
@@ -60,6 +72,7 @@ export default function RealEstateDashboard() {
       const jr = localStorage.getItem("onehub_re_jeonse"); if (jr != null) setJeonseRate(jr);
       const sc = localStorage.getItem("onehub_re_scope"); if (sc) setMoveScope(sc);
       const ua = localStorage.getItem("onehub_re_my_avm"); if (ua != null && ua !== "" && Number(ua) > 0) setUserAvm(Number(ua));
+      const rp = localStorage.getItem("onehub_re_properties"); if (rp) { const arr = JSON.parse(rp); if (Array.isArray(arr)) setReProps(arr); }
     } catch (e) {}
   }, []);
   // [S3] 빠른입력(FAB) 저장 시 내 단지 즉시 재로드
@@ -204,6 +217,20 @@ export default function RealEstateDashboard() {
   };
   // [PI-1] 분당구 법정동 폴백(complex-dongs 미도달 시 드롭다운 공백 방지). raw_transactions 실측 13개.
   const BUNDANG_DONGS = ["정자동", "야탑동", "구미동", "서현동", "이매동", "수내동", "금곡동", "분당동", "삼평동", "판교동", "백현동", "운중동", "대장동"];
+  // [#4 평가금액] 부동산 자산가치 = 대표(평형별 평가시세, 없으면 매수가) + 추가 보유 평가금액 합 → 총자산 원장(onboard)에 반영.
+  //   주식·ETF와 동일하게 '평가금액' 기준으로 통일. 대표 평형 시세가 잠금이면(희소평형) 매수가로 보수적 대체.
+  const repEvalUk = (() => { const p = myPyeongPrice(); return p.uk != null ? p.uk : (Number(myProp?.buyUk) || 0); })();
+  const reTotalEvalUk = Math.round((repEvalUk + reProps.reduce((s, p) => s + (Number(p.valueUk) || 0), 0)) * 100) / 100;
+  useEffect(() => {
+    try {
+      const onb = JSON.parse(localStorage.getItem("onehub_onboard_assets") || "{}") || {};
+      if (reTotalEvalUk > 0 && onb.realestate_uk !== reTotalEvalUk) {
+        onb.realestate_uk = reTotalEvalUk;
+        localStorage.setItem("onehub_onboard_assets", JSON.stringify(onb));
+        window.dispatchEvent(new Event("onehub-assets-change"));
+      }
+    } catch (e) {}
+  }, [reTotalEvalUk]);
   // 법정동: 백엔드(complex-dongs) 우선 → 랭킹 필드 → 브리핑 지역
   const dongOf = (name) => {
     if (dongMap[name]) return dongMap[name];
@@ -377,6 +404,37 @@ export default function RealEstateDashboard() {
           </section>
         );
       })()}
+
+      {/* [#1 다수 부동산] 대표 단지 외 추가 보유 부동산 목록 — 합계는 평가금액 기준(#4) */}
+      {myProp && (
+        <section className="card reprop-card">
+          <div className="rp-h">
+            <div className="rp-title">🏘 내 부동산 <span className="rp-sub">대표 외 추가 보유</span></div>
+            <button className="rp-add-btn" onClick={() => setAddProp((v) => !v)}>{addProp ? "취소" : "＋ 추가"}</button>
+          </div>
+          <div className="rp-row rep">
+            <span className="rp-name">⭐ {myProp.name} <span className="rp-tag">대표</span></span>
+            <span className="rp-val">{uk(repEvalUk)}<em>{myPyeongPrice().uk != null ? "평가" : "매수가"}</em></span>
+          </div>
+          {reProps.map((p) => (
+            <div className="rp-row" key={p.id}>
+              <span className="rp-name">🏠 {p.name}{p.memo ? <span className="rp-memo"> · {p.memo}</span> : null}</span>
+              <span className="rp-val">{uk(p.valueUk)}<em>평가</em></span>
+              <button className="rp-del" onClick={() => delReProp(p.id)} aria-label="삭제">✕</button>
+            </div>
+          ))}
+          {addProp && (
+            <div className="rp-form">
+              <input className="rp-in" placeholder="단지/부동산명" value={pName} onChange={(e) => setPName(e.target.value)} />
+              <input className="rp-in num" type="number" inputMode="decimal" placeholder="평가금액(억)" value={pVal} onChange={(e) => setPVal(e.target.value)} />
+              <input className="rp-in" placeholder="메모(선택)" value={pMemo} onChange={(e) => setPMemo(e.target.value)} />
+              <button className="rp-save" onClick={addReProp}>추가</button>
+            </div>
+          )}
+          <div className="rp-total"><span>부동산 합계 <em>평가금액</em></span><b>{uk(reTotalEvalUk)}</b></div>
+          <div className="rp-note">주식·ETF와 동일하게 <b>평가금액</b> 기준으로 총자산에 반영됩니다. 대표 단지는 평형별 실거래 시세(없으면 매수가), 추가 보유는 입력한 평가금액.</div>
+        </section>
+      )}
 
       {/* [정리] 기존 '갈아타기 갭' 카드는 아래 스크리너의 '같은 동/같은 단지'와 중복되어 제거.
           갈아타기 소요자금은 스크리너에서 이동 범위별로 계산한다. */}
@@ -925,6 +983,28 @@ export default function RealEstateDashboard() {
         .mp-avm-save { border: none; background: var(--color-primary); color: #fff; border-radius: 8px; padding: 7px 13px; font-size: 0.76rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .mp-avm-cancel { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 8px; padding: 7px 11px; font-size: 0.76rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .mp-note { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 10px; line-height: 1.5; word-break: keep-all; }
+        /* [#1 다수 부동산] 추가 보유 목록 */
+        .rp-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+        .rp-title { font-size: 0.92rem; font-weight: 800; color: var(--color-ink); }
+        .rp-sub { font-size: 0.66rem; font-weight: 600; color: var(--color-ink-3); margin-left: 4px; }
+        .rp-add-btn { border: 1px solid var(--color-primary); background: var(--color-card); color: var(--color-primary); border-radius: 8px; padding: 5px 11px; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .rp-row { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--color-line); }
+        .rp-row.rep { background: var(--color-card-soft); border-radius: 9px; padding: 9px 11px; border-bottom: none; margin-bottom: 4px; }
+        .rp-name { flex: 1; min-width: 0; font-size: 0.8rem; font-weight: 700; color: var(--color-ink); word-break: keep-all; }
+        .rp-tag { font-size: 0.58rem; font-weight: 800; color: var(--color-primary); background: var(--color-primary-soft); padding: 1px 6px; border-radius: 5px; margin-left: 4px; }
+        .rp-memo { font-size: 0.68rem; font-weight: 500; color: var(--color-ink-3); }
+        .rp-val { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; white-space: nowrap; }
+        .rp-val em { font-style: normal; font-size: 0.56rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); padding: 1px 5px; border-radius: 4px; margin-left: 5px; }
+        .rp-del { border: none; background: none; color: var(--color-ink-3); font-size: 0.8rem; cursor: pointer; padding: 2px 4px; }
+        .rp-form { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+        .rp-in { flex: 1 1 100%; border: 1px solid var(--color-line); border-radius: 8px; padding: 8px 10px; font-size: 0.82rem; font-family: var(--font-sans); background: var(--color-card); color: var(--color-ink); }
+        .rp-in.num { flex: 1 1 40%; }
+        .rp-save { flex: 1 1 100%; border: none; background: var(--color-primary); color: #fff; border-radius: 8px; padding: 9px 0; font-size: 0.8rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .rp-total { display: flex; align-items: center; justify-content: space-between; margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--color-line); }
+        .rp-total span { font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); }
+        .rp-total em { font-style: normal; font-size: 0.58rem; font-weight: 800; color: var(--color-success); background: var(--color-success-soft); padding: 1px 6px; border-radius: 4px; margin-left: 5px; }
+        .rp-total b { font-size: 1.05rem; font-weight: 900; color: var(--color-ink); font-family: ui-monospace, monospace; }
+        .rp-note { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 9px; line-height: 1.55; word-break: keep-all; }
         .mp-note b { color: var(--color-ink-2); font-weight: 700; }
         /* [S5] 투자아파트 스크리너 */
         /* [S5+] 이동 범위 칩 */
