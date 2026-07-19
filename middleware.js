@@ -28,10 +28,26 @@ const PROTECTED_API_PREFIXES = [
   "/api/realestate/v2",
   "/api/trader-verify",
   "/api/trader-register",
+  "/api/ops",         // NI-5: 운영자 전용(사용금액·리소스·트레이더 관리)
 ];
+
+// NI-5-c: 운영자(admin) 전용 — 지인(beta)은 접근 불가(서버 강제).
+const ADMIN_ONLY_PAGES = ["/pwa/system-health"];
+const ADMIN_ONLY_API = ["/api/ops"];
 
 function isProtectedApi(path) {
   return PROTECTED_API_PREFIXES.some((p) => path === p || path.startsWith(p));
+}
+
+function matchesPrefix(path, prefixes) {
+  return prefixes.some((p) => path === p || path.startsWith(p + "/") || path.startsWith(p));
+}
+
+function forbidden() {
+  return new NextResponse(JSON.stringify({ ok: false, error: "forbidden" }), {
+    status: 403,
+    headers: { "content-type": "application/json", "cache-control": "no-store" },
+  });
 }
 
 function unauthorized() {
@@ -48,11 +64,23 @@ export async function middleware(req) {
 
   // 1) 페이지 게이트: /pwa
   if (pathname === "/pwa" || pathname.startsWith("/pwa/")) {
-    if (session) return NextResponse.next();
-    const url = req.nextUrl.clone();
-    url.pathname = "/login";
-    url.search = `?next=${encodeURIComponent(pathname + req.nextUrl.search)}`;
-    return NextResponse.redirect(url);
+    if (!session) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/login";
+      url.search = `?next=${encodeURIComponent(pathname + req.nextUrl.search)}`;
+      return NextResponse.redirect(url);
+    }
+    // NI-5-c: 운영자 전용 페이지(시스템 상태 등)는 admin만. beta는 /pwa로.
+    if (matchesPrefix(pathname, ADMIN_ONLY_PAGES)) {
+      const t = tenantFromSession(session);
+      if (!t || t.role !== "admin") {
+        const url = req.nextUrl.clone();
+        url.pathname = "/pwa";
+        url.search = "";
+        return NextResponse.redirect(url);
+      }
+    }
+    return NextResponse.next();
   }
 
   // 2) API: 계정별 데이터만 게이트 + 테넌트 강제
@@ -62,6 +90,11 @@ export async function middleware(req) {
 
     const t = tenantFromSession(session);
     if (!t) return unauthorized();
+
+    // NI-5-c: 운영자 전용 API(사용금액·리소스 등)는 admin만(프론트 숨김만으론 부족 — 서버 강제).
+    if (matchesPrefix(pathname, ADMIN_ONLY_API) && t.role !== "admin") {
+      return forbidden();
+    }
 
     // 관리자(InYoung)는 A/B 전환 허용. 그 외 사용자는 세션 테넌트 강제(클라값 무시).
     const requested =

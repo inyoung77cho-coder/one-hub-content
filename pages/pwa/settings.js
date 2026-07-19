@@ -39,6 +39,7 @@ export default function Settings() {
   const [traderStat, setTraderStat] = useState({}); // [v11 #18] 트레이더 A/B 엔진 상태 (기존 engine-status 재사용)
   const [ops, setOps] = useState(null);   // [§3-9 #18] /api/ops/traders (매수/차단/에러/채널/자율)
   const [usage, setUsage] = useState(null); // [§3-9 #19] /api/ops/usage (KIS/Claude/서버 비용)
+  const [me, setMe] = useState(null); // [NI-5] 로그인 사용자 등급(tier/role) — 운영자 탭 분기·베타 배지
   const tick = useRef(null);
 
   const loadHealth = useCallback(async () => {
@@ -73,6 +74,11 @@ export default function Settings() {
     fetch("/api/ops/usage")
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d && d.ok) setUsage(d); })
+      .catch(() => {});
+    // [NI-5] 로그인 사용자 등급 로딩(운영자 탭 분기·베타 배지)
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => { if (d && d.authenticated) setMe(d); })
       .catch(() => {});
     if (typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window) {
       navigator.serviceWorker.getRegistration().then((reg) =>
@@ -156,17 +162,31 @@ export default function Settings() {
   const cbColor = cb === "OPEN" ? "var(--color-danger)" : cb === "HALF_OPEN" ? "var(--color-warning)" : cb ? "var(--color-success)" : "var(--color-ink-3)";
   const teleConnected = health?.telegram?.status === "connected";
 
+  // [NI-5] 등급은 서버 세션 기준(프론트 조작 불가 — 운영자 API도 서버에서 admin 검증).
+  const isAdmin = me?.user?.role === "admin";
+  const showOps = opsView && isAdmin; // 운영자 뷰는 admin만
+  // TODO(P3): tier==='free'/'premium' 페이월 분기는 이 등급 위에 얹는다. 지금은 결제·유료 잠금 없음(전원 beta 무료).
+
   return (
     <div className="m pwa-shell">
       <div className="hd"><h1>⚙️ 설정</h1></div>
 
-      {/* 뷰 전환 세그먼트 — 일반 / 운영자 */}
-      <div className="seg">
-        <button className={!opsView ? "on" : ""} onClick={() => opsView && toggleOps()}>일반</button>
-        <button className={opsView ? "on" : ""} onClick={() => !opsView && toggleOps()}>운영자</button>
-      </div>
+      {/* [NI-5-d] 베타 테스터 배지 — 정식 출시 후에도 무료 */}
+      {me && !isAdmin && (
+        <div style={{ margin: "0 0 12px", padding: "10px 12px", borderRadius: 10, background: "rgba(99,102,241,0.12)", color: "var(--color-ink, #1e293b)", fontSize: "0.78rem", fontWeight: 700, textAlign: "center" }}>
+          🧪 베타 테스터 · 정식 출시 후에도 무료로 이용하실 수 있어요
+        </div>
+      )}
 
-      {!opsView ? (
+      {/* 뷰 전환 세그먼트 — 일반 / 운영자 (운영자 탭은 admin 전용) */}
+      {isAdmin && (
+        <div className="seg">
+          <button className={!showOps ? "on" : ""} onClick={() => showOps && toggleOps()}>일반</button>
+          <button className={showOps ? "on" : ""} onClick={() => !showOps && toggleOps()}>운영자</button>
+        </div>
+      )}
+
+      {!showOps ? (
         <>
           {/* ── 일반 뷰: 알림 · 테마 · 계정 · 연동 ── */}
           {/* 알림 */}
