@@ -25,6 +25,7 @@ export default async function handler(req, res) {
       role: t.role || "member",
       tier: t.tier || "beta",
       lifetimeFree: !!t.lifetimeFree,
+      tenant: t.tenant || null, // [격리 진단] 내 테넌트(A/B/u…) 확인용
     },
   });
 }
