@@ -1,7 +1,8 @@
+import { reqTenant, bodyWithTenant } from "../../lib/reqTenant";
 const ENGINE_API = process.env.ENGINE_API_URL || "http://54.180.54.132:5001";
 
 export default async function handler(req, res) {
-  const trader = (req.query.trader || "A").toString();
+  const trader = reqTenant(req);
 
   try {
     if (req.method === "GET") {
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
           "Content-Type": "application/json",
           "X-API-Key": process.env.PWA_API_KEY || "",
         },
-        body: JSON.stringify(req.body),
+        body: JSON.stringify(bodyWithTenant(req)),
         signal: AbortSignal.timeout(8000),
       });
       const data = await upstream.json();

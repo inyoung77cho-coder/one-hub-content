@@ -2,6 +2,7 @@
 //  · RE(:5002)  검색/면적/보유추가/운영자속보  → ?key=RE_ACCESS_KEY (+ 속보는 X-Operator-Key)
 //  · ENG(:5001) 주식검색/KIS불러오기/ETF검색/ETF추가 → X-API-Key=PWA_API_KEY
 // 로컬 개발: SSH 터널(localhost:5001/5002) + .env.local 에 RE_API_URL/ENGINE_API_URL/키 설정.
+import { bodyWithTenant } from "../../../lib/reqTenant";
 const RE = process.env.RE_API_URL || "http://54.180.54.132:5002";
 const ENG = process.env.ENGINE_API_URL || "http://54.180.54.132:5001";
 const RE_KEY = process.env.RE_ACCESS_KEY || "";
@@ -47,7 +48,7 @@ export default async function handler(req, res) {
     const r = await fetch(url, {
       method: req.method,
       headers,
-      body: req.method === "POST" ? JSON.stringify(req.body || {}) : undefined,
+      body: req.method === "POST" ? JSON.stringify(bodyWithTenant(req)) : undefined,
     });
     const text = await r.text();
     let data;
