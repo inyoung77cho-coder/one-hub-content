@@ -9,6 +9,7 @@ import BottomNav from "../../components/BottomNav";
 import { setTraderGlobal } from "../../lib/trader";
 import QuickAddSheet from "../../components/shared/QuickAddSheet";
 import { APP_VERSION, BUILD_STAMP } from "../../lib/version";
+import { logout } from "../../lib/session";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -240,6 +241,11 @@ export default function Settings() {
               </div>
             </div>
             <div className="hint">화면의 모든 자산·주문이 선택한 계좌 기준으로 표시됩니다. B를 선택하면 상단에 표시가 나타납니다.</div>
+            <div className="row" style={{ marginTop: 12, borderTop: "1px solid var(--color-line)", paddingTop: 12 }}>
+              <span className="l">로그아웃</span>
+              <button className="tbtn" onClick={logout}>로그아웃</button>
+            </div>
+            <div className="hint">로그아웃하면 이 기기에 저장된 내 자산·게임·설정이 함께 지워집니다(공용 기기 보호).</div>
           </div>
 
           {/* [S3.5] 온보딩 항목별 편집 — 전체 재입력 폐기, 항목마다 독립 수정(동일 빠른입력 폼 재사용) */}

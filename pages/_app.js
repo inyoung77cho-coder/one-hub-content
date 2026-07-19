@@ -7,11 +7,31 @@ import { useEffect } from "react";
 import { useRouter } from "next/router";
 import { initSync } from "../lib/syncManager";
 import { getTrader } from "../lib/trader";
+import { enforceUserBoundary } from "../lib/session";
+
+// 페이지 로드당 1회만 로그인 경계 검사(사용자 전환 시 로컬 상태 초기화).
+let boundaryChecked = false;
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
   const isPWARoute = router.pathname.startsWith("/pwa");
   const isHome = router.pathname === "/"; // 홈은 자체 네이비 nav 사용 → 전역 Nav 숨김
+
+  // [공용기기 방어] 로그인한 사용자가 이 기기의 직전 사용자와 다르면 로컬 상태를 초기화한다.
+  //   로그아웃 없이 다음 사람이 로그인하는 경우(가장 흔함)까지 커버. 초기화 시 1회 새로고침.
+  useEffect(() => {
+    if (boundaryChecked || typeof window === "undefined") return;
+    if (!router.pathname.startsWith("/pwa")) return;
+    boundaryChecked = true;
+    fetch("/api/auth/me")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d && d.authenticated && d.user && d.user.id) {
+          if (enforceUserBoundary(d.user.id)) window.location.reload();
+        }
+      })
+      .catch(() => {});
+  }, [router.pathname]);
 
   useEffect(() => {
     if (typeof window !== "undefined" && "serviceWorker" in navigator) {
