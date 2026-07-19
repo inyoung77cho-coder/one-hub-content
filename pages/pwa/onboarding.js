@@ -329,6 +329,15 @@ export default function Onboarding() {
                   <div className="cmp-note">세로선 = 성향 기반 목표 비중. AI 자산운영 탭에서 리밸런싱 플랜이 자동 생성됩니다.</div>
                 </div>
               )}
+              {/* [PP-6] 첫 사용 가이드 — 베타 테스터가 바로 해볼 3가지(실제 기능으로 안내) */}
+              <div className="card guide3">
+                <div className="g3-t">🚀 이제 이 3가지부터 해보세요</div>
+                <ol className="g3-list">
+                  <li><span className="g3-ic">🔍</span><div className="g3-b"><b>AI에게 종목 물어보기</b><span className="g3-d">관심 종목이 지금 사도 될지 AI에게 물어보세요 (우측 상단 🔍)</span></div></li>
+                  <li><span className="g3-ic">🎮</span><div className="g3-b"><b>나 vs AI 가상대결</b><span className="g3-d">같은 종목을 나와 AI가 각자 굴려 누가 이기나 봐요 (가상머니)</span></div></li>
+                  <li><span className="g3-ic">💬</span><div className="g3-b"><b>불편하면 바로 알려주기</b><span className="g3-d">화면 왼쪽 아래 💬 버튼으로 한마디 남겨주시면 큰 도움이 돼요</span></div></li>
+                </ol>
+              </div>
               <div className="foot"><button className="btn-next" onClick={finish}>홈에서 내 자산 보기 →</button></div>
             </div>
           )}
@@ -452,6 +461,13 @@ export default function Onboarding() {
         .cmp-tgt { position: absolute; top: 0; height: 100%; width: 3px; background: var(--color-ink); }
         .cmp-val { width: 92px; text-align: right; font-size: 11.5px; font-weight: 600; color: var(--color-ink-2); }
         .cmp-note { font-size: 11.5px; color: var(--color-ink-3); margin-top: 12px; line-height: 1.5; }
+        .g3-t { font-size: 14px; font-weight: 700; margin-bottom: 13px; }
+        .g3-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 13px; }
+        .g3-list li { display: flex; align-items: flex-start; gap: 11px; }
+        .g3-ic { width: 30px; height: 30px; border-radius: 9px; background: var(--color-primary-soft); display: grid; place-items: center; font-size: 15px; flex-shrink: 0; }
+        .g3-b { display: flex; flex-direction: column; }
+        .g3-b b { font-size: 13.5px; font-weight: 700; }
+        .g3-d { font-size: 11.5px; color: var(--color-ink-3); margin-top: 2px; line-height: 1.5; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg-deep); margin: 0; }`}</style>
     </div>
