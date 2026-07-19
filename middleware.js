@@ -29,6 +29,7 @@ const PROTECTED_API_PREFIXES = [
   "/api/trader-verify",
   "/api/trader-register",
   "/api/ops",         // NI-5: 운영자 전용(사용금액·리소스·트레이더 관리)
+  "/api/feedback",    // NI-6: 피드백 제출(로그인 필수, 신원은 서버 세션에서 기록)
 ];
 
 // NI-5-c: 운영자(admin) 전용 — 지인(beta)은 접근 불가(서버 강제).

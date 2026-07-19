@@ -40,7 +40,25 @@ export default function Settings() {
   const [ops, setOps] = useState(null);   // [§3-9 #18] /api/ops/traders (매수/차단/에러/채널/자율)
   const [usage, setUsage] = useState(null); // [§3-9 #19] /api/ops/usage (KIS/Claude/서버 비용)
   const [me, setMe] = useState(null); // [NI-5] 로그인 사용자 등급(tier/role) — 운영자 탭 분기·베타 배지
+  const [fb, setFb] = useState(null); // [NI-6] 피드백 대시보드(admin 전용)
+  const [fbFilter, setFbFilter] = useState("all"); // [NI-6] 카테고리 필터
   const tick = useRef(null);
+
+  // [NI-6] 피드백 목록 로딩(admin만 — 서버가 /api/ops 강제). 상태변경 후 재조회.
+  const loadFeedback = useCallback(async () => {
+    try {
+      const r = await fetch("/api/ops/feedback");
+      if (!r.ok) return;
+      const d = await r.json();
+      if (d && d.ok) setFb(d);
+    } catch {}
+  }, []);
+  const setFbStatus = useCallback(async (id, status) => {
+    try {
+      await fetch("/api/ops/feedback", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, status }) });
+      loadFeedback();
+    } catch {}
+  }, [loadFeedback]);
 
   const loadHealth = useCallback(async () => {
     try {
@@ -80,6 +98,8 @@ export default function Settings() {
       .then((r) => r.json())
       .then((d) => { if (d && d.authenticated) setMe(d); })
       .catch(() => {});
+    // [NI-6] 피드백 목록(admin만 로드됨 — 비-admin은 403 무시)
+    loadFeedback();
     if (typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window) {
       navigator.serviceWorker.getRegistration().then((reg) =>
         reg?.pushManager.getSubscription().then((s) => setPushOn(!!s))).catch(() => {});
@@ -273,6 +293,45 @@ export default function Settings() {
         <>
           {/* ── 운영자 뷰: 시스템 상태 · Token · Scheduler · Circuit Breaker · 버전 ── */}
           <div className="opsnote">운영자 전용 · 시스템 상태 및 엔진 진단</div>
+
+          {/* [NI-6] 피드백 대시보드 — 지인 의견을 한 곳에서(화면·사람·카테고리·상태) */}
+          <div className="card">
+            <div className="k">💬 피드백 {fb && <span className="rt">· 총 {fb.total} · 미확인 {fb.unread}</span>}</div>
+            {!fb || !Array.isArray(fb.items) ? (
+              <div className="hint">불러오는 중…</div>
+            ) : fb.items.length === 0 ? (
+              <div className="hint">아직 피드백이 없습니다. 지인이 앱 화면의 💬 버튼으로 남기면 여기에 누가·어디서·뭐라고 정리됩니다.</div>
+            ) : (
+              <>
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap", margin: "6px 0 10px" }}>
+                  {[["all", "전체"], ["bug", "🔴버그"], ["inconvenience", "🟡불편"], ["suggestion", "💡제안"], ["praise", "💚칭찬"]].map(([k, l]) => (
+                    <button key={k} onClick={() => setFbFilter(k)}
+                      style={{ padding: "5px 10px", borderRadius: 14, border: fbFilter === k ? "1.5px solid #4f46e5" : "1px solid var(--color-line,#e2e8f0)", background: fbFilter === k ? "rgba(79,70,229,0.1)" : "transparent", color: "var(--color-ink)", fontSize: "0.72rem", fontWeight: fbFilter === k ? 800 : 500, cursor: "pointer" }}>
+                      {l}{k !== "all" && fb.counts[k] ? ` ${fb.counts[k]}` : ""}
+                    </button>
+                  ))}
+                </div>
+                {fb.items.filter((x) => fbFilter === "all" || x.category === fbFilter).map((x) => {
+                  const em = { bug: "🔴", inconvenience: "🟡", suggestion: "💡", praise: "💚" }[x.category] || "·";
+                  const mini = { padding: "4px 10px", borderRadius: 8, border: "1px solid var(--color-line,#e2e8f0)", background: "transparent", color: "var(--color-ink)", fontSize: "0.7rem", fontWeight: 700, cursor: "pointer" };
+                  return (
+                    <div key={x.id} style={{ borderTop: "1px solid var(--color-line,#eef2f7)", padding: "9px 0" }}>
+                      <div style={{ fontSize: "0.72rem", color: "var(--color-ink-3)" }}>
+                        {em} <b>{x.nickname}</b> · {x.screen} · {new Date(x.created_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        {x.status !== "new" && <span style={{ marginLeft: 6, color: x.status === "done" ? "#16a34a" : "#2563eb" }}>· {x.status === "done" ? "완료" : "확인"}</span>}
+                      </div>
+                      <div style={{ fontSize: "0.85rem", margin: "3px 0 6px", color: "var(--color-ink)", whiteSpace: "pre-wrap" }}>{x.message}</div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        {x.status === "new" && <button style={mini} onClick={() => setFbStatus(x.id, "reviewed")}>확인</button>}
+                        {x.status !== "done" && <button style={mini} onClick={() => setFbStatus(x.id, "done")}>완료</button>}
+                        <a style={{ ...mini, textDecoration: "none" }} href={x.url} target="_blank" rel="noreferrer">원문 ↗</a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+          </div>
 
           {/* System Health */}
           <div className="card">
