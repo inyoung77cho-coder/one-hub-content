@@ -589,6 +589,14 @@ export default function PWADashboard({ latestReport }) {
     const current = dedupBy(data.screening_candidates, (c) => c.code || c.name).map((s) => ({ code: s.code, name: s.name }));
     const auto = reconcileAutoWatch(current, trader);
     if (auto.length) setAutoWatchNote(auto);
+    // [게임 규율] 추천 종목의 확신 점수(code→score) 저장 → 나 vs AI에서 AI가 매수/관망 판정에 사용.
+    try {
+      const m = JSON.parse(localStorage.getItem('onehub_rec_scores') || '{}');
+      [...(data.screening_candidates || []), ...(data.today_buys || [])].forEach((s) => {
+        if (s && s.code) { const v = Number(s.final_score ?? s.score); if (!Number.isNaN(v)) m[s.code] = v; }
+      });
+      localStorage.setItem('onehub_rec_scores', JSON.stringify(m));
+    } catch {}
   }, [mounted, trader, data?.screening_candidates]);
 
   const loadPending = useCallback(async () => {
@@ -2396,9 +2404,10 @@ export default function PWADashboard({ latestReport }) {
               const won = 10000; // 1건 100만원 → ret(%) × 10000 = 손익(원)
               const dts = w.details;
               const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
-              const aiProfit = sum(dts.filter(d => d.ret > 0), d => d.ret * won);
-              const aiLoss = sum(dts.filter(d => d.ret < 0), d => -d.ret * won);
-              const aiWins = dts.filter(d => d.ret > 0).length;
+              const aiBuys = dts.filter(d => d.aiBought !== false); // [규율] AI는 확신(매수판정) 종목만 매수, 나머지 관망
+              const aiProfit = sum(aiBuys.filter(d => d.ret > 0), d => d.ret * won);
+              const aiLoss = sum(aiBuys.filter(d => d.ret < 0), d => -d.ret * won);
+              const aiWins = aiBuys.filter(d => d.ret > 0).length;
               const takes = dts.filter(d => d.decision === 'take');
               const myProfit = sum(takes.filter(d => d.ret > 0), d => d.ret * won);
               const myLoss = sum(takes.filter(d => d.ret < 0), d => -d.ret * won);
@@ -2419,7 +2428,7 @@ export default function PWADashboard({ latestReport }) {
                     <div className="pl-cell"><span className="pl-k">🙋 내 순손익 (실제 보유)</span><span className="pl-v" style={{ color: col(myNet) }}>{won0(myNet)}</span></div>
                     <div className="pl-cell"><span className="pl-k">🤖 AI 순손익 (가상)</span><span className="pl-v" style={{ color: col(aiNet) }}>{won0(aiNet)}</span></div>
                     <div className="pl-cell"><span className="pl-k">내 승률 · 손익비</span><span className="pl-v">{takes.length ? `${Math.round(myWins/takes.length*100)}%` : '-'} · {plr(myProfit, myLoss)}</span></div>
-                    <div className="pl-cell"><span className="pl-k">AI 승률 · 손익비</span><span className="pl-v">{Math.round(aiWins/dts.length*100)}% · {plr(aiProfit, aiLoss)}</span></div>
+                    <div className="pl-cell"><span className="pl-k">AI 승률 · 손익비 <span style={{color:'var(--text-tertiary)'}}>(매수 {aiBuys.length})</span></span><span className="pl-v">{aiBuys.length ? Math.round(aiWins/aiBuys.length*100) : 0}% · {plr(aiProfit, aiLoss)}</span></div>
                     <div className="pl-cell"><span className="pl-k">관망으로 피한 손실</span><span className="pl-v" style={{ color: 'var(--color-success)' }}>{won0(avoidedLoss)}</span></div>
                     <div className="pl-cell"><span className="pl-k">관망으로 놓친 이익</span><span className="pl-v" style={{ color: 'var(--color-danger)' }}>{won0(missedGain)}</span></div>
                     {/* [A-5] 오류 4분류 — 거짓 매수율(샀는데 내림) vs 기회 상실률(관망했는데 오름)을 분리. */}
@@ -2429,7 +2438,7 @@ export default function PWADashboard({ latestReport }) {
                       <div className="pl-cell wide"><span className="pl-k">종합</span><span className="pl-v" style={{ color: myNet > aiNet ? 'var(--color-success)' : myNet < aiNet ? 'var(--purple)' : 'var(--color-ink-2)' }}>{myNet > aiNet ? '🏆 내 판단이 더 벌었습니다' : myNet < aiNet ? '🤖 AI 가상이 더 벌었습니다' : '⚖️ 접전'}</span></div>
                     )}
                   </div>
-                  <p className="pl-foot">가정: 추천일 종가 매수 · 3일 후 매도 · 1건당 100만원 · 수수료·세금 미반영. AI 손익은 <b>실제 체결이 아닌 가상 포지션</b>입니다.{!pol.declareWinner && <> 표본 {dts.length}건 — <b>승자 선언은 30건 이상</b>부터 합니다.</>}</p>
+                  <p className="pl-foot">가정: 추천일 종가 매수 · 3일 후 매도 · 1건당 100만원 · 수수료·세금 미반영. AI는 <b>확신 종목(매수판정·점수≥12)만 매수</b>하고 나머지는 관망합니다(가상 포지션, 실제 체결 아님).{!pol.declareWinner && <> 표본 {dts.length}건 — <b>승자 선언은 30건 이상</b>부터 합니다.</>}</p>
                 </section>
               );
             })()}
