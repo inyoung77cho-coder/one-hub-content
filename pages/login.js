@@ -27,7 +27,10 @@ export default function Login() {
             <span className="ic" aria-hidden>💬</span> 카카오로 시작하기
           </a>
 
-          <p className="note">가입/로그인 시 서비스 이용에 동의하는 것으로 간주됩니다. · 시험 사용 단계</p>
+          <p className="note">
+            로그인 시 <a href="/terms" target="_blank" rel="noreferrer">이용약관</a> 및{" "}
+            <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리방침</a>에 동의하는 것으로 간주됩니다. · 시험 사용 단계
+          </p>
         </div>
       </main>
 
@@ -97,6 +100,10 @@ export default function Login() {
           font-size: 0.7rem;
           color: #94a3b8;
           line-height: 1.5;
+        }
+        .note a {
+          color: #6366f1;
+          text-decoration: underline;
         }
       `}</style>
     </>

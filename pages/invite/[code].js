@@ -31,6 +31,10 @@ export default function Invite() {
           </div>
 
           <button className="kakao" onClick={start}>💬 카카오로 시작하기</button>
+          <p className="consent">
+            시작하면 <a href="/terms" target="_blank" rel="noreferrer">이용약관</a> ·{" "}
+            <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리방침</a>에 동의합니다.
+          </p>
           <p className="note">아직 개발 중인 앱을 먼저 보시는 겁니다. 완성품이 아니라 <b>만들어지는 과정</b>에 함께해 주세요.</p>
         </div>
       </main>
@@ -47,7 +51,9 @@ export default function Invite() {
         .pts li { font-size: 0.83rem; color: #334155; line-height: 1.7; margin-bottom: 6px; }
         .kakao { width: 100%; padding: 15px 0; border: none; border-radius: 12px; background: #fee500; color: #191600; font-size: 1rem; font-weight: 800; cursor: pointer; }
         .kakao:active { filter: brightness(0.96); }
-        .note { margin: 14px 0 0; font-size: 0.72rem; color: #94a3b8; line-height: 1.6; }
+        .consent { margin: 12px 0 0; font-size: 0.72rem; color: #64748b; }
+        .consent a { color: #4f46e5; text-decoration: underline; }
+        .note { margin: 10px 0 0; font-size: 0.72rem; color: #94a3b8; line-height: 1.6; }
       `}</style>
     </>
   );
