@@ -2438,7 +2438,7 @@ export default function PWADashboard({ latestReport }) {
                       <div className="pl-cell wide"><span className="pl-k">종합</span><span className="pl-v" style={{ color: myNet > aiNet ? 'var(--color-success)' : myNet < aiNet ? 'var(--purple)' : 'var(--color-ink-2)' }}>{myNet > aiNet ? '🏆 내 판단이 더 벌었습니다' : myNet < aiNet ? '🤖 AI 가상이 더 벌었습니다' : '⚖️ 접전'}</span></div>
                     )}
                   </div>
-                  <p className="pl-foot">가정: 추천일 종가 매수 · 3일 후 매도 · 1건당 100만원 · 수수료·세금 미반영. AI는 <b>확신 종목(매수판정·점수≥12)만 매수</b>하고 나머지는 관망합니다(가상 포지션, 실제 체결 아님).{!pol.declareWinner && <> 표본 {dts.length}건 — <b>승자 선언은 30건 이상</b>부터 합니다.</>}</p>
+                  <p className="pl-foot">가정: 추천일 종가 매수 · 3일 후 매도 · 1건당 100만원 · 수수료·세금 미반영. AI는 <b>확신 종목(매수판정·점수≥10)만 매수</b>하고 나머지는 관망합니다(가상 포지션, 실제 체결 아님).{!pol.declareWinner && <> 표본 {dts.length}건 — <b>승자 선언은 30건 이상</b>부터 합니다.</>}</p>
                 </section>
               );
             })()}
