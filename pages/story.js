@@ -9,7 +9,7 @@ import { SITE } from '../lib/site';
 export default function StoryIndex({ episodes }) {
   const canonical = `${SITE}/story`;
   const description =
-    '분당에 자가 한 채, 대기업 18년 차 조 부장. 주식·ETF·부동산을 하나의 AI로 함께 운영하는 이야기 — 매주 한 편씩 이어지는 시리즈.';
+    '분당에 자가 한 채, 대기업 18년 차 조 부장. 주식·ETF·부동산을 하나의 AI로 함께 운영하며 달라진 1년 — 네 편에 담은 이야기.';
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
@@ -35,9 +35,9 @@ export default function StoryIndex({ episodes }) {
 
       <div style={{ minHeight: '100vh', background: '#F4F9FF', fontFamily: 'Pretendard, sans-serif' }}>
         <PageHero
-          eyebrow="Story · 머니더버니 노트 · 매주 연재"
+          eyebrow="Story · 머니더버니 노트 · 4부작"
           title="분당 조부장의 자산 이야기"
-          subtitle="주식·ETF·부동산을 하나의 AI로 굴리기 시작한 조 부장의 이야기. 성공도, 실패도, 아무것도 하지 않은 날까지 — 매주 한 편씩 이어집니다."
+          subtitle="주식·ETF·부동산을 하나의 AI로 굴리기 시작한 조 부장의 1년. 성공도, 실패도, 아무것도 하지 않은 날까지 — 네 편에 담았습니다."
         />
         <main className="oh-main" style={{ maxWidth: 760 }}>
           <p className="s-note">

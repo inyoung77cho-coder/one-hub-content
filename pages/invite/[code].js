@@ -36,6 +36,7 @@ export default function Invite() {
             <a href="/privacy" target="_blank" rel="noreferrer">개인정보 처리방침</a>에 동의합니다.
           </p>
           <p className="note">아직 개발 중인 앱을 먼저 보시는 겁니다. 완성품이 아니라 <b>만들어지는 과정</b>에 함께해 주세요.</p>
+          <a className="story-link" href="/story" target="_blank" rel="noreferrer">📖 어떤 앱인지 궁금하면 — 조 부장 이야기(4부작) 먼저 보기 →</a>
         </div>
       </main>
 
@@ -54,6 +55,8 @@ export default function Invite() {
         .consent { margin: 12px 0 0; font-size: 0.72rem; color: #64748b; }
         .consent a { color: #4f46e5; text-decoration: underline; }
         .note { margin: 10px 0 0; font-size: 0.72rem; color: #94a3b8; line-height: 1.6; }
+        .story-link { display: inline-block; margin: 14px 0 0; font-size: 0.78rem; font-weight: 700; color: #4f46e5; text-decoration: none; }
+        .story-link:hover { text-decoration: underline; }
       `}</style>
     </>
   );
