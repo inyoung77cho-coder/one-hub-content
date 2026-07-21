@@ -99,24 +99,30 @@ export function StockForm({ onSaved, autofocusName = false }) {
   const ccy = isKR ? "KRW" : "USD";
 
   const pick = (o) => { setSel(o); setName(`${o.name} (${o.ticker})`); setMsg(""); };
+  // [현재가 자동] 국내는 마스터가 현재가(close_price)를 준다. 평단 미입력 시 이 값으로 평가 → 종목+수량만 입력 가능.
+  const curPx = isKR ? Number(sel?.close_price) || 0 : 0;
+  const manualPx = Number(price) || 0;
+  const usingCurrent = manualPx <= 0 && curPx > 0; // 평단 공란 & 현재가 있음 → 현재가 기준
+  const effPrice = manualPx > 0 ? manualPx : curPx; // 평가/저장에 쓰는 유효 단가
   const priceWarn = (() => {
-    if (!isKR || !sel?.close_price || !(Number(price) > 0)) return "";
-    const p = Number(price), c = Number(sel.close_price);
+    if (!isKR || !curPx || !(manualPx > 0)) return "";
+    const p = manualPx, c = curPx;
     if (p > c * 10) return `평단이 현재가 ${c.toLocaleString()}원의 10배를 초과합니다 — 총 매수금액을 넣으신 건 아닌가요?`;
     if (p < c / 10) return `평단이 현재가의 1/10 미만입니다 — 단위(원)를 확인하세요.`;
     return "";
   })();
-  const total = Number(shares) > 0 && Number(price) > 0 ? Number(shares) * Number(price) : null;
+  const total = Number(shares) > 0 && effPrice > 0 ? Number(shares) * effPrice : null;
 
   const save = () => {
     if (isKR && !sel) { setMsg("⚠️ 목록에서 종목을 선택하세요 (자유 입력은 저장할 수 없습니다)"); return; }
-    // [G4] 입력 합리성 검증 — 단일 소스(lib/validateAsset). 수량·평단·현재가 대비 이상치 차단.
+    // [G4] 입력 합리성 검증 — 단일 소스(lib/validateAsset). 평단 미입력 시 현재가 기준 통과, ±10배 이탈 차단.
     const v = validateStockInput({ shares, price, closePrice: isKR ? sel?.close_price : null, ccy });
     if (!v.ok) { setMsg("⚠️ " + v.error); return; }
     const tr = getTrader();
     const res = buyStock({
       name: isKR ? sel.name : name, code: isKR ? sel.ticker : code,
-      shares, avgPrice: price, ccy, broker, market, account, buyDate, trader: tr,
+      shares, avgPrice: effPrice, ccy, broker, market, account, buyDate, trader: tr,
+      priceBasis: usingCurrent ? "current" : "manual",
     });
     if (!res.ok) { setMsg("⚠️ " + res.error); return; }
     // [N1] onb.stock_uk 누적 기록 제거 — 총자산은 onehub_stock_holdings '리스트'에서 계산(lib/assetsTotal).
@@ -158,7 +164,7 @@ export function StockForm({ onSaved, autofocusName = false }) {
       )}
       <div className="af-row">
         <label className="af-f"><span>수량(주)</span><input type="number" inputMode="numeric" value={shares} onChange={(e) => setShares(e.target.value)} placeholder="10" /></label>
-        <label className="af-f"><span>평단가 ({isKR ? "원" : "$"})</span><input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={isKR ? "70000" : "180"} /></label>
+        <label className="af-f"><span>평단가 ({isKR ? "원" : "$"}){isKR && <em>선택 · 미입력 시 현재가</em>}</span><input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={isKR && curPx ? `현재가 ${curPx.toLocaleString()}` : (isKR ? "70000" : "180")} /></label>
       </div>
       <div className="af-row">
         <label className="af-f"><span>증권사</span>
@@ -168,7 +174,7 @@ export function StockForm({ onSaved, autofocusName = false }) {
       </div>
       <label className="af-f"><span>매수일<em>성과비교용</em></span><input type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} /></label>
       {total != null && (
-        <div className="af-calc">총 매수금액 <b>{isKR ? `${total.toLocaleString()}원` : `$${total.toLocaleString()}`}</b> <span>(수량 × 평단, 검산용)</span></div>
+        <div className="af-calc">{usingCurrent ? "평가금액" : "총 매수금액"} <b>{isKR ? `${total.toLocaleString()}원` : `$${total.toLocaleString()}`}</b> <span>{usingCurrent ? `(수량 × 현재가 ${curPx.toLocaleString()}원 · 평단 미입력)` : "(수량 × 평단, 검산용)"}</span></div>
       )}
       {priceWarn && <div className="af-msg err">⚠ {priceWarn}</div>}
       {msg && <div className="af-msg err">{msg}</div>}

@@ -2206,7 +2206,7 @@ export default function PWADashboard({ latestReport }) {
                             <span className="mh-meta">{h.broker} · {h.account} · {h.market === 'us' ? '🇺🇸 해외' : '🇰🇷 국내'}</span>
                           </div>
                           {/* [B1] 국내(KRW) 평단은 원 단위 정수 표시(KIS 보유와 동일 규칙) — 소수점 노출 데이터 오류 방지. 정확값은 title. 해외(USD)는 소수 유지. */}
-                          <div className="mh-r" title={h.ccy === 'KRW' ? `정확 평단 ${Number(h.avgPrice).toLocaleString()}원` : undefined}>{h.shares}주 · 평단 {h.ccy === 'USD' ? '$' : ''}{h.ccy === 'KRW' ? Math.round(Number(h.avgPrice)).toLocaleString() : Number(h.avgPrice).toLocaleString()}{h.ccy === 'KRW' ? '원' : ''}</div>
+                          <div className="mh-r" title={h.priceBasis === 'current' ? '평단 미입력 — 입력 시점 현재가로 평가한 값입니다' : (h.ccy === 'KRW' ? `정확 평단 ${Number(h.avgPrice).toLocaleString()}원` : undefined)}>{h.shares}주 · {h.priceBasis === 'current' ? '현재가' : '평단'} {h.ccy === 'USD' ? '$' : ''}{h.ccy === 'KRW' ? Math.round(Number(h.avgPrice)).toLocaleString() : Number(h.avgPrice).toLocaleString()}{h.ccy === 'KRW' ? '원' : ''}</div>
                           <button className="mh-del" onClick={() => { removeStock({ id: h.id, trader }); setStManualTick(t => t + 1); }} aria-label={`${h.name} 삭제`}>✕</button>
                         </div>
                         );
