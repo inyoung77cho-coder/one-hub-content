@@ -17,6 +17,7 @@ import AppHeader from '../../components/AppHeader';
 import TraderBadge from '../../components/shared/TraderBadge';
 import BottomNav from '../../components/BottomNav';
 import { getStockHoldings, removeStock } from '../../lib/stockHoldings';
+import { fetchStockQuotes } from '../../lib/stockLive';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
 import { StockForm } from '../../components/shared/AssetForms';
@@ -269,7 +270,7 @@ export default function PWADashboard({ latestReport }) {
   const [autoWatchNote, setAutoWatchNote] = useState([]); // [S-6] 추천해제→자동 관망 편입 알림
   const [buyNotice, setBuyNotice] = useState(null); // [S-6] 바로매수 핸드오프 { name, code }
   const [decFeedback, setDecFeedback] = useState(null); // [S-5] 판단 기록 직후 즉시 피드백 { name, decision, date }
-  const [manualPx, setManualPx] = useState({}); // [S-1] 직접입력 보유 이상치 검증용 현재가맵(code→close_price)
+  const [manualPx, setManualPx] = useState({}); // [라이브] 직접입력 보유 현재가맵(id→{price,currency,krw,date}) · 평가/이상치용
   const [companyInfo, setCompanyInfo] = useState({}); // [S-7] 기업개요 캐시(code→summary)
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [opNotes, setOpNotes] = useState([]); // [알림카드] 운영자 신고가(spot_price) — 내 단지
@@ -567,17 +568,16 @@ export default function PWADashboard({ latestReport }) {
     return () => { alive = false; };
   }, [bottomSheet?.code]);
 
-  // [S-1] 직접입력 보유의 평단 이상치 검증 — 마스터 현재가와 대조(±10배 이탈 시 배지)
+  // [라이브 시세] 직접입력 보유(국내·해외)의 현재가를 접속 시마다 조회 → 평가액 자동 갱신 + 평단 이상치 배지.
+  //   manualPx: id → { price, currency, krw, date }. 원장(getLedger)과 동일 소스(/api/etf/quote)로 일관.
   useEffect(() => {
     if (!mounted) return;
     let alive = true;
     (async () => {
-      const list = getStockHoldings(trader).filter((h) => h.ccy === 'KRW' && h.code);
-      const px = {};
-      for (const h of list.slice(0, 20)) {
-        try { const d = await fetch(`/api/input/master-get?code=${encodeURIComponent(h.code)}`).then((r) => r.json()); if (d?.close_price) px[h.code] = d.close_price; } catch {}
-      }
-      if (alive) setManualPx(px);
+      const list = getStockHoldings(trader);
+      if (!list.length) { if (alive) setManualPx({}); return; }
+      const { quotes } = await fetchStockQuotes(list);
+      if (alive) setManualPx(quotes);
     })();
     return () => { alive = false; };
   }, [mounted, trader, stManualTick]);
@@ -2197,16 +2197,26 @@ export default function PWADashboard({ latestReport }) {
                   return (
                     <div className="mh-list">
                       {list.map((h) => {
-                        const cp = manualPx[h.code];
-                        const anomaly = cp && h.avgPrice && (h.avgPrice > cp * 10 || h.avgPrice < cp / 10);
+                        const q = manualPx[h.id];
+                        const cp = q?.price;                 // 현재가(해당 통화, 라이브)
+                        const isUsd = h.ccy === 'USD';
+                        const anomaly = cp && h.avgPrice && !isUsd && (h.avgPrice > cp * 10 || h.avgPrice < cp / 10);
+                        const fmt = (v) => `${isUsd ? '$' : ''}${isUsd ? Number(v).toLocaleString() : Math.round(Number(v)).toLocaleString()}${isUsd ? '' : '원'}`;
+                        const pnl = cp && Number(h.avgPrice) > 0 ? (cp / Number(h.avgPrice) - 1) * 100 : null;
+                        const basisLabel = h.priceBasis === 'current' ? '현재가' : '평단';
                         return (
                         <div className={`mh-row ${anomaly ? 'mh-anomaly' : ''}`} key={h.id}>
                           <div className="mh-l">
                             <b className="mh-name">{h.name}{anomaly && <span className="mh-warn" title={`평단 ${Number(h.avgPrice).toLocaleString()}원이 현재가 ${Number(cp).toLocaleString()}원과 크게 차이납니다. 총매수금액을 평단에 넣었는지 확인 후 다시 입력하세요.`}>⚠ 데이터 확인 필요</span>}</b>
-                            <span className="mh-meta">{h.broker} · {h.account} · {h.market === 'us' ? '🇺🇸 해외' : '🇰🇷 국내'}</span>
+                            <span className="mh-meta">{h.broker} · {h.account} · {h.market === 'us' ? '🇺🇸 해외' : '🇰🇷 국내'}{q?.date ? ` · 시세 ${q.date.slice(5)}` : ''}</span>
                           </div>
-                          {/* [B1] 국내(KRW) 평단은 원 단위 정수 표시(KIS 보유와 동일 규칙) — 소수점 노출 데이터 오류 방지. 정확값은 title. 해외(USD)는 소수 유지. */}
-                          <div className="mh-r" title={h.priceBasis === 'current' ? '평단 미입력 — 입력 시점 현재가로 평가한 값입니다' : (h.ccy === 'KRW' ? `정확 평단 ${Number(h.avgPrice).toLocaleString()}원` : undefined)}>{h.shares}주 · {h.priceBasis === 'current' ? '현재가' : '평단'} {h.ccy === 'USD' ? '$' : ''}{h.ccy === 'KRW' ? Math.round(Number(h.avgPrice)).toLocaleString() : Number(h.avgPrice).toLocaleString()}{h.ccy === 'KRW' ? '원' : ''}</div>
+                          {/* [라이브] 현재가(굵게) + 매수기준 대비 손익. 현재가 없으면 저장값 표시. 국내는 원 단위 정수. */}
+                          <div className="mh-r" title={h.ccy === 'KRW' ? `정확 ${basisLabel} ${Number(h.avgPrice).toLocaleString()}원` : undefined}>
+                            {h.shares}주 · 지금 {fmt(cp != null ? cp : h.avgPrice)}
+                            <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-ink-3)' }}>
+                              {basisLabel} {fmt(h.avgPrice)}{pnl != null ? <em style={{ fontStyle: 'normal', marginLeft: 6, color: pnl >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>{pnl >= 0 ? '+' : ''}{pnl.toFixed(1)}%</em> : ''}
+                            </span>
+                          </div>
                           <button className="mh-del" onClick={() => { removeStock({ id: h.id, trader }); setStManualTick(t => t + 1); }} aria-label={`${h.name} 삭제`}>✕</button>
                         </div>
                         );

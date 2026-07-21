@@ -5,6 +5,7 @@ import { buyEtf, sellEtf, inferMarket, ACCOUNTS } from "../../lib/etfHoldings";
 import { buyStock, STOCK_BROKERS } from "../../lib/stockHoldings";
 import { getTrader } from "../../lib/trader";
 import { validateStockInput, validateRealtyInput } from "../../lib/validateAsset";
+import { fetchStockQuote } from "../../lib/stockLive";
 
 function readOnb() { try { return JSON.parse(localStorage.getItem("onehub_onboard_assets") || "{}") || {}; } catch { return {}; } }
 function writeOnb(n) { try { localStorage.setItem("onehub_onboard_assets", JSON.stringify(n)); } catch {} }
@@ -113,16 +114,31 @@ export function StockForm({ onSaved, autofocusName = false }) {
   })();
   const total = Number(shares) > 0 && effPrice > 0 ? Number(shares) * effPrice : null;
 
-  const save = () => {
+  const save = async () => {
     if (isKR && !sel) { setMsg("⚠️ 목록에서 종목을 선택하세요 (자유 입력은 저장할 수 없습니다)"); return; }
+    if (!isKR && !String(code).trim()) { setMsg("⚠️ 해외는 티커를 입력하세요 (예: AAPL)"); return; }
+    // [현재가 자동] 평단 미입력이면 현재가로 채운다. 국내는 마스터 현재가 즉시, 해외는 라이브 조회.
+    let eff = manualPx;
+    let basis = "manual";
+    if (!(eff > 0)) {
+      basis = "current";
+      if (isKR && curPx > 0) {
+        eff = curPx;
+      } else {
+        setMsg("현재가 불러오는 중…");
+        const q = await fetchStockQuote(isKR ? sel.ticker : code, market);
+        if (!(q?.price > 0)) { setMsg("⚠️ 현재가를 불러오지 못했어요 — 평단가를 직접 입력해 주세요."); return; }
+        eff = q.price; // 해당 시장 통화(USD/KRW)
+      }
+    }
     // [G4] 입력 합리성 검증 — 단일 소스(lib/validateAsset). 평단 미입력 시 현재가 기준 통과, ±10배 이탈 차단.
-    const v = validateStockInput({ shares, price, closePrice: isKR ? sel?.close_price : null, ccy });
+    const v = validateStockInput({ shares, price: eff, closePrice: isKR ? sel?.close_price : null, ccy });
     if (!v.ok) { setMsg("⚠️ " + v.error); return; }
     const tr = getTrader();
     const res = buyStock({
       name: isKR ? sel.name : name, code: isKR ? sel.ticker : code,
-      shares, avgPrice: effPrice, ccy, broker, market, account, buyDate, trader: tr,
-      priceBasis: usingCurrent ? "current" : "manual",
+      shares, avgPrice: eff, ccy, broker, market, account, buyDate, trader: tr,
+      priceBasis: basis,
     });
     if (!res.ok) { setMsg("⚠️ " + res.error); return; }
     // [N1] onb.stock_uk 누적 기록 제거 — 총자산은 onehub_stock_holdings '리스트'에서 계산(lib/assetsTotal).
@@ -164,7 +180,7 @@ export function StockForm({ onSaved, autofocusName = false }) {
       )}
       <div className="af-row">
         <label className="af-f"><span>수량(주)</span><input type="number" inputMode="numeric" value={shares} onChange={(e) => setShares(e.target.value)} placeholder="10" /></label>
-        <label className="af-f"><span>평단가 ({isKR ? "원" : "$"}){isKR && <em>선택 · 미입력 시 현재가</em>}</span><input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={isKR && curPx ? `현재가 ${curPx.toLocaleString()}` : (isKR ? "70000" : "180")} /></label>
+        <label className="af-f"><span>평단가 ({isKR ? "원" : "$"})<em>선택 · 미입력 시 현재가</em></span><input type="number" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder={isKR && curPx ? `현재가 ${curPx.toLocaleString()}` : (isKR ? "70000" : "180")} /></label>
       </div>
       <div className="af-row">
         <label className="af-f"><span>증권사</span>

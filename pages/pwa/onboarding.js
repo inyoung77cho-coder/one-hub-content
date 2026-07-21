@@ -78,10 +78,23 @@ export default function Onboarding() {
 
   const pick = (q, val) => setPersonality((p) => ({ ...p, [q]: val }));
 
-  const addStock = () => {
-    const uk = uk1(num(stockForm.qty) * num(stockForm.price));
+  const [stockBusy, setStockBusy] = useState(false);
+  const addStock = async () => {
+    let price = num(stockForm.price);
+    let nm = stockForm.name;
+    // [현재가 자동] 평균 매수가를 비우면 마스터에서 종목을 해석해 현재가로 추정 → 종목+수량만 입력.
+    if (!(price > 0) && nm.trim()) {
+      setStockBusy(true);
+      try {
+        const d = await fetch(`/api/input/master-search?q=${encodeURIComponent(nm.trim())}`).then((r) => r.json());
+        const first = (d?.results || [])[0];
+        if (Number(first?.close_price) > 0) { price = Number(first.close_price); nm = first.name || nm; }
+      } catch (e) {}
+      setStockBusy(false);
+    }
+    const uk = uk1(num(stockForm.qty) * price);
     if (uk <= 0 && !stockForm.name) return;
-    setStockList((l) => [...l, { name: stockForm.name || "종목", uk }]);
+    setStockList((l) => [...l, { name: nm || "종목", uk }]);
     setStockForm({ name: "", qty: "", price: "" });
   };
   const addEtf = () => {
@@ -195,9 +208,9 @@ export default function Onboarding() {
                 <div className="field"><label>종목명 또는 코드</label><input placeholder="예: 한국항공우주 / 047810" value={stockForm.name} onChange={(e) => setStockForm((f) => ({ ...f, name: e.target.value }))} /></div>
                 <div className="frow">
                   <div className="field"><label>수량</label><input placeholder="6" inputMode="numeric" value={stockForm.qty} onChange={(e) => setStockForm((f) => ({ ...f, qty: e.target.value }))} /></div>
-                  <div className="field"><label>평균 매수가</label><input placeholder="156,600" inputMode="numeric" value={stockForm.price} onChange={(e) => setStockForm((f) => ({ ...f, price: e.target.value }))} /></div>
+                  <div className="field"><label>평균 매수가 · 선택</label><input placeholder="비우면 현재가 자동" inputMode="numeric" value={stockForm.price} onChange={(e) => setStockForm((f) => ({ ...f, price: e.target.value }))} /></div>
                 </div>
-                <button className="add-btn" onClick={addStock}>+ 종목 추가</button>
+                <button className="add-btn" onClick={addStock} disabled={stockBusy}>{stockBusy ? "현재가 불러오는 중…" : "+ 종목 추가"}</button>
                 {stockList.length > 0 && (
                   <div className="added">
                     <div className="added-t">추가된 종목 · 합계 {stockUk}억</div>

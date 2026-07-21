@@ -2,6 +2,8 @@
 // 참조 UX: onehub-input-demo.html. 색상은 PWA data-theme 토큰(var(--color-*))만 사용.
 // 백엔드: /api/input/* 프록시 (RE 5002 / ENG 5001). 저장 즉시 보유목록 낙관적 갱신.
 import { useEffect, useRef, useState } from "react";
+import { StockForm } from "../shared/AssetForms";
+import { getStockHoldings } from "../../lib/stockHoldings";
 
 const won = (n) => Number(n || 0).toLocaleString("ko-KR");
 const eok = (m) => {
@@ -32,6 +34,9 @@ export default function InputSheet({ trader = "A" }) {
 
   // 보유목록(탭별) — 낙관적 갱신 대상
   const [hold, setHold] = useState({ stock: [], etf: [], re: [] });
+  const [stManualTick, setStManualTick] = useState(0); // 직접입력 주식 저장 후 목록 재조회
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   // ── 주식/ETF 선택 상태 ──
   const [acQ, setAcQ] = useState("");
@@ -193,7 +198,13 @@ export default function InputSheet({ trader = "A" }) {
   };
 
   const isRE = tab === "re";
-  const holdList = hold[tab] || [];
+  // 주식탭: KIS 불러온 보유 + 직접입력(비KIS) 보유 병합 표시. (stManualTick으로 갱신)
+  // stManualTick: 저장 후 setState로 재렌더 → getStockHoldings가 최신 localStorage를 다시 읽는다.
+  const _stTick = stManualTick; // eslint: 갱신 트리거 의존성 명시
+  const manualStocks = (mounted && tab === "stock" && _stTick >= 0)
+    ? getStockHoldings(trader).map((h) => ({ name: h.name, qty: h.shares, avg_price: h.avgPrice, _manual: true }))
+    : [];
+  const holdList = tab === "stock" ? [...(hold.stock || []), ...manualStocks] : (hold[tab] || []);
 
   return (
     <div className="sheet">
@@ -237,11 +248,11 @@ export default function InputSheet({ trader = "A" }) {
       <div className="card">
         <h3>{isRE ? "내 단지 등록" : tab === "etf" ? "ETF 추가" : "종목 추가"}</h3>
 
-        {!isRE && (
+        {tab === "etf" && (
           <>
             <div className="field ac">
-              <label>{tab === "etf" ? "티커 · 이름" : "종목번호 · 이름"}</label>
-              <input value={sel ? `${sel.name} (${sel.code})` : acQ} placeholder={tab === "etf" ? "예: SMH · QQQM" : "예: 032800 · 삼성"}
+              <label>티커 · 이름</label>
+              <input value={sel ? `${sel.name} (${sel.code})` : acQ} placeholder="예: SMH · QQQM"
                 onChange={(e) => { setSel(null); setAcQ(e.target.value); }} autoComplete="off" />
               {acMenu.length > 0 && !sel && (
                 <div className="menu">
@@ -255,13 +266,21 @@ export default function InputSheet({ trader = "A" }) {
             </div>
             <div className="two">
               <div className="field"><label>수량</label><input type="number" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" /></div>
-              <div className="field"><label>{tab === "etf" ? "평단가 (USD)" : "평단가 (원)"}</label><input type="number" value={avg} onChange={(e) => setAvg(e.target.value)} placeholder="0" /></div>
+              <div className="field"><label>평단가 (USD)</label><input type="number" value={avg} onChange={(e) => setAvg(e.target.value)} placeholder="0" /></div>
             </div>
             <div className="btnrow">
-              <button className="btn ghost" onClick={kisImport}>KIS에서 불러오기</button>
               <button className="btn" onClick={addQuote}>추가</button>
             </div>
-            {tab === "stock" && <div className="note">주식 보유는 KIS 잔고와 동기화됩니다(수동 추가 대신 불러오기).</div>}
+          </>
+        )}
+
+        {tab === "stock" && (
+          <>
+            <div className="btnrow"><button className="btn ghost" onClick={kisImport}>KIS에서 불러오기</button></div>
+            <div className="note">KIS 연동 계좌는 위 버튼으로 동기화하고, 그 외 증권사(미래에셋·삼성 등) 보유는 아래에서 직접 추가하세요. <b>평단가를 비우면 현재가로 자동 계산</b>됩니다(국내·해외).</div>
+            <div style={{ marginTop: 12 }}>
+              <StockForm onSaved={() => { flash("직접입력 주식 추가됨"); setStManualTick((t) => t + 1); }} />
+            </div>
           </>
         )}
 
