@@ -28,6 +28,18 @@ except Exception:
     def call_and_log(_client, _feature, **kwargs):
         return _client.messages.create(**kwargs)
 
+# ── ThinkingBlock 안전 파싱 — 모듈이 없어도 폴백으로 동작 ──
+try:
+    from claude_text import extract_text
+except Exception:
+    def extract_text(message):
+        parts = []
+        for block in getattr(message, "content", None) or []:
+            t = getattr(block, "text", None)
+            if t:
+                parts.append(t)
+        return "".join(parts)
+
 JOURNAL_DIR = Path.home() / "one_hub_journals"
 OUTPUT_DIR  = Path("/home/ubuntu/one-hub-publish/content/daily")
 DB_PATH     = Path.home() / "trading.db"
@@ -144,7 +156,7 @@ Regime: {db['regime']} | Heat: {db['heat_score']}/100 ({db['heat_grade']})
             max_tokens=150,
             messages=[{"role": "user", "content": prompt}]
         )
-        raw = message.content[0].text.strip().strip('"\'「」')
+        raw = extract_text(message).strip().strip('"\'「」')
         if len(raw) > 100:
             raw = raw[:97] + "..."
         print(f"[INSIGHT] {raw}")

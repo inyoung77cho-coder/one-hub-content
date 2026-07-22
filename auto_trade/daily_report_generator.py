@@ -22,6 +22,18 @@ except Exception:
     def call_and_log(_client, _feature, **kwargs):
         return _client.messages.create(**kwargs)
 
+# ── ThinkingBlock 안전 파싱 — 모듈이 없어도 폴백으로 동작 ──
+try:
+    from claude_text import extract_text
+except Exception:
+    def extract_text(message):
+        parts = []
+        for block in getattr(message, "content", None) or []:
+            t = getattr(block, "text", None)
+            if t:
+                parts.append(t)
+        return "".join(parts)
+
 
 
 JOURNAL_DIR = Path.home() / "one_hub_journals"
@@ -161,7 +173,7 @@ def _generate_insight(target_date, db, sections):
 
         msg = call_and_log(client, "daily_report", model=MODEL_REPORT, max_tokens=150, messages=[{"role":"user","content":prompt}])
 
-        raw = msg.content[0].text.strip().strip('"\'「」')
+        raw = extract_text(msg).strip().strip('"\'「」')
 
         return raw[:97]+"..." if len(raw)>100 else raw
 

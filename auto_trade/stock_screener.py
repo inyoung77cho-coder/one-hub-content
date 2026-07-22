@@ -38,6 +38,18 @@ except Exception:
     def call_and_log(_client, _feature, **kwargs):
         return _client.messages.create(**kwargs)
 
+# ── ThinkingBlock 안전 파싱 — 모듈이 없어도 폴백으로 동작 ──
+try:
+    from claude_text import extract_text
+except Exception:
+    def extract_text(message):
+        parts = []
+        for block in getattr(message, "content", None) or []:
+            t = getattr(block, "text", None)
+            if t:
+                parts.append(t)
+        return "".join(parts)
+
 STOCK_POOL = [
     # ── 기존 종목 ─────────────────────────────────────────
     {"code": "005930", "name": "Samsung", "name_kr": "삼성전자",        "sector": "Semiconductor"},
@@ -406,7 +418,7 @@ SCORE5: integer 0-100
             max_tokens=600,
             messages=[{"role": "user", "content": prompt}]
         )
-        raw_ai = message.content[0].text
+        raw_ai = extract_text(message)
         print("AI screening done")
         return parse_screening(raw_ai, candidates)
     except Exception as e:

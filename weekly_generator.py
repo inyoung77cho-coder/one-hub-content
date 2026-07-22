@@ -13,6 +13,18 @@ except Exception:
     def call_and_log(_client, _feature, **kwargs):
         return _client.messages.create(**kwargs)
 
+# ── ThinkingBlock 안전 파싱 — 모듈이 없어도 폴백으로 동작 ──
+try:
+    from claude_text import extract_text
+except Exception:
+    def extract_text(message):
+        parts = []
+        for block in getattr(message, "content", None) or []:
+            t = getattr(block, "text", None)
+            if t:
+                parts.append(t)
+        return "".join(parts)
+
 PUBLISH_DIR = Path(__file__).parent
 DAILY_DIR   = PUBLISH_DIR / "content" / "daily"
 WEEKLY_DIR  = PUBLISH_DIR / "content" / "weekly"
@@ -127,7 +139,7 @@ def generate_ai_review(days, stats, week_str):
             max_tokens=400,
             messages=[{"role": "user", "content": prompt}]
         )
-        return msg.content[0].text.strip()
+        return extract_text(msg).strip()
     except Exception as e:
         print(f"[AI] {e}")
         return f"{stats['dominant_regime']} 장세에서 총 {stats['total_trades']}건 매매, {stats['total_blocks']}건 차단. 평균 Heat {stats['avg_heat']}/100."
@@ -142,7 +154,7 @@ def generate_market_outlook(stats, week_str):
             max_tokens=200,
             messages=[{"role": "user", "content": prompt}]
         )
-        return msg.content[0].text.strip()
+        return extract_text(msg).strip()
     except Exception as e:
         print(f"[AI Outlook] {e}")
         return "다음 주 시장 방향은 Heat Score와 Regime 변화를 모니터링하며 판단합니다."
