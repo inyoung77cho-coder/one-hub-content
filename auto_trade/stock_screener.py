@@ -30,6 +30,14 @@ from strategy import calc_gap_filter, calc_sector_bonus
 load_dotenv()
 client = anthropic.Anthropic(api_key=os.getenv("CLAUDE_API_KEY"))
 
+# ── API 비용 계측 (1층) — 모듈이 없어도 기존 동작 유지 ──────
+try:
+    from claude_usage import call_and_log, MODEL_SCREENER
+except Exception:
+    MODEL_SCREENER = "claude-opus-4-5"
+    def call_and_log(_client, _feature, **kwargs):
+        return _client.messages.create(**kwargs)
+
 STOCK_POOL = [
     # ── 기존 종목 ─────────────────────────────────────────
     {"code": "005930", "name": "Samsung", "name_kr": "삼성전자",        "sector": "Semiconductor"},
@@ -392,8 +400,9 @@ SCORE5: integer 0-100
 """
 
     try:
-        message = client.messages.create(
-            model="claude-opus-4-5",
+        message = call_and_log(
+            client, "stock_screener",
+            model=MODEL_SCREENER,
             max_tokens=600,
             messages=[{"role": "user", "content": prompt}]
         )

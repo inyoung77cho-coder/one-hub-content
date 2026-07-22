@@ -20,6 +20,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# ── API 비용 계측 (1층) — 모듈이 없어도 기존 동작 유지 ──────
+try:
+    from claude_usage import call_and_log, MODEL_REPORT
+except Exception:
+    MODEL_REPORT = "claude-sonnet-4-6"
+    def call_and_log(_client, _feature, **kwargs):
+        return _client.messages.create(**kwargs)
+
 JOURNAL_DIR = Path.home() / "one_hub_journals"
 OUTPUT_DIR  = Path("/home/ubuntu/one-hub-publish/content/daily")
 DB_PATH     = Path.home() / "trading.db"
@@ -130,8 +138,9 @@ Regime: {db['regime']} | Heat: {db['heat_score']}/100 ({db['heat_grade']})
 
     try:
         client  = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model="claude-sonnet-4-6",
+        message = call_and_log(
+            client, "daily_report",
+            model=MODEL_REPORT,
             max_tokens=150,
             messages=[{"role": "user", "content": prompt}]
         )

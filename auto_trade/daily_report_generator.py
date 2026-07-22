@@ -14,6 +14,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# ── API 비용 계측 (1층) — 모듈이 없어도 기존 동작 유지 ──────
+try:
+    from claude_usage import call_and_log, MODEL_REPORT
+except Exception:
+    MODEL_REPORT = "claude-sonnet-4-6"
+    def call_and_log(_client, _feature, **kwargs):
+        return _client.messages.create(**kwargs)
+
 
 
 JOURNAL_DIR = Path.home() / "one_hub_journals"
@@ -151,7 +159,7 @@ def _generate_insight(target_date, db, sections):
 
         client = anthropic.Anthropic(api_key=api_key)
 
-        msg = client.messages.create(model="claude-sonnet-4-6", max_tokens=150, messages=[{"role":"user","content":prompt}])
+        msg = call_and_log(client, "daily_report", model=MODEL_REPORT, max_tokens=150, messages=[{"role":"user","content":prompt}])
 
         raw = msg.content[0].text.strip().strip('"\'「」')
 
