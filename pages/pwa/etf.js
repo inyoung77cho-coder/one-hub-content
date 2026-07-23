@@ -7,6 +7,7 @@ import BottomNav from "../../components/BottomNav";
 import AppHeader from "../../components/AppHeader";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS } from "../../lib/etfHoldings";
+import { classifyEtf } from "../../lib/etfClassify";
 import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress, pensionCreditLimitCombined } from "../../lib/taxRules";
 import Term from "../../components/Term";
 import REBAL_PRESETS from "../../data/rebalance_presets.json";
@@ -904,7 +905,21 @@ export default function EtfDashboard() {
                       return (
                         <div className="me-row" key={h.id}>
                           <div className="me-l">
-                            <span className="me-tk">{h.ticker}{h.broker ? <span className="me-broker">{h.broker}</span> : null}</span>
+                            <span className="me-tk">
+                              {h.ticker}{h.broker ? <span className="me-broker">{h.broker}</span> : null}
+                              {(() => {
+                                // [투자지역] 상장시장(market)과 별개로, 실제 투자대상 지역을 표기.
+                                //   국내상장 해외추종(예: TIGER 미국나스닥)이 '국내'로 보이던 문제 해소.
+                                const c = classifyEtf(h.ticker);
+                                if (!c) return null;
+                                const overseas = c.r === "해외";
+                                return (
+                                  <span className={`me-region ${overseas ? "os" : "dm"}`}>
+                                    {overseas ? "🌏" : "🇰🇷"} {c.a}
+                                  </span>
+                                );
+                              })()}
+                            </span>
                             <span className="me-qty">{h.shares}주 · 평단 {h.avgCcy === "USD" ? "$" : ""}{h.avgPrice.toLocaleString()}{h.avgCcy === "KRW" ? "원" : ""}</span>
                           </div>
                           <div className="me-r">
@@ -916,7 +931,7 @@ export default function EtfDashboard() {
                           </div>
                           <div className="me-act">
                             <button className="me-edit" onClick={() => editHolding(h)} aria-label={`${h.ticker} 수정`}>수정</button>
-                            <button className="me-del" onClick={() => delHolding(h)} aria-label={`${h.ticker} 삭제`}>✕</button>
+                            <button className="me-del" onClick={() => delHolding(h)} aria-label={`${h.ticker} 삭제`}>삭제</button>
                           </div>
                         </div>
                       );
@@ -1231,6 +1246,9 @@ export default function EtfDashboard() {
         .me-l { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
         .me-tk { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); display: inline-flex; align-items: center; gap: 6px; }
         .me-broker { font-size: 0.6rem; font-weight: 700; color: var(--color-ink-2); background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 7px; }
+        .me-region { font-size: 0.6rem; font-weight: 800; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+        .me-region.os { color: #2F6BFF; background: #EAF1FF; border: 1px solid #CFE0FF; }
+        .me-region.dm { color: #0E9E6A; background: #E7FAF2; border: 1px solid #C7EFDD; }
         .me-qty { font-size: 0.68rem; color: var(--color-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .me-r { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
         .me-px { font-size: 0.82rem; font-weight: 700; color: var(--color-ink); font-family: ui-monospace, monospace; }
@@ -1241,7 +1259,7 @@ export default function EtfDashboard() {
         /* [S18 D-1] 보유 편집 — 수정·삭제를 한 쌍으로 */
         .me-act { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
         .me-edit { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 7px; padding: 4px 8px; font-size: 0.68rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
-        .me-del { flex-shrink: 0; width: 24px; height: 24px; border: none; background: var(--color-card); border-radius: 7px; color: var(--color-ink-3); font-size: 0.8rem; cursor: pointer; }
+        .me-del { flex-shrink: 0; border: 1px solid var(--color-danger, #E5484D); background: var(--color-card); color: var(--color-danger, #E5484D); border-radius: 7px; padding: 4px 8px; font-size: 0.68rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .me-empty { margin-top: 12px; font-size: 0.74rem; color: var(--color-ink-2); line-height: 1.6; background: var(--color-card-soft); border-radius: 11px; padding: 12px 14px; word-break: keep-all; }
         .me-empty b { color: var(--color-ink); font-weight: 700; }
         /* [S18 D-1] 매수·매도 기록 폼 */
