@@ -27,22 +27,37 @@ function GatheredSection({ items = [], notice = '' }) {
         <span className="gt-sub">{items.length}건 · 미검증</span>
       </div>
       <div className="gt-grid">
-        {items.map((it) => (
-          <div className="gt-card" key={it.id}>
-            <div className="gt-badges">
-              <span className="gt-flag">🟡 제보 · 미검증</span>
-              {it.info_type && <span className="gt-type">{it.info_type}</span>}
+        {items.map((it) => {
+          // is_news: 호가가 없는 시황·정책·대출 정보 → 요약을 본문으로 크게, 호가/평형 줄 숨김.
+          // 그 외(A): 단지·평형·호가 중심의 시세 카드.
+          const isNews = it.is_news ?? !it.price;
+          const price = it.price_display || it.price;
+          return (
+            <div className={`gt-card${isNews ? ' gt-news' : ''}`} key={it.id}>
+              <div className="gt-badges">
+                <span className="gt-flag">🟡 제보 · 미검증</span>
+                {it.info_type && <span className="gt-type">{it.info_type}</span>}
+              </div>
+              {isNews ? (
+                <>
+                  {it.danji && <div className="gt-newshead">{it.danji}</div>}
+                  {it.summary && <p className="gt-newsbody">{it.summary}</p>}
+                </>
+              ) : (
+                <>
+                  <div className="gt-line">
+                    {it.danji || '단지 미상'}
+                    {it.pyeong ? ` ${it.pyeong}㎡` : ''}
+                  </div>
+                  {price && <div className="gt-price">호가 {price}</div>}
+                  {it.summary && <p className="gt-summary">{it.summary}</p>}
+                </>
+              )}
+              <div className="gt-date">{String(it.posted_at || it.gathered_at || '').slice(0, 10)} 수집</div>
+              <div className="gt-disclaimer">※ 국토부 실거래로 확인되지 않은 참고용입니다</div>
             </div>
-            <div className="gt-line">
-              {it.danji || '단지 미상'}
-              {it.pyeong ? ` ${it.pyeong}㎡` : ''}
-            </div>
-            {it.price && <div className="gt-price">호가 {it.price}</div>}
-            {it.summary && <p className="gt-summary">{it.summary}</p>}
-            <div className="gt-date">{String(it.posted_at || it.gathered_at || '').slice(0, 10)} 수집</div>
-            <div className="gt-disclaimer">※ 국토부 실거래로 확인되지 않은 참고용입니다</div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       {notice && <p className="gt-notice">{notice}</p>}
 
@@ -59,6 +74,9 @@ function GatheredSection({ items = [], notice = '' }) {
         .gt-line { font-size: 15.5px; font-weight: 800; color: #12213B; letter-spacing: -.2px; margin-bottom: 4px; }
         .gt-price { font-size: 17px; font-weight: 800; color: #B45309; letter-spacing: -.3px; margin-bottom: 8px; }
         .gt-summary { font-size: 13px; color: #475569; line-height: 1.6; margin: 0 0 10px; }
+        .gt-news { background: #FBFCFF; border-color: #C9D8EF; }
+        .gt-newshead { font-size: 13px; font-weight: 800; color: #3A5C97; margin-bottom: 6px; }
+        .gt-newsbody { font-size: 14px; color: #26364F; line-height: 1.62; font-weight: 600; margin: 0 0 10px; letter-spacing: -.2px; }
         .gt-date { font-size: 11.5px; color: #94A3B8; font-family: 'Space Mono', monospace; }
         .gt-disclaimer { font-size: 11px; color: #B45309; margin-top: 8px; line-height: 1.5; }
         .gt-notice { font-size: 12px; color: #94A3B8; line-height: 1.7; margin-top: 14px; }
