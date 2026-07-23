@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import { getTrader, useTrader } from "../../lib/trader";
 import { getLedger } from "../../lib/ledger";
+import { recordSnapshot, getDelta, getHistory } from "../../lib/assetHistory";
 import { verifyStockAvg, updateStockAvg } from "../../lib/stockHoldings";
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
@@ -14,6 +15,31 @@ import QuickAddSheet from "../../components/shared/QuickAddSheet";
 
 const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || null);
 const uk = (v) => (v == null ? "-" : `${Number(v).toFixed(2)}억`);
+
+// 변화액 표기 헬퍼(억). 부호·색 구분.
+const dvUk = (v) => (v == null ? null : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}억`);
+const dCls = (v) => (v == null ? "" : v > 0.004 ? "up" : v < -0.004 ? "down" : "flat");
+
+// 총자산 시계열 미니 스파크라인(SVG). 최근 데이터가 오른쪽. 값이 2개 미만이면 렌더 안 함.
+function Sparkline({ data }) {
+  const pts = (data || []).filter((v) => v != null);
+  if (pts.length < 2) return null;
+  const W = 120, H = 30, min = Math.min(...pts), max = Math.max(...pts);
+  const span = max - min || 1;
+  const coords = pts.map((v, i) => {
+    const x = (i / (pts.length - 1)) * W;
+    const y = H - ((v - min) / span) * (H - 4) - 2;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const rising = pts[pts.length - 1] >= pts[0];
+  const color = rising ? "var(--color-success, #0E9E6A)" : "var(--color-danger, #E5484D)";
+  return (
+    <svg className="as-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
+      <polyline points={coords.join(" ")} fill="none" stroke={color} strokeWidth="1.6"
+        strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 // 자산군 메타(라벨·색·링크) — [순서변경] 주식 hooking → 부동산·주식 AI가 유료 전환점 → ETF → 현금
 const CLASSES = [
@@ -35,6 +61,8 @@ export default function AssetsMapPage() {
   const [simOpen, setSimOpen] = useState(false); // [N9] 처방 시뮬 — 같은 카드 안에서 결과를 보여준다
   const [fixId, setFixId] = useState(null);      // [N6] 평단 수정 중인 종목 id
   const [fixVal, setFixVal] = useState("");      // [N6] 사용자가 직접 입력하는 평단(앱이 추정하지 않는다)
+  const [delta, setDelta] = useState(null);      // [추세] 전일 대비 총자산·자산별 변화(브라우저 스냅샷 기반)
+  const [hist, setHist] = useState([]);          // [추세] 총자산 일별 스냅샷 시계열
 
   const load = useCallback(() => {
     const tr = getTrader();
@@ -45,6 +73,12 @@ export default function AssetsMapPage() {
     ]).then(([a, d]) => {
       setAssets(a); setDash(d); setAt(new Date());
       setStatus(a && a.ok ? "ok" : "error");
+      // [추세] 총자산이 유효할 때만 오늘치 스냅샷을 적립하고, 전일 대비/시계열을 읽는다.
+      if (a && a.ok && a.total_uk != null) {
+        recordSnapshot(tr, a);
+        setDelta(getDelta(tr));
+        setHist(getHistory(tr));
+      }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assets]);
@@ -156,7 +190,20 @@ export default function AssetsMapPage() {
         {/* ── 1층 ── */}
         <section className="card as-hero">
           <p className="as-headline">{headline}</p>
-          <div className="as-total"><span>총자산</span><b>{uk(total)}</b></div>
+          <div className="as-total">
+            <span>총자산</span>
+            <b>{uk(total)}</b>
+            {hist.length >= 2 && <Sparkline data={hist.map((h) => h.total)} />}
+          </div>
+          {/* [추세] 전일 대비 총자산 변화. 데이터가 하루뿐이면 '기록 시작' 안내. */}
+          {delta && delta.total != null ? (
+            <div className={`as-delta ${dCls(delta.total)}`}>
+              <span className="as-dchip">{delta.total >= 0 ? "▲" : "▼"} {dvUk(delta.total)}</span>
+              <span className="as-dlabel">{delta.prevDate} 대비</span>
+            </div>
+          ) : (
+            <p className="as-dnew">📈 오늘부터 총자산 추이를 기록합니다 — 내일부터 전일 대비 변화가 표시됩니다.</p>
+          )}
           {/* [N1] 총자산이 불완전하면 숫자와 같은 카드에서 말한다. 다른 화면으로 미루지 않는다. */}
           {(assets?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && (
             <p className="as-incomplete">⚠ 증권사 연동 자산을 불러오지 못했습니다 — 이 총자산은 <b>실제보다 적습니다</b>. 잠시 후 다시 시도해 주세요.</p>
@@ -191,7 +238,16 @@ export default function AssetsMapPage() {
                 <button className="as-row" key={r.k} onClick={() => (r.href ? router.push(r.href) : setQaOpen(true))}>
                   <span className="as-dotc" style={{ background: r.color }} />
                   <span className="as-rl">{r.label}</span>
-                  <span className="as-rv">{r.val != null ? uk(r.val) : <em>미입력</em>}</span>
+                  <span className="as-rv">
+                    {r.val != null ? uk(r.val) : <em>미입력</em>}
+                    {(() => {
+                      // CLASSES 키(stock/realestate/etf/cash) → delta 키(stock/realty/etf/cash)
+                      const dk = r.k === "realestate" ? "realty" : r.k;
+                      const dv = delta ? delta[dk] : null;
+                      return dv != null && Math.abs(dv) >= 0.005
+                        ? <span className={`as-rd ${dCls(dv)}`}>{dvUk(dv)}</span> : null;
+                    })()}
+                  </span>
                   <span className="as-rp">{r.val != null ? `${pctOf(r.val).toFixed(1)}%` : ""}</span>
                   <span className="as-arrow sm">→</span>
                 </button>
@@ -316,9 +372,21 @@ export default function AssetsMapPage() {
         .as-fresh { margin-left: auto; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .as-hero .as-headline { font-size: 0.94rem; line-height: 1.55; font-weight: 700; color: var(--color-ink); margin: 0 0 12px; word-break: keep-all; }
-        .as-total { display: flex; align-items: baseline; justify-content: space-between; }
+        .as-total { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
         .as-total span { font-size: 0.78rem; font-weight: 600; color: var(--color-ink-3); }
-        .as-total b { font-size: 1.5rem; font-weight: 800; color: var(--color-ink); }
+        .as-total b { font-size: 1.5rem; font-weight: 800; color: var(--color-ink); margin-left: auto; }
+        .as-spark { width: 88px; height: 26px; flex: 0 0 auto; align-self: center; }
+        .as-delta { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+        .as-delta .as-dchip { font-size: 0.84rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .as-delta .as-dlabel { font-size: 0.7rem; color: var(--color-ink-3); font-weight: 600; }
+        .as-delta.up .as-dchip { color: var(--color-success, #0E9E6A); }
+        .as-delta.down .as-dchip { color: var(--color-danger, #E5484D); }
+        .as-delta.flat .as-dchip { color: var(--color-ink-3); }
+        .as-dnew { font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; margin: 6px 0 0; word-break: keep-all; }
+        .as-rd { font-size: 0.68rem; font-weight: 700; font-variant-numeric: tabular-nums; margin-left: 6px; }
+        .as-rd.up { color: var(--color-success, #0E9E6A); }
+        .as-rd.down { color: var(--color-danger, #E5484D); }
+        .as-rd.flat { color: var(--color-ink-3); }
         .as-actions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
         .as-act { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 56px; padding: 12px 14px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; box-shadow: var(--shadow-card); cursor: pointer; font-family: var(--font-sans); text-align: left; }
         .as-act-l { display: flex; flex-direction: column; gap: 3px; min-width: 0; }

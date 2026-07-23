@@ -9,6 +9,7 @@ import { recordDecision, matureLedger, computeShowdown, getTodayDecision, reconc
 import { getSeed, setSeed, resetSeed, SEED_OPTIONS, computeWallets, streakNarrative, wonG } from '../../lib/gameWallet';
 // [N1] 자산 원장. lib/verdictLedger 의 getLedger(판단 기록)와 이름이 겹쳐 별칭으로 구분한다.
 import { getLedger as getAssetLedger } from '../../lib/ledger';
+import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta } from '../../lib/assetHistory';
 import { dedupBy } from '../../lib/useDedup';
 import { useTabState } from '../../lib/pwa/useTabState';
 import { samplePolicy, verdictColor as sampleVerdictColor, canAutoML, ML_MIN_SAMPLE } from '../../lib/sampleSize';
@@ -276,6 +277,7 @@ export default function PWADashboard({ latestReport }) {
   const [opNotes, setOpNotes] = useState([]); // [알림카드] 운영자 신고가(spot_price) — 내 단지
   const [notiOpen, setNotiOpen] = useState(null); // [알림카드] 펼친 알림 인덱스(상세 본문)
   const [assetSum, setAssetSum] = useState(null); // [v11 1-B] 총자산 통합 집계(주식+ETF+부동산)
+  const [assetDelta, setAssetDelta] = useState(null); // [추세] 전일 대비 자산별 변화(브라우저 스냅샷)
   const [showAssetDetail, setShowAssetDetail] = useState(false); // [팝업] 총자산 클릭 → 상세 breakdown
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
   const [reFeed, setReFeed] = useState(null); // [브리핑] 부동산 최근 실거래(신고가) 피드
@@ -515,7 +517,14 @@ export default function PWADashboard({ latestReport }) {
     // [N1] 총자산 = 단일 원장(lib/ledger). ETF 실시간 평가·온보딩 미러링은 원장이 내부에서 처리하므로
     //   여기서 다시 조정하지 않는다(과거 이중 조정·미러 오염의 원인).
     getAssetLedger(trader)
-      .then(a => setAssetSum(a?.total_uk != null ? a : null))
+      .then(a => {
+        if (a?.total_uk != null) {
+          setAssetSum(a);
+          // [추세] 홈은 '총자산 소유 페이지' — 오늘치 스냅샷을 여기서 정본으로 적립.
+          recordAssetSnapshot(trader, a);
+          setAssetDelta(getAssetDelta(trader));
+        } else setAssetSum(null);
+      })
       .catch(() => setAssetSum(null));
     fetch(`/api/realestate/v2/ai-summary?trader_id=${trader}`)
       .then(r => r.json())
@@ -1247,20 +1256,26 @@ export default function PWADashboard({ latestReport }) {
                 return (
                   <>
                   <HomeAccordion id="assets" title="💰 자산 구성" summary={`총 ${totalUk != null ? totalUk + '억' : '—'}${rePctA != null ? ` · 부동산 ${rePctA}%` : ''}`}>
-                    <div className="v10-total" onClick={() => setShowAssetDetail(true)} style={{ cursor: 'pointer' }}><span className="v10-total-lbl">총자산</span><span className="v10-total-amt mono">{totalUk != null ? `${totalUk}억` : '—'}</span><span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--color-muted)' }}>상세 ▸</span></div>
+                    <div className="v10-total" onClick={() => setShowAssetDetail(true)} style={{ cursor: 'pointer' }}><span className="v10-total-lbl">총자산</span><span className="v10-total-amt mono">{totalUk != null ? `${totalUk}억` : '—'}</span>{assetDelta && assetDelta.total != null && Math.abs(assetDelta.total) >= 0.005 && (<span className={`v10-tdelta ${assetDelta.total > 0 ? 'up' : assetDelta.total < 0 ? 'down' : 'flat'}`}>{assetDelta.total >= 0 ? '▲' : '▼'} {Math.abs(assetDelta.total).toFixed(2)}억</span>)}<span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--color-muted)' }}>상세 ▸</span></div>
                     {[
-                      ['주식', 'var(--color-primary)', assetSum?.breakdown?.stock_uk, '/pwa?tab=recommend'],
-                      ['ETF', 'var(--color-success)', assetSum?.breakdown?.etf_uk, '/pwa/etf'],
-                      ['부동산', 'var(--color-ink-3)', assetSum?.breakdown?.realestate_uk, '/pwa/realestate'],
-                      ['현금', 'var(--color-warning)', cashUk, '/pwa/onboarding'],
-                    ].map(([label, color, val, href]) => (
+                      ['주식', 'var(--color-primary)', assetSum?.breakdown?.stock_uk, '/pwa?tab=recommend', 'stock'],
+                      ['ETF', 'var(--color-success)', assetSum?.breakdown?.etf_uk, '/pwa/etf', 'etf'],
+                      ['부동산', 'var(--color-ink-3)', assetSum?.breakdown?.realestate_uk, '/pwa/realestate', 'realty'],
+                      ['현금', 'var(--color-warning)', cashUk, '/pwa/onboarding', 'cash'],
+                    ].map(([label, color, val, href, dkey]) => {
+                      // [추세] 전일 대비 변화액(억). 0.005억 미만은 노이즈로 숨김.
+                      const dv = assetDelta ? assetDelta[dkey] : null;
+                      const dShow = dv != null && Math.abs(dv) >= 0.005;
+                      const dCls = dv > 0 ? 'up' : dv < 0 ? 'down' : 'flat';
+                      return (
                       <div className="v10-arow" key={label}>
                         <span className="v10-aname"><i className="v10-adot" style={{ background: color }} />{label}</span>
                         {val != null
-                          ? <span className="v10-aval mono">{val}억</span>
+                          ? <span className="v10-aval mono">{val}억{dShow && <em className={`v10-adelta ${dCls}`}>{dv >= 0 ? '+' : '−'}{Math.abs(dv).toFixed(2)}</em>}</span>
                           : <span className="v10-miss"><span className="v10-miss-tag">미입력</span><button className="v10-miss-btn" onClick={() => { window.location.href = href; }}>입력하기 →</button></span>}
                       </div>
-                    ))}
+                      );
+                    })}
                     {/* [S2 IA] AI자산(배분 정밀 진단)은 대시보드에서 진입 — 상시 노출 링크 */}
                     <button className="v10-diag-link" onClick={() => { window.location.href = '/pwa/ai-advisor'; }}>
                       🩺 AI 배분 정밀 진단 · 포트폴리오 주치의 <span>→</span>
@@ -3427,6 +3442,14 @@ export default function PWADashboard({ latestReport }) {
         .v10-total { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
         .v10-total-lbl { font-size: 13px; color: var(--color-ink-2); font-weight: 600; }
         .v10-total-amt { font-size: 26px; font-weight: 800; letter-spacing: -.5px; color: var(--color-ink); }
+        .v10-tdelta { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .v10-tdelta.up { color: var(--color-success, #0E9E6A); }
+        .v10-tdelta.down { color: var(--color-danger, #E5484D); }
+        .v10-tdelta.flat { color: var(--color-muted); }
+        .v10-adelta { font-style: normal; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; margin-left: 6px; }
+        .v10-adelta.up { color: var(--color-success, #0E9E6A); }
+        .v10-adelta.down { color: var(--color-danger, #E5484D); }
+        .v10-adelta.flat { color: var(--color-muted); }
         .v10-diag-link { width: 100%; margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 6px; background: var(--color-primary-soft); color: var(--color-primary); border: none; border-radius: 11px; padding: 11px 0; font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: var(--font-body); }
         .v10-diag-link span { font-weight: 800; }
         .v10-arow { display: flex; align-items: center; justify-content: space-between; padding: 11px 0; border-top: 1px solid var(--color-line); }
