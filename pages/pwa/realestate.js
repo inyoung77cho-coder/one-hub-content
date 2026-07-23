@@ -6,6 +6,7 @@ import AppHeader from "../../components/AppHeader";
 import { dedupBy } from "../../lib/useDedup";
 import { ReForm } from "../../components/shared/AssetForms";
 import Term from "../../components/Term";
+import ReportTeaser from "../../components/ReportTeaser";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -312,6 +313,9 @@ export default function RealEstateDashboard() {
           <div className="brief-lead">{err ? "데이터 로드 오류" : "불러오는 중…"}</div>
         )}
       </section>
+
+      {/* 카톡방 수집정보 종합 리포트 → board 유도 (미검증 참고용) */}
+      <ReportTeaser />
 
       {/* [§3-7 피드백15] #1 결론 한 줄 — 국면 + 저평가 1위(위계 확립) */}
       {brief && !brief.error && (() => {
