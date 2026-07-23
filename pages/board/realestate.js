@@ -13,6 +13,68 @@ const DEAL_COLOR = {
   '분양': { bg: '#EEE9FF', fg: '#6A4CFF' },
 };
 
+// CA 엔진 종합 리포트 — 운영자가 승인 게시한 '지역별 동향' 초안.
+// 수집정보를 AI가 지역별로 묶어 요약·추세를 서술한 것. 역시 🟡 미검증 참고용.
+function ReportSection({ report }) {
+  if (!report || !report.body) return null;
+  const b = report.body;
+  const regions = Array.isArray(b.regions) ? b.regions : [];
+  const themes = Array.isArray(b.themes) ? b.themes : [];
+  return (
+    <section className="rp-wrap">
+      <div className="rp-badges">
+        <span className="rp-flag">🟡 종합 리포트 · 미검증</span>
+        <span className="rp-meta">{report.period_label} · {report.source_count}건 종합</span>
+      </div>
+      <h2 className="rp-title">{report.title}</h2>
+      {report.headline && <p className="rp-headline">{report.headline}</p>}
+
+      {regions.length > 0 && (
+        <div className="rp-regions">
+          {regions.map((r, i) => (
+            <div className="rp-region" key={i}>
+              <div className="rp-area">{r.area}</div>
+              <p className="rp-note">{r.note}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {themes.length > 0 && (
+        <div className="rp-themes">
+          <div className="rp-themes-h">이슈</div>
+          <ul>{themes.map((t, i) => <li key={i}>{t}</li>)}</ul>
+        </div>
+      )}
+
+      {b.overall && (
+        <div className="rp-overall"><div className="rp-themes-h">종합</div><p>{b.overall}</p></div>
+      )}
+
+      <p className="rp-legal">※ 카톡방 수집 호가 기준 · 국토부 실거래로 확인되지 않은 참고용입니다.</p>
+
+      <style jsx>{`
+        .rp-wrap { margin-top: 34px; background: #fff; border: 1px solid #E1E9F5; border-radius: 20px; padding: 26px 28px; box-shadow: 0 8px 28px rgba(31,63,120,.06); }
+        .rp-badges { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; margin-bottom: 10px; }
+        .rp-flag { font-size: 11px; font-weight: 800; padding: 4px 9px; border-radius: 7px; background: #FEF3C7; color: #B45309; }
+        .rp-meta { font-size: 12px; color: #94A3B8; font-weight: 700; }
+        .rp-title { font-size: 20px; font-weight: 800; color: #12213B; letter-spacing: -.4px; margin: 0 0 8px; }
+        .rp-headline { font-size: 14.5px; color: #2F4A73; line-height: 1.6; font-weight: 700; margin: 0 0 18px; }
+        .rp-regions { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px 20px; margin-bottom: 18px; }
+        .rp-area { font-size: 13.5px; font-weight: 800; color: #2F6BFF; margin-bottom: 4px; }
+        .rp-note { font-size: 13px; color: #46566E; line-height: 1.6; margin: 0; }
+        .rp-themes, .rp-overall { border-top: 1px solid #EEF2F8; padding-top: 14px; margin-top: 4px; }
+        .rp-themes-h { font-size: 12.5px; font-weight: 800; color: #64748B; margin-bottom: 8px; }
+        .rp-themes ul { margin: 0; padding-left: 18px; }
+        .rp-themes li { font-size: 13px; color: #46566E; line-height: 1.7; }
+        .rp-overall p { font-size: 13.5px; color: #26364F; line-height: 1.66; margin: 0; }
+        .rp-legal { font-size: 12px; color: #94A3B8; line-height: 1.6; margin: 18px 0 0; }
+        @media (max-width: 640px) { .rp-regions { grid-template-columns: 1fr; } }
+      `}</style>
+    </section>
+  );
+}
+
 // CA 엔진 수집정보 — 운영자가 카톡방에서 받아 승인 게시한 참고 정보.
 // 🟡 미검증: 국토부 실거래(ONE Score·시세)와 시각적으로 명확히 구분한다.
 // 데이터는 getStaticProps(ISR)에서 서버가 받아온다 — 클라이언트 fetch/하이드레이션에
@@ -86,7 +148,7 @@ function GatheredSection({ items = [], notice = '' }) {
   );
 }
 
-export default function RealEstateBoard({ listings, gathered, gatheredNotice }) {
+export default function RealEstateBoard({ listings, gathered, gatheredNotice, report }) {
   const canonical = `${SITE}/board/realestate`;
   const description = '협력업체가 등록하는 신규 부동산 매물·시세 정보 보드. ONE-HUB 홈에서 새 소식을 먼저 확인하세요.';
   return (
@@ -145,6 +207,7 @@ export default function RealEstateBoard({ listings, gathered, gatheredNotice }) 
             </div>
           )}
 
+          <ReportSection report={report} />
           <GatheredSection items={gathered} notice={gatheredNotice} />
 
           <p className="rb-legal">
@@ -198,15 +261,17 @@ export async function getStaticProps() {
   } catch (e) {
     listings = [];
   }
-  // CA 수집정보 — RE 엔진(:5002)에서 status='posted' 만 가져온다.
+  // CA 수집정보/리포트 — RE 엔진(:5002)에서 승인 게시분만 가져온다.
   // 실패해도 협력업체 매물 보드는 그대로 떠야 하므로 절대 throw 하지 않는다.
+  const base = process.env.RE_API_URL || 'http://54.180.54.132:5002';
+  const key = process.env.RE_ACCESS_KEY || '';
+  const auth = key ? `?key=${encodeURIComponent(key)}` : '';
+  const hdr = { headers: { 'X-API-Key': key } };
+
   let gathered = [];
   let gatheredNotice = '';
   try {
-    const base = process.env.RE_API_URL || 'http://54.180.54.132:5002';
-    const key = process.env.RE_ACCESS_KEY || '';
-    const r = await fetch(`${base}/api/board/gathered${key ? `?key=${encodeURIComponent(key)}` : ''}`,
-      { headers: { 'X-API-Key': key } });
+    const r = await fetch(`${base}/api/board/gathered${auth}`, hdr);
     if (r.ok) {
       const d = await r.json();
       gathered = Array.isArray(d.items) ? d.items : [];
@@ -216,6 +281,17 @@ export async function getStaticProps() {
     gathered = [];
   }
 
+  let report = null;
+  try {
+    const r = await fetch(`${base}/api/board/report${auth}`, hdr);
+    if (r.ok) {
+      const d = await r.json();
+      report = d.report || null;
+    }
+  } catch (e) {
+    report = null;
+  }
+
   // ISR: 운영자가 봇에서 [게시]를 누르면 최대 5분 뒤 보드에 반영된다.
-  return { props: { listings, gathered, gatheredNotice }, revalidate: 300 };
+  return { props: { listings, gathered, gatheredNotice, report }, revalidate: 300 };
 }
