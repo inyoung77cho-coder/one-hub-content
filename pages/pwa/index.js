@@ -2430,10 +2430,22 @@ export default function PWADashboard({ latestReport }) {
 
             {/* [A-6] AI vs 나 손익 비교 — 승률·총이익·총손실·순손익·손익비. AI는 가상 포지션(가정 명시). */}
             {(() => {
-              const w = computeShowdown(ledger, 7).ready ? computeShowdown(ledger, 7) : computeShowdown(ledger, 3);
+              const w7 = computeShowdown(ledger, 7);
+              const w = w7.ready ? w7 : computeShowdown(ledger, 3);
               if (!w.ready || !(w.details?.length)) return null;
+              const winDays = w7.ready ? 7 : 3;   // [항목1] 정산 창(거래일)
               const won = 10000; // 1건 100만원 → ret(%) × 10000 = 손익(원)
               const dts = w.details;
+              // [항목1] 대결 기준일 — 오늘(정산일) + 판단일 범위. 언제 기준인지 명시.
+              const _kstNow = new Date(Date.now() + 9*3600*1000);
+              const _todayStr = _kstNow.toISOString().slice(0, 10);
+              const _fmtMd = (ts) => { const d = new Date(ts + 9*3600*1000); return `${d.getUTCMonth()+1}/${d.getUTCDate()}`; };
+              const _dsTs = dts.map(d => d.ts).filter(Boolean);
+              const _dateRange = _dsTs.length
+                ? (_fmtMd(Math.min(..._dsTs)) === _fmtMd(Math.max(..._dsTs))
+                    ? _fmtMd(Math.max(..._dsTs))
+                    : `${_fmtMd(Math.min(..._dsTs))}~${_fmtMd(Math.max(..._dsTs))}`)
+                : null;
               const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
               const aiProfit = sum(dts.filter(d => d.ret > 0), d => d.ret * won); // AI=추천 전부 매수(항상 투자)
               const aiLoss = sum(dts.filter(d => d.ret < 0), d => -d.ret * won);
@@ -2453,6 +2465,7 @@ export default function PWADashboard({ latestReport }) {
               return (
                 <section className="pwa-card">
                   <span className="pwa-card-label">💰 AI vs 나 · 손익 비교</span>
+                  <div className="pl-asof">🗓 {_todayStr} 정산 · {winDays}거래일 전 판단{_dateRange ? ` (${_dateRange})` : ''} 기준 · 대결 {dts.length}건</div>
                   <div style={{ margin: '2px 0 4px' }}><SampleSizeBadge count={dts.length} label={pol.tier === 'learning' ? '학습 중' : undefined} /></div>
                   <div className="pl-grid">
                     <div className="pl-cell"><span className="pl-k">🙋 내 순손익 (실제 보유)</span><span className="pl-v" style={{ color: col(myNet) }}>{won0(myNet)}</span></div>
@@ -2479,27 +2492,35 @@ export default function PWADashboard({ latestReport }) {
             {trustSec === 'verify' && (<>
 
             {/* [자기검증] 오늘의 AI 판단 + 전일 대비 변화 — 매일 무엇이 달라졌는지 한눈에 */}
-            {aiDaily && aiDaily.today_date && (() => {
+            {aiDaily && (() => {
               const ACT_KO = { BUY: '매수', SELL: '매도', HOLD: '관망' };
               const chg = aiDaily.changes || [];
               const news = chg.filter(c => c.type === 'new');
               const acts = chg.filter(c => c.type === 'action');
               const gones = chg.filter(c => c.type === 'gone');
               const scores = chg.filter(c => c.type === 'score');
-              const buyCount = (aiDaily.today || []).filter(t => t.action === 'BUY').length;
+              // 실제 오늘(KST) vs ai_logs 최신 매수판단일 — 다르면 '요즘 관망'.
+              const realToday = new Date(Date.now() + 9*3600*1000).toISOString().slice(0, 10);
+              const analysisDate = aiDaily.today_date;
+              const isStale = !analysisDate || analysisDate !== realToday;
+              // 오늘의 실제 판단은 대시보드 data 에서(매수/차단). ai_logs 는 매수만 기록해 관망일엔 비어있다.
+              const todayBuys = (data?.recommend_stocks ?? []).filter(s => (s.score ?? 0) >= 70).length;
+              const todayBlocked = data?.market?.block_count ?? ((data?.today_blocked ?? data?.blocked_stocks ?? []).length || null);
               return (
                 <div className="aid-card">
                   <div className="aid-head">
-                    <span className="aid-date">🗓 {aiDaily.today_date} AI 판단</span>
-                    {aiDaily.prev_date && <span className="aid-prev">{aiDaily.prev_date} 대비</span>}
+                    <span className="aid-date">🗓 {realToday} AI 자기검증</span>
                   </div>
                   <div className="aid-sum">
-                    분석 <b>{(aiDaily.today || []).length}종목</b> · 매수의견 <b>{buyCount}</b> ·
-                    변화 <b>{chg.length}건</b>
+                    오늘 판단 — 매수 <b>{todayBuys}</b> · 차단 <b>{todayBlocked ?? '—'}</b>
+                    {todayBuys === 0 ? <span className="aid-watch"> · 관망</span> : null}
                   </div>
-                  {chg.length === 0 ? (
+                  {isStale ? (
+                    <p className="aid-stale">오늘은 신규 매수의견 없이 <b>관망</b> 중입니다{analysisDate ? <> — 최근 매수판단은 <b>{analysisDate}</b>이었습니다</> : ''}. 하락 국면에서는 매수보다 차단·관망이 정상입니다.{chg.length > 0 && analysisDate ? ` 아래는 ${analysisDate} 당시의 변화입니다.` : ''}</p>
+                  ) : (chg.length === 0 && (
                     <p className="aid-none">전일과 판단이 동일합니다 — 시장 흐름에 큰 변화가 없습니다.</p>
-                  ) : (
+                  ))}
+                  {chg.length > 0 && (
                     <ul className="aid-list">
                       {news.map((c, i) => (
                         <li key={`n${i}`}><span className="aid-tag new">신규</span> {c.stock} → <b>{ACT_KO[c.to] || c.to}</b>{c.score != null ? ` (${c.score}점)` : ''}</li>
@@ -4233,8 +4254,10 @@ export default function PWADashboard({ latestReport }) {
         .aid-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
         .aid-date { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); }
         .aid-prev { font-size: 0.7rem; color: var(--color-ink-3); font-weight: 600; }
-        .aid-sum { font-size: 0.76rem; color: var(--color-ink-2); margin-bottom: 8px; }
-        .aid-sum b { color: var(--color-ink); }
+        .aid-sum { font-size: 0.8rem; color: var(--color-ink-2); margin-bottom: 8px; }
+        .aid-sum b { color: var(--color-ink); font-size: 0.86rem; }
+        .aid-watch { color: var(--color-ink-3); font-weight: 700; }
+        .aid-stale { font-size: 0.76rem; color: var(--color-ink-2); line-height: 1.55; margin: 0 0 8px; word-break: keep-all; background: var(--color-card-soft, rgba(0,0,0,.03)); padding: 8px 10px; border-radius: 8px; }
         .aid-none { font-size: 0.78rem; color: var(--color-ink-3); line-height: 1.5; margin: 0; }
         .aid-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
         .aid-list li { font-size: 0.78rem; color: var(--color-ink-2); line-height: 1.4; }
@@ -4299,6 +4322,7 @@ export default function PWADashboard({ latestReport }) {
         .pl-cell.wide { grid-column: 1 / -1; }
         .pl-k { font-size: 0.64rem; color: var(--text-tertiary); font-weight: 700; }
         .pl-v { font-size: 0.9rem; font-weight: 800; font-family: var(--font-mono); }
+        .pl-asof { font-size: 0.66rem; font-weight: 700; color: var(--color-ink-3); margin: 2px 0 4px; }
         .pl-foot { font-size: 0.64rem; color: var(--text-tertiary); line-height: 1.5; margin-top: 8px; word-break: keep-all; }
         .vs-def { font-size: 0.74rem; color: var(--text-secondary); line-height: 1.55; margin: 10px 0 4px; word-break: keep-all; }
         .vs-def b { color: var(--text-primary); font-weight: 700; }
