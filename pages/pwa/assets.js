@@ -199,7 +199,6 @@ export default function AssetsMapPage() {
             <div className="as-trend">
               <span className={`as-dchip ${dCls(delta.total)}`}>{delta.total >= 0 ? "▲" : "▼"} {dvUk(delta.total)}</span>
               <span className="as-dlabel">{delta.prevDate} 대비</span>
-              {hist.length >= 2 && <Sparkline data={hist.map((h) => h.total)} />}
             </div>
           ) : (
             <p className="as-dnew">📈 오늘부터 총자산 추이를 기록합니다 — 내일부터 전일 대비 변화가 표시됩니다.</p>
@@ -383,7 +382,7 @@ export default function AssetsMapPage() {
         .as-trend .as-dlabel { font-size: 0.7rem; color: var(--color-ink-3); font-weight: 600; }
         .as-spark { width: 84px; height: 26px; flex: 0 0 auto; margin-left: auto; }
         .as-dnew { font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; margin: 6px 0 0; word-break: keep-all; }
-        .as-rd { font-size: 0.68rem; font-weight: 700; font-variant-numeric: tabular-nums; margin-left: 6px; }
+        .as-rd { font-size: 0.66rem; font-weight: 700; font-variant-numeric: tabular-nums; }
         .as-rd.up { color: var(--color-success, #0E9E6A); }
         .as-rd.down { color: var(--color-danger, #E5484D); }
         .as-rd.flat { color: var(--color-ink-3); }
@@ -414,7 +413,7 @@ export default function AssetsMapPage() {
         .as-row:last-child { border-bottom: none; }
         .as-dotc { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
         .as-rl { min-width: 0; font-size: 0.78rem; font-weight: 700; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .as-rv { font-size: 0.78rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+        .as-rv { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1.2; font-size: 0.78rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
         .as-rv em { font-style: normal; font-weight: 600; color: var(--color-ink-3); font-size: 0.72rem; }
         .as-rp { font-size: 0.68rem; color: var(--color-ink-3); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; min-width: 38px; }
         .as-add { width: 100%; margin-top: 14px; min-height: 44px; border: 1px dashed var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-ink-2); border-radius: 11px; font-size: 0.84rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
