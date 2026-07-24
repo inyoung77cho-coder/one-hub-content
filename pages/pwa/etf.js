@@ -504,15 +504,21 @@ export default function EtfDashboard() {
       )}
 
       {/* [E-4] 목표 배분 · 국내/해외 이탈도 → 처방(진단 단독 금지). 목표 미설정 시 프리셋 3종. */}
-      {holdings.length > 0 && (() => {
-        // [S18] 해외/국내는 '시장'으로 가른다 — 통화가 아니다.
-        //   기존: avgCcy === "USD" 로 판정 → 해외 ETF(SMH·VOO 등)를 원화로 매수 기록하면
-        //   국내로 잡혔다. 통화는 '어떻게 샀나'이고 시장은 '무엇을 샀나'다. 섞으면 안 된다.
-        //   market 필드가 없는 옛 기록은 티커로 추론한다(숫자=국내, 그 외=해외).
-        const overseasKrw = holdings.reduce((a, h) => a + (isOverseasHolding(h) ? (holdingMetrics(h).valueKrw || 0) : 0), 0);
-        const domesticKrw = Math.max(0, myTotal - overseasKrw);
-        const curO = myTotal > 0 ? Math.round(overseasKrw / myTotal * 1000) / 10 : null;
-        const curD = myTotal > 0 ? Math.round(domesticKrw / myTotal * 1000) / 10 : null;
+      {(positions.length > 0 || holdings.length > 0) && (() => {
+        // [투자지역] 국내/해외는 '투자대상 지역'(classifyEtf: tax_type 기반)으로 가른다.
+        //   ★기존 버그: holdings(직접입력)만 + 상장시장(market) 기준으로 판정 → 서버 등록
+        //     positions(포트폴리오 대부분)를 무시하고, 국내상장 해외추종을 '국내'로 잡아
+        //     "해외 0% 국내 100%" 처럼 실제와 정반대로 표시됐다.
+        //   이제: positions(서버) + holdings(직접입력) 모두 포함, classifyEtf(투자지역) 우선.
+        const evalKrw = (p) => p.value_krw ?? p.eval_krw ?? (holdingMetrics(p).valueKrw || 0);
+        const isOs = (p) => { const c = classifyEtf(p.ticker); return c ? c.r === "해외" : isOverseasHolding(p); };
+        const allEtf = [...positions, ...holdings];
+        const totalKrw = allEtf.reduce((a, p) => a + evalKrw(p), 0);
+        const overseasKrw = allEtf.reduce((a, p) => a + (isOs(p) ? evalKrw(p) : 0), 0);
+        const domesticKrw = Math.max(0, totalKrw - overseasKrw);
+        const myTotal = totalKrw;   // 이 섹션 분모는 전체 ETF(서버+직접입력)
+        const curO = totalKrw > 0 ? Math.round(overseasKrw / totalKrw * 1000) / 10 : null;
+        const curD = totalKrw > 0 ? Math.round(domesticKrw / totalKrw * 1000) / 10 : null;
         const tgt = targetAlloc?.region || null;
         const thr = REBAL_PRESETS.threshold_pp;
         return (
@@ -530,10 +536,10 @@ export default function EtfDashboard() {
             ) : (() => {
               const driftO = curO != null ? Math.round((curO - tgt.해외) * 10) / 10 : null;
               const over = driftO != null && Math.abs(driftO) >= thr;
-              // 처방: 해외 초과 시 가장 큰 USD 보유 축소 수량 산출
+              // 처방: 해외 초과 시 가장 큰 해외 보유 축소 수량 산출(서버+직접입력 통합)
               let rx = null;
               if (over && driftO > 0) {
-                const usd = holdings.filter(isOverseasHolding).map((h) => ({ h, v: holdingMetrics(h).valueKrw || 0, px: (quotes[h.ticker]?.price ?? 0) * (fxRate || 0) })).sort((a, b) => b.v - a.v)[0];
+                const usd = allEtf.filter(isOs).map((h) => ({ h, v: evalKrw(h), px: (quotes[h.ticker]?.price ?? 0) * (fxRate || 0) })).sort((a, b) => b.v - a.v)[0];
                 const cutKrw = overseasKrw - (tgt.해외 / 100) * myTotal;
                 const qty = usd && usd.px > 0 ? Math.max(1, Math.round(cutKrw / usd.px)) : null;
                 if (usd && qty) rx = { name: usd.h.ticker, qty, amt: Math.round(qty * usd.px) };
