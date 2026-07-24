@@ -8,6 +8,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import { getTrader, useTrader } from "../../lib/trader";
 import { getLedger as getAssetLedger } from "../../lib/ledger";
+import ReportTeaser from "../../components/ReportTeaser";
 import { getLedger as getDecisionLedger } from "../../lib/verdictLedger";
 import { samplePolicy } from "../../lib/sampleSize";
 import { pickInsight } from "../../lib/crossInsight";
@@ -263,6 +264,10 @@ export default function TodayPage() {
         {/* [삭제] '내 자산 오늘' 섹션 제거 — ① 남의 부동산 신고가(내 단지 아님)를 섞고 ② '오늘'이라면서
             총손익(당일변동 아님)을 보여줘 자산 화면과 어긋남 ③ 손절임박은 위 '결정 대기', 전체 포트는
             '자산' 화면과 중복. 중요한 변동은 결정 대기·알림 카드로 대체. */}
+
+        {/* 🏠 부동산 소식 — CA 엔진이 운영자 큐레이션한 지역 동향/제보(board). 실거래 feed 는 현재 비어
+            표시 안 하고, 승인 게시된 CA 정보만. 데이터 없으면 카드 자체가 안 뜬다(빈 자리 방지). */}
+        <ReportTeaser />
 
         {/* ④ 채점 임박 — 항상 */}
         <section className="card td-judge" onClick={() => router.push("/pwa?tab=report&sec=vs")}>
