@@ -57,9 +57,33 @@ export default async function handler(req, res) {
       return res.redirect("/login?error=profile");
     }
 
-    // 3) 세션 발급
     const nickname = me.properties?.nickname || me.kakao_account?.profile?.nickname || "";
-    const jwt = await createSession({ id: `kakao:${me.id}`, nickname, provider: "kakao" });
+
+    // 3) 정식 회원 upsert (Lightsail accounts.db) — 실패해도 로그인은 진행(기존 동작 유지).
+    //    성공 시 정식 user_id 를 세션 uid 로. sub(kakao:id)은 tenant/admin 판정용으로 그대로.
+    let uid = null;
+    try {
+      const base = process.env.RE_API_URL || "http://54.180.54.132:5002";
+      const key = process.env.RE_ACCESS_KEY || "";
+      const up = await fetch(`${base}/api/account/upsert${key ? `?key=${encodeURIComponent(key)}` : ""}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-API-Key": key },
+        body: JSON.stringify({
+          provider: "kakao",
+          provider_user_id: String(me.id),
+          nickname,
+          email: me.kakao_account?.email || null,
+          profile_image: me.properties?.profile_image || null,
+        }),
+      });
+      if (up.ok) { uid = (await up.json()).user_id ?? null; }
+      else { console.error("[kakao] account upsert failed", up.status); }
+    } catch (e) {
+      console.error("[kakao] account upsert error", e?.message);
+    }
+
+    // 4) 세션 발급 (uid 포함)
+    const jwt = await createSession({ id: `kakao:${me.id}`, uid, nickname, provider: "kakao" });
 
     res.setHeader("Set-Cookie", [
       `${SESSION_COOKIE}=${jwt}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_MAX_AGE}`,
