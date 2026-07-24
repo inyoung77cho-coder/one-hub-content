@@ -62,6 +62,7 @@ export default async function handler(req, res) {
     // 3) 정식 회원 upsert (Lightsail accounts.db) — 실패해도 로그인은 진행(기존 동작 유지).
     //    성공 시 정식 user_id 를 세션 uid 로. sub(kakao:id)은 tenant/admin 판정용으로 그대로.
     let uid = null;
+    let consentsOk = true;   // upsert 실패 시엔 동의 화면으로 못 보내므로 통과(기존 동작 유지)
     try {
       const base = process.env.RE_API_URL || "http://54.180.54.132:5002";
       const key = process.env.RE_ACCESS_KEY || "";
@@ -76,8 +77,11 @@ export default async function handler(req, res) {
           profile_image: me.properties?.profile_image || null,
         }),
       });
-      if (up.ok) { uid = (await up.json()).user_id ?? null; }
-      else { console.error("[kakao] account upsert failed", up.status); }
+      if (up.ok) {
+        const uj = await up.json();
+        uid = uj.user_id ?? null;
+        consentsOk = uj.consents_ok !== false;   // 신규/미동의면 false
+      } else { console.error("[kakao] account upsert failed", up.status); }
     } catch (e) {
       console.error("[kakao] account upsert error", e?.message);
     }
@@ -85,11 +89,16 @@ export default async function handler(req, res) {
     // 4) 세션 발급 (uid 포함)
     const jwt = await createSession({ id: `kakao:${me.id}`, uid, nickname, provider: "kakao" });
 
+    // 필수 동의가 없으면(신규 등) 동의 화면으로 유도. 완료 후 원래 목적지로.
+    const dest = (uid != null && !consentsOk)
+      ? `/pwa/consent?next=${encodeURIComponent(next)}`
+      : next;
+
     res.setHeader("Set-Cookie", [
       `${SESSION_COOKIE}=${jwt}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_MAX_AGE}`,
       `oh_oauth=; Path=/; Max-Age=0`,
     ]);
-    return res.redirect(next);
+    return res.redirect(dest);
   } catch (e) {
     console.error("[kakao] callback error", e);
     return res.redirect("/login?error=server");
