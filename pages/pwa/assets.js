@@ -193,13 +193,13 @@ export default function AssetsMapPage() {
           <div className="as-total">
             <span>총자산</span>
             <b>{uk(total)}</b>
-            {hist.length >= 2 && <Sparkline data={hist.map((h) => h.total)} />}
           </div>
-          {/* [추세] 전일 대비 총자산 변화. 데이터가 하루뿐이면 '기록 시작' 안내. */}
+          {/* [추세] 전일 대비 변화 + 스파크라인을 별도 줄에. 데이터가 하루뿐이면 '기록 시작' 안내. */}
           {delta && delta.total != null ? (
-            <div className={`as-delta ${dCls(delta.total)}`}>
-              <span className="as-dchip">{delta.total >= 0 ? "▲" : "▼"} {dvUk(delta.total)}</span>
+            <div className="as-trend">
+              <span className={`as-dchip ${dCls(delta.total)}`}>{delta.total >= 0 ? "▲" : "▼"} {dvUk(delta.total)}</span>
               <span className="as-dlabel">{delta.prevDate} 대비</span>
+              {hist.length >= 2 && <Sparkline data={hist.map((h) => h.total)} />}
             </div>
           ) : (
             <p className="as-dnew">📈 오늘부터 총자산 추이를 기록합니다 — 내일부터 전일 대비 변화가 표시됩니다.</p>
@@ -372,16 +372,16 @@ export default function AssetsMapPage() {
         .as-fresh { margin-left: auto; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .as-hero .as-headline { font-size: 0.94rem; line-height: 1.55; font-weight: 700; color: var(--color-ink); margin: 0 0 12px; word-break: keep-all; }
-        .as-total { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+        .as-total { display: flex; align-items: baseline; justify-content: space-between; }
         .as-total span { font-size: 0.78rem; font-weight: 600; color: var(--color-ink-3); }
-        .as-total b { font-size: 1.5rem; font-weight: 800; color: var(--color-ink); margin-left: auto; }
-        .as-spark { width: 88px; height: 26px; flex: 0 0 auto; align-self: center; }
-        .as-delta { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-        .as-delta .as-dchip { font-size: 0.84rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-        .as-delta .as-dlabel { font-size: 0.7rem; color: var(--color-ink-3); font-weight: 600; }
-        .as-delta.up .as-dchip { color: var(--color-success, #0E9E6A); }
-        .as-delta.down .as-dchip { color: var(--color-danger, #E5484D); }
-        .as-delta.flat .as-dchip { color: var(--color-ink-3); }
+        .as-total b { font-size: 1.5rem; font-weight: 800; color: var(--color-ink); }
+        .as-trend { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+        .as-trend .as-dchip { font-size: 0.84rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .as-trend .as-dchip.up { color: var(--color-success, #0E9E6A); }
+        .as-trend .as-dchip.down { color: var(--color-danger, #E5484D); }
+        .as-trend .as-dchip.flat { color: var(--color-ink-3); }
+        .as-trend .as-dlabel { font-size: 0.7rem; color: var(--color-ink-3); font-weight: 600; }
+        .as-spark { width: 84px; height: 26px; flex: 0 0 auto; margin-left: auto; }
         .as-dnew { font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; margin: 6px 0 0; word-break: keep-all; }
         .as-rd { font-size: 0.68rem; font-weight: 700; font-variant-numeric: tabular-nums; margin-left: 6px; }
         .as-rd.up { color: var(--color-success, #0E9E6A); }
@@ -404,7 +404,7 @@ export default function AssetsMapPage() {
           .as-donut { align-self: center; }
           .as-legend { width: 100%; }
         }
-        .as-donut { width: 116px; height: 116px; flex-shrink: 0; }
+        .as-donut { width: 92px; height: 92px; flex-shrink: 0; }
         .as-donut-t { font-size: 8px; fill: var(--color-ink-3); font-weight: 700; }
         .as-donut-v { font-size: 11px; fill: var(--color-ink); font-weight: 800; }
         .as-legend { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
