@@ -112,6 +112,10 @@ export async function middleware(req) {
     const headers = new Headers(req.headers);
     headers.set("x-oh-tenant", effective);
     headers.set("x-oh-role", t.role);
+    // [OH-AUTH] 정식 회원 user_id 를 헤더로 실어준다(티어 게이팅·계정별 데이터 스코프용).
+    //   세션에 uid 가 있을 때만(구세션/미upsert 는 없음). 클라 위조 방지 위해 항상 서버가 덮어쓴다.
+    if (session.uid != null) headers.set("x-oh-user", String(session.uid));
+    else headers.delete("x-oh-user");
     return NextResponse.rewrite(url, { request: { headers } });
   }
 
