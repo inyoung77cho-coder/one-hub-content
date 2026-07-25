@@ -51,7 +51,7 @@ function ReportSection({ report }) {
         <div className="rp-overall"><div className="rp-themes-h">종합</div><p>{b.overall}</p></div>
       )}
 
-      <p className="rp-legal">※ 카톡방 수집 호가 기준 · 국토부 실거래로 확인되지 않은 참고용입니다.</p>
+      <p className="rp-legal">※ 출처: 공개 채팅방·이용자 제보로 수집한 호가 정보. 국토교통부 실거래로 확인되지 않은 미검증 참고용입니다.</p>
 
       <style jsx>{`
         .rp-wrap { margin-top: 34px; background: #fff; border: 1px solid #E1E9F5; border-radius: 20px; padding: 26px 28px; box-shadow: 0 8px 28px rgba(31,63,120,.06); }
@@ -210,8 +210,15 @@ export default function RealEstateBoard({ listings, gathered, gatheredNotice, re
           <ReportSection report={report} />
           <GatheredSection items={gathered} notice={gatheredNotice} />
 
+          <div className="rb-source">
+            <b>데이터 출처</b>
+            <ul>
+              <li><b>실거래가·시세·ONE Score</b> — 국토교통부 실거래가 공개시스템(RTMS) OpenAPI (상업 이용 허가 공공데이터)</li>
+              <li><b>제보·수집 정보(🟡)</b> — 협력업체·이용자 제보 및 공개 채팅방에서 수집한 <b>미검증</b> 호가 정보. 국토부 실거래로 확인되지 않았습니다.</li>
+            </ul>
+          </div>
           <p className="rb-legal">
-            ※ 게시 정보는 협력업체가 제공한 자료이며 ONE-HUB는 정확성을 보증하지 않습니다. 거래 전 현장·서류 확인은 이용자 책임입니다.
+            ※ 게시 정보는 협력업체·이용자가 제공한 자료이며 ONE-HUB는 정확성을 보증하지 않습니다. 거래 전 현장·서류 확인은 이용자 책임입니다.
             {listings.some((l) => l.sample) && ' 「예시」 표기 항목은 보드 형식 안내용 샘플입니다.'}
           </p>
         </main>
@@ -233,7 +240,12 @@ export default function RealEstateBoard({ listings, gathered, gatheredNotice, re
         .rb-meta { font-size: 12.5px; color: #94A3B8; display: flex; gap: 4px; margin-bottom: 12px; }
         .rb-summary { font-size: 13.5px; color: #475569; line-height: 1.6; margin-bottom: 14px; }
         .rb-date { font-size: 12px; color: #94A3B8; font-family: 'Space Mono', monospace; }
-        .rb-legal { font-size: 12px; color: #94A3B8; line-height: 1.7; margin-top: 26px; }
+        .rb-source { margin-top: 26px; background: #F1F6FE; border: 1px solid #E1E9F5; border-radius: 12px; padding: 14px 16px; }
+        .rb-source > b { font-size: 12.5px; font-weight: 800; color: #2F4A73; }
+        .rb-source ul { margin: 8px 0 0; padding-left: 16px; }
+        .rb-source li { font-size: 12px; color: #46566E; line-height: 1.65; margin-bottom: 4px; }
+        .rb-source li b { color: #12213B; }
+        .rb-legal { font-size: 12px; color: #94A3B8; line-height: 1.7; margin-top: 14px; }
         @media (max-width: 640px) { .rb-grid { grid-template-columns: 1fr; } }
       `}</style>
     </>
