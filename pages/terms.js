@@ -2,7 +2,7 @@
 import Head from "next/head";
 import Link from "next/link";
 
-const UPDATED = "2026-07-19";
+const UPDATED = "2026-07-25";
 
 export default function Terms() {
   return (
@@ -37,16 +37,22 @@ export default function Terms() {
           <li>입력하는 정보에 대한 정확성·적법성은 이용자에게 있습니다.</li>
         </ul>
 
-        <h2>제6조 (책임의 한계)</h2>
-        <p>운영자는 베타 서비스의 정확성·완전성·연속성을 보증하지 않으며, 서비스 이용 또는 투자 판단으로 인한 손해에 대해 관련 법령이 허용하는 범위에서 책임을 지지 않습니다.</p>
+        <h2>제6조 (책임의 한계 · 투자 면책)</h2>
+        <p>운영자는 베타 서비스의 정확성·완전성·연속성을 보증하지 않으며, 서비스 이용 또는 투자 판단으로 인한 손해에 대해 관련 법령이 허용하는 범위에서 책임을 지지 않습니다. 투자 관련 유의사항은 <Link href="/disclaimer">투자 유의사항·면책 고지</Link>를 따릅니다.</p>
 
-        <h2>제7조 (개인정보)</h2>
+        <h2>제7조 (서비스의 변경 · 중단)</h2>
+        <p>운영자는 서비스의 전부 또는 일부를 변경·중단할 수 있으며, 베타 단계에서는 사전 고지 없이 데이터가 초기화되거나 기능이 조정될 수 있습니다. 중대한 변경은 가능한 범위에서 사전 고지합니다.</p>
+
+        <h2>제8조 (개인정보)</h2>
         <p>개인정보의 처리는 <Link href="/privacy">개인정보 처리방침</Link>에 따릅니다.</p>
 
-        <h2>제8조 (약관의 변경)</h2>
-        <p>운영자는 필요 시 약관을 변경할 수 있으며, 변경 시 서비스 내 고지합니다.</p>
+        <h2>제9조 (약관의 변경)</h2>
+        <p>운영자는 필요 시 약관을 변경할 수 있으며, 변경 시 시행일과 내용을 서비스 내 고지합니다. 변경 후 계속 이용하는 경우 변경 약관에 동의한 것으로 봅니다.</p>
 
-        <p className="foot"><Link href="/privacy">개인정보 처리방침</Link> · <Link href="/">홈으로</Link></p>
+        <h2>제10조 (준거법 · 분쟁 해결)</h2>
+        <p>본 약관은 대한민국 법령에 따라 해석되며, 서비스 이용과 관련한 분쟁은 관련 법령이 정한 절차와 관할 법원에 따릅니다.</p>
+
+        <p className="foot"><Link href="/privacy">개인정보 처리방침</Link> · <Link href="/disclaimer">투자 유의·면책</Link> · <Link href="/">홈으로</Link></p>
       </main>
       <style jsx>{`
         .doc { max-width: 720px; margin: 0 auto; padding: 32px 20px 60px; color: #1e293b; font-size: 0.92rem; line-height: 1.7; }
