@@ -362,6 +362,15 @@ export default function Settings() {
             )}
           </div>
 
+          {/* 보드 관리 — 부동산 신규 정보·리포트 수정/삭제(운영자 전용) */}
+          <div className="card">
+            <div className="k">보드 관리 · 부동산 신규 정보 / 리포트</div>
+            <p style={{ fontSize: "0.8rem", color: "#64748B", margin: "6px 0 10px", lineHeight: 1.6 }}>
+              보드에 게시된 수집 정보와 리포트를 수정하거나 내립니다.
+            </p>
+            <Link href="/pwa/board-admin" className="detail">보드 관리 열기 →</Link>
+          </div>
+
           {/* [v11 #18 / §3-9] 트레이더 A/B 관리 — engine-status + /api/ops/traders(있으면) 병합 */}
           <div className="card">
             <div className="k">트레이더 관리 · A / B</div>
