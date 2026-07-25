@@ -294,6 +294,28 @@ export default function Settings() {
             </div>
             <div className="hint">매매신호와 리포트를 텔레그램으로도 받습니다. 승인·주문은 앱에서 하세요.</div>
           </div>
+
+          {/* 약관 · 개인정보 · 면책 — 정식 페이지 열람 + 동의 항목 관리 */}
+          <div className="card">
+            <div className="k">약관 · 개인정보 · 면책</div>
+            <div className="row">
+              <span className="l">이용약관</span>
+              <button className="tbtn" onClick={() => router.push("/terms")}>보기</button>
+            </div>
+            <div className="row" style={{ marginTop: 8 }}>
+              <span className="l">개인정보 처리방침</span>
+              <button className="tbtn" onClick={() => router.push("/privacy")}>보기</button>
+            </div>
+            <div className="row" style={{ marginTop: 8 }}>
+              <span className="l">투자 유의사항 · 면책 고지</span>
+              <button className="tbtn" onClick={() => router.push("/disclaimer")}>보기</button>
+            </div>
+            <div className="row" style={{ marginTop: 8 }}>
+              <span className="l">동의 항목 관리(마케팅 수신 등)</span>
+              <button className="tbtn" onClick={() => router.push("/pwa/consent?next=/pwa/settings")}>관리</button>
+            </div>
+            <div className="hint">모든 정보는 참고용이며 투자자문이 아닙니다. 마케팅 정보 수신은 동의 항목 관리에서 언제든 켜고 끌 수 있어요.</div>
+          </div>
         </>
       ) : (
         <>
