@@ -2,6 +2,7 @@
 //   카톡/SNS로 공유하는 링크: https://app.one-hub.kr/welcome
 //   middleware 보호 대상(/pwa·/api)이 아니므로 누구나 열 수 있다. CTA는 /pwa → 카카오 로그인으로 유도.
 import Head from "next/head";
+import { useEffect, useState } from "react";
 
 const SITE = "https://app.one-hub.kr"; // 공개 공유 도메인(canonical·OG용). Vercel 앱이 이 도메인으로 서빙됨.
 
@@ -93,6 +94,9 @@ export default function Welcome() {
             ))}
           </div>
         </header>
+
+        {/* ── 무료 채점 체험(로그인 전) ── */}
+        <FreeScoreWidget />
 
         {/* ── 3대 강점 ── */}
         <section className="sec">
@@ -259,5 +263,141 @@ export default function Welcome() {
         @media (min-width: 560px) { .tabs { grid-template-columns: repeat(4, 1fr); } }
       `}</style>
     </>
+  );
+}
+
+// [P2] 로그인 전 무료 ONE Score 체험 — 지역·단지 선택 → 국토부 실거래 기반 채점.
+function FreeScoreWidget() {
+  const [regions, setRegions] = useState([]);
+  const [region, setRegion] = useState("서현동");
+  const [complexes, setComplexes] = useState([]);
+  const [complex, setComplex] = useState("");
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    fetch("/api/score-preview?kind=regions").then((r) => r.json()).then((d) => {
+      if (d.ok && d.regions.length) setRegions(d.regions);
+    }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    setComplexes([]); setComplex(""); setResult(null);
+    fetch(`/api/score-preview?kind=complexes&region=${encodeURIComponent(region)}`)
+      .then((r) => r.json()).then((d) => { if (d.ok) setComplexes(d.complexes); }).catch(() => {});
+  }, [region]);
+
+  async function score() {
+    if (!complex) { setErr("단지를 선택해 주세요"); return; }
+    setLoading(true); setErr(""); setResult(null);
+    try {
+      const d = await fetch(
+        `/api/score-preview?kind=score&complex=${encodeURIComponent(complex)}&region=${encodeURIComponent(region)}&area=84`
+      ).then((r) => r.json());
+      if (d.ok) setResult(d); else setErr(d.error || "채점할 수 없습니다");
+    } catch (e) { setErr("일시적으로 채점할 수 없습니다"); } finally { setLoading(false); }
+  }
+
+  const under = result && result.diff_pct != null && result.diff_pct < 0;
+  const comps = result && result.components ? Object.entries(result.components) : [];
+
+  return (
+    <section className="fs">
+      <div className="fs-inner">
+        <div className="fs-eyebrow">로그인 없이 · 5초 체험</div>
+        <h2 className="fs-title">내 단지, 지금 <b>무료로 채점</b>해 보세요</h2>
+        <p className="fs-lead">국토부 실거래가로 계산한 ONE Score와 저평가율을 바로 확인합니다.</p>
+
+        <div className="fs-form">
+          <select value={region} onChange={(e) => setRegion(e.target.value)} aria-label="지역">
+            {(regions.length ? regions : ["서현동"]).map((r) => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <select value={complex} onChange={(e) => setComplex(e.target.value)} aria-label="단지">
+            <option value="">단지 선택</option>
+            {complexes.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <button onClick={score} disabled={loading}>{loading ? "채점 중…" : "무료 채점"}</button>
+        </div>
+        {err && <div className="fs-err">{err}</div>}
+
+        {result && (
+          <div className="fs-result">
+            <div className="fs-r-top">
+              <div className="fs-r-name">{result.complex} <span>전용 {result.area}㎡</span></div>
+              <div className={`fs-r-badge ${under ? "u" : "n"}`}>{result.valuation || result.decision}</div>
+            </div>
+            <div className="fs-r-score">
+              <div className="fs-r-num">{Math.round(result.one_score)}<small>/100</small></div>
+              <div className="fs-r-meta">
+                <div className="fs-r-decision">{result.decision}</div>
+                {result.diff_pct != null && (
+                  <div className={`fs-r-gap ${under ? "u" : "o"}`}>
+                    {under ? `저평가 ${Math.abs(Math.round(result.diff_pct))}%` : `고평가 ${Math.abs(Math.round(result.diff_pct))}%`}
+                  </div>
+                )}
+              </div>
+            </div>
+            {result.reason && <p className="fs-r-reason">{result.reason}</p>}
+            {comps.length > 0 && (
+              <div className="fs-r-comps">
+                {comps.map(([k, v]) => (
+                  <div className="fs-r-comp" key={k}>
+                    <span className="fs-r-ck">{k}</span>
+                    <span className="fs-r-cbar"><i style={{ width: `${Math.max(0, Math.min(100, v))}%` }} /></span>
+                    <span className="fs-r-cv">{Math.round(v)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <a className="fs-cta" href="/pwa">관심단지로 등록하고 저평가 알림 받기 →</a>
+            <p className="fs-disc">※ 국토부 실거래 기반 참고용 점수입니다. 투자자문이 아니며 투자 판단·책임은 본인에게 있습니다.</p>
+          </div>
+        )}
+
+        {!result && <p className="fs-hint">가입하면 관심단지를 저장하고, 저평가 기준을 넘을 때 <b>알림</b>을 받을 수 있어요.</p>}
+      </div>
+
+      <style jsx>{`
+        .fs { padding: 8px 20px 8px; }
+        .fs-inner { max-width: 520px; margin: 0 auto; background: var(--surface); border: 1px solid var(--line);
+          border-radius: 20px; padding: 26px 24px; box-shadow: var(--shadow); text-align: center; }
+        .fs-eyebrow { font-size: 0.72rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: var(--brand); margin-bottom: 8px; }
+        .fs-title { font-size: 1.35rem; font-weight: 800; letter-spacing: -.5px; margin: 0 0 6px; }
+        .fs-title b { color: var(--brand); }
+        .fs-lead { font-size: 0.88rem; color: var(--ink-2); margin: 0 0 18px; }
+        .fs-form { display: grid; grid-template-columns: 1fr 1.3fr auto; gap: 8px; }
+        .fs-form select, .fs-form button { font-size: 0.9rem; font-family: inherit; border-radius: 10px; padding: 11px 12px; border: 1px solid var(--line); }
+        .fs-form select { background: var(--bg); color: var(--ink); }
+        .fs-form button { background: var(--brand); color: #fff; font-weight: 800; border: none; cursor: pointer; white-space: nowrap; }
+        .fs-form button:disabled { opacity: .6; }
+        .fs-err { margin-top: 12px; font-size: 0.84rem; color: var(--warn); }
+        .fs-hint { margin: 14px 0 0; font-size: 0.8rem; color: var(--ink-3); }
+        .fs-result { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 18px; text-align: left; }
+        .fs-r-top { display: flex; align-items: center; justify-content: space-between; }
+        .fs-r-name { font-size: 1rem; font-weight: 800; }
+        .fs-r-name span { font-size: 0.78rem; color: var(--ink-3); font-weight: 600; }
+        .fs-r-badge { font-size: 0.74rem; font-weight: 800; padding: 4px 10px; border-radius: 8px; }
+        .fs-r-badge.u { background: var(--up-soft); color: var(--up); }
+        .fs-r-badge.n { background: var(--brand-soft); color: var(--brand); }
+        .fs-r-score { display: flex; align-items: baseline; gap: 16px; margin: 12px 0 8px; }
+        .fs-r-num { font-size: 2.6rem; font-weight: 800; letter-spacing: -1px; line-height: 1; color: var(--brand); font-variant-numeric: tabular-nums; }
+        .fs-r-num small { font-size: 1rem; color: var(--ink-3); font-weight: 700; }
+        .fs-r-decision { font-size: 0.95rem; font-weight: 800; }
+        .fs-r-gap { font-size: 0.82rem; font-weight: 800; margin-top: 2px; }
+        .fs-r-gap.u { color: var(--up); } .fs-r-gap.o { color: var(--warn); }
+        .fs-r-reason { font-size: 0.84rem; color: var(--ink-2); line-height: 1.6; margin: 6px 0 14px; }
+        .fs-r-comps { display: grid; gap: 7px; margin-bottom: 16px; }
+        .fs-r-comp { display: grid; grid-template-columns: 70px 1fr 28px; align-items: center; gap: 8px; }
+        .fs-r-ck { font-size: 0.76rem; color: var(--ink-2); font-weight: 700; }
+        .fs-r-cbar { height: 7px; background: var(--line); border-radius: 4px; overflow: hidden; }
+        .fs-r-cbar i { display: block; height: 100%; background: var(--brand); border-radius: 4px; }
+        .fs-r-cv { font-size: 0.76rem; font-weight: 800; text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+        .fs-cta { display: block; text-align: center; background: var(--brand); color: #fff; font-weight: 800; font-size: 0.92rem;
+          padding: 13px; border-radius: 12px; text-decoration: none; box-shadow: 0 8px 22px rgba(47,107,255,.24); }
+        .fs-disc { font-size: 0.72rem; color: var(--ink-3); line-height: 1.55; margin: 12px 0 0; }
+        @media (max-width: 460px) { .fs-form { grid-template-columns: 1fr 1fr; } .fs-form button { grid-column: 1 / -1; } }
+      `}</style>
+    </section>
   );
 }
