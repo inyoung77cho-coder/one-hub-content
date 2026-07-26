@@ -34,6 +34,8 @@ export default function ReportTeaser() {
 
   const regions = report && report.body && Array.isArray(report.body.regions)
     ? report.body.regions.slice(0, 4) : [];
+  // 추세 화살표(리포트가 trend 를 담을 때만; 구 리포트는 생략)
+  const TREND_ICO = { '상승': '▲', '하락': '▼', '보합': '', '혼조': '↕', '정보부족': '' };
 
   return (
     <a className="rt-card" href="/board/realestate">
@@ -48,7 +50,11 @@ export default function ReportTeaser() {
           {report.headline && <p className="rt-headline">{report.headline}</p>}
           {regions.length > 0 && (
             <div className="rt-chips">
-              {regions.map((r, i) => <span className="rt-chip" key={i}>{r.area}</span>)}
+              {regions.map((r, i) => (
+                <span className={`rt-chip${r.trend === '상승' ? ' up' : r.trend === '하락' ? ' dn' : ''}`} key={i}>
+                  {r.area}{TREND_ICO[r.trend] ? ` ${TREND_ICO[r.trend]}` : ''}
+                </span>
+              ))}
               {report.body.regions.length > regions.length && (
                 <span className="rt-chip rt-more">+{report.body.regions.length - regions.length}</span>
               )}
@@ -77,6 +83,8 @@ export default function ReportTeaser() {
         .rt-headline { font-size: 13px; color: #46566E; line-height: 1.58; margin: 0 0 10px; }
         .rt-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
         .rt-chip { font-size: 11px; font-weight: 700; color: #3A5C97; background: #EAF1FF; border-radius: 6px; padding: 3px 8px; }
+        .rt-chip.up { background: #FDECEC; color: #D0342C; }
+        .rt-chip.dn { background: #EAF3FF; color: #1D6FE0; }
         .rt-more { background: #F1F5F9; color: #64748B; }
         .rt-meta { font-size: 11.5px; color: #94A3B8; font-weight: 600; }
       `}</style>
