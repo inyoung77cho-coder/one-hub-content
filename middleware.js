@@ -60,6 +60,20 @@ function unauthorized() {
 
 export async function middleware(req) {
   const { pathname } = req.nextUrl;
+
+  // 도메인 분리: www 로 들어온 앱 경로(/pwa)는 app 으로 되돌린다.
+  //  · 세션 쿠키가 app 도메인 기준이라 www 에서 /pwa 를 열면 로그인 루프가 난다.
+  //  · 미들웨어가 /pwa 를 먼저 잡으므로, 인증 검사 '전에' 여기서 호스트를 교정한다.
+  //    (next.config redirects 와 중복돼도 무해 — 먼저 걸리는 쪽이 1회 리다이렉트)
+  const host = (req.headers.get("host") || "").toLowerCase();
+  if (host === "www.one-hub.kr" && (pathname === "/pwa" || pathname.startsWith("/pwa/"))) {
+    const url = req.nextUrl.clone();
+    url.host = "app.one-hub.kr";
+    url.protocol = "https:";
+    url.port = "";
+    return NextResponse.redirect(url);
+  }
+
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const session = await verifySession(token);
 
