@@ -94,7 +94,7 @@ function ReportSection({ report }) {
         <div className="rp-overall"><div className="rp-themes-h">종합</div><p>{b.overall}</p></div>
       )}
 
-      <p className="rp-legal">※ 출처: 공개 채팅방·이용자 제보로 수집한 호가 정보. 국토교통부 실거래로 확인되지 않은 미검증 참고용입니다. 면적은 전용면적 기준 환산 평(㎡÷3.3)입니다.</p>
+      <p className="rp-legal">※ 출처: 공개 채팅방·이용자 제보로 수집한 호가 정보. 국토교통부 실거래로 확인되지 않은 미검증 참고용입니다. 면적은 전용면적을 평으로 환산해 표기했습니다(1평=3.3㎡).</p>
 
       <style jsx>{`
         .rp-wrap { margin-top: 34px; background: #fff; border: 1px solid #E1E9F5; border-radius: 20px; padding: 26px 28px; box-shadow: 0 8px 28px rgba(31,63,120,.06); }
@@ -177,7 +177,7 @@ function GatheredSection({ items = [], notice = '' }) {
     <section className="gt-wrap">
       <div className="gt-head">
         <h2 className="gt-title">🟡 제보 정보</h2>
-        <span className="gt-sub">{items.length}건 · 미검증 · 면적은 전용㎡ 환산 평(÷3.3)</span>
+        <span className="gt-sub">{items.length}건 · 미검증 · 면적은 평 표기(1평=3.3㎡)</span>
       </div>
 
       {groups.length > 0 && (
