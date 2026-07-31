@@ -7,6 +7,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import { getTrader, useTrader } from "../../lib/trader";
+import { dedupBy } from "../../lib/useDedup";
 import { getLedger as getAssetLedger } from "../../lib/ledger";
 import ReportTeaser from "../../components/ReportTeaser";
 import TodayNews from "../../components/TodayNews";
@@ -63,7 +64,9 @@ export default function TodayPage() {
     });
     // [알림카드 #5·#6] 텔레그램 알림 + 운영자 신고가
     fetch(`/api/notifications?trader=${tr}`).then((r) => r.json())
-      .then((n) => { if (n?.ok && Array.isArray(n.items)) setNotis(n.items); }).catch(() => {});
+      // [알림중복 수정] 집계 피드(텔레그램+리포트+큐싱크)가 같은 이벤트를 중복으로 줄 수 있어
+      //   프로젝트 필수 규칙대로 렌더 전에 dedupBy 로 흡수한다(id 없으면 제목|본문|시각 조합).
+      .then((n) => { if (n?.ok && Array.isArray(n.items)) setNotis(dedupBy(n.items, (x) => x.id ?? `${x.title || ""}|${x.body || ""}|${x.sent_at || x.created_at || ""}`)); }).catch(() => {});
     try {
       const mp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null");
       if (mp?.name) fetch(`/api/input/re-spot?complex_name=${encodeURIComponent(mp.name)}`).then((r) => r.json())
@@ -201,7 +204,10 @@ export default function TodayPage() {
                   const txt = `${n.title || ""} ${n.noti_type || ""} ${n.body || ""}`;
                   const isCrit = /critical|important/i.test(n.noti_type || "");
                   const isRoutine = RT.test(n.title || "");
-                  return ts.startsWith(today) && (isCrit || IMP.test(txt)) && !isRoutine;
+                  // [알림중복 수정] 운영자 신고가는 위 opNotes 카드(🏢)에 이미 표시되므로
+                  //   이 목록(🧑‍💼)에서는 제외해 이중 노출을 막는다.
+                  const isOp = /operator|운영자|manual/i.test(n.source || "");
+                  return ts.startsWith(today) && (isCrit || IMP.test(txt)) && !isRoutine && !isOp;
                 });
                 const shown = notiAll ? notis.slice(0, 12) : impNotis.slice(0, 5);
                 if (shown.length === 0) {
