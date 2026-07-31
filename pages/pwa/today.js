@@ -9,6 +9,7 @@ import { useRouter } from "next/router";
 import { getTrader, useTrader } from "../../lib/trader";
 import { getLedger as getAssetLedger } from "../../lib/ledger";
 import ReportTeaser from "../../components/ReportTeaser";
+import TodayNews from "../../components/TodayNews";
 import { getLedger as getDecisionLedger } from "../../lib/verdictLedger";
 import { samplePolicy } from "../../lib/sampleSize";
 import { pickInsight } from "../../lib/crossInsight";
@@ -293,6 +294,9 @@ export default function TodayPage() {
           </p>
         </section>
       </DataState>
+
+      {/* 오늘의 뉴스 — 뉴스 엔진 게시분(운영자 큐레이션). 데이터 없으면 조용히 숨김. */}
+      <TodayNews />
 
       <BottomNav active="today" />
 
