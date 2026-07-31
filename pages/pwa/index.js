@@ -2302,7 +2302,7 @@ export default function PWADashboard({ latestReport }) {
               </section>
             ) : (() => {
               const sd3 = computeShowdown(ledger, 3);
-              const g = computeWallets(sd3);
+              const g = computeWallets(sd3, gameSeed); // [모바일 수정] 알고 있는 시드를 넘겨 재조회 null 로 대시보드가 비지 않게
               if (!g) return null;
               const pending = ledger.filter((e) => Date.now() - e.ts < 3 * 86400000);
               const narr = streakNarrative(g.settled);
