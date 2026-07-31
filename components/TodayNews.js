@@ -36,7 +36,7 @@ export default function TodayNews() {
   if (!items || items.length === 0) return null;
 
   return (
-    <section className="card tnw">
+    <section className="card tnw" id="today-news">
       <div className="tnw-hh">📰 오늘의 뉴스 <span className="tnw-sub">운영자 큐레이션</span></div>
       <div className="tnw-list">
         {items.slice(0, 8).map((it) => {

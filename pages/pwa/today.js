@@ -11,6 +11,7 @@ import { dedupBy } from "../../lib/useDedup";
 import { getLedger as getAssetLedger } from "../../lib/ledger";
 import ReportTeaser from "../../components/ReportTeaser";
 import TodayNews from "../../components/TodayNews";
+import TodayNewsTop from "../../components/TodayNewsTop";
 import { getLedger as getDecisionLedger } from "../../lib/verdictLedger";
 import { samplePolicy } from "../../lib/sampleSize";
 import { pickInsight } from "../../lib/crossInsight";
@@ -141,6 +142,9 @@ export default function TodayPage() {
       </header>
 
       <div className="td-title">오늘 <span className="td-sub">할 일 중심</span>{at && <span className="td-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}</div>
+
+      {/* 맨 위 카드 — 오늘의 뉴스 키워드+중요 헤드라인(뉴스 엔진). 매매데이터와 무관하게 렌더. */}
+      <TodayNewsTop />
 
       <DataState status={status} hasData={!!dash || !!ledger} onRetry={load} skeletonLines={4} skeletonBlock>
         {/* ① 결정 대기 — 있을 때만 · 최상단 · 주의색 */}
