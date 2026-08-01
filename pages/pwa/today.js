@@ -12,7 +12,7 @@ import { getLedger as getAssetLedger } from "../../lib/ledger";
 import ReportTeaser from "../../components/ReportTeaser";
 import TodayNews from "../../components/TodayNews";
 import TodayNewsTop from "../../components/TodayNewsTop";
-import { getLedger as getDecisionLedger } from "../../lib/verdictLedger";
+import { getLedger as getDecisionLedger, computeShowdown } from "../../lib/verdictLedger";
 import { samplePolicy } from "../../lib/sampleSize";
 import { pickInsight } from "../../lib/crossInsight";
 import TraderBadge from "../../components/shared/TraderBadge";
@@ -124,6 +124,14 @@ export default function TodayPage() {
   const mine = decisions.filter((d) => (d.trader || "A") === tr2);
   const pendingJudge = mine.filter((d) => Date.now() - d.ts < MATURE_DAYS * DAY);
   const soonest = pendingJudge.length ? Math.min(...pendingJudge.map((d) => d.ts)) + MATURE_DAYS * DAY : null;
+  // [FB-2] 나 vs AI 생동감 — 이미 채점된 승부(3일 우선, 없으면 7일)가 있으면 승패·수익률을 바로 보여준다.
+  //   '채점 중'이라는 관리적 문구 대신, 실제 스코어보드처럼 승/패/무와 나·AI 수익률을 병기.
+  const vsShowdown = (() => {
+    const w3 = computeShowdown(mine, 3);
+    if (w3.ready) return w3;
+    const w7 = computeShowdown(mine, 7);
+    return w7.ready ? w7 : null;
+  })();
 
   // ── ⑤ AI 학습: 정식 통계까지 남은 표본.
   const pol = samplePolicy(mine.length);
@@ -253,11 +261,21 @@ export default function TodayPage() {
 
         {/* ② 오늘의 통합 판단 — 항상. '안 산 것'이 콘텐츠 */}
         <section className="card">
-          <div className="td-h">오늘의 통합 판단</div>
+          <div className="td-h">
+            오늘의 통합 판단
+            {/* [FB-2] 요약 배지 — 카드를 열지 않아도 오늘 상태를 한눈에. 매수후보 있음(초록) > 전부 필터(회색) > 완전 관망(연회색) */}
+            <span className={`td-badge ${cands.length > 0 ? "buy" : blocked.length > 0 ? "filter" : "quiet"}`}>
+              {cands.length > 0 ? `매수 후보 ${cands.length}` : blocked.length > 0 ? `필터 ${blocked.length}` : "관망"}
+            </span>
+          </div>
           <p className="td-vtext">
             {regime ? <>시장은 <b>{regime} 국면</b>{heat != null ? <> · 온도 {heat}</> : null}. </> : null}
             {blockLine}
           </p>
+          {/* [FB-2] 행동 유도 — 후보가 있을 때는 '걸러진 것'보다 '살 수 있는 것'을 먼저 행동으로 연결한다. */}
+          {cands.length > 0 && (
+            <button className="td-cta2" onClick={() => router.push("/pwa?tab=recommend")}>매수 후보 {cands.length}종목 확인하기 →</button>
+          )}
           {blocked.length > 0 && (
             <button className="td-link" onClick={() => router.push("/pwa?tab=report&sec=verify")}>무엇을 왜 걸렀나 →</button>
           )}
@@ -280,10 +298,19 @@ export default function TodayPage() {
             표시 안 하고, 승인 게시된 CA 정보만. 데이터 없으면 카드 자체가 안 뜬다(빈 자리 방지). */}
         <ReportTeaser />
 
-        {/* ④ 채점 임박 — 항상 */}
+        {/* ④ 채점 임박 — 항상. [FB-2] 이미 채점된 승부가 있으면 '관리 문구'가 아니라 스코어보드로. */}
         <section className="card td-judge" onClick={() => router.push("/pwa?tab=report&sec=vs")}>
           <div className="td-h">나 vs AI</div>
-          {pendingJudge.length > 0 ? (
+          {vsShowdown ? (
+            <p className="td-vtext">
+              <span className={`td-vs-badge ${vsShowdown.winner}`}>
+                {vsShowdown.winner === "me" ? "🏆 내 판단 승" : vsShowdown.winner === "ai" ? "💀 AI 승" : "⚖️ 무승부"}
+              </span>
+              {" "}나 <b className={vsShowdown.myRet >= 0 ? "td-up" : "td-dn2"}>{pctTxt(vsShowdown.myRet)}</b> · AI <b className={vsShowdown.aiRet >= 0 ? "td-up" : "td-dn2"}>{pctTxt(vsShowdown.aiRet)}</b>
+              {pendingJudge.length > 0 ? <> · {pendingJudge.length}건 채점 중</> : null}
+              {" "}<span className="td-arrow">기록 →</span>
+            </p>
+          ) : pendingJudge.length > 0 ? (
             <p className="td-vtext"><b>{pendingJudge.length}건</b> 채점 중 · 가장 빠른 결과 <b>{soonest ? mmdd(soonest) : "-"}</b> <span className="td-arrow">기록 →</span></p>
           ) : (
             <p className="td-vtext td-quiet">아직 승부가 없어요 — 추천에서 판단을 남기면 3일 뒤 자동 채점됩니다. <span className="td-arrow">첫 승부 시작 →</span></p>
@@ -322,8 +349,22 @@ export default function TodayPage() {
         .td-sub { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
         .td-fresh { margin-left: auto; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
-        .td-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 10px; }
+        .td-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
         .td-h b { color: var(--color-primary); }
+        /* [FB-2] 요약 배지 — 카드를 안 열어도 오늘 상태를 한눈에 */
+        .td-badge { font-size: 0.66rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; }
+        .td-badge.buy { color: var(--color-success); background: var(--color-success-soft, rgba(22,163,74,.12)); }
+        .td-badge.filter { color: var(--color-ink-2); background: var(--color-card-soft, var(--color-line)); }
+        .td-badge.quiet { color: var(--color-ink-3); background: var(--color-card-soft, var(--color-line)); }
+        /* [FB-2] 행동 유도 CTA — 결정 대기(빨강)와 구분되는 주 액션 톤 */
+        .td-cta2 { width: 100%; margin-top: 10px; min-height: 44px; border: none; border-radius: 11px; background: var(--color-primary); color: #fff; font-size: 0.86rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        /* [FB-2] 나 vs AI 스코어보드 */
+        .td-vs-badge { font-weight: 800; }
+        .td-vs-badge.me { color: var(--color-success); }
+        .td-vs-badge.ai { color: var(--purple); }
+        .td-vs-badge.tie { color: var(--color-ink-3); }
+        .td-up { color: var(--color-success); }
+        .td-dn2 { color: var(--color-danger); }
         /* ① 결정 대기 — 주의색 강조 */
         .td-decide { border-left: 4px solid var(--color-danger); }
         .td-decide .td-h b { color: var(--color-danger); }
