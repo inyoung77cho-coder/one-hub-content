@@ -139,6 +139,47 @@ export default function TodayPage() {
   // ── [N9] 자산군 교차 판단 — 하루 1개만. 규칙 기반·결정적(같은 데이터 = 같은 문장).
   const insight = pickInsight(ledger, { regime: dash?.market?.regime, heat: dash?.market?.heat_score, blockedCount: blocked.length });
 
+  // ── [FB-2 §2.6] '통합 판단' = 4대 자산축 요약 + 페이지 안내. 나열이 아니라 안내(원칙1).
+  //   숫자는 이미 있는 소스만 사용(원장·대시보드·판단기록). 없는 값은 날조하지 않고 행동 안내 문구로.
+  const bd = ledger?.breakdown || {};
+  const ukTxt = (v) => (v == null || !Number.isFinite(Number(v)) ? null : `${Number(v).toFixed(1)}억`);
+  const domains = [
+    {
+      key: "stock", ic: "📈", title: "주식 · 나 vs AI",
+      line: pendingJudge.length > 0
+        ? `채점 중 ${pendingJudge.length}건 · 가장 빠른 결과 ${soonest ? mmdd(soonest) : "-"}`
+        : cands.length > 0
+        ? `AI 추천 ${cands.length}종목 · 오늘 판단을 기다립니다`
+        : blocked.length > 0
+        ? `AI가 ${blocked.length}종목을 기준 미달로 걸렀습니다`
+        : "오늘은 기준을 넘은 종목이 없습니다",
+      href: "/pwa?tab=report&sec=vs",
+    },
+    {
+      key: "asset", ic: "💰", title: "종합자산",
+      line: ukTxt(ledger?.total_uk) ? `총자산 ${ukTxt(ledger.total_uk)} · 구성과 추세 보기` : "자산을 입력하면 한눈에 모입니다",
+      href: "/pwa/assets",
+    },
+    {
+      key: "re", ic: "🏠", title: "부동산",
+      line: myComplex ? `내 단지 ${myComplex} · 대장 대비 추이` : "관심 단지·지역 동향 보기",
+      href: "/pwa/realestate",
+    },
+    {
+      key: "etf", ic: "📊", title: "ETF",
+      line: ukTxt(bd.etf_uk) ? `평가 ${ukTxt(bd.etf_uk)} · 국내/해외 배분` : "국내/해외 ETF 시장 변화점",
+      href: "/pwa/etf",
+    },
+  ];
+  // 행동 유도(§2.6) — 원격의 '매수 후보 확인' CTA가 없는 관망일에만 보조 넛지 하나.
+  const todayCta = cands.length > 0
+    ? null
+    : (ledger && bd.cash_uk == null)
+    ? { label: "현금을 입력하면 총자산이 정확해집니다 →", href: "/pwa/assets" }
+    : (pendingJudge.length === 0 && mine.length === 0)
+    ? { label: "첫 판단으로 나 vs AI 시작하기 →", href: "/pwa?tab=analyze" }
+    : null;
+
   return (
     <div className="td">
       <header className="td-hd">
@@ -210,7 +251,7 @@ export default function TodayPage() {
                 const kd = new Date(Date.now() + 9 * 3600 * 1000);
                 const today = `${kd.getUTCFullYear()}-${String(kd.getUTCMonth() + 1).padStart(2, "0")}-${String(kd.getUTCDate()).padStart(2, "0")}`;
                 const RT = /오늘 해야 하는 것|전략 성과|최근 30일|Report|리포트|브리핑|Morning|Evening|Started|Status/i;
-                const IMP = /매수|매도|체결|손절|익절|승인|신호|차단|자율|서킷|circuit|오류|error|급등|급락|주문|신고가|OPEN|CLOSED/i;
+                const IMP = /매수|매도|체결|손절|익절|승인|신호|차단|자율|서킷|circuit|오류|error|급등|급락|주문|신고가|대결|승부|채점|리그|OPEN|CLOSED/i;
                 const impNotis = notis.filter((n) => {
                   const ts = String(n.sent_at || n.created_at || "");
                   const txt = `${n.title || ""} ${n.noti_type || ""} ${n.body || ""}`;
@@ -279,6 +320,26 @@ export default function TodayPage() {
           {blocked.length > 0 && (
             <button className="td-link" onClick={() => router.push("/pwa?tab=report&sec=verify")}>무엇을 왜 걸렀나 →</button>
           )}
+
+          {/* [FB-2 §2.6] 4대 자산축 요약 + 안내 — 각 줄을 누르면 해당 페이지로. 나열이 아니라 안내(원칙1). */}
+          <div className="td-nav">
+            {domains.map((d) => (
+              <button className="td-nav-row" key={d.key} onClick={() => router.push(d.href)}>
+                <span className="td-nav-ic">{d.ic}</span>
+                <span className="td-nav-body">
+                  <span className="td-nav-t">{d.title}</span>
+                  <span className="td-nav-s">{d.line}</span>
+                </span>
+                <span className="td-nav-go">→</span>
+              </button>
+            ))}
+          </div>
+
+          {/* [FB-2 §2.6] 보조 행동 유도 — 관망일에만(매수후보 CTA와 중복 방지). */}
+          {todayCta && (
+            <button className="td-actcta" onClick={() => router.push(todayCta.href)}>{todayCta.label}</button>
+          )}
+
           {/* [N9] 자산을 묶어 본 판단 — 하루 1개. 주식·ETF·부동산을 따로 보면 안 보이는 것. */}
           {insight && (
             <div className="td-x">
@@ -358,6 +419,19 @@ export default function TodayPage() {
         .td-badge.quiet { color: var(--color-ink-3); background: var(--color-card-soft, var(--color-line)); }
         /* [FB-2] 행동 유도 CTA — 결정 대기(빨강)와 구분되는 주 액션 톤 */
         .td-cta2 { width: 100%; margin-top: 10px; min-height: 44px; border: none; border-radius: 11px; background: var(--color-primary); color: #fff; font-size: 0.86rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        /* [FB-2 §2.6] 4대 자산축 안내 리스트 */
+        .td-nav { margin-top: 12px; display: flex; flex-direction: column; border-top: 1px solid var(--color-line); }
+        .td-nav-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 11px 2px; background: none; border: none; border-bottom: 1px solid var(--color-line); cursor: pointer; font-family: var(--font-sans); min-height: 48px; }
+        .td-nav-row:last-child { border-bottom: none; }
+        .td-nav-row:active { background: var(--color-card-soft, var(--color-line)); }
+        .td-nav-ic { flex: none; font-size: 17px; width: 24px; text-align: center; }
+        .td-nav-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .td-nav-t { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); }
+        .td-nav-s { font-size: 0.74rem; font-weight: 600; color: var(--color-ink-2); word-break: keep-all; line-height: 1.4; }
+        .td-nav-go { flex: none; font-size: 0.9rem; font-weight: 800; color: var(--color-primary); }
+        /* [FB-2 §2.6] 보조 행동 유도 CTA */
+        .td-actcta { width: 100%; margin-top: 12px; min-height: 46px; border: none; border-radius: 11px; background: var(--color-primary); color: #fff; font-size: 0.84rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .td-actcta:active { opacity: 0.9; }
         /* [FB-2] 나 vs AI 스코어보드 */
         .td-vs-badge { font-weight: 800; }
         .td-vs-badge.me { color: var(--color-success); }

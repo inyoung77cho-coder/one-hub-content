@@ -4,6 +4,7 @@
 // - 중요도·고정 우선으로 상위 헤드라인을 뽑고, 카테고리를 키워드 칩으로.
 // - 비어있으면 렌더 안 함. 탭하면 아래 상세 뉴스(#today-news)로 스크롤.
 import { useEffect, useState } from "react";
+import BriefTimestamp from "./BriefTimestamp";
 
 const CAT = {
   global: "글로벌", macro: "거시", markets: "증시",
@@ -31,6 +32,9 @@ export default function TodayNewsTop() {
   const heads = sorted.slice(0, 3);
   const keywords = [];
   items.forEach((it) => { const k = CAT[it.category] || "시사"; if (!keywords.includes(k)) keywords.push(k); });
+  // [FB-2 §2.5·§1-1] market brief 등록 시각 — 가장 최근 게시분의 created_at 을 '등록 시각'으로 고정 노출.
+  //   '방금'·'실시간' 금지. 며칠 전 자료면 며칠 전으로 정직하게 보인다.
+  const latestAt = items.reduce((mx, it) => (it.created_at && (!mx || it.created_at > mx) ? it.created_at : mx), null);
 
   const goDetail = () => {
     try { document.getElementById("today-news")?.scrollIntoView({ behavior: "smooth" }); } catch (e) {}
@@ -43,6 +47,7 @@ export default function TodayNewsTop() {
         <span className="tnt-cnt">{items.length}건</span>
         <span className="tnt-go">전체 보기 ↓</span>
       </div>
+      {latestAt && <div className="tnt-reg"><BriefTimestamp at={latestAt} label="등록" /></div>}
       <div className="tnt-kw">
         {keywords.slice(0, 6).map((k, i) => <span className="tnt-chip" key={i}>#{k}</span>)}
       </div>
@@ -62,6 +67,7 @@ export default function TodayNewsTop() {
         .tnt-title { font-size: 15px; font-weight: 800; color: #12213B; }
         .tnt-cnt { font-size: 11.5px; font-weight: 800; color: #2F6BFF; background: #E4EDFF; border-radius: 6px; padding: 2px 7px; }
         .tnt-go { margin-left: auto; font-size: 12px; font-weight: 800; color: #2F6BFF; }
+        .tnt-reg { margin: -4px 0 9px; }
         .tnt-kw { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
         .tnt-chip { font-size: 11px; font-weight: 700; color: #3A5C97; background: #E7EEFC; border-radius: 6px; padding: 3px 8px; }
         .tnt-heads { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
