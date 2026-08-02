@@ -266,7 +266,8 @@ export default function PWADashboard({ latestReport }) {
     return () => window.removeEventListener('onehub-game-change', load);
   }, []);
   // [S3/G2] AI 트러스트 3섹션 서브내비(vs/verify/archive)를 URL(?sec=)로 유지 — 뒤로가기·딥링크(F4) 지원
-  const [trustSec, setTrustSec] = useTabState('sec', ['vs', 'verify', 'archive'], 'vs');
+  // [FB-4 §4.2] 정직성 브랜드 강화 — AI 페이지는 '자기검증'을 앞세운다(기본 진입 섹션).
+  const [trustSec, setTrustSec] = useTabState('sec', ['verify', 'vs', 'archive'], 'verify');
   const [recSort, setRecSort] = useState('interest'); // [S7.2] 추천 정렬(interest/upside)
   const [holdSort, setHoldSort] = useState('urgency'); // [S-2] 보유 정렬(urgency/value)
   const [autoWatchNote, setAutoWatchNote] = useState([]); // [S-6] 추천해제→자동 관망 편입 알림
@@ -2312,7 +2313,7 @@ export default function PWADashboard({ latestReport }) {
 
             {/* [S2.2] AI 트러스트 3섹션 서브내비 — 나vsAI 승부 / 자기검증 / 리포트 아카이브 */}
             <div className="trust-nav" role="tablist" aria-label="AI 트러스트 섹션">
-              {[['vs','🥊 나 vs AI'],['verify','🔬 자기검증'],['archive','🗂 리포트 아카이브']].map(([k,l]) => (
+              {[['verify','🔬 자기검증'],['vs','🥊 나 vs AI'],['archive','🗂 리포트 아카이브']].map(([k,l]) => (
                 <button key={k} role="tab" aria-selected={trustSec===k} className={`trust-nav-btn ${trustSec===k?'on':''}`} onClick={() => setTrustSec(k)}>{l}</button>
               ))}
             </div>
@@ -2455,6 +2456,32 @@ export default function PWADashboard({ latestReport }) {
                       <button className="vs-empty-btn" onClick={() => setTab('recommend')}>⚔ AI와 첫 승부 시작하기</button>
                     </div>
                   )}
+                </section>
+              );
+            })()}
+
+            {/* [FB-4 §4.1] 나 vs AI 일자별 — 판단을 남긴 날짜별로 누적 현황을 한눈에. ledger.ts 기준(KST). */}
+            {ledger.length > 0 && (() => {
+              const byDay = {};
+              ledger.forEach((e) => {
+                const key = new Date((e.ts || 0) + 9 * 3600000).toISOString().slice(0, 10);
+                byDay[key] = byDay[key] || { take: 0, pass: 0 };
+                if (e.decision === 'take') byDay[key].take++; else byDay[key].pass++;
+              });
+              const days = Object.entries(byDay).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 7);
+              return (
+                <section className="pwa-card vsday-card">
+                  <span className="pwa-card-label">📅 나 vs AI · 일자별 판단</span>
+                  <div className="vsday-list">
+                    {days.map(([d, v]) => (
+                      <div className="vsday-row" key={d}>
+                        <span className="vsday-d">{d.slice(5)}</span>
+                        <span className="vsday-cnt">판단 {v.take + v.pass}건</span>
+                        <span className="vsday-tp">샀어요 {v.take} · 관망 {v.pass}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="vsday-foot">판단을 남긴 날짜별 기록입니다 · 각 판단은 3·7일 뒤 실제 수익으로 채점됩니다.</p>
                 </section>
               );
             })()}
@@ -4365,6 +4392,14 @@ export default function PWADashboard({ latestReport }) {
         .pl-asof { font-size: 0.66rem; font-weight: 700; color: var(--color-ink-3); margin: 2px 0 4px; }
         .pl-foot { font-size: 0.64rem; color: var(--text-tertiary); line-height: 1.5; margin-top: 8px; word-break: keep-all; }
         .vs-def { font-size: 0.74rem; color: var(--text-secondary); line-height: 1.55; margin: 10px 0 4px; word-break: keep-all; }
+        /* [FB-4 §4.1] 나 vs AI 일자별 */
+        .vsday-list { display: flex; flex-direction: column; margin-top: 8px; }
+        .vsday-row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--color-line); }
+        .vsday-row:last-child { border-bottom: none; }
+        .vsday-d { flex: none; width: 44px; font-size: 0.78rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+        .vsday-cnt { flex: none; font-size: 0.74rem; font-weight: 700; color: var(--color-primary); }
+        .vsday-tp { flex: 1; text-align: right; font-size: 0.74rem; font-weight: 600; color: var(--text-secondary); }
+        .vsday-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 9px; line-height: 1.5; word-break: keep-all; }
         .vs-def b { color: var(--text-primary); font-weight: 700; }
         .vs-row { margin-top: 12px; padding: 12px; background: var(--color-card-soft); border-radius: 14px; }
         .vs-row-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
