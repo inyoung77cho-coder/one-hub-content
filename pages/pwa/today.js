@@ -4,12 +4,17 @@
 //   — 이건 이 앱의 브랜드(사후검증·투명한 실패 공개)와 정확히 일치하고, 다른 앱엔 없는 콘텐츠다.
 //   데이터는 전부 기존 소스: 원장(lib/ledger) · /api/pwa-dashboard · /api/pwa-pending ·
 //   /api/pwa/re/feed · lib/verdictLedger(판단 기록). 새로 만든 저장소 없음.
+import fs from "fs";
+import path from "path";
+import matter from "gray-matter";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import { getTrader, useTrader } from "../../lib/trader";
 import { dedupBy } from "../../lib/useDedup";
 import { getLedger as getAssetLedger } from "../../lib/ledger";
 import ReportTeaser from "../../components/ReportTeaser";
+import AutoReportCard from "../../components/AutoReportCard";
+import HoldingsNews from "../../components/HoldingsNews";
 import TodayNews from "../../components/TodayNews";
 import TodayNewsTop from "../../components/TodayNewsTop";
 import { getLedger as getDecisionLedger, computeShowdown } from "../../lib/verdictLedger";
@@ -33,7 +38,7 @@ function parsePositions(dash) {
   return Array.isArray(p) ? p : [];
 }
 
-export default function TodayPage() {
+export default function TodayPage({ reports }) {
   const router = useRouter();
   const [trader] = useTrader();
   const [dash, setDash] = useState(null);
@@ -355,6 +360,12 @@ export default function TodayPage() {
             총손익(당일변동 아님)을 보여줘 자산 화면과 어긋남 ③ 손절임박은 위 '결정 대기', 전체 포트는
             '자산' 화면과 중복. 중요한 변동은 결정 대기·알림 카드로 대체. */}
 
+        {/* ④ [FB-2 §2.4] 내 보유종목 관련 뉴스 — 내가 산 주식/ETF 중심. macro/관련/onehub 3층. 없으면 숨김. */}
+        <HoldingsNews trader={trader} />
+
+        {/* ⑤ [FB-2 §2.7] 자동 리포트 요약 — 주식 D/W(실제 요약)·부동산·ETF 링크. '부동산 정보 보드' 대체. */}
+        <AutoReportCard reports={reports} />
+
         {/* 🏠 부동산 소식 — CA 엔진이 운영자 큐레이션한 지역 동향/제보(board). 실거래 feed 는 현재 비어
             표시 안 하고, 승인 게시된 CA 정보만. 데이터 없으면 카드 자체가 안 뜬다(빈 자리 방지). */}
         <ReportTeaser />
@@ -492,4 +503,29 @@ export default function TodayPage() {
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>
   );
+}
+
+// [FB-2 §2.7] 자동 리포트 최신 요약을 빌드타임에 읽어 AutoReportCard 로 주입.
+//   런타임 API 없이 content/*.md frontmatter 의 실제 insight 만 사용(날조 없음).
+function latestFrontmatter(subdir) {
+  try {
+    const dir = path.join(process.cwd(), "content", subdir);
+    if (!fs.existsSync(dir)) return null;
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".md")).sort().reverse();
+    for (const f of files) {
+      const { data } = matter(fs.readFileSync(path.join(dir, f), "utf8"));
+      if (data && data.published !== false) return data;
+    }
+  } catch (e) {}
+  return null;
+}
+
+export async function getStaticProps() {
+  const d = latestFrontmatter("daily");
+  const w = latestFrontmatter("weekly");
+  const reports = {
+    daily: d ? { insight: d.insight || d.title || null, date: d.date || null, slug: d.slug || null } : null,
+    weekly: w ? { insight: w.insight || w.title || null, week: w.week || null, date: w.date || null, slug: w.slug || null } : null,
+  };
+  return { props: { reports }, revalidate: 600 };
 }
