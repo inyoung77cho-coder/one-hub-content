@@ -118,7 +118,7 @@ export default function ApiKeySettings() {
                 초대코드 확인
               </div>
               <p style={{ fontSize: "0.8rem", color: "var(--color-muted)", marginBottom: "1rem", lineHeight: 1.6 }}>
-                ONE-HUB는 초대받은 분만 참여할 수 있습니다. 운영자에게 받은 초대코드를 입력해주세요.
+                ONE-HUB는 초대받은 분만 참여할 수 있습니다. OneHub에서 받은 초대코드를 입력해주세요.
               </p>
               <input
                 value={inviteCode}

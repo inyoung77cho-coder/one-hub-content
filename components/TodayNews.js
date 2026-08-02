@@ -46,7 +46,7 @@ export default function TodayNews({ items: itemsProp }) {
 
   return (
     <section className="card tnw" id="today-news">
-      <div className="tnw-hh">📰 오늘의 뉴스 <span className="tnw-sub">운영자 큐레이션</span></div>
+      <div className="tnw-hh">📰 오늘의 뉴스 <span className="tnw-sub">OneHub 큐레이션</span></div>
       {latestAt && <div className="tnw-reg"><BriefTimestamp at={latestAt} label="등록" /></div>}
       {keywords.length > 0 && (
         <div className="tnw-kw">{keywords.slice(0, 6).map((k, i) => <span className="tnw-chip" key={i}>#{k}</span>)}</div>
@@ -66,7 +66,7 @@ export default function TodayNews({ items: itemsProp }) {
                 <ul className="tnw-body">{body.slice(0, 4).map((l, i) => <li key={i}>{l}</li>)}</ul>
               )}
               <div className="tnw-meta">
-                {it.source_label || "운영자 제공"}
+                {it.source_label || "OneHub 제공"}
                 {it.external_publication && <span className="tnw-ext"> · 🟡 외부보도 기반</span>}
                 <span className="tnw-when"> · {String(it.created_at || "").slice(0, 10)}</span>
               </div>
@@ -74,7 +74,7 @@ export default function TodayNews({ items: itemsProp }) {
           );
         })}
       </div>
-      <p className="tnw-foot">※ 운영자가 큐레이션한 뉴스 요약입니다. 개인정보·원문 전재는 자동 제거되며, 투자자문이 아닙니다.</p>
+      <p className="tnw-foot">※ OneHub가 큐레이션한 뉴스 요약입니다. 개인정보·원문 전재는 자동 제거되며, 투자자문이 아닙니다.</p>
 
       <style jsx>{`
         .tnw { }

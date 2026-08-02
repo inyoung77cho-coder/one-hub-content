@@ -247,7 +247,7 @@ export default function TodayPage({ reports }) {
                 <div className="tn-item op" key={`op${i}`}>
                   <span className="tn-ic">🏢</span>
                   <div className="tn-b">
-                    <div className="tn-t">운영자 신고가 · {s.complex_name}{s.area_m2 ? ` ${Math.round(s.area_m2)}㎡` : ""}<span className="tn-src">운영자</span></div>
+                    <div className="tn-t">OneHub 신고가 · {s.complex_name}{s.area_m2 ? ` ${Math.round(s.area_m2)}㎡` : ""}<span className="tn-src">OneHub</span></div>
                     <div className="tn-d">{s.price_manwon ? `${(s.price_manwon / 10000).toFixed(2)}억` : ""} · {s.kind || "신고"}{s.status === "tentative" ? " · 미확정(참고)" : ""}</div>
                   </div>
                   {s.created_at && <span className="tn-ts">{String(s.created_at).slice(5, 16)}</span>}
@@ -290,7 +290,7 @@ export default function TodayPage({ reports }) {
                       <div className={`tn-item ${n.is_read ? "" : "unread"}`} key={key} onClick={() => hasDetail && setNotiOpen(open ? null : key)} style={{ cursor: hasDetail ? "pointer" : "default" }}>
                         <span className="tn-ic">{ic}</span>
                         <div className="tn-b">
-                          <div className="tn-t">{title}{isOp && <span className="tn-src">운영자</span>}{hasDetail && <span className="tn-more">{open ? "▲" : "▾"}</span>}</div>
+                          <div className="tn-t">{title}{isOp && <span className="tn-src">OneHub</span>}{hasDetail && <span className="tn-more">{open ? "▲" : "▾"}</span>}</div>
                           {hasDetail && open && <div className="tn-d">{body}</div>}
                         </div>
                         {when && <span className="tn-ts">{when}</span>}

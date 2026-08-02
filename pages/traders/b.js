@@ -71,7 +71,7 @@ export default function TraderB() {
 
               <div style={{ background: "#E6F1FB", border: "1px solid #85B7EB", borderRadius: "12px", padding: "1.25rem" }}>
                 <div style={{ fontSize: "11px", fontWeight: 600, color: "#185FA5", marginBottom: "8px", fontFamily: "Space Mono, monospace" }}>
-                  TRADER A — 운영자
+                  TRADER A — OneHub
                 </div>
                 {traderA ? (
                   <>
@@ -276,7 +276,7 @@ export default function TraderB() {
             </h2>
             <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {[
-                { step: "01", title: "지인 초대 필요", desc: "현재 운영자의 초대를 받은 분만 참여할 수 있습니다." },
+                { step: "01", title: "지인 초대 필요", desc: "현재 OneHub의 초대를 받은 분만 참여할 수 있습니다." },
                 { step: "02", title: "KIS API 발급", desc: "KIS 홈트레이딩 사이트 → KIS Developers에서 API 발급. App Key + App Secret 필요." },
                 { step: "03", title: "API 키 등록", desc: "아래 버튼을 눌러 API 키를 입력하세요. AES-256으로 암호화되어 안전하게 보관됩니다." },
                 { step: "04", title: "자동매매 시작", desc: "AI가 매일 9시 5분부터 자동으로 매매를 실행합니다. 텔레그램으로 실시간 알림을 받습니다." },

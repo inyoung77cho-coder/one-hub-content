@@ -98,7 +98,7 @@ export default function Privacy() {
         <p>개인정보 관련 열람·정정·삭제·탈퇴·문의는 아래로 접수합니다.</p>
         <ul>
           <li>문의 채널: 서비스 내 <b>💬 피드백</b></li>
-          <li>보호책임자: ONE·HUB 운영자</li>
+          <li>보호책임자: ONE·HUB</li>
         </ul>
         <p className="fine">개인정보 침해에 대한 신고·상담은 개인정보침해신고센터(privacy.kisa.or.kr, 국번없이 118),
           대검찰청·경찰청 사이버수사대 등에 문의할 수 있습니다.</p>

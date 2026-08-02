@@ -1385,7 +1385,7 @@ function AlertSettingsCard() {
           )}
       </div>
 
-      <p className="ac-foot">※ 알림을 받으려면 <b>설정 → 알림</b>에서 웹푸시 알림을 켜 주세요. 급매 알림(운영자 호가 기반)은 준비 중입니다.</p>
+      <p className="ac-foot">※ 알림을 받으려면 <b>설정 → 알림</b>에서 웹푸시 알림을 켜 주세요. 급매 알림(OneHub 호가 기반)은 준비 중입니다.</p>
       {toast && <div className="ac-toast">{toast}</div>}
 
       <style jsx>{`

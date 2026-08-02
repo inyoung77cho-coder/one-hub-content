@@ -1061,7 +1061,7 @@ export default function PWADashboard({ latestReport }) {
                     <div className="noti-item op" key={`op${i}`}>
                       <span className="noti-ic">🏢</span>
                       <div className="noti-b">
-                        <div className="noti-t">운영자 신고가 · {s.complex_name}{s.area_m2 ? ` ${Math.round(s.area_m2)}㎡` : ''}<span className="noti-src">운영자</span></div>
+                        <div className="noti-t">OneHub 신고가 · {s.complex_name}{s.area_m2 ? ` ${Math.round(s.area_m2)}㎡` : ''}<span className="noti-src">OneHub</span></div>
                         <div className="noti-d open">{s.price_manwon ? `${(s.price_manwon / 10000).toFixed(2)}억` : ''} · {s.kind || '신고'}{s.reporter ? ` · ${s.reporter}` : ''}{s.status === 'tentative' ? ' · 미확정(참고)' : ''}</div>
                       </div>
                       {s.created_at && <span className="noti-ts mono">{String(s.created_at).slice(5, 16)}</span>}
@@ -1082,7 +1082,7 @@ export default function PWADashboard({ latestReport }) {
                       <div className={`noti-item ${n.is_read ? '' : 'unread'}`} key={i} onClick={() => hasDetail && setNotiOpen(open ? null : i)} style={{ cursor: hasDetail ? 'pointer' : 'default' }}>
                         <span className="noti-ic">{ic}</span>
                         <div className="noti-b">
-                          <div className="noti-t">{title}{isOp && <span className="noti-src">운영자</span>}{hasDetail && <span className="noti-more">{open ? '▲' : '▾'}</span>}</div>
+                          <div className="noti-t">{title}{isOp && <span className="noti-src">OneHub</span>}{hasDetail && <span className="noti-more">{open ? '▲' : '▾'}</span>}</div>
                           {hasDetail && open && <div className="noti-d open">{body}</div>}
                         </div>
                         {when && <span className="noti-ts mono">{when}</span>}
@@ -1090,7 +1090,7 @@ export default function PWADashboard({ latestReport }) {
                     );
                   })}
                 </div>
-                <p className="noti-foot">📱 텔레그램으로 받은 알림과 운영자 신고가를 여기서 확인합니다 · 항목을 누르면 상세가 펼쳐집니다.</p>
+                <p className="noti-foot">📱 텔레그램으로 받은 알림과 OneHub 신고가를 여기서 확인합니다 · 항목을 누르면 상세가 펼쳐집니다.</p>
               </section>
             )}
             {!data && !error && (
