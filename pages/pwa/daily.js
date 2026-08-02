@@ -31,7 +31,7 @@ export default function PwaDaily({ posts, postsB }) {
               <button className="dc-top" onClick={() => setOpen(isOpen ? null : i)} aria-expanded={isOpen}>
                 <span className="dc-date">{p.date}</span>
                 <span className="dc-regime" style={{ color: r.c }}>{r.l}</span>
-                <span className="dc-heat" style={{ color: heatColor(p.heat_score) }}>Heat {p.heat_score}</span>
+                {p.heat_score != null && <span className="dc-heat" style={{ color: heatColor(p.heat_score) }}>Heat {p.heat_score}</span>}
                 <span className="dc-trades">매매 {p.trade_count}</span>
                 <span className="dc-caret">{isOpen ? "▾" : "▸"}</span>
               </button>
@@ -63,7 +63,7 @@ function load(dir) {
     const d = path.join(process.cwd(), "content", dir);
     return fs.readdirSync(d).filter((f) => f.endsWith(".md")).sort().reverse().map((file) => {
       const { data } = matter(fs.readFileSync(path.join(d, file), "utf-8"));
-      return { date: data.date || file.replace(".md", ""), regime: data.regime || "SIDEWAYS", heat_score: data.heat_score || 50, insight: data.insight || "", trade_count: data.trade_count || 0 };
+      return { date: data.date || file.replace(".md", ""), regime: data.regime || "SIDEWAYS", heat_score: data.heat_score ?? null, insight: data.insight || "", trade_count: data.trade_count || 0 };
     });
   } catch (e) { return []; }
 }

@@ -135,7 +135,7 @@ export default function DailyReport({ meta, body, prev, next }) {
 
           <span className="status-divider">|</span>
 
-          <span className={`heat-indicator ${heatColor(meta.heat_grade)}`}>Heat {meta.heat_score} · {meta.heat_grade}</span>
+          {meta.heat_score != null && <span className={`heat-indicator ${heatColor(meta.heat_grade)}`}>Heat {meta.heat_score}{meta.heat_grade ? ` · ${meta.heat_grade}` : ""}</span>}
 
         </div>
 
@@ -159,7 +159,7 @@ export default function DailyReport({ meta, body, prev, next }) {
 
                 <span className={`regime-badge-lg ${regimeClass(meta.regime)}`}>{regimeIcon(meta.regime)} {meta.regime}</span>
 
-                <span className={`heat-indicator ${heatColor(meta.heat_grade)}`}>Heat {meta.heat_score}</span>
+                {meta.heat_score != null && <span className={`heat-indicator ${heatColor(meta.heat_grade)}`}>Heat {meta.heat_score}</span>}
 
                 <span className="trade-count-badge">매매 {meta.trade_count}건</span>
 
@@ -462,9 +462,9 @@ export async function getStaticProps({ params }) {
 
         regime:      data.regime      || 'SIDEWAYS',
 
-        heat_score:  data.heat_score  || 50,
+        heat_score:  data.heat_score  ?? null,
 
-        heat_grade:  data.heat_grade  || 'COOL',
+        heat_grade:  data.heat_grade  || null,
 
         pnl_emoji:   data.pnl_emoji   || '➖',
 
