@@ -27,7 +27,7 @@ export default function PwaWeekly({ reports }) {
               </div>
               {(w.monday || w.friday) && <div className="wc-range">{w.monday}{w.friday ? ` ~ ${w.friday}` : ""}</div>}
               <div className="wc-stats">
-                <div className="ws"><span>평균 과열도</span><b style={{ color: heatColor(w.avg_heat) }}>{w.avg_heat}</b></div>
+                <div className="ws"><span>평균 과열도</span><b style={w.avg_heat != null ? { color: heatColor(w.avg_heat) } : undefined}>{w.avg_heat != null ? w.avg_heat : "—"}</b></div>
                 <div className="ws"><span>매매</span><b>{w.total_trades}건</b></div>
               </div>
             </button>
@@ -61,7 +61,7 @@ export async function getStaticProps() {
     const week = data.week || data.slug || f.replace(".md", "");
     if (seen.has(week)) return acc;
     seen.add(week);
-    acc.push({ week, monday: data.monday || data.mon || "", friday: data.friday || data.fri || "", dominant_regime: data.dominant_regime || "SIDEWAYS", avg_heat: data.avg_heat || 50, total_trades: data.total_trades || data.trade_count || 0 });
+    acc.push({ week, monday: data.monday || data.mon || "", friday: data.friday || data.fri || "", dominant_regime: data.dominant_regime || "SIDEWAYS", avg_heat: data.avg_heat ?? null, total_trades: data.total_trades || data.trade_count || 0 });
     return acc;
   }, []);
   return { props: { reports } };

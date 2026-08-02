@@ -20,7 +20,7 @@ export default function WeeklyReport({ meta, body }) {
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
               <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#94A3B8" }}>{meta.monday} ~ {meta.friday}</span>
               <span style={{ fontFamily: "monospace", fontSize: "10px", fontWeight: 700, padding: "2px 8px", borderRadius: "4px", background: regimeBg, color: regimeColor }}>{meta.dominant_regime}</span>
-              <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#94A3B8" }}>Heat {meta.avg_heat}/100</span>
+              {meta.avg_heat != null && <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#94A3B8" }}>Heat {meta.avg_heat}/100</span>}
               <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#94A3B8" }}>매매 {meta.total_trades}건</span>
             </div>
             <h1 style={{ fontSize: "22px", fontWeight: 700, color: "#12213B", margin: "0 0 8px", lineHeight: 1.4 }}>{meta.week} 주간 운영 보고서</h1>
@@ -39,7 +39,7 @@ export default function WeeklyReport({ meta, body }) {
                 { label: "운영 일수", value: meta.trade_days + "일" },
                 { label: "총 매매", value: meta.total_trades + "건" },
                 { label: "Regime", value: meta.dominant_regime },
-                { label: "Avg Heat", value: meta.avg_heat + "/100" },
+                { label: "Avg Heat", value: meta.avg_heat != null ? meta.avg_heat + "/100" : "—" },
               ].map((item, i) => (
                 <div key={i} style={{ background: "#F4F9FF", borderRadius: "8px", padding: "12px 14px" }}>
                   <div style={{ fontFamily: "monospace", fontSize: "10px", color: "#94A3B8", marginBottom: "6px" }}>{item.label}</div>
@@ -107,7 +107,7 @@ export async function getStaticProps({ params }) {
         monday:            data.monday           || '',
         friday:            data.friday           || '',
         dominant_regime:   data.dominant_regime  || 'SIDEWAYS',
-        avg_heat:          data.avg_heat         || 50,
+        avg_heat:          data.avg_heat         ?? null,
         total_trades:      data.total_trades     || 0,
         trade_days:        data.trade_days       || 0,
         insight:           data.insight          || '',

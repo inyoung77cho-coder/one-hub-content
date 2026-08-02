@@ -12,7 +12,8 @@ export default function WeeklyIndex({ reports }) {
 
   // ① 최근 4주 KPI 계산
   const recent4 = reports.slice(0, 4)
-  const avgHeat   = recent4.length ? Math.round(recent4.reduce((s, r) => s + (r.avg_heat || 0), 0) / recent4.length) : null
+  const heatSamples = recent4.filter((r) => r.avg_heat != null)
+  const avgHeat   = heatSamples.length ? Math.round(heatSamples.reduce((s, r) => s + r.avg_heat, 0) / heatSamples.length) : null
   const totalTrades = recent4.reduce((s, r) => s + (r.total_trades || 0), 0)
   const recentReports = reports.filter(r => r.dominant_regime === 'BEAR' || r.dominant_regime === 'BULL' || r.dominant_regime === 'SIDEWAYS')
 
@@ -99,7 +100,7 @@ export default function WeeklyIndex({ reports }) {
                       background: regimeBg(r.dominant_regime), color: regimeClr(r.dominant_regime) }}>
                       {r.dominant_regime || "SIDEWAYS"}
                     </span>
-                    <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#94A3B8" }}>Heat {r.avg_heat}/100</span>
+                    {r.avg_heat != null && <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#94A3B8" }}>Heat {r.avg_heat}/100</span>}
                     <span style={{ fontFamily: "monospace", fontSize: "11px", color: "#94A3B8" }}>매매 {r.total_trades}건</span>
                   </div>
                 </div>
@@ -129,7 +130,7 @@ export async function getStaticProps() {
       monday: data.monday || data.mon || '',
       friday: data.friday || data.fri || '',
       dominant_regime: data.dominant_regime || 'SIDEWAYS',
-      avg_heat: data.avg_heat || 50,
+      avg_heat: data.avg_heat ?? null,
       total_trades: data.total_trades || data.trade_count || 0,
     })
     return acc
