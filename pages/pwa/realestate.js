@@ -295,6 +295,26 @@ export default function RealEstateDashboard() {
         </div>
       )}
 
+      {/* [§3.7·§3.8] 내 단지 포지션 — 최상단(내 단지 가격 최우선). 대장 대비 어느 위치인지 + 대장 트렌드. */}
+      {myProp?.name && brief && !brief.error && (() => {
+        const mineUk = repEvalUk > 0 ? repEvalUk : null;
+        const leadUk = brief.leader_price != null ? Number(brief.leader_price) : null;
+        const ratio = mineUk != null && leadUk ? Math.round((mineUk / leadUk) * 100) : null;
+        return (
+          <section className="card mypos">
+            <div className="mypos-h">🏠 내 단지 포지션</div>
+            <div className="mypos-main"><b>{myProp.name}</b>{mineUk != null ? <> · {uk(mineUk)}</> : null}</div>
+            <div className="mypos-vs">
+              {ratio != null
+                ? <>대장 <b>{brief.leader}</b> {uk(leadUk)} 대비 <b className="mypos-r">{ratio}% 수준</b></>
+                : <>이 지역 대장 <b>{brief.leader}</b> {uk(leadUk)}</>}
+            </div>
+            <div className="mypos-trend">대장 트렌드 · 분기 {pct(brief.chg_q)} · 연간 {pct(brief.chg_yr)}</div>
+            <button className="mypos-cta" onClick={() => { try { document.querySelector(".myprop-card")?.scrollIntoView({ behavior: "smooth" }); } catch (e) {} }}>내 단지 상세 보기 →</button>
+          </section>
+        );
+      })()}
+
       {/* 1) HERO — 시장 브리핑 (다크 네이비 히어로) */}
       <section className="hero">
         <div className="eyebrow">
@@ -933,6 +953,15 @@ export default function RealEstateDashboard() {
         .err { background: var(--color-danger-soft); color: var(--color-danger); padding: 10px 12px; border-radius: 10px; font-size: 0.82rem; margin-bottom: 12px; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow-card); }
         /* HERO — 시장 브리핑 */
+        /* [§3.7·§3.8] 내 단지 포지션 카드 — 최상단 */
+        .mypos { border-left: 4px solid var(--color-primary); }
+        .mypos-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
+        .mypos-main { font-size: 1rem; font-weight: 700; color: var(--color-ink); word-break: keep-all; }
+        .mypos-main b { font-weight: 800; }
+        .mypos-vs { font-size: 0.84rem; font-weight: 600; color: var(--color-ink-2); margin-top: 6px; word-break: keep-all; line-height: 1.5; }
+        .mypos-r { color: var(--color-primary); font-weight: 800; }
+        .mypos-trend { font-size: 0.76rem; font-weight: 600; color: var(--color-ink-3); margin-top: 6px; font-variant-numeric: tabular-nums; }
+        .mypos-cta { margin-top: 11px; min-height: 42px; width: 100%; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-primary); border-radius: 10px; font-size: 0.8rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 20px 18px; box-shadow: var(--shadow-float); margin-bottom: 14px; }
         .hero .eyebrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
         .hero .lbl { font-size: 12px; font-weight: 700; color: var(--hero-ink-sub); }
