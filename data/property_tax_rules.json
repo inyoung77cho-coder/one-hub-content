@@ -1,0 +1,70 @@
+{
+  "_meta": {
+    "version": "2026.1",
+    "updated": "2026-08-02",
+    "source": "지방세법(재산세)·종합부동산세법(2026 기준) 요약. 종부세 세율표는 여러 출처 교차 확인했으나 국세청 원문 대조는 못함 — 실제 세액은 반드시 홈택스·세무 전문가와 확인할 것.",
+    "disclaimer": "본 계산은 참고용 추정치이며 세무자문이 아닙니다. 재산세액공제·세부담상한·감면 특례 등 일부 항목은 반영되지 않았습니다. 실제 고지·신고 세액은 국세청 홈택스 또는 세무 전문가를 통해 확인하세요."
+  },
+  "propertyTax": {
+    "fairMarketRatio": {
+      "general": 0.6,
+      "oneHouseBands": [
+        { "upTo": 300000000, "ratio": 0.43 },
+        { "upTo": 600000000, "ratio": 0.44 },
+        { "upTo": null, "ratio": 0.45 }
+      ],
+      "oneHouseSpecialCapWon": 900000000
+    },
+    "brackets": {
+      "general": [
+        { "upTo": 60000000, "rate": 0.001 },
+        { "upTo": 150000000, "rate": 0.0015 },
+        { "upTo": 300000000, "rate": 0.0025 },
+        { "upTo": null, "rate": 0.004 }
+      ],
+      "oneHouseSpecial": [
+        { "upTo": 60000000, "rate": 0.0005 },
+        { "upTo": 150000000, "rate": 0.001 },
+        { "upTo": 300000000, "rate": 0.002 },
+        { "upTo": null, "rate": 0.0035 }
+      ]
+    },
+    "urbanAreaRate": 0.0014,
+    "localEduTaxRate": 0.2
+  },
+  "comprehensiveTax": {
+    "basicDeductionWon": { "oneHouse": 1200000000, "general": 900000000 },
+    "fairMarketRatio": 0.6,
+    "brackets": {
+      "upTo2Houses": [
+        { "upTo": 300000000, "rate": 0.005 },
+        { "upTo": 600000000, "rate": 0.007 },
+        { "upTo": 1200000000, "rate": 0.01 },
+        { "upTo": 2500000000, "rate": 0.013 },
+        { "upTo": 5000000000, "rate": 0.015 },
+        { "upTo": 9400000000, "rate": 0.02 },
+        { "upTo": null, "rate": 0.027 }
+      ],
+      "3HousesOrMore": [
+        { "upTo": 300000000, "rate": 0.005 },
+        { "upTo": 600000000, "rate": 0.007 },
+        { "upTo": 1200000000, "rate": 0.01 },
+        { "upTo": 2500000000, "rate": 0.02 },
+        { "upTo": 5000000000, "rate": 0.03 },
+        { "upTo": 9400000000, "rate": 0.04 },
+        { "upTo": null, "rate": 0.05 }
+      ]
+    },
+    "seniorCredit": [
+      { "minAge": 70, "rate": 0.4 },
+      { "minAge": 65, "rate": 0.3 },
+      { "minAge": 60, "rate": 0.2 }
+    ],
+    "longHoldCredit": [
+      { "minYears": 15, "rate": 0.5 },
+      { "minYears": 10, "rate": 0.4 },
+      { "minYears": 5, "rate": 0.2 }
+    ],
+    "combinedCreditCap": 0.8
+  }
+}

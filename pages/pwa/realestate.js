@@ -341,6 +341,16 @@ export default function RealEstateDashboard() {
       {/* 카톡방 수집정보 종합 리포트 → board 유도 (미검증 참고용) */}
       <ReportTeaser />
 
+      {/* [내 세금] 재산세·종부세 추정 계산기 */}
+      <a className="tax-nav" href="/pwa/tax">
+        <span className="tax-nav-ic">💰</span>
+        <span className="tax-nav-body">
+          <span className="tax-nav-t">내 세금</span>
+          <span className="tax-nav-s">공시가격으로 재산세·종부세 추정 계산</span>
+        </span>
+        <span className="tax-nav-go">→</span>
+      </a>
+
       {/* [P1-b] 관심단지 저평가 알림 — 조건 충족 시 웹푸시 자동 발송 */}
       <AlertSettingsCard />
 
@@ -1416,6 +1426,12 @@ function AlertSettingsCard() {
         .ac-foot { font-size: 0.72rem; color: var(--color-ink-3, #8A99B0); line-height: 1.55; margin: 12px 0 0; }
         .ac-toast { position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%); background: var(--color-ink, #12213B);
           color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+        .tax-nav { display: flex; align-items: center; gap: 12px; background: var(--color-card, #fff); border: 1px solid var(--color-line, #E8EEF7); border-radius: var(--radius-card, 14px); box-shadow: var(--shadow-card); padding: 16px; margin-bottom: 12px; text-decoration: none; }
+        .tax-nav-ic { font-size: 22px; flex: none; }
+        .tax-nav-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .tax-nav-t { font-size: 0.9rem; font-weight: 800; color: var(--color-ink, #12213B); }
+        .tax-nav-s { font-size: 0.76rem; color: var(--color-ink-2, #64748B); }
+        .tax-nav-go { font-size: 1rem; font-weight: 800; color: var(--color-primary, #2F6BFF); flex: none; }
       `}</style>
     </section>
   );
