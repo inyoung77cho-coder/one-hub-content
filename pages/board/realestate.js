@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import { useState } from 'react';
 import fs from 'fs';
 import path from 'path';
 import matter from 'gray-matter';
@@ -43,10 +44,21 @@ function ReportHighlight({ h }) {
 // 자유 형식: 지역별 카드 + 추세 칩 + (있으면) 단지 하이라이트. 구 리포트(trend/highlights
 // 없는 body_json)도 그대로 렌더된다 — 없는 필드는 조용히 생략.
 function ReportSection({ report }) {
+  const [open, setOpen] = useState(() => new Set());
+  const [allOpen, setAllOpen] = useState(false);
   if (!report || !report.body) return null;
   const b = report.body;
   const regions = Array.isArray(b.regions) ? b.regions : [];
   const themes = Array.isArray(b.themes) ? b.themes : [];
+
+  const toggle = (i) => {
+    setOpen((prev) => {
+      const next = new Set(prev);
+      next.has(i) ? next.delete(i) : next.add(i);
+      return next;
+    });
+  };
+
   return (
     <section className="rp-wrap">
       <div className="rp-badges">
@@ -57,30 +69,42 @@ function ReportSection({ report }) {
       {report.headline && <p className="rp-headline">{report.headline}</p>}
 
       {regions.length > 0 && (
-        <div className="rp-regions">
-          {regions.map((r, i) => {
-            const tr = r.trend && TREND[r.trend];
-            const highlights = Array.isArray(r.highlights) ? r.highlights : [];
-            return (
-              <div className="rp-region" key={i}>
-                <div className="rp-area-row">
-                  <span className="rp-area">{r.area}</span>
-                  {tr && (
-                    <span className="rp-trend" style={{ background: tr.bg, color: tr.fg }}>
-                      {tr.ico} {r.trend}
-                    </span>
+        <>
+          <div className="rp-regions-head">
+            <span className="rp-regions-count">지역 {regions.length}곳 · 관심 지역만 눌러서 확인하세요</span>
+            <button className="rp-toggle-all" onClick={() => setAllOpen((v) => !v)}>{allOpen ? '모두 접기' : '모두 펼치기'}</button>
+          </div>
+          <div className="rp-regions">
+            {regions.map((r, i) => {
+              const tr = r.trend && TREND[r.trend];
+              const highlights = Array.isArray(r.highlights) ? r.highlights : [];
+              const isOpen = allOpen || open.has(i);
+              return (
+                <div className={`rp-region ${isOpen ? 'open' : ''}`} key={i}>
+                  <button className="rp-area-row" onClick={() => toggle(i)} aria-expanded={isOpen}>
+                    <span className="rp-area">{r.area}</span>
+                    {tr && (
+                      <span className="rp-trend" style={{ background: tr.bg, color: tr.fg }}>
+                        {tr.ico} {r.trend}
+                      </span>
+                    )}
+                    <span className="rp-caret">{isOpen ? '▲' : '▼'}</span>
+                  </button>
+                  {isOpen && (
+                    <div className="rp-region-body">
+                      {r.note && <p className="rp-note">{r.note}</p>}
+                      {highlights.length > 0 && (
+                        <ul className="rp-hls">
+                          {highlights.map((h, j) => <ReportHighlight h={h} key={j} />)}
+                        </ul>
+                      )}
+                    </div>
                   )}
                 </div>
-                {r.note && <p className="rp-note">{r.note}</p>}
-                {highlights.length > 0 && (
-                  <ul className="rp-hls">
-                    {highlights.map((h, j) => <ReportHighlight h={h} key={j} />)}
-                  </ul>
-                )}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
       {themes.length > 0 && (
@@ -103,11 +127,17 @@ function ReportSection({ report }) {
         .rp-meta { font-size: 12px; color: #94A3B8; font-weight: 700; }
         .rp-title { font-size: 20px; font-weight: 800; color: #12213B; letter-spacing: -.4px; margin: 0 0 8px; }
         .rp-headline { font-size: 14.5px; color: #2F4A73; line-height: 1.6; font-weight: 700; margin: 0 0 18px; }
-        .rp-regions { display: flex; flex-direction: column; gap: 14px; margin-bottom: 18px; }
-        .rp-region { border: 1px solid #EEF2F8; border-left: 3px solid #2F6BFF; border-radius: 12px; padding: 14px 16px; background: #FBFCFF; }
-        .rp-area-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+        .rp-regions-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+        .rp-regions-count { font-size: 12px; font-weight: 700; color: #94A3B8; }
+        .rp-toggle-all { font-size: 12px; font-weight: 800; color: #2F6BFF; background: #EAF1FF; border: none; border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+        .rp-regions { display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px; }
+        .rp-region { border: 1px solid #EEF2F8; border-left: 3px solid #2F6BFF; border-radius: 12px; background: #FBFCFF; overflow: hidden; }
+        .rp-region.open { background: #FFFFFF; box-shadow: 0 4px 16px rgba(31,63,120,.05); }
+        .rp-area-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; width: 100%; text-align: left; background: none; border: none; cursor: pointer; padding: 14px 16px; font-family: inherit; }
         .rp-area { font-size: 14px; font-weight: 800; color: #2F6BFF; }
         .rp-trend { font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 6px; }
+        .rp-caret { margin-left: auto; font-size: 10px; color: #94A3B8; }
+        .rp-region-body { padding: 0 16px 14px; }
         .rp-note { font-size: 13px; color: #46566E; line-height: 1.62; margin: 0; }
         .rp-hls { list-style: none; margin: 10px 0 0; padding: 10px 0 0; border-top: 1px dashed #E1E9F5; display: flex; flex-direction: column; gap: 6px; }
         .rp-hl { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 12.5px; line-height: 1.5; }
@@ -152,7 +182,11 @@ function groupByDanji(items) {
       const d = String(r.posted_at || r.gathered_at || '');
       return d > mx ? d : mx;
     }, '');
-    groups.push({ danji, rows, latest });
+    // 같은 단지의 제보들이 동/지역을 다르게 남겼을 수도 있어 가장 흔한 값을 대표로 쓴다.
+    const dongCounts = new Map();
+    rows.forEach((r) => { if (r.dong) dongCounts.set(r.dong, (dongCounts.get(r.dong) || 0) + 1); });
+    const dong = [...dongCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+    groups.push({ danji, dong, rows, latest });
   }
   groups.sort((a, b) => String(b.latest).localeCompare(String(a.latest)));
   return groups;
@@ -187,7 +221,10 @@ function GatheredSection({ items = [], notice = '' }) {
             {groups.map((g) => (
               <div className="gt-danji" key={g.danji}>
                 <div className="gt-danji-h">
-                  <span className="gt-danji-name">{g.danji}</span>
+                  <span className="gt-danji-hb">
+                    <span className="gt-danji-name">{g.danji}</span>
+                    {g.dong && <span className="gt-danji-dong">📍 {g.dong}</span>}
+                  </span>
                   <span className="gt-danji-n">호가 {g.rows.length}건</span>
                 </div>
                 <div className="gt-rows">
@@ -247,8 +284,10 @@ function GatheredSection({ items = [], notice = '' }) {
         .gt-subhead.news { color: #3A5C97; }
         .gt-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
         .gt-danji { background: #FFFCF5; border: 1px dashed #F0C879; border-radius: 16px; padding: 16px 18px; }
-        .gt-danji-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #F3E6C6; }
+        .gt-danji-h { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #F3E6C6; }
+        .gt-danji-hb { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
         .gt-danji-name { font-size: 16px; font-weight: 800; color: #12213B; letter-spacing: -.3px; }
+        .gt-danji-dong { font-size: 11.5px; font-weight: 600; color: #94A3B8; }
         .gt-danji-n { font-size: 11.5px; font-weight: 800; color: #B45309; background: #FEF3C7; border-radius: 6px; padding: 2px 8px; white-space: nowrap; }
         .gt-rows { display: flex; flex-direction: column; gap: 10px; }
         .gt-row { border-bottom: 1px solid #F5EDD8; padding-bottom: 10px; }

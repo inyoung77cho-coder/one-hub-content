@@ -8,6 +8,6 @@ area: "49.5"
 partner: "죽전역상가전문"
 date: "2026-07-08"
 sample: true
-published: true
+published: false
 summary: "죽전역 상권 1층 코너. 유동인구 상위, 요식·카페 업종 적합."
 ---

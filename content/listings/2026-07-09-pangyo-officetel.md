@@ -8,6 +8,6 @@ area: "33.1"
 partner: "테크노밸리부동산"
 date: "2026-07-09"
 sample: true
-published: true
+published: false
 summary: "판교역 5분·풀옵션. IT 직주근접 수요 꾸준, 전세가율 안정 구간."
 ---
