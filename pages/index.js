@@ -457,6 +457,31 @@ export default function Home({ reports, stats }) {
             </div>
           </section>
 
+          {/* [FB-7 §7.3] 자동 리포트 홈 공개 — 분당 하이퍼로컬 SEO·유입. 매주 자동 생성되는 리포트를 홈에서. */}
+          <section style={{ paddingTop: 0 }}>
+            <div className="container">
+              <div className="sec-head">
+                <p className="eyebrow">AUTO REPORT</p>
+                <h2>매주 자동 생성되는 리포트, 홈에서 바로</h2>
+                <p>엔진이 국토부 실거래와 시장에서 확인된 자료를 종합해 매주 리포트를 씁니다. 확정과 미검증(🟡 참고)을 구분해 투명하게 공개합니다.</p>
+              </div>
+              <div className="channels">
+                <a className="channel" href="/board/realestate">
+                  <div className="ch-ic">🏠</div>
+                  <div className="ch-t">분당 부동산 주간 리포트</div>
+                  <div className="ch-d">대장 단지 흐름 · 실거래(확정)+시장확인(🟡 미검증) 종합</div>
+                  <span className="ch-cta">리포트 보기 →</span>
+                </a>
+                <a className="channel" href="/weekly">
+                  <div className="ch-ic">📊</div>
+                  <div className="ch-t">주식 주간 리포트</div>
+                  <div className="ch-d">국면 · 과열도 · 매매 요약 자동 발행</div>
+                  <span className="ch-cta">리포트 보기 →</span>
+                </a>
+              </div>
+            </div>
+          </section>
+
           {/* ROADMAP */}
           <section style={{ paddingTop: 0 }}>
             <div className="container">
