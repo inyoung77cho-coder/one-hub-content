@@ -2,40 +2,43 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useState, useEffect, useRef } from 'react';
 
+// [2026-08-02] 메뉴 4그룹으로 재구성 — 이전 4그룹(Market/AI/Content/Community)이
+//   합쳐 15개 링크라 복잡하다는 피드백. 사용 빈도가 낮은 일부(Engines·Market Center·
+//   AI Replay·Feedback)는 최상단 메뉴에서 빼되 페이지 자체는 삭제하지 않음(직접 URL 접근 가능).
 const MENUS = [
   {
-    label: 'Market',
+    label: '주식 vs AI',
     items: [
-      { label: 'Market Center', href: '/market-center', badge: 'NEW' },
-      { label: 'Decision Log',  href: '/decision-log' },
-      { label: 'AI Accuracy',   href: '/ai-accuracy' },
+      { label: 'AI와 대결하기',  href: '/pwa?tab=report&sec=vs', badge: 'HOT' },
+      { label: 'Decision Log', href: '/decision-log' },
+      { label: 'AI Accuracy',  href: '/ai-accuracy' },
+      { label: '주식 리포트',    href: '/weekly' },
+      { label: 'Trust',        href: '/trust' },
+      { label: 'Leaderboard',  href: '/leaderboard' },
     ],
   },
   {
-    label: 'AI',
+    label: '종합자산 관리',
     items: [
-      { label: 'AI Replay',   href: '/ai-replay',   badge: 'NEW' },
-      { label: 'Engines',     href: '/engines' },
-      { label: 'Trust',       href: '/trust' },
-      { label: 'Leaderboard', href: '/leaderboard', badge: 'NEW' },
+      { label: '내 자산 한눈에', href: '/pwa/assets' },
     ],
   },
   {
-    label: 'Content',
+    label: 'ETF·부동산',
+    items: [
+      { label: '부동산',       href: '/realestate' },
+      { label: '부동산 리포트', href: '/board/realestate' },
+      { label: 'ETF',         href: '/pwa/etf' },
+    ],
+  },
+  {
+    label: 'Blog·Community',
     items: [
       { label: 'Blog',            href: '/blog' },
-      { label: 'Weekly',          href: '/weekly' },
-      { label: 'Daily',           href: '/daily' },
-      { label: 'Learning Center', href: '/learning-center', badge: 'NEW' },
-    ],
-  },
-  {
-    label: 'Community',
-    items: [
-      { label: 'Community',  href: '/community' },
-      { label: 'My Journey', href: '/my-journey',  badge: 'NEW' },
-      { label: 'Feedback',   href: '/feedback',    badge: 'NEW' },
-      { label: 'About',      href: '/about' },
+      { label: 'Community',       href: '/community' },
+      { label: 'Learning Center', href: '/learning-center' },
+      { label: 'My Journey',      href: '/my-journey' },
+      { label: 'About',           href: '/about' },
     ],
   },
 ];

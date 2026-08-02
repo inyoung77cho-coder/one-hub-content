@@ -9,7 +9,7 @@ const REGIME_EMOJI = { BULL: '📈', BEAR: '📉', SIDEWAYS: '➖' };
 const REGIME_LABEL = { BULL: '상승장', BEAR: '하락장', SIDEWAYS: '횡보장' };
 const REGIME_TAG = { BULL: 'p-bull', BEAR: 'p-bear', SIDEWAYS: 'p-flat' };
 
-export default function Home({ reports, stats }) {
+export default function Home({ reports, stats, cases }) {
   const latest = reports[0] || null;
   const emoji = (r) => REGIME_EMOJI[r] || '➖';
   const label = (r) => REGIME_LABEL[r] || '횡보장';
@@ -121,9 +121,6 @@ export default function Home({ reports, stats }) {
               </p>
               <div className="hero-cta">
                 <a className="btn btn-white btn-lg" href="/pwa?tab=report&sec=vs">⚔️ AI와 대결 시작</a>
-                <a className="btn btn-line btn-lg" href={latest ? `/daily/${latest.date}` : '/daily'}>
-                  먼저 구경하기
-                </a>
               </div>
               <p className="hero-disclaim">※ 가상 게임머니로 하는 <b>판단 연습</b>입니다. 실제 투자·주문이 아니며, 최종 판단은 본인 책임입니다(투자자문 아님).</p>
               <div className="hero-teaser">
@@ -154,6 +151,12 @@ export default function Home({ reports, stats }) {
                   <span className="gh-step">① 오늘 AI 선택 보기</span>
                   <span className="gh-step">② 나라면 매수/관망</span>
                   <span className="gh-step">③ 3일 뒤 지갑 대결</span>
+                </div>
+                <div className="gh-example">
+                  <div className="gh-ex-lbl">예를 들면 이렇게 진행됩니다</div>
+                  <div className="gh-ex-row"><span className="gh-ex-day">Day 1</span>AI가 A종목을 추천 — 당신은 &ldquo;아니, 너무 올랐다&rdquo;며 관망을 선택</div>
+                  <div className="gh-ex-row"><span className="gh-ex-day">Day 3</span>A종목 -4% 하락 — 관망한 당신의 판단이 이겼습니다 🏆</div>
+                  <div className="gh-ex-note">반대로 당신이 옳지 않을 수도 있습니다. 승패보다 중요한 건, <b>왜 그렇게 판단했는지</b>가 매번 기록으로 남는다는 것.</div>
                 </div>
                 <a className="btn btn-white btn-lg gh-cta" href="/pwa?tab=report&sec=vs">지금 대결 시작 →</a>
                 <p className="gh-foot">🎮 가상·모의 게임 · 실제 자산 아님 · 재미로 판단을 남길수록 AI가 더 정확해집니다(당신의 판단이 학습 데이터).</p>
@@ -312,6 +315,29 @@ export default function Home({ reports, stats }) {
                     <span className="link-arrow">전체 분석 보기 →</span>
                   </div>
                 </a>
+              </div>
+            </section>
+          )}
+
+          {/* REAL CASES — 후기 대신 실제 운영일지 사례(날조 없음) */}
+          {cases && cases.length > 0 && (
+            <section style={{ paddingTop: 0 }}>
+              <div className="container">
+                <div className="sec-head">
+                  <p className="eyebrow">REAL CASES · 실제 있었던 일</p>
+                  <h2>후기 대신, 실제 있었던 판단을 보여드립니다</h2>
+                  <p>꾸며낸 이용자 후기가 아니라 — 운영일지에 실제로 기록된 날짜·수치·인사이트 그대로입니다.</p>
+                </div>
+                <div className="usecases">
+                  {cases.map((c) => (
+                    <a className="uc case-card" key={c.key} href={`/daily/${c.date}`}>
+                      <div className="uc-badge">{c.ic} {c.tag} · {c.date}</div>
+                      <h3>{c.headline}</h3>
+                      <p>&ldquo;{c.quote}&rdquo;</p>
+                      <span className="case-link">그날 판단 전체 보기 →</span>
+                    </a>
+                  ))}
+                </div>
               </div>
             </section>
           )}
@@ -594,6 +620,11 @@ export default function Home({ reports, stats }) {
         .uc p{font-size:14px;color:var(--ink2);line-height:1.7}
         .uc p b{color:var(--ink)}
         @media(max-width:820px){.usecases{grid-template-columns:1fr}}
+        .case-card{display:block;cursor:pointer;transition:transform .15s ease,box-shadow .15s ease}
+        .case-card:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(31,63,120,.12)}
+        .case-card .uc-badge{background:#F1F5F9;color:var(--ink2)}
+        .case-card p{font-style:italic}
+        .case-link{display:inline-block;margin-top:12px;font-size:13px;font-weight:700;color:var(--blue)}
 
         /* 성과 보드 */
         .board-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -678,6 +709,12 @@ export default function Home({ reports, stats }) {
         .gh-desc b{color:#0E1B3A;font-weight:800}
         .gh-steps{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
         .gh-step{font-size:12px;font-weight:700;color:#3A4666;background:#EEF2FB;border-radius:8px;padding:6px 10px}
+        .gh-example{background:#F8FAFF;border:1px dashed #C7D4EC;border-radius:12px;padding:14px 16px;margin-bottom:14px}
+        .gh-ex-lbl{font-size:11px;font-weight:800;color:#8894AE;letter-spacing:.3px;text-transform:uppercase;margin-bottom:8px}
+        .gh-ex-row{font-size:13px;color:#3A4666;line-height:1.6;margin-bottom:4px;word-break:keep-all}
+        .gh-ex-day{display:inline-block;font-size:10.5px;font-weight:800;color:#2F6BFF;background:rgba(47,107,255,.1);border-radius:6px;padding:2px 7px;margin-right:8px;font-family:ui-monospace,monospace}
+        .gh-ex-note{font-size:12px;color:#8894AE;line-height:1.55;margin-top:8px;word-break:keep-all}
+        .gh-ex-note b{color:#3A4666;font-weight:800}
         .gh-cta{width:100%;justify-content:center;background:#2F6BFF !important;color:#fff !important;text-align:center}
         .gh-foot{font-size:11.5px;color:#8894AE;margin-top:12px;line-height:1.6;word-break:keep-all}
         @media(max-width:640px){.hero h1{font-size:34px}}
@@ -818,5 +855,15 @@ export async function getStaticProps() {
     watchDays: reports.filter((r) => (r.trade_count || 0) === 0).length,
   };
 
-  return { props: { reports, stats } };
+  // [실전 사례] 후기 대신 — 실제 운영일지에서 뽑은 3가지 실제 사례(날조 없음, 전부 content/daily 실데이터).
+  //   ① 가장 많이 걸러낸 날(방어) ② 실제 매매가 있었던 날(실행) ③ 하락장에서 버틴 날(관망).
+  const byBlock = [...reports].filter((r) => (r.block_count || 0) > 0).sort((a, b) => (b.block_count || 0) - (a.block_count || 0));
+  const byTrade = reports.filter((r) => (r.trade_count || 0) > 0);
+  const byBear = reports.filter((r) => r.regime === 'BEAR' && (r.trade_count || 0) === 0);
+  const cases = [];
+  if (byBlock[0]) cases.push({ key: 'block', ic: '🛡️', tag: '방어', date: byBlock[0].date, headline: `${byBlock[0].block_count}건을 걸러낸 날`, quote: byBlock[0].insight });
+  if (byTrade[0]) cases.push({ key: 'trade', ic: '⚡', tag: '실행', date: byTrade[0].date, headline: `${byTrade[0].trade_count}건을 실행한 날`, quote: byTrade[0].insight });
+  if (byBear[0]) cases.push({ key: 'watch', ic: '🧊', tag: '관망', date: byBear[0].date, headline: '하락장에서 아무것도 사지 않은 날', quote: byBear[0].insight });
+
+  return { props: { reports, stats, cases } };
 }
