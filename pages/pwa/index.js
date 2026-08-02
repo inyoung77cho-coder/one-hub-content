@@ -1758,6 +1758,35 @@ export default function PWADashboard({ latestReport }) {
                   </>
                 );
               })()}
+              {/* [FB-3 §3.6] 오늘 판단 확정 요약 — 맨 아래. 샀어요/관망은 이미 즉시 기록되므로
+                  여기선 오늘 확정된 판단을 요약하고 3거래일 뒤 결과를 기대하게 한다(§4.4 나vsAI 연결). */}
+              {(() => {
+                const _rerender = decTick; // decTick 변경 시 재계산
+                const all = getLedger(trader) || [];
+                const DAY_MS = 86400000;
+                const tkey = Math.floor(Date.now() / DAY_MS);
+                const td = all.filter((e) => Math.floor((e.ts || 0) / DAY_MS) === tkey);
+                const nTake = td.filter((e) => e.decision === 'take').length;
+                const nPass = td.filter((e) => e.decision === 'pass').length;
+                return (
+                  <div className="rec-confirm">
+                    <div className="rec-confirm-h">✅ 오늘 판단 확정</div>
+                    {td.length > 0 ? (
+                      <>
+                        <p className="rec-confirm-t">
+                          오늘 <b>{td.length}건</b> 판단이 확정됐어요 · 샀어요 {nTake} · 관망 {nPass}.
+                          {' '}<b>3거래일 뒤</b> 실제 수익으로 나 vs AI가 채점합니다.
+                        </p>
+                        <button className="rec-confirm-cta" onClick={() => setTab('report')}>3일 뒤 승부 결과 기대하기 →</button>
+                      </>
+                    ) : (
+                      <p className="rec-confirm-t quiet">
+                        아직 오늘 판단이 없어요 — 위에서 <b>샀어요·관망</b>을 누르면 3일 뒤 AI와 승부가 시작됩니다.
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
               <button className="pwa-link-btn" onClick={() => setTab('analyze')}>
                 다른 종목 직접 검색 →
               </button>
@@ -3860,6 +3889,15 @@ export default function PWADashboard({ latestReport }) {
         .top3-upside-lg b { font-size: 0.95rem; color: var(--color-success); font-weight: 800; font-variant-numeric: tabular-nums; }
         .top3-upside-lg .est { font-size: 0.5rem; color: var(--text-tertiary); border: 1px solid var(--border); border-radius: 4px; padding: 0 3px; }
         .rec-rest-h { font-size: 0.68rem; font-weight: 700; color: var(--text-tertiary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em; }
+        /* [FB-3 §3.6] 오늘 판단 확정 요약 */
+        .rec-confirm { margin-top: 14px; padding: 14px; border: 1px solid var(--color-line); border-radius: 12px; background: var(--inset-bg, var(--color-card-soft)); }
+        .rec-confirm-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
+        .rec-confirm-t { font-size: 0.8rem; font-weight: 600; color: var(--color-ink-2); line-height: 1.55; word-break: keep-all; margin: 0; }
+        .rec-confirm-t b { color: var(--color-primary); font-weight: 800; }
+        .rec-confirm-t.quiet { color: var(--color-ink-3); }
+        .rec-confirm-t.quiet b { color: var(--color-ink-2); }
+        .rec-confirm-cta { width: 100%; margin-top: 11px; min-height: 46px; border: none; border-radius: 11px; background: var(--color-primary); color: #fff; font-size: 0.84rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .rec-confirm-cta:active { opacity: 0.9; }
         .rec-rest-list { display: flex; flex-direction: column; gap: 6px; }
         .rec-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: var(--inset-bg); border-radius: 10px; }
         .rec-row-l { min-width: 0; flex: 1; }
