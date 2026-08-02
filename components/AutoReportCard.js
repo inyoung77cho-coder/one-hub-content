@@ -2,6 +2,7 @@
 // [FB-2 §2.7] '자동 리포트 요약' — 나열이 아니라 안내(원칙1). 자동 생성 리포트의 한 줄 요약 + 링크.
 //   주식 데일리·주식 위클리는 content/*.md frontmatter 의 실제 insight 요약(날조 없음, getStaticProps 주입).
 //   부동산·ETF 트렌드는 해당 페이지로 바로가기(부동산 주간 리포트 엔진은 FB-5에서 요약 연결 예정).
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 
 function trunc(s, n = 46) {
@@ -14,6 +15,20 @@ export default function AutoReportCard({ reports }) {
   const router = useRouter();
   const daily = reports?.daily || null;
   const weekly = reports?.weekly || null;
+
+  // [FB-5 §5.4] 부동산 주간 리포트 요약(확정+미검증 병기)을 백엔드에서 표면화.
+  const [reWeekly, setReWeekly] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/pwa/re/weekly")
+      .then((r) => r.json())
+      .then((d) => { if (alive && d && d.ok) setReWeekly(d); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const reLine = reWeekly
+    ? `대장 ${reWeekly.leader || "시범삼성"} ${reWeekly.leader_now != null ? `${reWeekly.leader_now}억 · ` : ""}${String(reWeekly.market_phase || "").replace(/\s*[⚪🔴🟢🟡]\s*$/, "").trim()}${reWeekly.unverified?.count > 0 ? ` · 🟡 미검증 ${reWeekly.unverified.count}건` : ""}`
+    : "실거래·호가 주간 동향";
 
   const rows = [
     {
@@ -30,8 +45,8 @@ export default function AutoReportCard({ reports }) {
     },
     {
       key: "re", ic: "🏠", title: "부동산 트렌드",
-      line: "실거래·호가 주간 동향",
-      meta: null,
+      line: reLine,
+      meta: reWeekly?.week ? String(reWeekly.week).replace("년 ", "-").replace("월 ", "-").replace("일 주간", "") : null,
       href: "/pwa/realestate",
     },
     {

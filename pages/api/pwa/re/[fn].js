@@ -19,6 +19,7 @@ const ENDPOINTS = {
   gapTracker: "/api/v2/gap-tracker", // [R-5] 평형 갈아타기 갭 시계열·적정밴드·판정
   upgradeGap: "/api/v2/upgrade-gap", // [R-5 시나리오B] 같은 동 단지 갈아타기 후보·갭·판정
   regionGap: "/api/v2/region-gap", // [R-5 시나리오C] 지역 변경 동 평균단가 갭·추적·판정
+  weekly: "/api/re/weekly", // [FB-5 §5.4] 주간 부동산 리포트 요약(확정+미검증 병기)
 };
 
 // fn·key 외 추가 쿼리(complex 등)는 백엔드로 그대로 전달
