@@ -63,10 +63,20 @@ export default function AssetsMapPage() {
   const [fixVal, setFixVal] = useState("");      // [N6] 사용자가 직접 입력하는 평단(앱이 추정하지 않는다)
   const [delta, setDelta] = useState(null);      // [추세] 전일 대비 총자산·자산별 변화(브라우저 스냅샷 기반)
   const [hist, setHist] = useState([]);          // [추세] 총자산 일별 스냅샷 시계열
+  const [exRes, setExRes] = useState(true);      // [§3.1] 실거주(대표단지) 제외 보기 — 기본 켜짐(운용가능 먼저)
+  const [invProps, setInvProps] = useState([]);  // [§3.1] 추가 보유 부동산(투자용) = onehub_re_properties
+  const [myComplex, setMyComplex] = useState(""); // [§3.1] 대표단지(실거주)명
 
   const load = useCallback(() => {
     const tr = getTrader();
     setStatus((s) => (assets ? "stale" : "loading"));
+    // [§3.1] 추가 보유 부동산(투자용)만 별도로 읽어 실거주(대표단지)와 분리한다.
+    try {
+      const rp = JSON.parse(localStorage.getItem("onehub_re_properties") || "null");
+      setInvProps(Array.isArray(rp) ? rp : []);
+      const mp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null");
+      setMyComplex(mp?.name || "");
+    } catch (e) { setInvProps([]); }
     Promise.all([
       getLedger(tr).catch(() => ({ ok: false })),
       fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => ({ ok: false })),
@@ -101,33 +111,52 @@ export default function AssetsMapPage() {
     val: bd[`${k}_uk`] != null ? Number(bd[`${k}_uk`]) : null,
   }));
   const total = assets?.total_uk != null ? Number(assets.total_uk) : rows.reduce((s, r) => s + (r.val || 0), 0);
-  const pctOf = (v) => (total > 0 && v != null ? (v / total) * 100 : 0);
+  const pctFull = (v) => (total > 0 && v != null ? (v / total) * 100 : 0); // [§3.1] 전체 총자산 기준(단일 소스 유지)
 
-  // 1층 판단 1문장 — 쏠림 or 국면
-  const dominant = [...rows].filter((r) => r.val != null).sort((a, b) => (b.val || 0) - (a.val || 0))[0];
+  // [§3.1] 실거주(대표단지) 분리 — realestate_uk = 대표단지 + 추가부동산. 추가부동산(투자용)만 빼면 실거주값.
+  const realtyUk = bd.realestate_uk != null ? Number(bd.realestate_uk) : 0;
+  const invRealtyUk = invProps.reduce((s, p) => s + (Number(p.valueUk) || 0), 0);
+  const residenceUk = Math.max(0, realtyUk - invRealtyUk);   // 실거주(못 파는 자산)
+  const hasResidence = residenceUk > 0.005;
+  const opTotal = Math.max(0, total - residenceUk);           // 운용 가능 자산
+  const useEx = exRes && hasResidence;                        // 실거주 제외 뷰 활성
+
+  // 자산 지도/쏠림 진단만 뷰에 따라 분모가 바뀐다(총자산 헤드라인은 항상 total 유지 = 단일 소스).
+  const mapDenom = useEx ? opTotal : total;
+  const mapRows = (useEx
+    ? rows.map((r) => (r.k === "realestate"
+        ? { ...r, label: "🏠 부동산(투자)", val: invRealtyUk > 0.005 ? invRealtyUk : null }
+        : r))
+    : rows
+  ).filter((r) => !(useEx && r.k === "realestate" && !(invRealtyUk > 0.005)));
+  const pctOf = (v) => (mapDenom > 0 && v != null ? (v / mapDenom) * 100 : 0);
+
+  // 1층 판단 1문장 — 쏠림 or 국면 (뷰 분모 기준)
+  const dominant = [...mapRows].filter((r) => r.val != null).sort((a, b) => (b.val || 0) - (a.val || 0))[0];
   const domPct = dominant ? pctOf(dominant.val) : 0;
+  const scopeLbl = useEx ? "운용 가능 자산의" : "자산의";
   const regime = regimeKo(dash?.market?.regime);
   const buys = (dash?.recommend_stocks ?? []).filter((s) => (s.score ?? 0) >= 70);
   const blocked = dash?.today_blocked ?? [];
   const headline = domPct >= 60 && dominant
-    ? `자산의 ${Math.round(domPct)}%가 ${dominant.label.replace(/^[^\s]+\s/, "")}입니다 — 쏠림을 줄일 때인지 살펴보세요.`
+    ? `${scopeLbl} ${Math.round(domPct)}%가 ${dominant.label.replace(/^[^\s]+\s/, "")}입니다 — 쏠림을 줄일 때인지 살펴보세요.`
     : regime
     ? `시장은 ${regime} 국면입니다. ${buys.length > 0 ? `주식 매수 후보 ${buys.length}건.` : "뚜렷한 매수 후보는 없습니다."}`
     : "자산을 입력하면 오늘의 판단을 요약해 드립니다.";
 
-  // 1층 액션 카드(최대 3)
+  // 1층 액션 카드(최대 3) — %는 전체 총자산 기준(pctFull) 유지(다른 화면과 일치)
   const actions = [
     { label: "📈 주식", sub: buys.length > 0 ? `매수 후보 ${buys.length}건 검토` : `선별 관망 · ${blocked.length}건 차단`, href: "/pwa?tab=portfolio" },
-    { label: "💹 ETF", sub: `보유 비중 ${pctOf(bd.etf_uk).toFixed(1)}% · 계좌·세제 점검`, href: "/pwa/etf" },
-    { label: "🏠 부동산", sub: pctOf(bd.realestate_uk) >= 60 ? `${Math.round(pctOf(bd.realestate_uk))}% 쏠림 · 신규 매입 신중` : "ONE Score·저평가 확인", href: "/pwa/realestate" },
+    { label: "💹 ETF", sub: `보유 비중 ${pctFull(bd.etf_uk).toFixed(1)}% · 계좌·세제 점검`, href: "/pwa/etf" },
+    { label: "🏠 부동산", sub: pctFull(bd.realestate_uk) >= 60 ? `${Math.round(pctFull(bd.realestate_uk))}% 쏠림 · 신규 매입 신중` : "ONE Score·저평가 확인", href: "/pwa/realestate" },
   ].slice(0, 3);
 
-  // 도넛(stroke-dasharray) — 4개 자산군
+  // 도넛(stroke-dasharray) — 뷰 분모(mapDenom) 기준
   const donut = (() => {
     const R = 42, C = 2 * Math.PI * R;
     let acc = 0;
-    return rows.filter((r) => (r.val || 0) > 0).map((r) => {
-      const frac = total > 0 ? (r.val || 0) / total : 0;
+    return mapRows.filter((r) => (r.val || 0) > 0).map((r) => {
+      const frac = mapDenom > 0 ? (r.val || 0) / mapDenom : 0;
       const seg = { color: r.color, dash: frac * C, offset: -acc * C, k: r.k };
       acc += frac;
       return seg;
@@ -140,9 +169,9 @@ export default function AssetsMapPage() {
   //   제약: 그 수단이 당장 안 되는 이유를 먼저 밝힌다(부동산 분할매도 불가·현금 부족).
   const TARGET_PCT = 60;
   const rx = (() => {
-    if (!(domPct >= 55) || !dominant || !(total > 0)) return null;
+    if (!(domPct >= 55) || !dominant || !(mapDenom > 0)) return null;
     const name = dominant.label.replace(/^[^\s]+\s/, "");
-    const moveUk = Math.max(0, Number(dominant.val) - total * (TARGET_PCT / 100));
+    const moveUk = Math.max(0, Number(dominant.val) - mapDenom * (TARGET_PCT / 100));
     const cashUk = bd.cash_uk != null ? Number(bd.cash_uk) : null;
     const cashPct = bd.cash_uk != null ? pctOf(bd.cash_uk) : null;
     const means =
@@ -160,11 +189,11 @@ export default function AssetsMapPage() {
   // [N9] 시뮬 = 처방대로 옮겼을 때의 비중(before → after). 결정적 산수이며 예측이 아니다.
   const simRows = (() => {
     if (!rx || !(rx.moveUk > 0)) return null;
-    return rows.filter((r) => r.val != null).map((r) => {
+    return mapRows.filter((r) => r.val != null).map((r) => {
       const after = r.k === dominant.k ? Number(r.val) - rx.moveUk
         : r.k === "etf" ? Number(r.val) + rx.moveUk
         : Number(r.val);
-      return { k: r.k, label: r.label, color: r.color, before: pctOf(r.val), after: total > 0 ? (after / total) * 100 : 0 };
+      return { k: r.k, label: r.label, color: r.color, before: pctOf(r.val), after: mapDenom > 0 ? (after / mapDenom) * 100 : 0 };
     });
   })();
 
@@ -207,6 +236,23 @@ export default function AssetsMapPage() {
           {(assets?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && (
             <p className="as-incomplete">⚠ 증권사 연동 자산을 불러오지 못했습니다 — 이 총자산은 <b>실제보다 적습니다</b>. 잠시 후 다시 시도해 주세요.</p>
           )}
+          {/* [§3.1] 실거주 제외 — '못 파는 자산'을 빼고 실제 운용 가능 자산을 본다. 총자산 수치는 위에 그대로 유지. */}
+          {hasResidence && (
+            <div className="as-ex">
+              <label className="as-ex-tg">
+                <input type="checkbox" checked={exRes} onChange={(e) => setExRes(e.target.checked)} />
+                <span>실거주 아파트 제외</span>
+              </label>
+              {useEx ? (
+                <div className="as-ex-line">
+                  운용 가능 <b>{uk(opTotal)}</b>
+                  <span className="as-ex-sub">· 실거주 {uk(residenceUk)} 제외(못 파는 자산)</span>
+                </div>
+              ) : (
+                <div className="as-ex-line off">실거주 {uk(residenceUk)} 포함 · 전체 기준</div>
+              )}
+            </div>
+          )}
         </section>
 
         <div className="as-actions">
@@ -229,11 +275,11 @@ export default function AssetsMapPage() {
                   strokeDasharray={`${s.dash} ${2 * Math.PI * 42 - s.dash}`} strokeDashoffset={s.offset}
                   transform="rotate(-90 50 50)" />
               ))}
-              <text x="50" y="47" textAnchor="middle" className="as-donut-t">총</text>
-              <text x="50" y="60" textAnchor="middle" className="as-donut-v">{uk(total)}</text>
+              <text x="50" y="47" textAnchor="middle" className="as-donut-t">{useEx ? "운용" : "총"}</text>
+              <text x="50" y="60" textAnchor="middle" className="as-donut-v">{uk(mapDenom)}</text>
             </svg>
             <div className="as-legend">
-              {rows.map((r) => (
+              {mapRows.map((r) => (
                 <button className="as-row" key={r.k} onClick={() => (r.href ? router.push(r.href) : setQaOpen(true))}>
                   <span className="as-dotc" style={{ background: r.color }} />
                   <span className="as-rl">{r.label}</span>
@@ -251,6 +297,16 @@ export default function AssetsMapPage() {
                   <span className="as-arrow sm">→</span>
                 </button>
               ))}
+              {/* [§3.1] 실거주는 운용 분모에서 빠진 '못 파는 자산'으로 별도 표기(회색). */}
+              {useEx && (
+                <button className="as-row ex" onClick={() => router.push("/pwa/realestate")}>
+                  <span className="as-dotc ex" />
+                  <span className="as-rl">🔑 실거주{myComplex ? ` ${myComplex}` : ""}</span>
+                  <span className="as-rv">{uk(residenceUk)}</span>
+                  <span className="as-rp">제외</span>
+                  <span className="as-arrow sm">→</span>
+                </button>
+              )}
             </div>
           </div>
           <button className="as-add" onClick={() => setQaOpen(true)}>＋ 자산 추가·수정</button>
@@ -292,7 +348,7 @@ export default function AssetsMapPage() {
         {domPct >= 55 && dominant && (
           <section className="card as-a4">
             <div className="as-h">시장 대비 · 왜 이런가</div>
-            <div className="as-a4-num">자산의 <b>{Math.round(domPct)}%</b>가 {dominant.label.replace(/^[^\s]+\s/, "")}입니다</div>
+            <div className="as-a4-num">{scopeLbl} <b>{Math.round(domPct)}%</b>가 {dominant.label.replace(/^[^\s]+\s/, "")}입니다</div>
             <p className="as-a4-why">한 자산군에 크게 쏠려 있으면 시장이 오르내릴 때 내 자산은 상대적으로 <b>덜 따라갑니다</b> — 손실이 아니라 ‘덜 오름’일 수 있어요.</p>
             {/* [N9] 처방: 숫자 + 수단 + 제약 */}
             {rx && (
@@ -361,6 +417,16 @@ export default function AssetsMapPage() {
       <style jsx>{`
         /* [N5-3] 하단 여백 = 하단탭(56) + FAB 상단(68+52) 여유. 88px이면 FAB가 마지막 문구를 가렸다. */
         .as { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 140px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
+        /* [§3.1] 실거주 제외 토글 + 운용가능 요약 */
+        .as-ex { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--color-line); }
+        .as-ex-tg { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; font-weight: 800; color: var(--color-ink-2); cursor: pointer; }
+        .as-ex-tg input { width: 16px; height: 16px; accent-color: var(--color-primary); cursor: pointer; }
+        .as-ex-line { margin-top: 7px; font-size: 0.9rem; font-weight: 700; color: var(--color-ink); }
+        .as-ex-line b { font-size: 1.05rem; font-weight: 800; color: var(--color-primary); }
+        .as-ex-line.off { font-size: 0.78rem; font-weight: 600; color: var(--color-ink-3); }
+        .as-ex-sub { font-size: 0.72rem; font-weight: 600; color: var(--color-ink-3); margin-left: 6px; word-break: keep-all; }
+        .as-row.ex { opacity: 0.72; }
+        .as-dotc.ex { background: repeating-linear-gradient(45deg, var(--color-ink-3) 0 2px, transparent 2px 4px); }
         .as-hd { display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top, 0px) + 12px) 2px 10px; }
         .as-logo { font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--color-ink); background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
         .as-dot { color: var(--color-success); }
