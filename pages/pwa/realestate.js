@@ -42,12 +42,16 @@ export default function RealEstateDashboard() {
   const [reProps, setReProps] = useState([]);
   const [addProp, setAddProp] = useState(false); // 추가 폼 열림
   const [pName, setPName] = useState(""); const [pVal, setPVal] = useState(""); const [pMemo, setPMemo] = useState("");
+  const [pDeposit, setPDeposit] = useState(""); const [pMonthly, setPMonthly] = useState(""); // [피드백] 전세/월세 보증금(억)·월수익(만원)
   const saveReProps = (list) => { setReProps(list); try { localStorage.setItem("onehub_re_properties", JSON.stringify(list)); window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {} };
   const addReProp = () => {
     const name = String(pName || "").trim(); const v = Number(pVal);
     if (!name || !(v > 0)) return;
-    saveReProps([...reProps, { id: Date.now(), name, valueUk: v, memo: String(pMemo || "").trim() }]);
-    setPName(""); setPVal(""); setPMemo(""); setAddProp(false);
+    // [피드백] 보증금·월수익으로 순수투자금(평가−보증금)·월수익을 구분해 기록. 총자산(평가금액)은 그대로.
+    const deposit = Math.max(0, Number(pDeposit) || 0);
+    const monthly = Math.max(0, Number(pMonthly) || 0);
+    saveReProps([...reProps, { id: Date.now(), name, valueUk: v, deposit, monthly, memo: String(pMemo || "").trim() }]);
+    setPName(""); setPVal(""); setPMemo(""); setPDeposit(""); setPMonthly(""); setAddProp(false);
   };
   const delReProp = (id) => saveReProps(reProps.filter((p) => p.id !== id));
   // [item1] 부동산 검색 — 상단 🔍를 종목검색이 아니라 단지/관심지역 검색으로.
@@ -493,23 +497,44 @@ export default function RealEstateDashboard() {
             <span className="rp-name">⭐ {myProp.name} <span className="rp-tag">대표</span></span>
             <span className="rp-val">{uk(repEvalUk)}<em>{myPyeongPrice().uk != null ? "평가" : "매수가"}</em></span>
           </div>
-          {reProps.map((p) => (
-            <div className="rp-row" key={p.id}>
-              <span className="rp-name">🏠 {p.name}{p.memo ? <span className="rp-memo"> · {p.memo}</span> : null}</span>
-              <span className="rp-val">{uk(p.valueUk)}<em>평가</em></span>
-              <button className="rp-del" onClick={() => delReProp(p.id)} aria-label="삭제">✕</button>
-            </div>
-          ))}
+          {reProps.map((p) => {
+            const dep = Number(p.deposit) || 0, mon = Number(p.monthly) || 0;
+            const netUk = Math.round(((Number(p.valueUk) || 0) - dep) * 100) / 100;
+            return (
+              <div className="rp-row" key={p.id}>
+                <span className="rp-name">🏠 {p.name}{p.memo ? <span className="rp-memo"> · {p.memo}</span> : null}
+                  {(dep > 0 || mon > 0) && (
+                    <span className="rp-invest">순수투자금 {uk(netUk)}{dep > 0 ? ` (보증금 ${uk(dep)} 차감)` : ""}{mon > 0 ? ` · 월 ${mon.toLocaleString()}만원` : ""}</span>
+                  )}
+                </span>
+                <span className="rp-val">{uk(p.valueUk)}<em>평가</em></span>
+                <button className="rp-del" onClick={() => delReProp(p.id)} aria-label="삭제">✕</button>
+              </div>
+            );
+          })}
           {addProp && (
             <div className="rp-form">
               <input className="rp-in" placeholder="단지/부동산명" value={pName} onChange={(e) => setPName(e.target.value)} />
               <input className="rp-in num" type="number" inputMode="decimal" placeholder="평가금액(억)" value={pVal} onChange={(e) => setPVal(e.target.value)} />
+              <input className="rp-in num" type="number" inputMode="decimal" placeholder="전세/월세 보증금(억, 선택)" value={pDeposit} onChange={(e) => setPDeposit(e.target.value)} />
+              <input className="rp-in num" type="number" inputMode="decimal" placeholder="월수익(만원, 선택)" value={pMonthly} onChange={(e) => setPMonthly(e.target.value)} />
               <input className="rp-in" placeholder="메모(선택)" value={pMemo} onChange={(e) => setPMemo(e.target.value)} />
               <button className="rp-save" onClick={addReProp}>추가</button>
             </div>
           )}
           <div className="rp-total"><span>부동산 합계 <em>평가금액</em></span><b>{uk(reTotalEvalUk)}</b></div>
-          <div className="rp-note">주식·ETF와 동일하게 <b>평가금액</b> 기준으로 총자산에 반영됩니다. 대표 단지는 평형별 실거래 시세(없으면 매수가), 추가 보유는 입력한 평가금액.</div>
+          {(() => {
+            const dep = reProps.reduce((s, p) => s + (Number(p.deposit) || 0), 0);
+            const mon = reProps.reduce((s, p) => s + (Number(p.monthly) || 0), 0);
+            if (dep <= 0 && mon <= 0) return null;
+            return (
+              <div className="rp-invest-total">
+                <span>추가 보유 순수투자금 <em>보증금 차감</em></span>
+                <b>{uk(Math.round((reProps.reduce((s, p) => s + (Number(p.valueUk) || 0), 0) - dep) * 100) / 100)}{mon > 0 ? ` · 월 ${mon.toLocaleString()}만원` : ""}</b>
+              </div>
+            );
+          })()}
+          <div className="rp-note">총자산에는 <b>평가금액</b>이 반영됩니다. <b>보증금·월수익</b>은 전세/월세 레버리지를 감안한 <b>순수투자금(평가−보증금)·월수익</b>을 함께 보기 위한 기록입니다.</div>
         </section>
       )}
 
@@ -1091,6 +1116,12 @@ export default function RealEstateDashboard() {
         .rp-total em { font-style: normal; font-size: 0.58rem; font-weight: 800; color: var(--color-success); background: var(--color-success-soft); padding: 1px 6px; border-radius: 4px; margin-left: 5px; }
         .rp-total b { font-size: 1.05rem; font-weight: 900; color: var(--color-ink); font-family: ui-monospace, monospace; }
         .rp-note { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 9px; line-height: 1.55; word-break: keep-all; }
+        /* [피드백] 순수투자금·월수익 표기 */
+        .rp-invest { display: block; font-size: 0.66rem; font-weight: 700; color: var(--color-primary); margin-top: 3px; word-break: keep-all; }
+        .rp-invest-total { display: flex; align-items: center; justify-content: space-between; margin-top: 7px; }
+        .rp-invest-total span { font-size: 0.74rem; font-weight: 700; color: var(--color-ink-2); }
+        .rp-invest-total em { font-style: normal; font-size: 0.56rem; font-weight: 800; color: var(--color-primary); background: var(--color-primary-soft); padding: 1px 6px; border-radius: 4px; margin-left: 5px; }
+        .rp-invest-total b { font-size: 0.9rem; font-weight: 800; color: var(--color-primary); font-family: ui-monospace, monospace; }
         .mp-note b { color: var(--color-ink-2); font-weight: 700; }
         /* [S5] 투자아파트 스크리너 */
         /* [S5+] 이동 범위 칩 */
