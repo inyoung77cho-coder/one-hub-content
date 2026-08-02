@@ -14,6 +14,7 @@ import AutoReportCard from "../../components/AutoReportCard";
 import HoldingsNews from "../../components/HoldingsNews";
 import ReportTeaser from "../../components/ReportTeaser";
 import { getLedger as getDecisionLedger, computeShowdown } from "../../lib/verdictLedger";
+import { computeWallets, getSeed, wonG } from "../../lib/gameWallet";
 import { samplePolicy } from "../../lib/sampleSize";
 import { pickInsight } from "../../lib/crossInsight";
 import TraderBadge from "../../components/shared/TraderBadge";
@@ -50,6 +51,7 @@ export default function TodayPage({ reports }) {
   const [opNotes, setOpNotes] = useState([]); // [알림] OneHub 신고가(spot_price)
   const [news, setNews] = useState(null); // [뉴스 통합] 오늘의 뉴스 — 부모가 한 번 fetch 해 카테고리별로 나눠 쓴다
   const [newsOpen, setNewsOpen] = useState(false); // ETF·부동산 타일 뉴스 더보기
+  const [newsDetail, setNewsDetail] = useState(null); // 뉴스 클릭 → 상세 팝업
 
   const load = useCallback(() => {
     const tr = getTrader();
@@ -122,6 +124,17 @@ export default function TodayPage({ reports }) {
     return w7.ready ? w7 : null;
   })();
   const vsMax = vsShowdown ? Math.max(Math.abs(vsShowdown.myRet), Math.abs(vsShowdown.aiRet), 1) : 1;
+  // [금액 표기] 가상 시드머니 지갑(설정된 경우만) — 실제 매매와 완전 분리된 게임머니. 미설정이면 %만 표시.
+  const wallet = vsShowdown ? computeWallets(vsShowdown, getSeed()) : null;
+  // [며칠 경쟁] 첫 판단 기록일부터 오늘까지
+  const daysCompeting = mine.length ? Math.max(1, Math.floor((Date.now() - Math.min(...mine.map((d) => d.ts))) / DAY) + 1) : 0;
+  // [주요 판단 차이] 내가 관망(pass)했는데 결과가 크게 갈린 종목을 최우선(details는 이미 |ret| 내림차순) — 없으면 최대 변동 종목.
+  const keyDiff = vsShowdown ? (vsShowdown.details.find((d) => d.decision === "pass") || vsShowdown.details[0]) : null;
+  const keyDiffLine = keyDiff
+    ? keyDiff.decision === "pass"
+      ? `${keyDiff.name} 관망 — ${keyDiff.ret >= 0 ? `AI만 매수해 ${pctTxt(keyDiff.ret)} 앞섰습니다` : `손실 ${pctTxt(keyDiff.ret)}를 피해 유리했습니다`}`
+      : `${keyDiff.name} — 나·AI 모두 매수, ${pctTxt(keyDiff.ret)}`
+    : null;
 
   // ── AI 학습 진행도
   const pol = samplePolicy(mine.length);
@@ -131,13 +144,6 @@ export default function TodayPage({ reports }) {
 
   const bd = ledger?.breakdown || {};
   const ukTxt = (v) => (v == null || !Number.isFinite(Number(v)) ? null : `${Number(v).toFixed(1)}억`);
-  const todayCta = cands.length > 0
-    ? null
-    : (ledger && bd.cash_uk == null)
-    ? { label: "현금을 입력하면 총자산이 정확해집니다 →", href: "/pwa/assets" }
-    : (pendingJudge.length === 0 && mine.length === 0)
-    ? { label: "첫 판단으로 나 vs AI 시작하기 →", href: "/pwa?tab=analyze" }
-    : null;
 
   // ── 뉴스: 카테고리로 타일 배분(①주식=증시, ②ETF·부동산=글로벌/거시/부동산/정책)
   const allNews = news || [];
@@ -174,7 +180,7 @@ export default function TodayPage({ reports }) {
         {/* ══ ① 히어로: 주식 · 나 vs AI ══ */}
         <section className="hero" onClick={() => router.push("/pwa?tab=report&sec=vs")} role="button" tabIndex={0}>
           <div className="hero-eyebrow">
-            <span className="hero-lbl">📈 주식 · 나 vs AI</span>
+            <span className="hero-lbl">📈 주식 · 나 vs AI{daysCompeting > 0 ? ` · ${daysCompeting}일째` : ""}</span>
             {regime && (
               <span className={`hero-regime r-${regimeRaw.toLowerCase()}`}>{regime}{heat != null ? ` · 온도 ${heat}` : ""}</span>
             )}
@@ -189,14 +195,16 @@ export default function TodayPage({ reports }) {
                 <div className="vsrow">
                   <span className="vsrow-lbl">나</span>
                   <span className="vsrow-track"><span className={`vsrow-fill ${vsShowdown.myRet >= 0 ? "up" : "dn"}`} style={{ width: `${Math.min(100, (Math.abs(vsShowdown.myRet) / vsMax) * 100)}%` }} /></span>
-                  <span className={`vsrow-val ${vsShowdown.myRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.myRet)}</span>
+                  <span className={`vsrow-val ${vsShowdown.myRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.myRet)}{wallet ? <em className="vsrow-won">{wonG(wallet.myGain)}</em> : null}</span>
                 </div>
                 <div className="vsrow">
                   <span className="vsrow-lbl">AI</span>
                   <span className="vsrow-track"><span className={`vsrow-fill ${vsShowdown.aiRet >= 0 ? "up" : "dn"}`} style={{ width: `${Math.min(100, (Math.abs(vsShowdown.aiRet) / vsMax) * 100)}%` }} /></span>
-                  <span className={`vsrow-val ${vsShowdown.aiRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.aiRet)}</span>
+                  <span className={`vsrow-val ${vsShowdown.aiRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.aiRet)}{wallet ? <em className="vsrow-won">{wonG(wallet.aiGain)}</em> : null}</span>
                 </div>
               </div>
+              {wallet && <div className="hero-watermark">가상 시드머니 {wonG(wallet.seed)} 기준 · 실제 매매 아님</div>}
+              {keyDiffLine && <div className="hero-keydiff">🔍 {keyDiffLine}</div>}
               <div className="hero-sub">{pendingJudge.length > 0 ? `채점 중 ${pendingJudge.length}건 · ` : ""}기록 전체 보기 →</div>
             </>
           ) : pendingJudge.length > 0 ? (
@@ -242,7 +250,7 @@ export default function TodayPage({ reports }) {
           {stockNews.length > 0 && (
             <div className="hero-news">
               {stockNews.slice(0, 2).map((n) => (
-                <div className="hero-news-row" key={n.id}>📰 {n.headline}</div>
+                <button className="hero-news-row" key={n.id} onClick={(e) => { e.stopPropagation(); setNewsDetail(n); }}>📰 {n.headline}</button>
               ))}
             </div>
           )}
@@ -281,7 +289,7 @@ export default function TodayPage({ reports }) {
             <div className="tile-news">
               <div className="tile-news-h">글로벌 · 거시 · 부동산 뉴스</div>
               {(newsOpen ? macroNews : macroNews.slice(0, 3)).map((n) => (
-                <button className="tile-news-row" key={n.id} onClick={() => router.push("/pwa/today")}>
+                <button className="tile-news-row" key={n.id} onClick={() => setNewsDetail(n)}>
                   <span className={`tile-news-cat c-${n.category}`}>{CAT_KO[n.category] || "뉴스"}</span>
                   <span className="tile-news-t">{n.headline}</span>
                 </button>
@@ -295,14 +303,11 @@ export default function TodayPage({ reports }) {
           <ReportTeaser />
         </section>
 
-        {/* ══ ③ Daily & Weekly 리포트 ══ */}
-        <AutoReportCard reports={reports} />
-
-        {/* ══ ④ 종합자산 · 오늘의 할일 ══ */}
+        {/* ══ ③ 종합자산 · 오늘의 할일 ══ */}
         <section className="card tile">
           <div className="tile-h">💼 종합자산 · 오늘의 할일</div>
 
-          {decideCount === 0 && !insight && !todayCta ? (
+          {decideCount === 0 && !insight ? (
             <div className="todo-empty">오늘은 특별히 할 일이 없어요 · 관망</div>
           ) : (
             <div className="todo-list">
@@ -343,9 +348,6 @@ export default function TodayPage({ reports }) {
                   </span>
                 </div>
               )}
-              {todayCta && (
-                <button className="todo-cta soft" onClick={() => router.push(todayCta.href)}>{todayCta.label}</button>
-              )}
             </div>
           )}
 
@@ -358,14 +360,27 @@ export default function TodayPage({ reports }) {
             <span className="tile-nav-go">→</span>
           </button>
 
-          <div className="ai-prog">
-            <div className="ai-prog-h">AI 학습 <span className="ai-prog-sub">나 vs AI 채점 기준 · {pol.count}건</span></div>
-            <div className="ai-prog-track"><span className="ai-prog-fill" style={{ width: `${pol.progressPct}%` }} /></div>
-            <div className="ai-prog-note">{pol.remaining > 0 ? `${pol.remaining}건 남으면 채점 통계를 공개합니다` : `채점 기준 ${pol.target}건을 넘겼습니다`}</div>
-          </div>
+          <div className="ai-prog-mini">누적 판단 {pol.count}건{pol.remaining > 0 ? ` · ${pol.remaining}건 남으면 채점 통계 공개` : ` · 채점 기준(${pol.target}건) 충족`}</div>
         </section>
 
+        {/* ══ ④ Daily & Weekly 리포트 — 맨 아래 ══ */}
+        <AutoReportCard reports={reports} />
+
       </DataState>
+
+      {newsDetail && (
+        <div className="td-modal-bg" onClick={() => setNewsDetail(null)}>
+          <div className="td-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="td-modal-close" onClick={() => setNewsDetail(null)} aria-label="닫기">✕</button>
+            <span className={`tile-news-cat c-${newsDetail.category}`}>{CAT_KO[newsDetail.category] || "뉴스"}</span>
+            <h3 className="td-modal-h">{newsDetail.headline}</h3>
+            <div className="td-modal-meta">{newsDetail.source_label || "OneHub 제공"}{newsDetail.created_at ? ` · ${String(newsDetail.created_at).slice(0, 10)}` : ""}</div>
+            <div className="td-modal-body">
+              {String(newsDetail.summary_md || "").split("\n").map((l, i) => l.trim() && <p key={i}>{l.replace(/^\s*[-*]\s*/, "")}</p>)}
+            </div>
+          </div>
+        </div>
+      )}
 
       <BottomNav active="today" />
 
@@ -379,6 +394,12 @@ export default function TodayPage({ reports }) {
         .td-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; font-family: var(--font-display, var(--font-sans)); }
         .td-fresh { margin-left: auto; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
+        .td-modal-bg { position: fixed; inset: 0; z-index: 300; background: rgba(10,15,25,.5); display: flex; align-items: flex-end; justify-content: center; }
+        .td-modal { position: relative; width: 100%; max-width: 480px; max-height: 78vh; overflow-y: auto; background: var(--color-card); border-radius: 18px 18px 0 0; padding: 22px 20px calc(env(safe-area-inset-bottom, 0px) + 22px); }
+        .td-modal-close { position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--color-card-soft, var(--color-line)); color: var(--color-ink-2); font-size: 14px; cursor: pointer; }
+        .td-modal-h { font-size: 1.02rem; font-weight: 800; color: var(--color-ink); line-height: 1.4; margin: 10px 40px 6px 0; word-break: keep-all; }
+        .td-modal-meta { font-size: 0.72rem; color: var(--color-ink-3); margin-bottom: 14px; }
+        .td-modal-body { font-size: 0.86rem; color: var(--color-ink-2); line-height: 1.7; word-break: keep-all; display: flex; flex-direction: column; gap: 8px; }
 
         /* ══ 히어로: 주식 · 나 vs AI ══ */
         .hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero, 22px); padding: 20px 18px; box-shadow: var(--shadow-float); margin-bottom: 12px; cursor: pointer; }
@@ -401,6 +422,9 @@ export default function TodayPage({ reports }) {
         .vsrow-val { flex: none; width: 62px; text-align: right; font-family: ui-monospace, monospace; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
         .vsrow-val.up { color: var(--hero-accent); }
         .vsrow-val.dn { color: var(--hero-danger); }
+        .vsrow-won { display: block; font-style: normal; font-size: 10px; font-weight: 600; color: var(--hero-ink-faint); margin-top: 1px; }
+        .hero-watermark { font-size: 10px; color: var(--hero-ink-faint); margin-bottom: 8px; }
+        .hero-keydiff { font-size: 0.78rem; color: var(--hero-ink-soft); line-height: 1.5; word-break: keep-all; margin-bottom: 8px; padding: 8px 10px; background: var(--hero-fill); border-radius: 9px; }
         .hero-big { font-size: 26px; font-weight: 800; letter-spacing: -.4px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
         .hero-big.hero-quiet { color: var(--hero-ink-soft); font-size: 22px; }
         .hero-sub { font-size: 13px; color: var(--hero-ink-soft); line-height: 1.5; word-break: keep-all; margin-bottom: 4px; }
@@ -410,7 +434,7 @@ export default function TodayPage({ reports }) {
         .hero-notis { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hero-fill-line); display: flex; flex-direction: column; gap: 4px; }
         .hero-noti-row { font-size: 0.76rem; color: var(--hero-ink-soft); line-height: 1.5; word-break: keep-all; }
         .hero-news { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hero-fill-line); display: flex; flex-direction: column; gap: 4px; }
-        .hero-news-row { font-size: 0.74rem; color: var(--hero-ink-faint); line-height: 1.5; word-break: keep-all; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hero-news-row { display: block; width: 100%; text-align: left; border: none; background: none; padding: 0; font-family: var(--font-sans); cursor: pointer; font-size: 0.74rem; color: var(--hero-ink-faint); line-height: 1.5; word-break: keep-all; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--hero-accent); display: inline-block; animation: td-pulse 1.6s ease-in-out infinite; }
         @keyframes td-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 
@@ -455,12 +479,7 @@ export default function TodayPage({ reports }) {
         .tile-nav-t { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); }
         .tile-nav-s { font-size: 0.72rem; font-weight: 600; color: var(--color-ink-2); word-break: keep-all; }
         .tile-nav-go { flex: none; font-size: 0.9rem; font-weight: 800; color: var(--color-primary); }
-        .ai-prog { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--color-line); }
-        .ai-prog-h { font-size: 0.76rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
-        .ai-prog-sub { font-size: 0.68rem; font-weight: 600; color: var(--color-ink-3); margin-left: 6px; }
-        .ai-prog-track { height: 7px; border-radius: 999px; background: var(--color-card-soft, var(--color-line)); overflow: hidden; margin-bottom: 6px; }
-        .ai-prog-fill { display: block; height: 100%; background: var(--color-primary); }
-        .ai-prog-note { font-size: 0.68rem; color: var(--color-ink-3); }
+        .ai-prog-mini { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--color-line); font-size: 0.66rem; color: var(--color-ink-3); }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>

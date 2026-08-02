@@ -58,8 +58,8 @@ export default function AutoReportCard({ reports }) {
   ];
 
   return (
-    <section className="card arc">
-      <div className="arc-h">🗂 자동 리포트 <span className="arc-sub">매일·매주 자동 생성</span></div>
+    <section className="arc-card">
+      <div className="arc-h">🗂 AI 리포트 <span className="arc-sub">일간 · 주간</span></div>
       <div className="arc-list">
         {rows.map((r) => (
           <button className="arc-row" key={r.key} onClick={() => router.push(r.href)}>
@@ -74,7 +74,8 @@ export default function AutoReportCard({ reports }) {
       </div>
 
       <style jsx>{`
-        .arc-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; display: flex; align-items: baseline; gap: 8px; }
+        .arc-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
+        .arc-h { font-size: 0.92rem; font-weight: 800; color: var(--color-ink); margin-bottom: 12px; display: flex; align-items: baseline; gap: 8px; }
         .arc-sub { font-size: 0.66rem; font-weight: 700; color: var(--color-ink-3); }
         .arc-list { display: flex; flex-direction: column; }
         .arc-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 10px 2px; background: none; border: none; border-bottom: 1px solid var(--color-line); cursor: pointer; font-family: var(--font-sans); min-height: 46px; }
