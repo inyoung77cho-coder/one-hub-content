@@ -145,8 +145,14 @@ export default function AssetsMapPage() {
     : "자산을 입력하면 오늘의 판단을 요약해 드립니다.";
 
   // 1층 액션 카드(최대 3) — %는 전체 총자산 기준(pctFull) 유지(다른 화면과 일치)
+  //   [§3.2] '선별 관망 · 0건 차단'은 현 시장을 못 대변한다 — 국면·사유를 함께 담아 왜 관망인지 맥락을 준다.
+  const stockSub = buys.length > 0
+    ? `매수 후보 ${buys.length}건 검토`
+    : blocked.length > 0
+    ? `${regime ? `${regime} 국면 · ` : ""}${blocked.length}종목 기준 미달로 관망`
+    : `${regime ? `${regime} 국면 · ` : ""}오늘 기준 통과 종목 없음`;
   const actions = [
-    { label: "📈 주식", sub: buys.length > 0 ? `매수 후보 ${buys.length}건 검토` : `선별 관망 · ${blocked.length}건 차단`, href: "/pwa?tab=portfolio" },
+    { label: "📈 주식", sub: stockSub, href: "/pwa?tab=portfolio" },
     { label: "💹 ETF", sub: `보유 비중 ${pctFull(bd.etf_uk).toFixed(1)}% · 계좌·세제 점검`, href: "/pwa/etf" },
     { label: "🏠 부동산", sub: pctFull(bd.realestate_uk) >= 60 ? `${Math.round(pctFull(bd.realestate_uk))}% 쏠림 · 신규 매입 신중` : "ONE Score·저평가 확인", href: "/pwa/realestate" },
   ].slice(0, 3);
@@ -197,9 +203,26 @@ export default function AssetsMapPage() {
     });
   })();
 
+  // [§3.4] 시장 맥락을 나열하지 말고 '내 position'을 장기 관점으로 해석한다(규칙 기반·결정적).
+  //   국면 × 운용가능 구성(쏠림/현금)으로 큰 그림의 방향성을 한 문장으로.
+  const positionRead = (() => {
+    const rg = String(dash?.market?.regime || "").toUpperCase();
+    const cashPct = pctFull(bd.cash_uk);
+    const domName = dominant ? dominant.label.replace(/^[^\s]+\s/, "") : null;
+    if (rg === "BULL") {
+      if (useEx && domPct >= 60) return `상승 국면인데 운용 가능 자산이 ${domName}에 몰려 있어 시장 상승을 폭넓게 누리긴 어렵습니다. 장기적으론 새로 들어오는 현금을 운용 자산으로 분산해 참여도를 높이는 방향이 유효합니다.`;
+      return `상승 국면입니다. 지금의 배분을 유지하되, 쏠린 자산군이 있다면 신규 자금은 부족한 쪽에 채워 균형을 맞춰가는 게 장기적으로 안전합니다.`;
+    }
+    if (rg === "BEAR") {
+      if (cashPct != null && cashPct < 3) return `하락 국면인데 현금이 ${cashPct < 1 ? "1% 미만" : `${Math.round(cashPct)}%`}뿐이라 방어·저가 매수 여력이 제한됩니다. 장기적으론 일정 현금 완충을 두는 편이 변동성 국면에 유리합니다.`;
+      return `하락 국면입니다. 급하게 움직이기보다 원칙을 지키며 저평가 기회를 기다리기 좋은 구간입니다.`;
+    }
+    return `뚜렷한 방향이 없는 국면입니다 — 큰 베팅보다 배분 균형을 다지고 원칙을 점검하기 좋은 시기입니다.`;
+  })();
+
   const tgl3 = (id) => setOpen3((o) => ({ ...o, [id]: !o[id] }));
   const acc3 = [
-    { id: "market", title: "시장 맥락", summary: `${regime || "-"} 국면 · 온도 ${dash?.market?.heat_score ?? "-"} · 심리 ${dash?.market?.fear_greed ?? "-"}`, href: "/pwa?tab=report" },
+    { id: "market", title: "시장 맥락 · 내 position", summary: `${regime || "-"} 국면 · 온도 ${dash?.market?.heat_score ?? "-"} · 심리 ${dash?.market?.fear_greed ?? "-"}`, href: "/pwa?tab=report", body: positionRead },
     { id: "briefing", title: "오늘의 브리핑·판단 근거", summary: buys.length > 0 || blocked.length > 0 ? `매수 ${buys.length} · 차단 ${blocked.length}` : "요약 보기", href: "/pwa?tab=report" },
   ];
 
@@ -401,6 +424,7 @@ export default function AssetsMapPage() {
               </button>
               {open3[a.id] && (
                 <div className="as-accbody">
+                  {a.body && <p className="as-posread">{a.body}</p>}
                   <button className="as-acclink" onClick={() => router.push(a.href)}>자세히 보기 →</button>
                 </div>
               )}
@@ -491,6 +515,7 @@ export default function AssetsMapPage() {
         .as-accsum { flex: 1; min-width: 0; font-size: 0.72rem; color: var(--color-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
         .as-caret { color: var(--color-ink-3); font-size: 0.8rem; width: 14px; text-align: center; }
         .as-accbody { padding: 0 0 12px; }
+        .as-posread { font-size: 0.82rem; line-height: 1.6; color: var(--color-ink-2); word-break: keep-all; margin: 0 0 8px; }
         .as-acclink { border: none; background: none; color: var(--color-primary); font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); padding: 4px 0; }
         /* [A4] 쏠림 진단 — 중립 톤(빨강 없음) */
         .as-a4 { border-left: 4px solid var(--color-ink-3); }

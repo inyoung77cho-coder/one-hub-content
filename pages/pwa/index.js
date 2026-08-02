@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useState, useEffect, useCallback } from 'react';
 import { getLatestDailyReport } from '../../lib/reports';
 import LastUpdated from '../../components/LastUpdated';
+import MarketSession from '../../components/MarketSession';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
 import { recordDecision, matureLedger, computeShowdown, getTodayDecision, reconcileAutoWatch, getLedger } from '../../lib/verdictLedger';
 import { getSeed, setSeed, resetSeed, SEED_OPTIONS, computeWallets, streakNarrative, wonG } from '../../lib/gameWallet';
@@ -1523,7 +1524,8 @@ export default function PWADashboard({ latestReport }) {
               <div className="rec-hero-top">
                 <span className="rec-hero-title">🔍 추천 관심종목</span>
               </div>
-              <div className="rec-hero-upd"><LastUpdated timestamp={data?.ok ? new Date() : null} staleAfterSeconds={180} /></div>
+              {/* [§3.5] 의미 없는 '방금' 대신 증시 세션 표기 — 매매 시간에 맞춰 맥락을 준다. */}
+              <div className="rec-hero-upd"><MarketSession /></div>
               <p className="rec-hero-desc">AI 매수 선별 전 기술 스코어링 상위 후보입니다. 실제 매수 신호와는 별개입니다.</p>
             </section>
 
