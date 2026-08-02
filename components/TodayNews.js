@@ -4,6 +4,7 @@
 // - 실패/빈 목록이면 아무것도 렌더하지 않는다(빈 자리·에러 방지) — ReportTeaser 패턴.
 // - 운영자가 텔레그램 뉴스봇으로 올린 요약이 여기에 뜬다. 확정 뉴스가 아니라 '운영자 큐레이션'.
 import { useEffect, useState } from "react";
+import BriefTimestamp from "./BriefTimestamp";
 
 const CAT = {
   global:     { ko: "글로벌", bg: "#EEF2FF", fg: "#4F5BD5" },
@@ -21,23 +22,35 @@ function lines(md) {
     .filter(Boolean);
 }
 
-export default function TodayNews() {
-  const [items, setItems] = useState(null);
+export default function TodayNews({ items: itemsProp }) {
+  const [fetched, setFetched] = useState(null);
+  // [뉴스 통합] 부모(오늘 페이지)가 items 를 넘기면 자체 fetch 하지 않는다(중복 요청 방지).
+  const items = itemsProp !== undefined ? itemsProp : fetched;
 
   useEffect(() => {
+    if (itemsProp !== undefined) return;
     let alive = true;
     fetch("/api/today/news")
       .then((r) => r.json())
-      .then((d) => { if (alive) setItems(Array.isArray(d?.items) ? d.items : []); })
-      .catch(() => { if (alive) setItems([]); });
+      .then((d) => { if (alive) setFetched(Array.isArray(d?.items) ? d.items : []); })
+      .catch(() => { if (alive) setFetched([]); });
     return () => { alive = false; };
-  }, []);
+  }, [itemsProp]);
 
   if (!items || items.length === 0) return null;
+
+  // [뉴스 통합] 상단 글랜스 카드(TodayNewsTop)의 등록 시각·키워드를 이 단일 카드로 흡수.
+  const latestAt = items.reduce((mx, it) => (it.created_at && (!mx || it.created_at > mx) ? it.created_at : mx), null);
+  const keywords = [];
+  items.forEach((it) => { const k = (CAT[it.category] || CAT.affairs).ko; if (!keywords.includes(k)) keywords.push(k); });
 
   return (
     <section className="card tnw" id="today-news">
       <div className="tnw-hh">📰 오늘의 뉴스 <span className="tnw-sub">운영자 큐레이션</span></div>
+      {latestAt && <div className="tnw-reg"><BriefTimestamp at={latestAt} label="등록" /></div>}
+      {keywords.length > 0 && (
+        <div className="tnw-kw">{keywords.slice(0, 6).map((k, i) => <span className="tnw-chip" key={i}>#{k}</span>)}</div>
+      )}
       <div className="tnw-list">
         {items.slice(0, 8).map((it) => {
           const c = CAT[it.category] || CAT.affairs;
@@ -65,8 +78,11 @@ export default function TodayNews() {
 
       <style jsx>{`
         .tnw { }
-        .tnw-hh { font-size: 15px; font-weight: 800; color: #12213B; display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px; }
+        .tnw-hh { font-size: 15px; font-weight: 800; color: #12213B; display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
         .tnw-sub { font-size: 11.5px; font-weight: 700; color: #94A3B8; }
+        .tnw-reg { margin: -2px 0 8px; }
+        .tnw-kw { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .tnw-chip { font-size: 11px; font-weight: 700; color: #3A5C97; background: #E7EEFC; border-radius: 6px; padding: 3px 8px; }
         .tnw-list { display: flex; flex-direction: column; gap: 12px; }
         .tnw-item { border-bottom: 1px solid #EEF2F8; padding-bottom: 12px; }
         .tnw-item:last-child { border-bottom: none; padding-bottom: 0; }

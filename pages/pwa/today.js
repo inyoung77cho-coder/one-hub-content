@@ -16,7 +16,6 @@ import ReportTeaser from "../../components/ReportTeaser";
 import AutoReportCard from "../../components/AutoReportCard";
 import HoldingsNews from "../../components/HoldingsNews";
 import TodayNews from "../../components/TodayNews";
-import TodayNewsTop from "../../components/TodayNewsTop";
 import { getLedger as getDecisionLedger, computeShowdown } from "../../lib/verdictLedger";
 import { samplePolicy } from "../../lib/sampleSize";
 import { pickInsight } from "../../lib/crossInsight";
@@ -53,6 +52,7 @@ export default function TodayPage({ reports }) {
   const [opNotes, setOpNotes] = useState([]); // [알림카드 #6] 운영자 신고가(spot_price)
   const [notiOpen, setNotiOpen] = useState(null); // 펼친 알림 인덱스
   const [notiAll, setNotiAll] = useState(false); // [알림필터] 전체(루틴 포함) 보기 토글
+  const [news, setNews] = useState(null); // [뉴스 통합] 오늘의 뉴스 — 부모가 한 번 fetch 해 단일 카드로 전달
 
   const load = useCallback(() => {
     const tr = getTrader();
@@ -73,6 +73,9 @@ export default function TodayPage({ reports }) {
       // [알림중복 수정] 집계 피드(텔레그램+리포트+큐싱크)가 같은 이벤트를 중복으로 줄 수 있어
       //   프로젝트 필수 규칙대로 렌더 전에 dedupBy 로 흡수한다(id 없으면 제목|본문|시각 조합).
       .then((n) => { if (n?.ok && Array.isArray(n.items)) setNotis(dedupBy(n.items, (x) => x.id ?? `${x.title || ""}|${x.body || ""}|${x.sent_at || x.created_at || ""}`)); }).catch(() => {});
+    // [뉴스 통합] 오늘의 뉴스 — 한 번만 fetch 해 단일 카드(TodayNews)로 전달(상·하단 중복 제거).
+    fetch(`/api/today/news`).then((r) => r.json())
+      .then((d) => { setNews(Array.isArray(d?.items) ? d.items : []); }).catch(() => setNews([]));
     try {
       const mp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null");
       if (mp?.name) fetch(`/api/input/re-spot?complex_name=${encodeURIComponent(mp.name)}`).then((r) => r.json())
@@ -197,10 +200,9 @@ export default function TodayPage({ reports }) {
 
       <div className="td-title">오늘 <span className="td-sub">할 일 중심</span>{at && <span className="td-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}</div>
 
-      {/* 맨 위 카드 — 오늘의 뉴스 키워드+중요 헤드라인(뉴스 엔진). 매매데이터와 무관하게 렌더. */}
-      <TodayNewsTop />
-
       <DataState status={status} hasData={!!dash || !!ledger} onRetry={load} skeletonLines={4} skeletonBlock>
+        {/* ── 그룹: 자산 · 오늘 할 일 ── */}
+        <div className="td-grouph">💼 자산 · 오늘 할 일</div>
         {/* ① 결정 대기 — 있을 때만 · 최상단 · 주의색 */}
         {decideCount > 0 && (
           <section className="card td-decide">
@@ -360,17 +362,23 @@ export default function TodayPage({ reports }) {
             총손익(당일변동 아님)을 보여줘 자산 화면과 어긋남 ③ 손절임박은 위 '결정 대기', 전체 포트는
             '자산' 화면과 중복. 중요한 변동은 결정 대기·알림 카드로 대체. */}
 
-        {/* ④ [FB-2 §2.4] 내 보유종목 관련 뉴스 — 내가 산 주식/ETF 중심. macro/관련/onehub 3층. 없으면 숨김. */}
+        {/* ── 그룹: 뉴스 ── (뉴스가 있을 때만 헤더 노출) */}
+        {news && news.length > 0 && <div className="td-grouph">📰 뉴스</div>}
+        {/* [FB-2 §2.4] 내 보유종목 관련 뉴스 — 없으면 숨김 */}
         <HoldingsNews trader={trader} />
+        {/* [뉴스 통합] 오늘의 뉴스 — 단일 카드(상단 글랜스 카드 제거, 여기로 일원화). 부모 fetch 결과 전달(로딩 중엔 빈 배열로 숨김). */}
+        <TodayNews items={news || []} />
 
-        {/* ⑤ [FB-2 §2.7] 자동 리포트 요약 — 주식 D/W(실제 요약)·부동산·ETF 링크. '부동산 정보 보드' 대체. */}
+        {/* ── 그룹: 리포트 ── */}
+        <div className="td-grouph">🗂 리포트</div>
+        {/* [FB-2 §2.7] 자동 리포트 요약 — 주식 D/W(실제 요약)·부동산·ETF 링크. */}
         <AutoReportCard reports={reports} />
-
-        {/* 🏠 부동산 소식 — CA 엔진이 운영자 큐레이션한 지역 동향/제보(board). 실거래 feed 는 현재 비어
-            표시 안 하고, 승인 게시된 CA 정보만. 데이터 없으면 카드 자체가 안 뜬다(빈 자리 방지). */}
+        {/* 🏠 부동산 소식 — CA 엔진이 운영자 큐레이션한 지역 동향/제보(board). 데이터 없으면 숨김. */}
         <ReportTeaser />
 
-        {/* ④ 채점 임박 — 항상. [FB-2] 이미 채점된 승부가 있으면 '관리 문구'가 아니라 스코어보드로. */}
+        {/* ── 그룹: AI ── */}
+        <div className="td-grouph">🛡️ AI</div>
+        {/* 채점 임박 — 항상. [FB-2] 이미 채점된 승부가 있으면 '관리 문구'가 아니라 스코어보드로. */}
         <section className="card td-judge" onClick={() => router.push("/pwa?tab=report&sec=vs")}>
           <div className="td-h">나 vs AI</div>
           {vsShowdown ? (
@@ -404,9 +412,6 @@ export default function TodayPage({ reports }) {
         </section>
       </DataState>
 
-      {/* 오늘의 뉴스 — 뉴스 엔진 게시분(운영자 큐레이션). 데이터 없으면 조용히 숨김. */}
-      <TodayNews />
-
       <BottomNav active="today" />
 
       <style jsx>{`
@@ -421,6 +426,9 @@ export default function TodayPage({ reports }) {
         .td-sub { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
         .td-fresh { margin-left: auto; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
+        /* [IA] 섹션 그룹 헤더 — 자산/뉴스/리포트/AI 시각 구분. 첫 그룹 외에는 위 여백을 더 준다. */
+        .td-grouph { font-size: 0.72rem; font-weight: 800; letter-spacing: 0.02em; color: var(--color-ink-3); margin: 22px 2px 10px; padding-bottom: 6px; border-bottom: 1.5px solid var(--color-line); text-transform: uppercase; }
+        .td-grouph:first-child { margin-top: 4px; }
         .td-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
         .td-h b { color: var(--color-primary); }
         /* [FB-2] 요약 배지 — 카드를 안 열어도 오늘 상태를 한눈에 */
