@@ -361,7 +361,8 @@ export default function RealEstateDashboard() {
           <div className="re-verdict">
             <div className="rv-h"><span className="rv-lbl">📌 이 지역 한 줄 결론</span><span className={`rv-phase ${jtag(brief.phase)}`}>{String(brief.phase || "").replace(/\s*국면\s*$/, "")} 국면</span></div>
             <div className="rv-sub">
-              대장 <b>{brief.leader}</b> {uk(brief.leader_price)} · 분기 <b>{pct(brief.chg_q)}</b>
+              대장 <b>{brief.leader}</b> {uk(brief.leader_price)}
+              <Term term="국민평형">전용 84㎡·국민평형 기준</Term> · 분기 <b>{pct(brief.chg_q)}</b>
               {topU && <> · 저평가 1위 <b className="rv-under">{topU.단지명} +{Number(topU.gap).toFixed(1)}%</b></>}
             </div>
           </div>
@@ -598,15 +599,23 @@ export default function RealEstateDashboard() {
                     const anomaly = price != null && runMax !== -Infinity && price < runMax;
                     if (price != null && price > runMax) runMax = price;
                     const thin = a.n != null && a.n < 3; // 표본 부족 기준(거래 3건 미만)
+                    // [2026-08-05] 어디를 눌러야 다음 단계(갭 분석)로 가는지 안 보인다는 피드백 —
+                    //   행 자체를 탭하면 바로 그 평형으로 갭 분석이 실행되도록. 아래 select는 그대로 두되
+                    //   행 클릭이 "1-click 진입로"가 되어 표를 다시 훑어 select에서 재선택할 필요가 없다.
+                    const goGap = () => {
+                      if (mine) return;
+                      setGapTarget(String(a.m2));
+                      try { document.querySelector(".gap5")?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
+                    };
                     return (
-                      <div className="scr-row" key={a.m2}>
+                      <div className={`scr-row ${!mine ? "clickable" : ""}`} key={a.m2} onClick={goGap} role={!mine ? "button" : undefined} tabIndex={!mine ? 0 : undefined}>
                         <span className="scr-name">전용 {a.m2}㎡ <span className="scr-py">약 {m2ToPyeong(a.m2)}평</span>{mine && <span className="scr-mine">내 평형</span>}{anomaly && <span className="scr-anom" title={`평형이 큰데 실거래 최고가가 더 낮습니다. ${a.n != null ? `이 평형 거래 ${a.n}건으로 표본이 적어` : "표본이 적어"} 생기는 이상치일 수 있습니다.`}>⚠ {a.n != null ? `거래 ${a.n}건` : "표본 적음"}</span>}</span>
                         <span className="scr-avm">{a.maxUk != null ? uk(a.maxUk) : (a.priceUk != null ? uk(a.priceUk) : "-")}{a.maxUk != null && a.priceUk != null && a.priceUk !== a.maxUk ? <span className="scr-rep"> · 대표 {uk(a.priceUk)}</span> : null}{a.n != null && !anomaly ? <span className="scr-n">{thin ? " · " : " · "}거래 {a.n}건</span> : null}</span>
-                        <span className={`scr-gap ${diff != null && diff <= 0 ? "ok" : ""}`}>{mine ? "—" : gapCell(diff)}</span>
+                        <span className={`scr-gap ${diff != null && diff <= 0 ? "ok" : ""}`}>{mine ? "—" : <>{gapCell(diff)}<span className="scr-go">갭 분석 →</span></>}</span>
                       </div>
                     );
                   })}
-                  {/* [R-5] 갭 분석 — 목표 평형 선택 → 적정 밴드(평균±σ)·추천/관망/보류·표본부족 보류 */}
+                  {/* [R-5] 갭 분석 — 위 표에서 평형을 탭하면 자동 선택됨. 직접 고르고 싶으면 아래 select도 사용 가능. */}
                   <div className="gap5">
                     <div className="gap5-h">📊 갈아타기 갭 분석 <span>내 평형 → 목표 평형(3년 시계열)</span></div>
                     <select className="gap5-sel" value={gapTarget} onChange={(e) => setGapTarget(e.target.value)}>
@@ -1154,8 +1163,11 @@ export default function RealEstateDashboard() {
         .scr-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--color-line); }
         .scr-name { font-size: 0.82rem; font-weight: 700; color: var(--color-ink); display: flex; align-items: center; gap: 6px; min-width: 0; }
         .scr-avm { font-size: 0.8rem; font-weight: 700; color: var(--color-ink-2); font-family: ui-monospace, monospace; text-align: right; min-width: 56px; }
-        .scr-gap { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; text-align: right; min-width: 56px; }
+        .scr-gap { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; text-align: right; min-width: 56px; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
         .scr-gap.ok { color: var(--color-success); }
+        .scr-row.clickable { cursor: pointer; border-radius: 8px; margin: 0 -6px; padding: 10px 6px; transition: background .15s; }
+        .scr-row.clickable:hover, .scr-row.clickable:active { background: var(--color-primary-soft, #EAF1FF); }
+        .scr-go { font-size: 0.62rem; font-weight: 700; color: var(--color-primary, #2F6BFF); font-family: var(--font-body); }
         /* [S5] 등록 위저드 바텀시트 */
         /* [item1] 부동산 찾기 모달 */
         .resr-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 210; display: flex; align-items: flex-start; justify-content: center; padding-top: calc(env(safe-area-inset-top, 0px) + 40px); }
@@ -1426,12 +1438,12 @@ function AlertSettingsCard() {
         .ac-foot { font-size: 0.72rem; color: var(--color-ink-3, #8A99B0); line-height: 1.55; margin: 12px 0 0; }
         .ac-toast { position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%); background: var(--color-ink, #12213B);
           color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
-        .tax-nav { display: flex; align-items: center; gap: 12px; background: var(--color-card, #fff); border: 1px solid var(--color-line, #E8EEF7); border-radius: var(--radius-card, 14px); box-shadow: var(--shadow-card); padding: 16px; margin-bottom: 12px; text-decoration: none; }
-        .tax-nav-ic { font-size: 22px; flex: none; }
-        .tax-nav-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-        .tax-nav-t { font-size: 0.9rem; font-weight: 800; color: var(--color-ink, #12213B); }
-        .tax-nav-s { font-size: 0.76rem; color: var(--color-ink-2, #64748B); }
-        .tax-nav-go { font-size: 1rem; font-weight: 800; color: var(--color-primary, #2F6BFF); flex: none; }
+        .tax-nav { display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg, var(--color-primary-soft, #EAF1FF), var(--color-card, #fff)); border: 1px solid var(--color-line, #E8EEF7); border-radius: var(--radius-card, 14px); box-shadow: var(--shadow-card); padding: 20px; margin-bottom: 12px; text-decoration: none; }
+        .tax-nav-ic { font-size: 30px; flex: none; }
+        .tax-nav-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+        .tax-nav-t { font-size: 1.05rem; font-weight: 800; color: var(--color-ink, #12213B); }
+        .tax-nav-s { font-size: 0.82rem; color: var(--color-ink-2, #64748B); }
+        .tax-nav-go { font-size: 1.3rem; font-weight: 800; color: var(--color-primary, #2F6BFF); flex: none; }
       `}</style>
     </section>
   );

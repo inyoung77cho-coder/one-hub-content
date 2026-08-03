@@ -1,11 +1,15 @@
 // [내 세금] 공시가격 기반 재산세·종합부동산세 추정 계산기.
 //   숫자는 lib/propertyTax.js(data/property_tax_rules.json 단일 소스)에서만 나온다 — 하드코딩 없음.
 //   재산세액공제·세부담상한 등 일부 항목은 반영하지 않은 추정치임을 화면에 항상 고지한다.
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import { calcPropertyTax, calcComprehensiveTax, won, PROPERTY_TAX_META } from "../../lib/propertyTax";
+
+// [2026-08-05] 자동화 관점 개선 — 매번 처음부터 다시 입력하지 않도록 마지막 입력을 저장,
+//   다음 방문 시 자동으로 채우고 즉시 계산까지 해 둔다(버튼 한 번 덜 눌러도 됨).
+const SAVE_KEY = "onehub_tax_last_input";
 
 function parseEok(s) {
   const n = Number(String(s).replace(/[^0-9.]/g, ""));
@@ -25,20 +29,45 @@ export default function TaxPage() {
   const [holdingYears, setHoldingYears] = useState("");
   const [result, setResult] = useState(null);
 
-  const calc = () => {
-    const assessedValue = parseEok(assessed);
-    if (assessedValue <= 0) return;
-    const pt = calcPropertyTax(assessedValue, isOneHouse);
-    const totalAssessedValue = multiAssessed ? parseEok(multiAssessed) : assessedValue;
+  const computeResult = useCallback((v) => {
+    const assessedValue = parseEok(v.assessed);
+    if (assessedValue <= 0) return null;
+    const pt = calcPropertyTax(assessedValue, v.isOneHouse);
+    const totalAssessedValue = v.multiAssessed ? parseEok(v.multiAssessed) : assessedValue;
     const ct = calcComprehensiveTax({
       totalAssessedValue,
-      isOneHouse,
-      houseCount: Number(houseCount) || 1,
-      age: age ? Number(age) : null,
-      holdingYears: holdingYears ? Number(holdingYears) : null,
+      isOneHouse: v.isOneHouse,
+      houseCount: Number(v.houseCount) || 1,
+      age: v.age ? Number(v.age) : null,
+      holdingYears: v.holdingYears ? Number(v.holdingYears) : null,
     });
-    setResult({ pt, ct });
+    return { pt, ct };
+  }, []);
+
+  const calc = () => {
+    const vals = { assessed, multiAssessed, isOneHouse, houseCount, age, holdingYears };
+    const r = computeResult(vals);
+    if (!r) return;
+    setResult(r);
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify(vals)); } catch {}
   };
+
+  // [자동화] 저장된 마지막 입력을 불러와 채우고 바로 계산까지 — 재방문 시 클릭 한 번으로 결과 확인.
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SAVE_KEY) || "null");
+      if (!saved || !saved.assessed) return;
+      setAssessed(saved.assessed || "");
+      setMultiAssessed(saved.multiAssessed || "");
+      setIsOneHouse(saved.isOneHouse !== false);
+      setHouseCount(saved.houseCount || 1);
+      setAge(saved.age || "");
+      setHoldingYears(saved.holdingYears || "");
+      const r = computeResult(saved);
+      if (r) setResult(r);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="tx">
