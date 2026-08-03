@@ -13,8 +13,8 @@ import { getLedger as getAssetLedger } from "../../lib/ledger";
 import AutoReportCard from "../../components/AutoReportCard";
 import HoldingsNews from "../../components/HoldingsNews";
 import ReportTeaser from "../../components/ReportTeaser";
-import { getLedger as getDecisionLedger, computeShowdown } from "../../lib/verdictLedger";
-import { computeWallets, getSeed, wonG } from "../../lib/gameWallet";
+import { getLedger as getDecisionLedger, computeShowdown, matureLedger } from "../../lib/verdictLedger";
+import { computeWallets, getSeed, wonG, getNickname, setNickname } from "../../lib/gameWallet";
 import { samplePolicy } from "../../lib/sampleSize";
 import { pickInsight } from "../../lib/crossInsight";
 import TraderBadge from "../../components/shared/TraderBadge";
@@ -51,13 +51,37 @@ export default function TodayPage({ reports }) {
   const [opNotes, setOpNotes] = useState([]); // [알림] OneHub 신고가(spot_price)
   const [news, setNews] = useState(null); // [뉴스 통합] 오늘의 뉴스 — 부모가 한 번 fetch 해 카테고리별로 나눠 쓴다
   const [newsOpen, setNewsOpen] = useState(false); // ETF·부동산 타일 뉴스 더보기
-  const [newsDetail, setNewsDetail] = useState(null); // 뉴스 클릭 → 상세 팝업
+  // [2026-08-05] 뉴스 상세는 useState가 아니라 URL(?news=id)에서 파생 — history에 진짜 항목이
+  //   쌓이므로 뒤로가기를 누르면 페이지를 벗어나지 않고 팝업만 닫히고 스크롤 위치가 그대로 남는다.
+  //   (예전엔 순수 React state라 back을 누르면 "오늘" 페이지 자체를 벗어났다.)
+  const newsDetail = router.query.news && Array.isArray(news)
+    ? news.find((n) => String(n.id) === String(router.query.news)) || null
+    : null;
+  const openNewsDetail = (n) => {
+    router.push({ pathname: router.pathname, query: { ...router.query, news: n.id } }, undefined, { shallow: true, scroll: false });
+  };
+  const closeNewsDetail = () => {
+    if (router.query.news) router.back();
+  };
+  const [nick, setNick] = useState("나"); // [닉네임] 나 vs AI에서 "나" 대신 표시
 
   const load = useCallback(() => {
     const tr = getTrader();
     setStatus((s) => (dash ? "stale" : "loading"));
     try { const mp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); setMyComplex(mp?.name || ""); } catch (e) {}
     try { setDecisions(getDecisionLedger(tr) || []); } catch (e) { setDecisions([]); }
+    // [2026-08-03] 나 vs AI 누적 손익이 매일 시드머니로 리셋된 것처럼 보이던 버그 수정.
+    //   matureLedger(스냅샷 축적)가 예전엔 index.js의 ?tab=report 진입 때만 돌아서, "오늘"
+    //   페이지만 보는 사용자는 판단이 영영 성숙(3거래일 채점)되지 않아 늘 seed 그대로였다.
+    //   "오늘"이 기본 랜딩이 된 지금은 여기서도 직접 성숙시켜야 한다.
+    const fetchPrice = async (code) => {
+      try {
+        const r = await fetch(`/api/analyze-stock?code=${code}`);
+        const d = await r.json();
+        return Number(d?.current_price ?? d?.price) || null;
+      } catch { return null; }
+    };
+    matureLedger(tr, fetchPrice).then((list) => setDecisions(list || [])).catch(() => {});
     Promise.all([
       fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => null),
       fetch(`/api/pwa-pending?trader=${tr}`).then((r) => r.json()).catch(() => null),
@@ -89,6 +113,20 @@ export default function TodayPage({ reports }) {
       window.removeEventListener("onehub-assets-change", on);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    setNick(getNickname());
+    const on = () => setNick(getNickname());
+    window.addEventListener("onehub-game-change", on);
+    return () => window.removeEventListener("onehub-game-change", on);
+  }, []);
+
+  const editNickname = useCallback((e) => {
+    e.stopPropagation();
+    const cur = getNickname();
+    const next = typeof window !== "undefined" ? window.prompt("나 vs AI에서 쓸 닉네임 (8자 이내)", cur === "나" ? "" : cur) : null;
+    if (next != null) setNickname(next);
   }, []);
 
   const positions = parsePositions(dash);
@@ -166,7 +204,7 @@ export default function TodayPage({ reports }) {
   return (
     <div className="td">
       <header className="td-hd">
-        <button className="td-logo" onClick={() => router.push("/pwa/assets")} aria-label="종합자산">ONE<span className="td-dot">·</span>HUB</button>
+        <button className="td-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">ONE<span className="td-dot">·</span>HUB</button>
         <div className="td-ic">
           <TraderBadge />
           <button className="td-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>
@@ -180,7 +218,7 @@ export default function TodayPage({ reports }) {
         {/* ══ ① 히어로: 주식 · 나 vs AI ══ */}
         <section className="hero" onClick={() => router.push("/pwa?tab=report&sec=vs")} role="button" tabIndex={0}>
           <div className="hero-eyebrow">
-            <span className="hero-lbl">📈 주식 · 나 vs AI{daysCompeting > 0 ? ` · ${daysCompeting}일째` : ""}</span>
+            <span className="hero-lbl">📈 주식 · 나 vs AI{daysCompeting > 0 ? ` · ${daysCompeting}일째` : ""}{vsShowdown ? ` · ${vsShowdown.n}종목` : ""}</span>
             {regime && (
               <span className={`hero-regime r-${regimeRaw.toLowerCase()}`}>{regime}{heat != null ? ` · 온도 ${heat}` : ""}</span>
             )}
@@ -193,7 +231,7 @@ export default function TodayPage({ reports }) {
               </div>
               <div className="vsbars">
                 <div className="vsrow">
-                  <span className="vsrow-lbl">나</span>
+                  <span className="vsrow-lbl" onClick={editNickname} role="button" tabIndex={0} title="닉네임 바꾸기">{nick} ✎</span>
                   <span className="vsrow-track"><span className={`vsrow-fill ${vsShowdown.myRet >= 0 ? "up" : "dn"}`} style={{ width: `${Math.min(100, (Math.abs(vsShowdown.myRet) / vsMax) * 100)}%` }} /></span>
                   <span className={`vsrow-val ${vsShowdown.myRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.myRet)}{wallet ? <em className="vsrow-won">{wonG(wallet.myGain)}</em> : null}</span>
                 </div>
@@ -250,7 +288,7 @@ export default function TodayPage({ reports }) {
           {stockNews.length > 0 && (
             <div className="hero-news">
               {stockNews.slice(0, 2).map((n) => (
-                <button className="hero-news-row" key={n.id} onClick={(e) => { e.stopPropagation(); setNewsDetail(n); }}>📰 {n.headline}</button>
+                <button className="hero-news-row" key={n.id} onClick={(e) => { e.stopPropagation(); openNewsDetail(n); }}>📰 {n.headline}</button>
               ))}
             </div>
           )}
@@ -289,7 +327,7 @@ export default function TodayPage({ reports }) {
             <div className="tile-news">
               <div className="tile-news-h">글로벌 · 거시 · 부동산 뉴스</div>
               {(newsOpen ? macroNews : macroNews.slice(0, 3)).map((n) => (
-                <button className="tile-news-row" key={n.id} onClick={() => setNewsDetail(n)}>
+                <button className="tile-news-row" key={n.id} onClick={() => openNewsDetail(n)}>
                   <span className={`tile-news-cat c-${n.category}`}>{CAT_KO[n.category] || "뉴스"}</span>
                   <span className="tile-news-t">{n.headline}</span>
                 </button>
@@ -369,9 +407,9 @@ export default function TodayPage({ reports }) {
       </DataState>
 
       {newsDetail && (
-        <div className="td-modal-bg" onClick={() => setNewsDetail(null)}>
+        <div className="td-modal-bg" onClick={closeNewsDetail}>
           <div className="td-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="td-modal-close" onClick={() => setNewsDetail(null)} aria-label="닫기">✕</button>
+            <button className="td-modal-close" onClick={closeNewsDetail} aria-label="닫기">✕</button>
             <span className={`tile-news-cat c-${newsDetail.category}`}>{CAT_KO[newsDetail.category] || "뉴스"}</span>
             <h3 className="td-modal-h">{newsDetail.headline}</h3>
             <div className="td-modal-meta">{newsDetail.source_label || "OneHub 제공"}{newsDetail.created_at ? ` · ${String(newsDetail.created_at).slice(0, 10)}` : ""}</div>

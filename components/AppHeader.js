@@ -1,6 +1,6 @@
 // [UI 통일] 전 PWA 페이지 공통 상단 헤더 — ONE·HUB 로고 + 🔍(검색)만.
 //   ＋(빠른입력)·⚙️(설정)은 하단 BottomNav(FAB+설정탭)에 있으므로 상단에서는 중복 제거.
-//   로고=종합자산 이동. 검색=AI 종목 검색(onSearch 있으면 그걸, 없으면 /pwa?tab=analyze 이동).
+//   로고=오늘(홈) 이동. 검색=AI 종목 검색(onSearch 있으면 그걸, 없으면 /pwa?tab=analyze 이동).
 import { useRouter } from "next/router";
 import TraderBadge from "./shared/TraderBadge";
 
@@ -12,7 +12,7 @@ export default function AppHeader({ onSearch }) {
   };
   return (
     <header className="apphd">
-      <button type="button" className="apphd-logo" onClick={() => router.push("/pwa/assets")} aria-label="종합자산">
+      <button type="button" className="apphd-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">
         ONE<span className="apphd-dot">·</span>HUB
       </button>
       <div className="apphd-actions">

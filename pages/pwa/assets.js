@@ -229,7 +229,7 @@ export default function AssetsMapPage() {
   return (
     <div className="as">
       <header className="as-hd">
-        <button className="as-logo" onClick={() => router.push("/pwa/assets")} aria-label="종합자산">ONE<span className="as-dot">·</span>HUB</button>
+        <button className="as-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">ONE<span className="as-dot">·</span>HUB</button>
         <div className="as-ic">
           <TraderBadge />
           <button className="as-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>

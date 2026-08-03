@@ -7,7 +7,7 @@ import LastUpdated from '../../components/LastUpdated';
 import MarketSession from '../../components/MarketSession';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
 import { recordDecision, matureLedger, computeShowdown, getTodayDecision, reconcileAutoWatch, getLedger } from '../../lib/verdictLedger';
-import { getSeed, setSeed, resetSeed, SEED_OPTIONS, computeWallets, streakNarrative, wonG } from '../../lib/gameWallet';
+import { getSeed, setSeed, resetSeed, SEED_OPTIONS, computeWallets, streakNarrative, wonG, getNickname, setNickname } from '../../lib/gameWallet';
 // [N1] 자산 원장. lib/verdictLedger 의 getLedger(판단 기록)와 이름이 겹쳐 별칭으로 구분한다.
 import { getLedger as getAssetLedger } from '../../lib/ledger';
 import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta } from '../../lib/assetHistory';
@@ -18,8 +18,9 @@ import SampleSizeBadge from '../../components/SampleSizeBadge';
 import AppHeader from '../../components/AppHeader';
 import TraderBadge from '../../components/shared/TraderBadge';
 import BottomNav from '../../components/BottomNav';
-import { getStockHoldings, removeStock } from '../../lib/stockHoldings';
+import { getStockHoldings, removeStock, buyStock } from '../../lib/stockHoldings';
 import { fetchStockQuotes } from '../../lib/stockLive';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
 import { StockForm } from '../../components/shared/AssetForms';
@@ -259,11 +260,17 @@ export default function PWADashboard({ latestReport }) {
   const [ledger, setLedger] = useState([]); // [나 vs AI] 내 판단(매매/관망) 원장 + 3·7일 성과
   const [decTick, setDecTick] = useState(0); // [나 vs AI] 추천 카드 판단 버튼 상태 리렌더 트리거
   const [gameSeed, setGameSeed] = useState(null); // [G-시리즈] 가상 게임 시드머니(있으면 게임 시작됨)
+  const [gameNick, setGameNick] = useState('나'); // [닉네임] 나 vs AI에서 "나" 대신 표시
   useEffect(() => {
-    const load = () => setGameSeed(getSeed());
+    const load = () => { setGameSeed(getSeed()); setGameNick(getNickname()); };
     load();
     window.addEventListener('onehub-game-change', load);
     return () => window.removeEventListener('onehub-game-change', load);
+  }, []);
+  const editGameNickname = useCallback(() => {
+    const cur = getNickname();
+    const next = typeof window !== 'undefined' ? window.prompt('나 vs AI에서 쓸 닉네임 (8자 이내)', cur === '나' ? '' : cur) : null;
+    if (next != null) setNickname(next);
   }, []);
   // [S3/G2] AI 트러스트 3섹션 서브내비(vs/verify/archive)를 URL(?sec=)로 유지 — 뒤로가기·딥링크(F4) 지원
   // [FB-4 §4.2] 정직성 브랜드 강화 — AI 페이지는 '자기검증'을 앞세운다(기본 진입 섹션).
@@ -325,14 +332,16 @@ export default function PWADashboard({ latestReport }) {
     // [N2] 종합자산 지도는 /pwa/assets 하나로 통합 — 구 dashboard로 오는 경로를 전부 리다이렉트.
     //   지도가 2개면 총자산이 같아도 '어느 화면이 정답인지' 알 수 없어 신뢰가 무너진다.
     if (tabParam === 'dashboard') { router.replace('/pwa/assets'); return; }
-    // 탭 없이 /pwa 진입(PWA start_url)도 단일 지도로. 단, 온보딩 미완료자는 온보딩이 우선이라 제외.
+    // [2026-08-03] 탭 없이 /pwa 진입(로고 클릭·PWA start_url)은 "오늘"이 기본 홈.
+    //   구버전은 여기서 /pwa/assets로 보냈는데, manifest start_url이 /pwa/today로
+    //   바뀐 뒤에도 이 경로만 안 따라와서 "로고 눌러도 오늘로 안 감" 버그가 남아있었다.
     if (!tabParam && !code) {
       let onboarded = false;
       try {
         onboarded = !!window.localStorage.getItem('onehub_profile')
           || window.localStorage.getItem('onehub_onboarded') === '1';
       } catch (e) {}
-      if (onboarded) { router.replace('/pwa/assets'); return; }
+      if (onboarded) { router.replace('/pwa/today'); return; }
       // 최초 사용자(프로필·온보딩 모두 없음) → 위저드 1회 진입.
       //   ★ 딥링크(?tab=·?code=)로 들어온 경우엔 절대 튕기지 않는다. isReady 이후라 판정이 정확하다.
       router.replace('/pwa/onboarding');
@@ -849,9 +858,25 @@ export default function PWADashboard({ latestReport }) {
   const blockedCodeSet = new Set((data?.today_blocked ?? data?.blocked_stocks ?? []).map(b => String(b?.code ?? b?.stock ?? '')).filter(Boolean));
   const isBlockedCode = (code) => code != null && blockedCodeSet.has(String(code));
   // [AI-5] 차단 종목을 '샀어요'로 기록할 땐 오염 방지 경고 후 확인.
-  const logTake = (code, name) => {
+  // [2026-08-05] 샀어요 = 나 vs AI 게임 판단(%)일 뿐 실제 보유수량은 안 남았다 —
+  //   몇 주 샀는지 가볍게 물어서 답하면 '직접 입력 보유'에도 자동 등록(건너뛰어도 게임 기록엔 영향 없음).
+  const logTake = async (code, name) => {
     if (isBlockedCode(code) && typeof window !== 'undefined' && !window.confirm(`AI는 ${name || code}을(를) 매수 차단했습니다(AI 매도신호). 그래도 '샀어요'로 기록할까요?`)) return;
     logDecision(code, name, 'take');
+    if (typeof window === 'undefined') return;
+    const sharesStr = window.prompt(`${name || code} 몇 주 사셨나요? (건너뛰려면 취소 — 자산 탭 보유종목에 자동 등록됩니다)`);
+    if (sharesStr == null) return;
+    const shares = Number(sharesStr);
+    if (!(shares > 0)) return;
+    let px = 0;
+    try {
+      const r = await fetch(`/api/analyze-stock?code=${code}`);
+      const d = await r.json();
+      px = Number(d?.current_price ?? d?.price) || 0;
+    } catch {}
+    if (!px) { window.alert('현재가를 불러오지 못해 보유종목에는 등록하지 못했습니다. 자산 탭에서 직접 추가해 주세요.'); return; }
+    const res = buyStock({ name, code, shares, avgPrice: px, trader, priceBasis: 'current' });
+    if (res.ok) window.dispatchEvent(new Event('onehub-assets-change'));
   };
   const heat = data?.market?.heat_score ?? null;
   const fearGreed = data?.market?.fear_greed ?? null;
@@ -2344,12 +2369,52 @@ export default function PWADashboard({ latestReport }) {
                   <div className="gd-top"><span className="pwa-card-label" style={{ margin: 0 }}>⚔ 나 vs AI · 가상 지갑 대결</span><span className="gd-virtual">가상·모의</span></div>
                   {narr && <div className="gd-narr">📖 {narr}</div>}
                   <div className="gd-wallets">
-                    <div className="gd-w me"><span className="gd-wl">🙋 내 지갑</span><b className="gd-wb">{wonG(g.myBalance)}</b>{g.myGain !== 0 && <span className={`gd-wg ${g.myGain >= 0 ? 'up' : 'dn'}`}>{g.myGain >= 0 ? '+' : ''}{wonG(g.myGain)}</span>}</div>
+                    <div className="gd-w me"><span className="gd-wl" onClick={editGameNickname} role="button" tabIndex={0} title="닉네임 바꾸기">🙋 {gameNick} ✎</span><b className="gd-wb">{wonG(g.myBalance)}</b>{g.myGain !== 0 && <span className={`gd-wg ${g.myGain >= 0 ? 'up' : 'dn'}`}>{g.myGain >= 0 ? '+' : ''}{wonG(g.myGain)}</span>}</div>
                     <div className="gd-vs">VS</div>
                     <div className="gd-w ai"><span className="gd-wl">AI 지갑 🤖</span><b className="gd-wb">{wonG(g.aiBalance)}</b>{g.aiGain !== 0 && <span className={`gd-wg ${g.aiGain >= 0 ? 'up' : 'dn'}`}>{g.aiGain >= 0 ? '+' : ''}{wonG(g.aiGain)}</span>}</div>
                   </div>
                   <div className="gd-bar"><div className="gd-bar-me" style={{ width: `${Math.max(6, Math.min(94, pct))}%` }} /></div>
                   <div className="gd-lead">{g.leader === 'me' ? <b className="up">🏆 내가 {wonG(Math.abs(g.diff))} 앞섬</b> : g.leader === 'ai' ? <b className="dn">🤖 AI가 {wonG(Math.abs(g.diff))} 앞섬</b> : <b>⚖️ 접전</b>} · 판당 베팅 {wonG(g.bet)}(가상)</div>
+                  {(() => {
+                    // [2026-08-03] 며칠차·몇종목 대결 + 일자별 누적 금액 추이 그래프.
+                    //   x축=정산된 날짜, 시드(출발점)부터 판이 정산될 때마다 잔고가 누적된다.
+                    const daysIn = g.settled.length ? Math.max(1, Math.floor((Date.now() - Math.min(...g.settled.map((s) => s.ts))) / 86400000) + 1) : 0;
+                    const chron = [...g.settled].sort((a, b) => a.ts - b.ts);
+                    let myCum = g.seed, aiCum = g.seed;
+                    const start = new Date(chron.length ? chron[0].ts : Date.now());
+                    const trend = [{ label: `${start.getMonth() + 1}/${start.getDate()} 시작`, [gameNick]: myCum, AI: aiCum }];
+                    chron.forEach((s) => {
+                      myCum += s.myPnl; aiCum += s.aiPnl;
+                      const d = new Date(s.ts);
+                      trend.push({ label: `${d.getMonth() + 1}/${d.getDate()}`, [gameNick]: myCum, AI: aiCum });
+                    });
+                    return (
+                      <div className="gd-trend">
+                        <div className="gd-trend-top">
+                          <span className="gd-trend-days">{daysIn}일째 · {g.settled.length}종목 대결</span>
+                          <span className="gd-trend-final">
+                            최종 <b className={g.myGain >= 0 ? 'up' : 'dn'}>{gameNick} {wonG(g.myBalance)}</b>
+                            {' · '}
+                            <b className={g.aiGain >= 0 ? 'up' : 'dn'}>AI {wonG(g.aiBalance)}</b>
+                          </span>
+                        </div>
+                        {trend.length > 1 && (
+                          <ResponsiveContainer width="100%" height={140}>
+                            <LineChart data={trend} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+                              <XAxis dataKey="label" stroke="var(--color-ink-3)" fontSize={10} tickLine={false} />
+                              <YAxis hide domain={['dataMin', 'dataMax']} />
+                              <Tooltip
+                                formatter={(v) => wonG(v)}
+                                contentStyle={{ background: 'var(--color-card)', border: '1px solid var(--color-line)', borderRadius: 8, fontSize: 12 }}
+                              />
+                              <Line type="monotone" dataKey={gameNick} stroke="var(--color-success)" strokeWidth={2} dot={false} />
+                              <Line type="monotone" dataKey="AI" stroke="var(--purple)" strokeWidth={2} dot={false} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        )}
+                      </div>
+                    );
+                  })()}
                   {pending.length > 0 && (
                     <div className="gd-pending">
                       <div className="gd-ph">⏳ 진행 중 대결 {pending.length}건 (3일 후 정산)</div>
@@ -4363,6 +4428,11 @@ export default function PWADashboard({ latestReport }) {
         .gd-bar-me { height: 100%; background: var(--color-success); border-radius: 4px; transition: width .4s; }
         .gd-lead { text-align: center; font-size: 0.74rem; color: var(--text-secondary); line-height: 1.5; word-break: keep-all; }
         .gd-lead b.up { color: var(--color-success); } .gd-lead b.dn { color: var(--purple, var(--color-danger)); }
+        .gd-trend { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+        .gd-trend-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
+        .gd-trend-days { font-size: 0.7rem; font-weight: 700; color: var(--text-tertiary); }
+        .gd-trend-final { font-size: 0.72rem; color: var(--text-secondary); text-align: right; }
+        .gd-trend-final b.up { color: var(--color-success); } .gd-trend-final b.dn { color: var(--purple, var(--color-danger)); }
         .gd-pending, .gd-recent { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
         .gd-ph { font-size: 0.7rem; font-weight: 800; color: var(--color-ink-2); margin-bottom: 6px; }
         .gd-prow, .gd-rrow { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 0.74rem; }
