@@ -1,12 +1,11 @@
 // [리포트 PWA화] AI 신뢰도 아카이브 상세 리포트 공용 셸.
-//   TopNav(신뢰도 탭 활성) + '← AI 신뢰도로' 백링크 + 제목. PWA 톤·디자인 토큰만 사용.
+//   [FB-8 3-A] 드릴다운 상세에는 상단 자산탭(TopNav)을 그리지 않는다 — '← AI 신뢰도로' 백링크로만 복귀.
+//   '← AI 신뢰도로' 백링크 + 제목. PWA 톤·디자인 토큰만 사용.
 import Link from "next/link";
-import TopNav from "../TopNav";
 
 export default function ReportShell({ title, sub, children }) {
   return (
     <div className="rp pwa-shell">
-      <TopNav active="trust" />
       <Link href="/pwa?tab=report" className="rp-back">← AI 신뢰도로</Link>
       <div className="rp-head">
         <h1 className="rp-title">{title}</h1>
@@ -18,7 +17,7 @@ export default function ReportShell({ title, sub, children }) {
         <Link href="/pwa?tab=dashboard" className="rp-foot-link">🏠 종합자산</Link>
       </div>
       <style jsx>{`
-        .rp { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
+        .rp { max-width: 480px; margin: 0 auto; padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
         .rp-back { display: inline-block; font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); text-decoration: none; margin: 2px 0 10px; }
         .rp-head { margin-bottom: 14px; }
         .rp-title { font-size: 1.15rem; font-weight: 800; letter-spacing: -.3px; margin: 0; }

@@ -2127,6 +2127,13 @@ export default function PWADashboard({ latestReport }) {
                             {p.pnl_rate>=0?'+':''}{p.pnl_rate}%
                           </span>
                         </div>
+                        {/* [FB-8 이슈2] 조치 필요 종목: '지금 뭘 하라'를 카드 최상단에 명령형으로 */}
+                        {u.rank <= 2 && (() => { const st = deriveStance(p); const doText = u.level === 'urgent' ? '손절가에 근접했어요 — 매도할지 지금 결정하세요.' : `${st.label} 시점이에요 — 오늘 한 번 확인하세요.`; return (
+                          <div className="pos-todo" style={{ borderLeft: `3px solid ${u.color}` }}>
+                            <span className="pos-todo-k" style={{ color: u.color }}>👉 지금 할 일</span>
+                            <span className="pos-todo-v">{doText} <span className="pos-todo-hint">아래 <b>매도</b> · <b>AI 분석 보기</b>에서 실행</span></span>
+                          </div>
+                        ); })()}
                         <div className="position-card-grid mono">
                           <div className="position-card-cell">
                             <span className="dim">매수가</span>
@@ -4310,6 +4317,12 @@ export default function PWADashboard({ latestReport }) {
         .position-card-ai-text { font-size: 0.76rem; line-height: 1.55; color: var(--text-secondary); }
         /* [§3-4] 보유 AI 스탠스 + 근거 인라인 */
         .pos-stance { display: flex; align-items: flex-start; gap: 8px; margin-top: 9px; padding-top: 9px; border-top: 1px dashed var(--border); }
+        /* [FB-8 이슈2] 조치 필요 종목 상단 명령형 안내 배너 */
+        .pos-todo { display: flex; flex-direction: column; gap: 2px; margin: 8px 0 2px; padding: 8px 10px; background: var(--color-card-soft); border-radius: 8px; word-break: keep-all; }
+        .pos-todo-k { font-size: 0.68rem; font-weight: 800; }
+        .pos-todo-v { font-size: 0.76rem; color: var(--color-ink); line-height: 1.5; font-weight: 700; }
+        .pos-todo-hint { display: block; font-size: 0.66rem; color: var(--color-ink-3); font-weight: 500; margin-top: 1px; }
+        .pos-todo-hint b { color: var(--color-ink-2); font-weight: 700; }
         /* [S7.1] 종목별 다음 트리거 */
         .pos-trigger { font-size: 0.68rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 8px; padding: 7px 10px; margin-top: 8px; line-height: 1.5; word-break: keep-all; }
         .pos-trigger b { color: var(--color-ink); font-weight: 800; }

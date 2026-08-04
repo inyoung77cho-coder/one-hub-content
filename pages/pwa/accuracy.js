@@ -25,6 +25,9 @@ export default function AccuracyPage() {
       {!loading && data?.ok && (() => {
         const s = data.summary;
         const recent = data.recent || [];
+        // [FB-8 3-C] 관계가 보이도록: 검증완료 = 적중 + 보합 + 오판, 대기 = 총차단 − 검증완료
+        const flat = Math.max(0, (s.total_checked ?? 0) - (s.success_count ?? 0) - (s.fail_count ?? 0));
+        const pending = Math.max(0, (s.total_blocked ?? 0) - (s.total_checked ?? 0));
         // 큰 오판(차단 후 상승 최대)
         const bigMiss = recent.filter((r) => r.price_change_pct != null && r.price_change_pct > 0)
           .sort((a, b) => b.price_change_pct - a.price_change_pct)[0];
@@ -63,12 +66,20 @@ export default function AccuracyPage() {
               <div className="ac-hero-lbl">AI 차단 적중률</div>
               <div className={`ac-hero-pct ${pctTone}`}>{pct != null ? `${pct}%` : '-'}</div>
               <div className={`ac-hero-tag ${pctTone}`}>{pctLabel}</div>
-              <div className="ac-hero-sub">검증 완료 {s.total_checked}건 중 {s.success_count}건 적중</div>
+              <div className="ac-hero-mean">AI가 “사지 말라”고 막은 종목 중, 3거래일 뒤 검증에서 <b>실제로 오르지 않은</b> 비율이에요.</div>
               <div className="ac-bar"><div className={`ac-bar-fill ${pctTone}`} style={{ width: `${pct || 0}%` }} /></div>
+              <div className="ac-hero-sub">적중률 = 적중 {s.success_count} ÷ 검증 완료 {s.total_checked}</div>
+              {/* [FB-8 3-C] 총차단 → 검증완료(대기) 관계를 눈에 보이게 */}
+              <div className="ac-funnel">
+                <span>총 차단 <b>{s.total_blocked}</b></span>
+                <span className="ac-funnel-ar">→</span>
+                <span>검증 완료 <b>{s.total_checked}</b></span>
+                {pending > 0 && <span className="ac-funnel-wait">검증 대기 {pending}</span>}
+              </div>
               <div className="ac-stats">
                 {[
-                  { label: '총 차단', value: s.total_blocked, tone: '' },
                   { label: '✓ 적중', value: s.success_count, tone: 'good' },
+                  { label: '― 보합', value: flat, tone: '' },
                   { label: '✗ 오판', value: s.fail_count, tone: 'bad' },
                 ].map((stat) => (
                   <div className="ac-stat" key={stat.label}>
@@ -77,6 +88,7 @@ export default function AccuracyPage() {
                   </div>
                 ))}
               </div>
+              <div className="ac-stats-note">검증 완료 {s.total_checked}건 = 적중 {s.success_count} + 보합 {flat} + 오판 {s.fail_count}</div>
               {/* [S7.6] 회피손실 합계 — 적중률만의 오해 방지 */}
               {(() => {
                 const hits = recent.filter((r) => r.price_change_pct != null && r.price_change_pct < 0);
@@ -92,6 +104,15 @@ export default function AccuracyPage() {
                   </div>
                 );
               })()}
+            </section>
+
+            {/* [FB-8 3-B] 무엇을 하면 정확도가 올라가나 — 쉬운 안내 */}
+            <section className="ac-card ac-howto">
+              <div className="ac-card-h">📈 정확도는 어떻게 올라가나요?</div>
+              <ul className="ac-howto-list">
+                <li>매주 검증이 쌓일수록 숫자가 정교해져요. (지금까지 검증 완료 {s.total_checked}건)</li>
+                <li>오판이 잦은 신호는 거래량·수급 같은 보조지표를 더해 차단 기준을 좁혀요 — 아래 개선 제안 참고.</li>
+              </ul>
             </section>
 
             {/* [A2] 큰 오판 개선 제안 */}
@@ -200,6 +221,16 @@ export default function AccuracyPage() {
         .ac-hero-pct { font-size: 3.7rem; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
         .ac-hero-tag { font-size: 0.76rem; font-weight: 700; margin-top: 4px; }
         .ac-hero-sub { font-size: 0.76rem; color: var(--color-ink-2); margin-top: 8px; }
+        .ac-hero-mean { font-size: 0.76rem; color: var(--color-ink-2); margin-top: 10px; line-height: 1.55; word-break: keep-all; }
+        .ac-hero-mean b { color: var(--color-ink); font-weight: 800; }
+        .ac-funnel { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 14px; font-size: 0.74rem; color: var(--color-ink-2); }
+        .ac-funnel b { color: var(--color-ink); font-weight: 800; }
+        .ac-funnel-ar { color: var(--color-ink-3); }
+        .ac-funnel-wait { font-size: 0.66rem; color: var(--color-ink-3); background: var(--color-card-soft); padding: 2px 8px; border-radius: 10px; }
+        .ac-stats-note { font-size: 0.66rem; color: var(--color-ink-3); text-align: center; margin-top: 9px; word-break: keep-all; }
+        .ac-howto-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+        .ac-howto-list li { font-size: 0.8rem; color: var(--color-ink-2); line-height: 1.55; padding-left: 18px; position: relative; word-break: keep-all; }
+        .ac-howto-list li::before { content: "→"; position: absolute; left: 0; color: var(--color-primary); font-weight: 800; }
         .good { color: var(--color-success); }
         .warn { color: var(--color-warning); }
         .bad { color: var(--color-danger); }

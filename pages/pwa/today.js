@@ -248,6 +248,8 @@ export default function TodayPage({ reports }) {
           ) : pendingJudge.length > 0 ? (
             <>
               <div className="hero-big"><span className="live-dot" />{pendingJudge.length}건 채점 중</div>
+              {/* [FB-8 이슈1] 결과가 왜 아직 없는지 + 무엇이 언제 나오는지 설명 */}
+              <div className="hero-note">내 판단과 AI를 3거래일 뒤 비교해요. 승부 결과는 {soonest ? mmdd(soonest) : "-"}부터 — 그때 여기에 ‘내 지갑 vs AI’ 스코어가 나옵니다.</div>
               <div className="hero-sub">가장 빠른 결과 {soonest ? mmdd(soonest) : "-"} · 기록 보기 →</div>
             </>
           ) : cands.length > 0 ? (
@@ -463,6 +465,7 @@ export default function TodayPage({ reports }) {
         .vsrow-won { display: block; font-style: normal; font-size: 10px; font-weight: 600; color: var(--hero-ink-faint); margin-top: 1px; }
         .hero-watermark { font-size: 10px; color: var(--hero-ink-faint); margin-bottom: 8px; }
         .hero-keydiff { font-size: 0.78rem; color: var(--hero-ink-soft); line-height: 1.5; word-break: keep-all; margin-bottom: 8px; padding: 8px 10px; background: var(--hero-fill); border-radius: 9px; }
+        .hero-note { font-size: 0.78rem; color: var(--hero-ink-soft); line-height: 1.5; word-break: keep-all; margin: 2px 0 8px; padding: 8px 10px; background: var(--hero-fill); border-radius: 9px; }
         .hero-big { font-size: 26px; font-weight: 800; letter-spacing: -.4px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
         .hero-big.hero-quiet { color: var(--hero-ink-soft); font-size: 22px; }
         .hero-sub { font-size: 13px; color: var(--hero-ink-soft); line-height: 1.5; word-break: keep-all; margin-bottom: 4px; }
