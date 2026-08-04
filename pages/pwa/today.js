@@ -14,7 +14,8 @@ import AutoReportCard from "../../components/AutoReportCard";
 import HoldingsNews from "../../components/HoldingsNews";
 import ReportTeaser from "../../components/ReportTeaser";
 import { getLedger as getDecisionLedger, computeShowdown, matureLedger } from "../../lib/verdictLedger";
-import { computeWallets, getSeed, wonG, getNickname, setNickname } from "../../lib/gameWallet";
+import { computeWallets, computeDailySeries, getSeed, wonG, getNickname, setNickname } from "../../lib/gameWallet";
+import { initGameSync } from "../../lib/gameSync";
 import { samplePolicy } from "../../lib/sampleSize";
 import { pickInsight } from "../../lib/crossInsight";
 import TraderBadge from "../../components/shared/TraderBadge";
@@ -28,6 +29,55 @@ const CAT_KO = { global: "글로벌", macro: "거시", markets: "증시", reales
 const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || null);
 const pctTxt = (v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(2)}%`;
 const mmdd = (ms) => { const d = new Date(ms); return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
+// [2026-08-05] 일자별 잔고 비교 그래프 — "당일 종가 기준부터 일자별로 계속 update" 피드백.
+//   computeDailySeries(gameWallet.js)가 매일 마크투마켓한 시리즈를 그대로 그린다. 최종 금액은
+//   요청대로 그래프 오른쪽에 표기.
+function DuelChart({ series, myLabel }) {
+  if (!series || series.length < 2) return null;
+  const W = 200, H = 76, PAD = 4;
+  const vals = series.flatMap((s) => [s.my, s.ai]);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const range = Math.max(1, max - min);
+  const x = (i) => PAD + (i / (series.length - 1)) * (W - PAD * 2);
+  const y = (v) => H - PAD - ((v - min) / range) * (H - PAD * 2);
+  const path = (key) => series.map((s, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(s[key]).toFixed(1)}`).join(" ");
+  const last = series[series.length - 1];
+  const first = series[0];
+  return (
+    <div className="dc-row">
+      <div className="dc-chart">
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
+          <path d={path("ai")} className="dc-line dc-ai" fill="none" />
+          <path d={path("my")} className="dc-line dc-me" fill="none" />
+          <circle cx={x(series.length - 1)} cy={y(last.ai)} r="2.5" className="dc-dot dc-ai" />
+          <circle cx={x(series.length - 1)} cy={y(last.my)} r="2.5" className="dc-dot dc-me" />
+        </svg>
+        <div className="dc-daterange">{first.date.slice(5)} → {last.date.slice(5)}</div>
+      </div>
+      <div className="dc-finals">
+        <div className="dc-final-item me"><span className="dc-fk">{myLabel}</span><span className="dc-fv">{wonG(last.my)}</span></div>
+        <div className="dc-final-item ai"><span className="dc-fk">AI</span><span className="dc-fv">{wonG(last.ai)}</span></div>
+      </div>
+      <style jsx>{`
+        .dc-row { display: flex; align-items: center; gap: 10px; margin: 10px 0 2px; }
+        .dc-chart { flex: 1; min-width: 0; }
+        .dc-daterange { font-size: 0.6rem; color: var(--hero-ink-sub, rgba(255,255,255,0.55)); margin-top: 2px; text-align: center; }
+        .dc-line { stroke-width: 2; vector-effect: non-scaling-stroke; }
+        .dc-line.dc-me { stroke: #fff; }
+        .dc-line.dc-ai { stroke: rgba(255,255,255,0.4); stroke-dasharray: 3 3; }
+        .dc-dot.dc-me { fill: #fff; }
+        .dc-dot.dc-ai { fill: rgba(255,255,255,0.6); }
+        .dc-finals { flex: none; display: flex; flex-direction: column; gap: 5px; min-width: 72px; }
+        .dc-final-item { display: flex; flex-direction: column; line-height: 1.2; }
+        .dc-fk { font-size: 0.6rem; font-weight: 700; opacity: 0.65; }
+        .dc-fv { font-size: 0.78rem; font-weight: 800; font-family: var(--font-mono); }
+        .dc-final-item.me .dc-fv { color: #fff; }
+        .dc-final-item.ai .dc-fv { color: rgba(255,255,255,0.75); }
+      `}</style>
+    </div>
+  );
+}
 
 // 백엔드가 positions를 문자열로 주는 경우가 있어 방어적으로 파싱
 function parsePositions(dash) {
@@ -67,6 +117,7 @@ export default function TodayPage({ reports }) {
 
   const load = useCallback(() => {
     const tr = getTrader();
+    initGameSync(tr); // [2026-08-05] 시드/닉네임/원장 서버 하이드레이션 + 이후 변경 서버 미러링
     setStatus((s) => (dash ? "stale" : "loading"));
     try { const mp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); setMyComplex(mp?.name || ""); } catch (e) {}
     try { setDecisions(getDecisionLedger(tr) || []); } catch (e) { setDecisions([]); }
@@ -164,6 +215,9 @@ export default function TodayPage({ reports }) {
   const vsMax = vsShowdown ? Math.max(Math.abs(vsShowdown.myRet), Math.abs(vsShowdown.aiRet), 1) : 1;
   // [금액 표기] 가상 시드머니 지갑(설정된 경우만) — 실제 매매와 완전 분리된 게임머니. 미설정이면 %만 표시.
   const wallet = vsShowdown ? computeWallets(vsShowdown, getSeed()) : null;
+  // [2026-08-05] 일자별 그래프 — 3거래일 확정 판정(vsShowdown)을 기다리지 않고 스냅샷이 쌓인
+  //   첫날부터 매일 마크투마켓으로 반영(당일 종가 기준 즉시 업데이트 요구사항).
+  const dailySeries = computeDailySeries(mine, getSeed(), tr2);
   // [며칠 경쟁] 첫 판단 기록일부터 오늘까지
   const daysCompeting = mine.length ? Math.max(1, Math.floor((Date.now() - Math.min(...mine.map((d) => d.ts))) / DAY) + 1) : 0;
   // [주요 판단 차이] 내가 관망(pass)했는데 결과가 크게 갈린 종목을 최우선(details는 이미 |ret| 내림차순) — 없으면 최대 변동 종목.
@@ -241,6 +295,7 @@ export default function TodayPage({ reports }) {
                   <span className={`vsrow-val ${vsShowdown.aiRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.aiRet)}{wallet ? <em className="vsrow-won">{wonG(wallet.aiGain)}</em> : null}</span>
                 </div>
               </div>
+              <DuelChart series={dailySeries} myLabel={nick} />
               {wallet && <div className="hero-watermark">가상 시드머니 {wonG(wallet.seed)} 기준 · 실제 매매 아님</div>}
               {keyDiffLine && <div className="hero-keydiff">🔍 {keyDiffLine}</div>}
               <div className="hero-sub">{pendingJudge.length > 0 ? `채점 중 ${pendingJudge.length}건 · ` : ""}기록 전체 보기 →</div>
@@ -250,6 +305,8 @@ export default function TodayPage({ reports }) {
               <div className="hero-big"><span className="live-dot" />{pendingJudge.length}건 채점 중</div>
               {/* [FB-8 이슈1] 결과가 왜 아직 없는지 + 무엇이 언제 나오는지 설명 */}
               <div className="hero-note">내 판단과 AI를 3거래일 뒤 비교해요. 승부 결과는 {soonest ? mmdd(soonest) : "-"}부터 — 그때 여기에 ‘내 지갑 vs AI’ 스코어가 나옵니다.</div>
+              {/* [2026-08-05] 확정 판정 전에도 스냅샷이 있으면 잠정 그래프를 바로 보여준다(당일 종가부터 업데이트). */}
+              {dailySeries.length >= 2 && <DuelChart series={dailySeries} myLabel={nick} />}
               <div className="hero-sub">가장 빠른 결과 {soonest ? mmdd(soonest) : "-"} · 기록 보기 →</div>
             </>
           ) : cands.length > 0 ? (

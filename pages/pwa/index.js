@@ -8,6 +8,7 @@ import MarketSession from '../../components/MarketSession';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
 import { recordDecision, matureLedger, computeShowdown, getTodayDecision, reconcileAutoWatch, getLedger } from '../../lib/verdictLedger';
 import { getSeed, setSeed, resetSeed, SEED_OPTIONS, computeWallets, streakNarrative, wonG, getNickname, setNickname } from '../../lib/gameWallet';
+import { initGameSync } from '../../lib/gameSync';
 // [N1] 자산 원장. lib/verdictLedger 의 getLedger(판단 기록)와 이름이 겹쳐 별칭으로 구분한다.
 import { getLedger as getAssetLedger } from '../../lib/ledger';
 import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta } from '../../lib/assetHistory';
@@ -264,6 +265,7 @@ export default function PWADashboard({ latestReport }) {
   useEffect(() => {
     const load = () => { setGameSeed(getSeed()); setGameNick(getNickname()); };
     load();
+    initGameSync(getTrader()); // [2026-08-05] 서버 하이드레이션 + 변경 미러링(today.js와 동일 진입점)
     window.addEventListener('onehub-game-change', load);
     return () => window.removeEventListener('onehub-game-change', load);
   }, []);
@@ -298,6 +300,10 @@ export default function PWADashboard({ latestReport }) {
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
   const [bottomSheet, setBottomSheet] = useState(null); // [v9.0] AI 판단근거 Bottom Sheet: null | { name, code, scores, reasons, final_score, win_rate }
   const [qaOpen, setQaOpen] = useState(false); // [S3] 빠른입력 시트(공용 QuickAddSheet) 열림
+  // [2026-08-05 재작업] window.prompt는 카카오톡 인앱브라우저 등에서 아예 안 뜨거나
+  //   조용히 무시되는 경우가 있어 앱 내장 시트로 교체. null | { code, name, blocked }
+  const [sharesPrompt, setSharesPrompt] = useState(null);
+  const [sharesPromptInput, setSharesPromptInput] = useState('');
   const [basisOpen, setBasisOpen] = useState(false); // [v10 UI] 홈 'AI 판단 근거' 접기
   const [heroWhyOpen, setHeroWhyOpen] = useState(false); // [v11-ux] 홈 통합 판단 '왜?' 인라인 펼치기(근거 버튼 제거)
   const [logOpen, setLogOpen] = useState(false);     // [v10 UI] 홈 '최근 활동' 접기
@@ -858,25 +864,45 @@ export default function PWADashboard({ latestReport }) {
   const blockedCodeSet = new Set((data?.today_blocked ?? data?.blocked_stocks ?? []).map(b => String(b?.code ?? b?.stock ?? '')).filter(Boolean));
   const isBlockedCode = (code) => code != null && blockedCodeSet.has(String(code));
   // [AI-5] 차단 종목을 '샀어요'로 기록할 땐 오염 방지 경고 후 확인.
-  // [2026-08-05] 샀어요 = 나 vs AI 게임 판단(%)일 뿐 실제 보유수량은 안 남았다 —
-  //   몇 주 샀는지 가볍게 물어서 답하면 '직접 입력 보유'에도 자동 등록(건너뛰어도 게임 기록엔 영향 없음).
-  const logTake = async (code, name) => {
-    if (isBlockedCode(code) && typeof window !== 'undefined' && !window.confirm(`AI는 ${name || code}을(를) 매수 차단했습니다(AI 매도신호). 그래도 '샀어요'로 기록할까요?`)) return;
+  // [2026-08-05 재작업] window.prompt/confirm은 카카오톡 인앱브라우저 등에서 아예 안 뜨거나
+  //   조용히 무시돼 '샀어요'가 아무 반응 없어 보이는 사고가 있었다 — 앱 내장 시트(sharesPrompt)로 교체.
+  //   샀어요 = 나 vs AI 게임 판단(%)일 뿐 실제 보유수량은 안 남았다 — 몇 주 샀는지 물어서
+  //   답하면 '직접 입력 보유'에도 자동 등록(건너뛰어도 게임 기록엔 영향 없음).
+  const logTake = (code, name) => {
+    if (isBlockedCode(code)) {
+      setSharesPrompt({ code, name, needsBlockedConfirm: true });
+      return;
+    }
     logDecision(code, name, 'take');
-    if (typeof window === 'undefined') return;
-    const sharesStr = window.prompt(`${name || code} 몇 주 사셨나요? (건너뛰려면 취소 — 자산 탭 보유종목에 자동 등록됩니다)`);
-    if (sharesStr == null) return;
-    const shares = Number(sharesStr);
-    if (!(shares > 0)) return;
+    setSharesPromptInput('');
+    setSharesPrompt({ code, name });
+  };
+  const confirmBlockedTake = () => {
+    if (!sharesPrompt) return;
+    const { code, name } = sharesPrompt;
+    logDecision(code, name, 'take');
+    setSharesPromptInput('');
+    setSharesPrompt({ code, name });
+  };
+  const submitSharesPrompt = async () => {
+    if (!sharesPrompt) return;
+    const { code, name } = sharesPrompt;
+    const shares = Number(sharesPromptInput);
+    if (!(shares > 0)) { setSharesPrompt(null); return; }
+    setSharesPrompt((p) => (p ? { ...p, saving: true, err: '' } : p));
     let px = 0;
     try {
       const r = await fetch(`/api/analyze-stock?code=${code}`);
       const d = await r.json();
       px = Number(d?.current_price ?? d?.price) || 0;
     } catch {}
-    if (!px) { window.alert('현재가를 불러오지 못해 보유종목에는 등록하지 못했습니다. 자산 탭에서 직접 추가해 주세요.'); return; }
+    if (!px) {
+      setSharesPrompt((p) => (p ? { ...p, saving: false, err: '현재가를 불러오지 못했습니다 — 자산 탭에서 직접 추가해 주세요.' } : p));
+      return;
+    }
     const res = buyStock({ name, code, shares, avgPrice: px, trader, priceBasis: 'current' });
     if (res.ok) window.dispatchEvent(new Event('onehub-assets-change'));
+    setSharesPrompt(null);
   };
   const heat = data?.market?.heat_score ?? null;
   const fearGreed = data?.market?.fear_greed ?? null;
@@ -3539,6 +3565,41 @@ export default function PWADashboard({ latestReport }) {
 
         {/* [S3] 빠른입력 — 공용 QuickAddSheet(자산군별 맞춤 폼). 대시보드·서브페이지 동일 사용 */}
         {qaOpen && <QuickAddSheet initialAsset="stock" onClose={() => setQaOpen(false)} />}
+
+        {/* [2026-08-05 재작업] '샀어요' 주식수 입력 시트 — window.prompt 대체(인앱브라우저 대응) */}
+        {sharesPrompt && (
+          <div className="sp-scrim" onClick={() => setSharesPrompt(null)}>
+            <div className="sp" onClick={(e) => e.stopPropagation()}>
+              {sharesPrompt.needsBlockedConfirm ? (
+                <>
+                  <div className="sp-h">⚠️ AI 매수 차단 종목</div>
+                  <div className="sp-warn">AI는 <b>{sharesPrompt.name || sharesPrompt.code}</b>을(를) 매수 차단했습니다(매도신호). 그래도 '샀어요'로 기록할까요?</div>
+                  <div className="sp-row2">
+                    <button className="sp-btn ghost" onClick={() => setSharesPrompt(null)}>기록 안 함</button>
+                    <button className="sp-btn warn" onClick={confirmBlockedTake}>그래도 기록</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="sp-h">{sharesPrompt.name || sharesPrompt.code} 몇 주 사셨나요?</div>
+                  <div className="sp-sub">답하면 자산 탭 보유종목에 현재가로 자동 등록됩니다. 건너뛰어도 나 vs AI 기록엔 영향 없어요.</div>
+                  <input
+                    className="sp-input" type="number" inputMode="numeric" placeholder="예: 10" autoFocus
+                    value={sharesPromptInput} onChange={(e) => setSharesPromptInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') submitSharesPrompt(); }}
+                  />
+                  {sharesPrompt.err && <div className="sp-err">{sharesPrompt.err}</div>}
+                  <div className="sp-row2">
+                    <button className="sp-btn ghost" onClick={() => setSharesPrompt(null)}>건너뛰기</button>
+                    <button className="sp-btn" disabled={sharesPrompt.saving} onClick={submitSharesPrompt}>
+                      {sharesPrompt.saving ? '등록 중…' : '보유종목에 등록'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
         {/* [G5] 하단 앱 내비 — report 탭=AI, 그 외(dashboard/portfolio/analyze)=자산 */}
         <BottomNav active={tab === 'report' ? 'ai' : 'assets'} />
       </div>
@@ -4575,6 +4636,21 @@ export default function PWADashboard({ latestReport }) {
         .pwa-error { color: var(--accent-sell); font-size: 0.78rem; padding: 14px 16px; }
         .pwa-footer { padding: 24px; text-align: center; }
         .pwa-footer :global(a) { color: var(--text-tertiary); text-decoration: none; font-size: 0.75rem; }
+
+        /* [2026-08-05] '샀어요' 주식수 입력 시트 — window.prompt 대체(인앱브라우저 대응) */
+        .sp-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 9000; display: flex; align-items: flex-end; justify-content: center; }
+        .sp { width: 100%; max-width: 480px; background: var(--card-bg); border-radius: 20px 20px 0 0; padding: 22px 18px calc(env(safe-area-inset-bottom, 0px) + 20px); box-shadow: 0 -4px 32px rgba(0,0,0,0.18); font-family: var(--font-body); color: var(--text-primary); }
+        .sp-h { font-size: 1rem; font-weight: 800; margin-bottom: 6px; }
+        .sp-sub { font-size: 0.76rem; color: var(--text-tertiary); line-height: 1.5; margin-bottom: 14px; word-break: keep-all; }
+        .sp-warn { font-size: 0.85rem; color: var(--text-secondary); line-height: 1.6; margin-bottom: 16px; word-break: keep-all; }
+        .sp-input { width: 100%; border: 1px solid var(--border); background: var(--inset-bg); border-radius: 12px; padding: 13px 14px; font-size: 1rem; font-family: var(--font-body); color: var(--text-primary); margin-bottom: 10px; }
+        .sp-input:focus { outline: none; border-color: var(--color-primary); }
+        .sp-err { font-size: 0.74rem; color: var(--color-danger); font-weight: 600; margin-bottom: 10px; }
+        .sp-row2 { display: flex; gap: 8px; margin-top: 4px; }
+        .sp-btn { flex: 1; border: none; border-radius: 12px; padding: 13px 0; font-size: 0.88rem; font-weight: 800; color: #fff; background: var(--color-primary); cursor: pointer; font-family: var(--font-body); }
+        .sp-btn:disabled { opacity: 0.6; }
+        .sp-btn.ghost { background: var(--inset-bg); color: var(--text-secondary); }
+        .sp-btn.warn { background: var(--color-danger); }
       `}</style>
     </>
   );
