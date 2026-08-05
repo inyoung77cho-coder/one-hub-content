@@ -21,7 +21,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 JOURNAL_DIR = Path.home() / "one_hub_journals"
-OUTPUT_DIR  = Path("/home/ubuntu/one-hub-publish/content/daily")
+# [2026-08-05] 이 스크립트는 GitHub Actions(daily_publish.yml)에서 저장소 체크아웃
+# 루트를 cwd로 실행된다 — EC2 서버 전용 절대경로(/home/ubuntu/one-hub-publish/...)를
+# 그대로 쓰면 그런 디렉터리가 없는 러너에서 즉시 실패했고(워크플로 "1분 13초 실패"의
+# 원인), 설령 만들어져도 워크플로의 "Verify file"·"Commit and push" 단계가 확인하는
+# 저장소 상대경로(content/daily/)와 아예 다른 곳에 쓰는 상황이었다.
+OUTPUT_DIR  = Path("content/daily")
 DB_PATH     = Path.home() / "trading.db"
 DISCLAIMER  = "본 리포트는 투자 참고 자료이며 투자 권유가 아닙니다. 모든 투자 결과는 본인 책임입니다."
 
