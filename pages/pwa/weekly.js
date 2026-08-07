@@ -36,7 +36,7 @@ export default function PwaWeekly({ reports }) {
       )}
       <style jsx>{`
         .rp-empty { text-align: center; color: var(--color-ink-3); padding: 40px 0; font-size: 0.85rem; }
-        .wc { display: block; width: 100%; text-align: left; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 15px 16px; margin-bottom: 10px; cursor: pointer; font-family: var(--font-sans); }
+        .wc { display: block; width: 100%; text-align: left; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px; margin-bottom: 12px; cursor: pointer; font-family: var(--font-sans); }
         .wc:active { background: var(--color-card-soft, var(--color-line)); }
         .wc-top { display: flex; align-items: baseline; gap: 10px; }
         .wc-week { font-size: 0.95rem; font-weight: 800; font-family: ui-monospace, monospace; }

@@ -22,6 +22,7 @@ import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
 import LastUpdated from "../../components/LastUpdated";
+import MarketStatusBadge from "../../components/MarketStatusBadge";
 
 const DAY = 86400000;
 const MATURE_DAYS = 3; // 판단 → 채점까지(나 vs AI)
@@ -262,10 +263,12 @@ export default function TodayPage({ reports }) {
         <div className="td-ic">
           <TraderBadge />
           <button className="td-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>
+          <button className="td-search" onClick={() => router.push("/pwa/settings")} aria-label="설정">⚙️</button>
         </div>
       </header>
 
       <div className="td-title">오늘{at && <span className="td-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}</div>
+      <div className="td-market"><MarketStatusBadge /></div>
 
       <DataState status={status} hasData={!!dash || !!ledger} onRetry={load} skeletonLines={4} skeletonBlock>
 
@@ -488,8 +491,9 @@ export default function TodayPage({ reports }) {
         .td-dot { color: var(--color-success); }
         .td-ic { display: flex; align-items: center; gap: 8px; }
         .td-search { width: 34px; height: 34px; border-radius: 50%; background: var(--color-card); border: none; display: grid; place-items: center; font-size: 15px; cursor: pointer; box-shadow: var(--shadow-card); }
-        .td-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; font-family: var(--font-display, var(--font-sans)); }
+        .td-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 6px; font-family: var(--font-display, var(--font-sans)); }
         .td-fresh { margin-left: auto; }
+        .td-market { margin: 0 2px 14px; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .td-modal-bg { position: fixed; inset: 0; z-index: 300; background: rgba(10,15,25,.5); display: flex; align-items: flex-end; justify-content: center; }
         .td-modal { position: relative; width: 100%; max-width: 480px; max-height: 78vh; overflow-y: auto; background: var(--color-card); border-radius: 18px 18px 0 0; padding: 22px 20px calc(env(safe-area-inset-bottom, 0px) + 22px); }

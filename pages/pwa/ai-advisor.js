@@ -408,7 +408,7 @@ export default function AIAdvisor() {
         .num { font-variant-numeric: tabular-nums; letter-spacing: -.2px; }
         .unit-note { text-align: right; font-size: 11px; color: var(--color-ink-2); font-weight: 600; padding: 2px 6px 12px; }
         .unit-note b { color: var(--color-ink); }
-        .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 20px; margin-bottom: 16px; box-shadow: var(--shadow-card); }
+        .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .err { color: var(--color-danger); font-size: 0.85rem; }
         .sec-title { font-size: 16px; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 7px; }
         .sec-sub { font-size: 11.5px; color: var(--color-ink-2); font-weight: 600; background: var(--color-bg); padding: 3px 9px; border-radius: 8px; margin-left: auto; }

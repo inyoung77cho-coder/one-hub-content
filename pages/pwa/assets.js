@@ -98,9 +98,20 @@ export default function AssetsMapPage() {
     const onChange = () => load();
     window.addEventListener("onehub-trader-change", onChange);
     window.addEventListener("onehub-assets-change", onChange);
+    // [ⓖ] KIS 외 증권사(직접입력) 종목도 실시간에 가깝게 — getLedger()가 내부적으로 lib/stockLive를
+    //   호출해 매번 최신 시세를 반영하므로, 화면을 오래 켜둬도 낡지 않게 1분 주기로 재조회한다.
+    //   백그라운드 탭은 건너뛰고, 탭이 다시 보이면 즉시 갱신.
+    const id = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      load();
+    }, 60000);
+    const onVisible = () => { if (document.visibilityState === "visible") load(); };
+    if (typeof document !== "undefined") document.addEventListener("visibilitychange", onVisible);
     return () => {
       window.removeEventListener("onehub-trader-change", onChange);
       window.removeEventListener("onehub-assets-change", onChange);
+      clearInterval(id);
+      if (typeof document !== "undefined") document.removeEventListener("visibilitychange", onVisible);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -233,6 +244,7 @@ export default function AssetsMapPage() {
         <div className="as-ic">
           <TraderBadge />
           <button className="as-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>
+          <button className="as-search" onClick={() => router.push("/pwa/settings")} aria-label="설정">⚙️</button>
         </div>
       </header>
 

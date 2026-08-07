@@ -75,7 +75,7 @@ export default function PwaHeatHistory() {
         .tt button { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 999px; padding: 7px 16px; font-size: 0.8rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .tt button.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
         .rp-empty { text-align: center; color: var(--color-ink-3); padding: 40px 0; font-size: 0.85rem; }
-        .hh-now { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px 18px; margin-bottom: 14px; text-align: center; }
+        .hh-now { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px; margin-bottom: 12px; text-align: center; }
         .hh-now-lbl { font-size: 0.72rem; color: var(--color-ink-3); font-weight: 700; }
         .hh-now-val { font-size: 2.4rem; font-weight: 800; line-height: 1.1; margin: 4px 0; }
         .hh-now-val small { font-size: 1rem; font-weight: 600; color: var(--color-ink-3); }

@@ -497,7 +497,7 @@ export default function Settings() {
         .seg button { flex: 1; padding: 8px 0; border: none; background: none; border-radius: var(--radius-pill); font-family: var(--font-sans); font-size: 0.82rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
         .seg button.on { background: var(--color-card); color: var(--color-primary); box-shadow: var(--shadow-card); }
         .opsnote { font-size: 0.72rem; color: var(--color-ink-3); margin: -2px 2px 10px; }
-        .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-card); }
+        .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .k { font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); margin-bottom: 12px; } .rt { font-weight: 400; font-size: 0.66rem; }
         .none { color: var(--color-ink-3); font-size: 0.85rem; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }

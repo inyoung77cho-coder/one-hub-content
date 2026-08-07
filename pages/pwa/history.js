@@ -65,7 +65,7 @@ export default function PwaHistory() {
         .tt button { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 999px; padding: 7px 16px; font-size: 0.8rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .tt button.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
         .rp-empty { text-align: center; color: var(--color-ink-3); padding: 40px 0; font-size: 0.85rem; }
-        .hc { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 14px 16px; margin-bottom: 10px; }
+        .hc { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px; margin-bottom: 12px; }
         .hc-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
         .hc-name { font-size: 0.98rem; font-weight: 800; }
         .hc-act { font-size: 0.82rem; font-weight: 800; }

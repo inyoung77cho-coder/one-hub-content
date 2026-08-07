@@ -1,5 +1,6 @@
-// [G5] 하단 4탭 + FAB — 엄지 도달 영역으로 IA 이동(상단 5탭 = 도달 밖 해소).
-//   오늘(액션) · 자산(캐비닛) · AI(신뢰·기록) · 설정. 우하단 FAB = 빠른입력.
+// [G5] 하단 탭 + FAB — 엄지 도달 영역으로 IA 이동(상단 5탭 = 도달 밖 해소).
+//   오늘(액션) · 자산(캐비닛) · 이야기(커뮤니티) · AI(신뢰·기록). 우하단 FAB = 빠른입력.
+//   설정(⚙️)은 각 페이지 상단 헤더 버튼으로 이동(하단 탭에서 제거) — 페이지 어디서나 1탭 접근 유지.
 //   '자산' 내부 세그먼트(종합·주식·ETF·부동산)는 각 페이지 상단 세그먼트(TopNav)가 담당.
 import { useRouter } from "next/router";
 import { useState } from "react";
@@ -8,8 +9,8 @@ import QuickAddSheet from "./shared/QuickAddSheet";
 const TABS = [
   ["today", "🎯", "오늘", "/pwa/today"],
   ["assets", "💼", "자산", "/pwa/assets"],
+  ["story", "💬", "이야기", "/pwa/story"],
   ["ai", "🛡️", "AI", "/pwa?tab=report"],
-  ["settings", "⚙️", "설정", "/pwa/settings"],
 ];
 
 export default function BottomNav({ active }) {

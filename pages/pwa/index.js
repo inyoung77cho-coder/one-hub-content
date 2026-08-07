@@ -21,6 +21,7 @@ import TraderBadge from '../../components/shared/TraderBadge';
 import BottomNav from '../../components/BottomNav';
 import { getStockHoldings, removeStock, buyStock } from '../../lib/stockHoldings';
 import { fetchStockQuotes } from '../../lib/stockLive';
+import { getKrxSession } from '../../lib/marketHours';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
@@ -600,18 +601,30 @@ export default function PWADashboard({ latestReport }) {
     return () => { alive = false; };
   }, [bottomSheet?.code]);
 
-  // [라이브 시세] 직접입력 보유(국내·해외)의 현재가를 접속 시마다 조회 → 평가액 자동 갱신 + 평단 이상치 배지.
+  // [라이브 시세][ⓖ] 직접입력(KIS 외 증권사) 보유의 현재가를 자동 갱신 → 평가액이 실시간에 가깝게 반영.
   //   manualPx: id → { price, currency, krw, date }. 원장(getLedger)과 동일 소스(/api/etf/quote)로 일관.
+  //   KIS는 서버가 1분 주기로 잔고를 갱신하므로, 수동입력 종목도 같은 주기로 자동 재조회해 격차를 없앤다
+  //   (기존엔 접속 시 1회뿐이라 화면을 오래 켜두면 시세가 낡아졌음). 백그라운드 탭은 폴링을 건너뛰고,
+  //   탭이 다시 보이면 즉시 재조회한다.
   useEffect(() => {
     if (!mounted) return;
     let alive = true;
-    (async () => {
+    const refresh = async () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       const list = getStockHoldings(trader);
       if (!list.length) { if (alive) setManualPx({}); return; }
       const { quotes } = await fetchStockQuotes(list);
       if (alive) setManualPx(quotes);
-    })();
-    return () => { alive = false; };
+    };
+    refresh();
+    const id = setInterval(refresh, 60000);
+    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      alive = false;
+      clearInterval(id);
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible);
+    };
   }, [mounted, trader, stManualTick]);
 
   // [S-6] 추천 리스트가 갱신될 때, 직전에 노출됐다가 사라진(해제된) 무액션 종목을
@@ -1586,7 +1599,7 @@ export default function PWADashboard({ latestReport }) {
               <section className="pwa-card approve-card">
                 <div className="approve-head">
                   <span className="approve-title">🤝 AI 매매 제안 · 승인 대기 <b>{pendingList.length}건</b></span>
-                  {!isMarketHoursKST() && <span className="approve-off">장외 · 예약 승인</span>}
+                  {!isMarketHoursKST() && <span className="approve-off">{getKrxSession().label} · 예약 승인</span>}
                 </div>
                 <div className="pending-list">
                   {pendingList.map((p) => {
@@ -4456,7 +4469,7 @@ export default function PWADashboard({ latestReport }) {
         .trust-hero-sub { font-size: 0.76rem; color: var(--hero-ink-soft); line-height: 1.55; margin-top: 6px; word-break: keep-all; }
         /* [S2.2] AI 트러스트 3섹션 서브내비 */
         .trust-nav { display: flex; gap: 6px; margin: 12px 0 14px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 4px; box-shadow: var(--shadow-card); }
-        .aid-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
+        .aid-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .aid-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
         .aid-date { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); }
         .aid-prev { font-size: 0.7rem; color: var(--color-ink-3); font-weight: 600; }

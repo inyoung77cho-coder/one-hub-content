@@ -212,7 +212,7 @@ export default function AccuracyPage() {
 
       <style jsx>{`
         .ac-loading { text-align: center; padding: 60px 0; color: var(--color-ink-2); font-size: 0.88rem; }
-        .ac-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 18px; margin-bottom: 14px; }
+        .ac-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px; margin-bottom: 12px; }
         .ac-card-h { font-weight: 800; font-size: 0.92rem; color: var(--color-ink); margin-bottom: 13px; display: flex; align-items: baseline; gap: 7px; }
         .ac-card-sub { font-size: 0.7rem; font-weight: 700; color: var(--color-ink-3); }
         /* 히어로 요약 */

@@ -143,7 +143,7 @@ export default function SystemHealth() {
         .hd { display: flex; align-items: center; justify-content: space-between; padding: 12px 2px; }
         .hd h1 { font-size: 1.05rem; font-weight: 800; margin: 0; } .ts { font-size: 0.68rem; color: var(--color-ink-3); }
         .rf { border: 1px solid var(--color-line); background: var(--color-card); border-radius: 8px; width: 34px; height: 34px; font-size: 1rem; color: var(--color-ink); }
-        .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 14px; margin-bottom: 10px; box-shadow: var(--shadow-card); }
+        .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .ec { color: var(--color-danger); font-size: 0.84rem; }
         .k { font-size: 0.76rem; font-weight: 700; color: var(--color-ink-2); margin-bottom: 10px; }
         .row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--color-line); font-size: 0.86rem; }

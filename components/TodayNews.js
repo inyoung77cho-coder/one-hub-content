@@ -5,22 +5,9 @@
 // - 운영자가 텔레그램 뉴스봇으로 올린 요약이 여기에 뜬다. 확정 뉴스가 아니라 '운영자 큐레이션'.
 import { useEffect, useState } from "react";
 import BriefTimestamp from "./BriefTimestamp";
+import { parseNewsBody, impactTone, NEWS_SECTIONS } from "../lib/newsFormat";
 
-const CAT = {
-  global:     { ko: "글로벌", bg: "#EEF2FF", fg: "#4F5BD5" },
-  macro:      { ko: "거시",   bg: "#EAF1FF", fg: "#2F6BFF" },
-  markets:    { ko: "증시",   bg: "#E7FAF2", fg: "#0E9E6A" },
-  realestate: { ko: "부동산", bg: "#FFF6E5", fg: "#B45309" },
-  policy:     { ko: "정책",   bg: "#F6EEFF", fg: "#7A4CE0" },
-  affairs:    { ko: "시사",   bg: "#F1F5F9", fg: "#475569" },
-};
-
-function lines(md) {
-  return String(md || "")
-    .split("\n")
-    .map((l) => l.replace(/^\s*[-*]\s*/, "").trim())
-    .filter(Boolean);
-}
+const CAT = NEWS_SECTIONS;
 
 export default function TodayNews({ items: itemsProp }) {
   const [fetched, setFetched] = useState(null);
@@ -54,7 +41,8 @@ export default function TodayNews({ items: itemsProp }) {
       <div className="tnw-list">
         {items.slice(0, 8).map((it) => {
           const c = CAT[it.category] || CAT.affairs;
-          const body = lines(it.summary_md);
+          const { bullets: body, impact } = parseNewsBody(it.summary_md);
+          const tone = impactTone(impact);
           return (
             <div className="tnw-item" key={it.id}>
               <div className="tnw-top">
@@ -64,6 +52,11 @@ export default function TodayNews({ items: itemsProp }) {
               </div>
               {body.length > 0 && (
                 <ul className="tnw-body">{body.slice(0, 4).map((l, i) => <li key={i}>{l}</li>)}</ul>
+              )}
+              {tone && (
+                <div className="tnw-impact" style={{ background: tone.bg, color: tone.color }}>
+                  영향도 {impact} · {tone.label}
+                </div>
               )}
               <div className="tnw-meta">
                 {it.source_label || "OneHub 제공"}
@@ -92,6 +85,7 @@ export default function TodayNews({ items: itemsProp }) {
         .tnw-head { font-size: 14.5px; font-weight: 800; color: #12213B; letter-spacing: -.2px; }
         .tnw-body { margin: 4px 0 0; padding-left: 16px; }
         .tnw-body li { font-size: 13px; color: #46566E; line-height: 1.6; }
+        .tnw-impact { display: inline-block; font-size: 10.5px; font-weight: 800; padding: 2px 8px; border-radius: 6px; margin-top: 6px; }
         .tnw-meta { font-size: 11.5px; color: #94A3B8; margin-top: 6px; }
         .tnw-ext { color: #B45309; font-weight: 700; }
         .tnw-when { color: #A0AEC0; }

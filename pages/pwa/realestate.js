@@ -995,7 +995,7 @@ export default function RealEstateDashboard() {
         .partner-cta .pc-sub { display: block; color: var(--color-muted); font-size: 0.76rem; margin-top: 2px; }
         .partner-cta .pc-arrow { color: var(--color-primary); font-weight: 700; }
         .err { background: var(--color-danger-soft); color: var(--color-danger); padding: 10px 12px; border-radius: 10px; font-size: 0.82rem; margin-bottom: 12px; }
-        .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 18px; margin-bottom: 14px; box-shadow: var(--shadow-card); }
+        .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         /* HERO — 시장 브리핑 */
         /* [§3.7·§3.8] 내 단지 포지션 카드 — 최상단 */
         .mypos { border-left: 4px solid var(--color-primary); }

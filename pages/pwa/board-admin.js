@@ -1,15 +1,21 @@
-// pages/pwa/board-admin.js — 운영자 전용: 부동산 신규 정보(수집정보)·리포트 수정/삭제.
-//   미들웨어가 이 경로를 admin 전용으로 강제(ADMIN_ONLY_PAGES). 데이터/변경은 /api/ops/board.
-//   삭제는 소프트 삭제(보드에서 내림, 되돌릴 수 있음). 변경 시 공개 보드 즉시 재검증.
+// pages/pwa/board-admin.js — 운영자 전용: 부동산 신규 정보(수집정보)·리포트·뉴스 게시물 수정/삭제.
+//   미들웨어가 이 경로를 admin 전용으로 강제(ADMIN_ONLY_PAGES). 부동산은 /api/ops/board, 뉴스는 /api/ops/news.
+//   [ⓐ] 4개 텔레그램 봇 중 콘텐츠를 발행하는 봇(ca-bot=부동산, 뉴스봇)을 이 한 화면에서 통합 관리.
+//   삭제는 소프트 삭제(보드에서 내림/hidden 처리, 되돌릴 수 있음). 변경 시 공개 보드 즉시 재검증.
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 
 const INFO_TYPES = ["매물", "시세소식", "개발호재", "기타"];
+const NEWS_CATEGORIES = [
+  ["markets", "주식"], ["realestate", "부동산"], ["etf", "ETF"], ["onehub_ai", "One-hub AI"],
+  ["global", "글로벌"], ["macro", "거시"], ["policy", "정책"], ["affairs", "시사"],
+];
 
 export default function BoardAdmin() {
-  const [tab, setTab] = useState("gathered"); // gathered | reports
+  const [tab, setTab] = useState("gathered"); // gathered | reports | news
   const [gathered, setGathered] = useState(null);
   const [reports, setReports] = useState(null);
+  const [news, setNews] = useState(null);
   const [err, setErr] = useState("");
   const [toast, setToast] = useState("");
 
@@ -25,7 +31,20 @@ export default function BoardAdmin() {
     } catch (e) { setErr("네트워크 오류"); }
   }, []);
 
-  useEffect(() => { load("gathered"); load("reports"); }, [load]);
+  // [ⓐ] 뉴스는 status(draft/published/hidden)가 있어 전부(운영자 관점) 불러온다 — 텔레그램으로
+  //   막 올라와 아직 draft인 항목도 여기서 바로 보여야 "게시 즉시 확인"이 된다.
+  const loadNews = useCallback(async () => {
+    try {
+      const r = await fetch("/api/ops/news");
+      if (r.status === 403) { setErr("운영자만 접근할 수 있습니다."); return; }
+      const d = await r.json();
+      if (!d.ok) { setErr(d.error || "불러오기 실패"); return; }
+      setErr("");
+      setNews(d.items || []);
+    } catch (e) { setErr("네트워크 오류"); }
+  }, []);
+
+  useEffect(() => { load("gathered"); load("reports"); loadNews(); }, [load, loadNews]);
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 2200); };
 
@@ -50,12 +69,27 @@ export default function BoardAdmin() {
     else flash("삭제 실패: " + (d.error || ""));
   }
 
+  async function saveNews(id, patch) {
+    const r = await fetch("/api/ops/news", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...patch }),
+    });
+    const d = await r.json();
+    if (d.ok) { flash("저장됐습니다 · '오늘' 페이지에 반영"); loadNews(); }
+    else flash("저장 실패: " + (d.error || ""));
+  }
+
+  async function hideNews(id, label) {
+    if (!window.confirm(`"${label}"\n'오늘' 화면에서 내립니다(되돌릴 수 있음). 계속할까요?`)) return;
+    await saveNews(id, { status: "hidden" });
+  }
+
   return (
     <div className="ba">
       <header className="ba-head">
         <Link href="/pwa/settings" className="ba-back">← 설정</Link>
-        <h1>운영자 · 보드 관리</h1>
-        <p className="ba-sub">부동산 신규 정보와 리포트를 수정하거나 보드에서 내립니다. 변경은 공개 보드에 곧바로 반영됩니다.</p>
+        <h1>운영자 · 콘텐츠 관리</h1>
+        <p className="ba-sub">텔레그램 봇으로 올린 부동산 정보·리포트·뉴스를 이 화면에서 확인하고 바로 수정합니다. 변경은 공개 화면에 곧바로 반영됩니다.</p>
       </header>
 
       <div className="ba-tabs">
@@ -64,6 +98,9 @@ export default function BoardAdmin() {
         </button>
         <button className={tab === "reports" ? "on" : ""} onClick={() => setTab("reports")}>
           리포트 {reports ? `(${reports.length})` : ""}
+        </button>
+        <button className={tab === "news" ? "on" : ""} onClick={() => setTab("news")}>
+          뉴스 {news ? `(${news.length})` : ""}
         </button>
       </div>
 
@@ -89,6 +126,18 @@ export default function BoardAdmin() {
               <ReportCard key={it.id} item={it}
                 onSave={(p) => saveItem("reports", { id: it.id, ...p })}
                 onDelete={() => deleteItem("reports", it.id, it.title || "리포트")} />
+            ))}
+        </div>
+      )}
+
+      {tab === "news" && (
+        <div className="ba-list">
+          {news === null ? <div className="ba-empty">불러오는 중…</div>
+            : news.length === 0 ? <div className="ba-empty">게시된 뉴스가 없습니다.</div>
+            : news.map((it) => (
+              <NewsCard key={it.id} item={it}
+                onSave={(p) => saveNews(it.id, p)}
+                onHide={() => hideNews(it.id, it.headline || "뉴스")} />
             ))}
         </div>
       )}
@@ -184,6 +233,58 @@ function ReportCard({ item, onSave, onDelete }) {
         </button>
       </div>
       <style jsx>{cardCss}</style>
+    </div>
+  );
+}
+
+function NewsCard({ item, onSave, onHide }) {
+  const [f, setF] = useState({
+    category: item.category || "affairs", headline: item.headline || "",
+    summary_md: item.summary_md || "", importance: item.importance ?? 3,
+    pinned: !!item.pinned, status: item.status || "published",
+  });
+  const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
+  const setBool = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.checked }));
+  const keys = ["category", "headline", "summary_md", "importance", "pinned", "status"];
+  const dirty = keys.some((k) => String(f[k]) !== String(k === "pinned" ? !!item.pinned : (item[k] ?? (k === "importance" ? 3 : ""))));
+
+  return (
+    <div className="card">
+      <div className="row3">
+        <Field label="섹션">
+          <select value={f.category} onChange={set("category")}>
+            {NEWS_CATEGORIES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </Field>
+        <Field label="영향도(1~5)">
+          <select value={f.importance} onChange={set("importance")}>
+            {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+        </Field>
+        <Field label="게시 상태">
+          <select value={f.status} onChange={set("status")}>
+            <option value="draft">초안(비공개)</option>
+            <option value="published">게시됨</option>
+            <option value="hidden">내림</option>
+          </select>
+        </Field>
+      </div>
+      <Field label="헤드라인"><input value={f.headline} onChange={set("headline")} /></Field>
+      <Field label="본문 — [기사요약]/[영향도] 형식 권장(불릿 -로 시작)">
+        <textarea rows={5} value={f.summary_md} onChange={set("summary_md")}
+          placeholder={"[기사요약]\n- \n[영향도]\n- 영향도: 85"} />
+      </Field>
+      <label className="pin"><input type="checkbox" checked={f.pinned} onChange={setBool("pinned")} /> 상단 고정</label>
+      <div className="meta">{item.status === "draft" ? "🕓 초안" : item.status === "hidden" ? "🚫 내려짐" : "✅ 게시됨"} · {String(item.created_at || "").slice(0, 16).replace("T", " ")} · id {item.id}</div>
+      <div className="acts">
+        <button className="del" onClick={onHide}>화면에서 내리기</button>
+        <button className="save" disabled={!dirty}
+          onClick={() => onSave({ category: f.category, headline: f.headline, summary_md: f.summary_md, importance: Number(f.importance), pinned: f.pinned, status: f.status })}>
+          {dirty ? "저장" : "변경 없음"}
+        </button>
+      </div>
+      <style jsx>{cardCss}</style>
+      <style jsx>{`.pin { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 700; color: #475569; }`}</style>
     </div>
   );
 }
