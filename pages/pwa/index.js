@@ -2857,7 +2857,7 @@ export default function PWADashboard({ latestReport }) {
                   {ready ? (
                     <>
                       <div className="ml-bar"><div style={{ width: `${pct}%`, background: pctColor }} /></div>
-                      <p className="ml-desc">AI는 매주 과거 판단을 <b>실제 주가 결과와 대조</b>해 스스로 채점합니다. 누적 <b>{s.total_blocked ?? 0}건</b>의 기록으로 사유별 정확도를 학습해 판단 로직을 지속 보정합니다.</p>
+                      <p className="ml-desc">매주 실제 결과와 대조해 자기채점 · 누적 <b>{s.total_blocked ?? 0}건</b>으로 판단 로직 보정.</p>
                       {(topReasons.length > 0 || hiddenReasons > 0) && (
                         <div className="ml-reasons">
                           {/* [N7] 신뢰를 유도하는 수식어를 제목에서 제거 — 사실만 적는다. */}
@@ -2899,7 +2899,7 @@ export default function PWADashboard({ latestReport }) {
                       )}
                     </>
                   ) : (
-                    <p className="ml-desc">차단·판단 기록을 모으는 중입니다. 누적 <b>{s.total_blocked ?? 0}건</b> — 검증 <b>5건</b> 이상 쌓이면 학습 정확도가 표시됩니다. AI는 매주 판단을 실제 결과로 재검증하며 발전합니다.</p>
+                    <p className="ml-desc">기록 모으는 중 — 누적 <b>{s.total_blocked ?? 0}건</b>, 검증 <b>5건</b>부터 정확도 표시.</p>
                   )}
                   <button className="ml-more" onClick={() => router.push('/pwa/accuracy')}>전체 자기검증 내역 · 사유별 적중 보기 →</button>
                 </section>
@@ -2968,7 +2968,7 @@ export default function PWADashboard({ latestReport }) {
                       ))}
                     </div>
                     {pol.collapseExtremes && (
-                      <p className="sc-warn">⚠ 거래 {nTrade}건 — 각 거래가 1/{nTrade} 비중이라 <b>손익비·MDD는 이상치 하나에 크게 흔들립니다</b>. 30건 이상 쌓이면 정식 통계로 표시합니다.</p>
+                      <p className="sc-warn">⚠ 거래 {nTrade}건 — <b>손익비·MDD는 이상치에 민감</b>. 30건부터 정식 통계.</p>
                     )}
                     <div className="sc-summary">
                       이번 주 수익률 <b style={{ color: (perf.avg_pnl_pct ?? 0) >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>{(perf.avg_pnl_pct ?? 0) >= 0 ? '+' : ''}{perf.avg_pnl_pct ?? 0}%</b> · AI는 <b>{perf.wins ?? 0}종목 매수</b>, <b>{perf.losses ?? 0}건 손절</b>했습니다.
