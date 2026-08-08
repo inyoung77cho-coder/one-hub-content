@@ -87,11 +87,11 @@ export default async function handler(req, res) {
 
           const data = JSON.parse(c.body);
 
-          return { id: c.id, nick: data.nick || '익명', text: data.text || '', ts: data.ts || c.created_at };
+          return { id: c.id, nick: data.nick || '익명', text: data.text || '', ts: data.ts || c.created_at, category: data.category || '전체' };
 
         } catch {
 
-          return { id: c.id, nick: '익명', text: c.body, ts: c.created_at };
+          return { id: c.id, nick: '익명', text: c.body, ts: c.created_at, category: '전체' };
 
         }
 
@@ -112,6 +112,8 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
 
     const { nick, text } = req.body || {};
+    const CATS = ['전체', '주식', 'ETF', '부동산'];
+    const category = CATS.includes(req.body?.category) ? req.body.category : '전체';
 
     if (!nick || !text) return res.status(400).json({ error: 'nick, text required' });
 
@@ -121,7 +123,7 @@ export default async function handler(req, res) {
 
       const issueNum = await getOrCreateIssue(date);
 
-      const body = JSON.stringify({ nick: nick.trim().slice(0, 20), text: text.trim(), ts: new Date().toISOString() });
+      const body = JSON.stringify({ nick: nick.trim().slice(0, 20), text: text.trim(), ts: new Date().toISOString(), category });
 
       const comment = await ghFetch(`/issues/${issueNum}/comments`, {
 
@@ -131,7 +133,7 @@ export default async function handler(req, res) {
 
       });
 
-      return res.status(201).json({ id: comment.id, nick: nick.trim().slice(0, 20), text: text.trim(), ts: comment.created_at });
+      return res.status(201).json({ id: comment.id, nick: nick.trim().slice(0, 20), text: text.trim(), ts: comment.created_at, category });
 
     } catch (e) {
 

@@ -1,7 +1,6 @@
 import "../styles/globals.css";
 import Nav from "../components/Nav";
 import EngineVersionBanner from "../components/EngineVersionBanner";
-import FeedbackButton from "../components/FeedbackButton";
 import SplashScreen from "../components/SplashScreen";
 import Head from "next/head";
 import { useEffect } from "react";
@@ -91,8 +90,6 @@ export default function App({ Component, pageProps }) {
           한 화면만 정직하면 의미가 없다. 정상이면 아무것도 그리지 않는다. */}
       {isPWARoute && <EngineVersionBanner />}
       <Component {...pageProps} />
-      {/* [NI-6] 전 화면 플로팅 피드백 버튼 — PWA(로그인 구역)에만 */}
-      {isPWARoute && <FeedbackButton />}
     </>
   );
 }

@@ -13,14 +13,16 @@ import DataState from "../../components/DataState";
 import LastUpdated from "../../components/LastUpdated";
 import QuickAddSheet from "../../components/shared/QuickAddSheet";
 import RotatingPageTitle from "../../components/RotatingPageTitle";
+import FeedbackButton from "../../components/FeedbackButton";
 
 const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || null);
 const uk = (v) => (v == null ? "-" : `${Number(v).toFixed(2)}억`);
-// [OS-2] "자산지도" 옆 순환 표시 — 클릭(종목변경)마다 다음 자산군으로 넘어가며 해당 상세 페이지로 이동.
+// [OS-2] "자산지도" 옆 순환 표시 — 종목변경 버튼으로 순환, 라벨을 탭하면 해당 상세 페이지로 이동.
+//   key는 QuickAddSheet의 initialAsset과 동일 값 — 선택된 뷰의 "+"가 그 자산군으로 바로 열리게.
 const ASSET_VIEWS = [
-  { label: "주식", href: "/pwa?tab=portfolio" },
-  { label: "ETF", href: "/pwa/etf" },
-  { label: "부동산", href: "/pwa/realestate" },
+  { label: "주식", key: "stock", href: "/pwa?tab=portfolio" },
+  { label: "ETF", key: "etf", href: "/pwa/etf" },
+  { label: "부동산", key: "realestate", href: "/pwa/realestate" },
 ];
 
 // 변화액 표기 헬퍼(억). 부호·색 구분.
@@ -73,6 +75,7 @@ export default function AssetsMapPage() {
   const [exRes, setExRes] = useState(true);      // [§3.1] 실거주(대표단지) 제외 보기 — 기본 켜짐(운용가능 먼저)
   const [invProps, setInvProps] = useState([]);  // [§3.1] 추가 보유 부동산(투자용) = onehub_re_properties
   const [myComplex, setMyComplex] = useState(""); // [§3.1] 대표단지(실거주)명
+  const [view, setView] = useState(0); // [OS-2] 0=주식 1=ETF 2=부동산 — 종목변경 순환에 맞춰 아래 카드 필터
 
   const load = useCallback(() => {
     const tr = getTrader();
@@ -251,27 +254,29 @@ export default function AssetsMapPage() {
         <div className="as-ic">
           <TraderBadge />
           <button className="as-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>
+          <FeedbackButton variant="icon" />
           <button className="as-search" onClick={() => router.push("/pwa/settings")} aria-label="설정">⚙️</button>
         </div>
       </header>
 
       <div className="as-title">
-        💼 종합자산 <span className="as-sub">자산 지도</span>
+        <span className="as-fixed">💼 종합자산 <span className="as-sub">자산 지도</span></span>
         <RotatingPageTitle
           compact
           items={ASSET_VIEWS.map((v) => ({ suffix: v.label }))}
+          onChange={(i) => setView(i)}
           onLabelClick={(item) => { const v = ASSET_VIEWS.find((x) => x.label === item.suffix); if (v) router.push(v.href); }}
         />
-        {at && <span className="as-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
       </div>
 
       <DataState status={status} hasData={!!assets} onRetry={load} skeletonLines={5} skeletonBlock>
-        {/* ── 1층 ── */}
+        {/* ── 1층(공통): 자산지도 + 통합분석은 선택된 자산군과 무관하게 항상 먼저 ── */}
         <section className="card as-hero">
           <p className="as-headline">{headline}</p>
           <div className="as-total">
             <span>총자산</span>
             <b>{uk(total)}</b>
+            {at && <span className="as-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
           </div>
           {/* [추세] 전일 대비 변화 + 스파크라인을 별도 줄에. 데이터가 하루뿐이면 '기록 시작' 안내. */}
           {delta && delta.total != null ? (
@@ -363,8 +368,9 @@ export default function AssetsMapPage() {
         </section>
 
         {/* [N6] 이상 평단 확인 — 총자산에서 뺀 사실은 총자산이 보이는 곳에서 설명한다.
-            앱은 값을 고치지 않는다. 원본이 평단인지 총매입액인지는 입력한 사람만 알기 때문이다. */}
-        {(assets?.warnings || []).filter((w) => w.code === "AVG_PRICE_OUT_OF_RANGE").map((w) => (
+            앱은 값을 고치지 않는다. 원본이 평단인지 총매입액인지는 입력한 사람만 알기 때문이다.
+            [OS-2] 평단 이슈는 주로 직접입력 주식이라 "주식" 뷰에서만. */}
+        {view === 0 && (assets?.warnings || []).filter((w) => w.code === "AVG_PRICE_OUT_OF_RANGE").map((w) => (
           <section className="card as-fix" key={w.id || w.name}>
             <div className="as-h">확인이 필요합니다</div>
             <p className="as-fix-q">
@@ -433,14 +439,31 @@ export default function AssetsMapPage() {
                 )}
               </div>
             )}
+            {/* [OS-2] CTA는 선택된 뷰(주식/ETF/부동산)에 맞는 한 가지만 — "페이지별 카드 분리" */}
             <div className="as-a4-cta">
-              <button onClick={() => router.push("/pwa/etf")}>ETF 리밸런싱 →</button>
-              <button onClick={() => router.push("/pwa/realestate")}>부동산 살펴보기 →</button>
+              <button onClick={() => router.push(ASSET_VIEWS[view].href)}>{ASSET_VIEWS[view].label === "ETF" ? "ETF 리밸런싱 →" : ASSET_VIEWS[view].label === "부동산" ? "부동산 살펴보기 →" : "포트폴리오 보기 →"}</button>
             </div>
           </section>
         )}
 
-        {/* ── 3층: 상세(기본 닫힘) ── */}
+        {/* ── 뷰별 전용 카드 ── */}
+        {view === 1 && (
+          <section className="card as-viewcard">
+            <div className="as-h">📊 ETF 요약</div>
+            <div className="as-vc-line">보유 비중 <b>{pctFull(bd.etf_uk).toFixed(1)}%</b>{bd.etf_uk != null ? ` · 평가 ${uk(bd.etf_uk)}` : ""}</div>
+            <button className="as-vc-cta" onClick={() => router.push("/pwa/etf")}>ETF 리밸런싱·계좌·세제 점검 →</button>
+          </section>
+        )}
+        {view === 2 && (
+          <section className="card as-viewcard">
+            <div className="as-h">🏠 부동산 요약</div>
+            <div className="as-vc-line">{myComplex ? `실거주 ${myComplex}` : "실거주 단지 미등록"}{invProps.length > 0 ? ` · 투자용 ${invProps.length}건` : ""}</div>
+            <button className="as-vc-cta" onClick={() => router.push("/pwa/realestate")}>부동산 살펴보기 →</button>
+          </section>
+        )}
+
+        {/* ── 3층: 상세(기본 닫힘) — 시장 맥락은 주식 시황 중심이라 "주식" 뷰에서만 ── */}
+        {view === 0 && (
         <section className="card as-acc">
           {acc3.map((a) => (
             <div className="as-accitem" key={a.id}>
@@ -458,11 +481,13 @@ export default function AssetsMapPage() {
             </div>
           ))}
         </section>
+        )}
 
         <div className="as-note">종합자산은 읽기 전용 지도예요. 상세 확인·수정은 각 자산 페이지에서 이어집니다.</div>
       </DataState>
 
-      {qaOpen && <QuickAddSheet initialAsset="stock" onClose={() => setQaOpen(false)} onSaved={() => { setQaOpen(false); load(); }} />}
+      {/* [OS-2] "+"는 현재 선택된 뷰(주식/ETF/부동산)의 자산군으로 바로 열림 */}
+      {qaOpen && <QuickAddSheet initialAsset={ASSET_VIEWS[view].key} onClose={() => setQaOpen(false)} onSaved={() => { setQaOpen(false); load(); }} />}
       <BottomNav active="assets" />
 
       <style jsx>{`
@@ -483,12 +508,13 @@ export default function AssetsMapPage() {
         .as-dot { color: var(--color-success); }
         .as-ic { display: flex; align-items: center; gap: 8px; }
         .as-search { width: 34px; height: 34px; border-radius: 50%; background: var(--color-card); border: none; display: grid; place-items: center; font-size: 15px; cursor: pointer; box-shadow: var(--shadow-card); }
-        .as-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; flex-wrap: wrap; }
+        .as-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; }
+        .as-fixed { flex-shrink: 0; }
         .as-sub { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
-        .as-fresh { margin-left: auto; }
+        .as-fresh { margin-left: auto; font-size: 0.68rem; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .as-hero .as-headline { font-size: 0.94rem; line-height: 1.55; font-weight: 700; color: var(--color-ink); margin: 0 0 12px; word-break: keep-all; }
-        .as-total { display: flex; align-items: baseline; justify-content: space-between; }
+        .as-total { display: flex; align-items: baseline; gap: 8px; }
         .as-total span { font-size: 0.78rem; font-weight: 600; color: var(--color-ink-3); }
         .as-total b { font-size: 1.5rem; font-weight: 800; color: var(--color-ink); }
         .as-trend { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
@@ -575,6 +601,9 @@ export default function AssetsMapPage() {
         .as-sim-ar { font-size: 0.72rem; color: var(--color-ink-3); text-align: center; }
         .as-a4-cta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
         .as-a4-cta button { flex: 1 1 0; min-width: 0; min-height: 40px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-primary); border-radius: 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .as-vc-line { font-size: 0.86rem; color: var(--color-ink-2); margin-bottom: 12px; }
+        .as-vc-line b { color: var(--color-ink); font-weight: 800; }
+        .as-vc-cta { width: 100%; min-height: 42px; border: 1px solid var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-primary); border-radius: 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .as-note { font-size: 0.7rem; color: var(--color-ink-3); text-align: center; margin-top: 6px; line-height: 1.5; word-break: keep-all; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>

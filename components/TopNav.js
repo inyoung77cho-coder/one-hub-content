@@ -5,6 +5,7 @@ import { useRouter } from "next/router";
 import { useState } from "react";
 import QuickAddSheet from "./shared/QuickAddSheet";
 import TraderBadge from "./shared/TraderBadge";
+import FeedbackButton from "./FeedbackButton";
 
 // [빠른입력] 현재 탭 → 시트 기본 선택 자산
 const QA_ASSET = { etf: "etf", realestate: "realestate" };
@@ -32,6 +33,7 @@ export default function TopNav({ active }) {
           <TraderBadge />
           <button className="tn-add" aria-label="자산 빠른입력" title="자산 빠른입력" onClick={() => setQaOpen(true)}>＋</button>
           <button aria-label="AI 종목 검색" onClick={() => router.push("/pwa?tab=analyze")}>🔍</button>
+          <FeedbackButton variant="icon" />
           <button aria-label="설정" onClick={() => router.push("/pwa/settings")}>⚙️</button>
         </div>
       </header>

@@ -1,10 +1,11 @@
-// [OS-2] 전 페이지 공통 상단 타이틀 패턴 — 고정 단어(예: "오늘")는 그대로, 뒤에 붙는 단어만
-//   "종목변경" 버튼 클릭 시 회색 페이드 애니메이션으로 자연스럽게 순환 전환된다.
-//   버튼은 항상 라벨만 순환시킨다(그 자체로 이동하지 않음) — 이동이 필요하면 onLabelClick으로
-//   현재 라벨 텍스트 자체를 탭했을 때만 이동시킨다(오늘 페이지처럼 순수 표시용으로도 쓸 수 있게 분리).
+// [OS-2] 전 페이지 공통 상단 타이틀 패턴 — 고정 단어(예: "오늘")는 검정 볼드로 고정, 뒤에 붙는 단어만
+//   "종목변경" 버튼(행 맨 오른쪽)을 눌러 순환한다. 전환 중 살짝 회색으로 비쳤다 검정으로 자연스럽게
+//   자리잡는 애니메이션(사용자 피드백 반영 — 전엔 계속 회색이었음).
+//   onChange(index): 버튼으로 순환할 때마다 호출(콘텐츠 필터링용). onLabelClick: 라벨 텍스트 자체를
+//   탭했을 때만 호출(예: 즉시 다른 페이지로 이동) — 버튼 순환과는 분리된 별개 동작.
 import { useState } from "react";
 
-export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "종목변경", onLabelClick, compact = false }) {
+export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "종목변경", onLabelClick, onChange, compact = false }) {
   const [idx, setIdx] = useState(0);
   const [anim, setAnim] = useState(false);
   const cur = items[idx % items.length];
@@ -12,8 +13,10 @@ export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "�
   const advance = () => {
     setAnim(true);
     setTimeout(() => {
-      setIdx((i) => (i + 1) % items.length);
-      setAnim(false);
+      const next = (idx + 1) % items.length;
+      setIdx(next);
+      if (typeof onChange === "function") onChange(next, items[next]);
+      requestAnimationFrame(() => requestAnimationFrame(() => setAnim(false)));
     }, 180);
   };
 
@@ -40,13 +43,13 @@ export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "�
         <button type="button" className="rpt-btn" onClick={advance}>{buttonLabel}</button>
       )}
       <style jsx>{`
-        .rpt { display: inline-flex; align-items: center; gap: 8px; }
+        .rpt { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
         .rpt-title { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.4px; font-family: var(--font-display, var(--font-sans)); display: flex; }
         .rpt-fixed { color: var(--color-ink); }
-        .rpt-suffix { color: var(--color-ink-3); transition: opacity .18s ease, transform .18s ease; opacity: 1; transform: translateY(0); }
-        .rpt-suffix.fade { opacity: 0; transform: translateY(3px); }
+        .rpt-suffix { color: var(--color-ink); font-weight: 800; opacity: 1; transform: translateY(0); transition: opacity .18s ease, transform .18s ease, color .28s ease; }
+        .rpt-suffix.fade { opacity: 0; transform: translateY(3px); color: var(--color-ink-3); }
         .rpt-suffix.clickable { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
-        .rpt.compact .rpt-suffix { font-size: 12px; font-weight: 700; }
+        .rpt.compact .rpt-suffix { font-size: 12px; }
         .rpt-btn {
           flex-shrink: 0; border: 1px solid var(--color-line); background: var(--color-card);
           color: var(--color-ink-2); font-weight: 700; padding: 6px 12px; border-radius: 999px;

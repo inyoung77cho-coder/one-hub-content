@@ -2542,7 +2542,7 @@ export default function PWADashboard({ latestReport }) {
                   {(() => { const manual = ledger.filter((e) => e.source !== 'auto_watch').length; return (
                     <div className="vs-integrity">📋 기록 <b>{recorded}건</b>{recorded > 0 ? <> · 직접 판단 <b>{manual}건</b>({Math.round(manual / recorded * 100)}%)</> : ''} · <span className="vs-integrity-note">순위는 수익률이 아니라 <b>판단 기록·성실도</b>로 매깁니다</span></div>
                   ); })()}
-                  <div className="vs-def">AI 추천 종목 중 <b>내가 산 것</b>(내 판단·실제)과 <b>AI가 전부 매매</b>했다고 <b>가정한 가상 포지션</b>(AI 단독)의 수익을 3일·7일로 비교합니다. AI 쪽은 실제 체결이 아닌 <b>가상</b>입니다. 승인=매매 · 거절=관망으로 기록됩니다.</div>
+                  <div className="vs-def"><b>내가 산 것</b> vs <b>AI가 전부 매매했다고 가정한 가상 수익</b>을 3·7일로 비교합니다(AI는 가상 체결).</div>
                   {anyReady ? (
                     <>
                       <Row label="3일" w={w3} />
@@ -2656,7 +2656,7 @@ export default function PWADashboard({ latestReport }) {
                       <div className="pl-cell wide"><span className="pl-k">종합</span><span className="pl-v" style={{ color: myNet > aiNet ? 'var(--color-success)' : myNet < aiNet ? 'var(--purple)' : 'var(--color-ink-2)' }}>{myNet > aiNet ? '🏆 내 판단이 더 벌었습니다' : myNet < aiNet ? '🤖 AI 가상이 더 벌었습니다' : '⚖️ 접전'}</span></div>
                     )}
                   </div>
-                  <p className="pl-foot">가정: 추천일 종가 매수 · 3일 후 매도 · 1건당 100만원 · 수수료·세금 미반영. AI는 <b>추천 전부 매수(항상 투자)</b>·나는 산 것만 — 8년 검증상 관망은 대개 손해, 하방은 손절이 방어. AI 손익은 <b>실제 체결이 아닌 가상 포지션</b>입니다.{!pol.declareWinner && <> 표본 {dts.length}건 — <b>승자 선언은 30건 이상</b>부터 합니다.</>}</p>
+                  <p className="pl-foot">가정: 1건당 100만원 매수 · AI는 항상 투자, 나는 산 것만 — 실제 체결 아닌 가상.{!pol.declareWinner && <> 표본 {dts.length}건 — 30건부터 승자 선언.</>}</p>
                 </section>
               );
             })()}
@@ -2691,9 +2691,9 @@ export default function PWADashboard({ latestReport }) {
                     {todayBuys === 0 ? <span className="aid-watch"> · 관망</span> : null}
                   </div>
                   {isStale ? (
-                    <p className="aid-stale">오늘은 신규 매수의견 없이 <b>관망</b> 중입니다{analysisDate ? <> — 최근 매수판단은 <b>{analysisDate}</b>이었습니다</> : ''}. 하락 국면에서는 매수보다 차단·관망이 정상입니다.{chg.length > 0 && analysisDate ? ` 아래는 ${analysisDate} 당시의 변화입니다.` : ''}</p>
+                    <p className="aid-stale"><b>관망</b> 중{analysisDate ? <> — 최근 매수판단 <b>{analysisDate}</b></> : ''}.</p>
                   ) : (chg.length === 0 && (
-                    <p className="aid-none">전일과 판단이 동일합니다 — 시장 흐름에 큰 변화가 없습니다.</p>
+                    <p className="aid-none">전일과 판단 동일 — 큰 변화 없음.</p>
                   ))}
                   {chg.length > 0 && (
                     <ul className="aid-list">
@@ -2804,8 +2804,8 @@ export default function PWADashboard({ latestReport }) {
                 <section className="pwa-card">
                   <span className="pwa-card-label">📝 AI 개선노트 · 무엇을 틀렸고 어떻게 고쳤나</span>
                   <p className="chlog-intro">누적 검증 <b>{total}건</b>{mlOn
-                    ? <> 을 반영해 규칙을 이렇게 조정했습니다. <b>정확도가 아니라 개선의 방향</b>을 봅니다.</>
-                    : <> — 아직 <b>{ML_MIN_SAMPLE}건 미만</b>이라 자동 규칙조정은 <b>보류(과적합 방지)</b>합니다. 아래는 <b>관찰·검토 후보</b>입니다.</>}</p>
+                    ? <> — 개선 방향을 봅니다(정확도 아님).</>
+                    : <> — <b>{ML_MIN_SAMPLE}건 미만</b>이라 자동조정 보류, 아래는 관찰 후보.</>}</p>
                   <div className="imp-list">
                     {items.map((it, i) => (
                       <div className="imp-row" key={i}>

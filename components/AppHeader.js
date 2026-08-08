@@ -3,6 +3,7 @@
 //   로고=오늘(홈) 이동. 검색=AI 종목 검색(onSearch 있으면 그걸, 없으면 /pwa?tab=analyze 이동).
 import { useRouter } from "next/router";
 import TraderBadge from "./shared/TraderBadge";
+import FeedbackButton from "./FeedbackButton";
 
 export default function AppHeader({ onSearch }) {
   const router = useRouter();
@@ -18,6 +19,7 @@ export default function AppHeader({ onSearch }) {
       <div className="apphd-actions">
         <TraderBadge />
         <button type="button" className="apphd-search" onClick={search} aria-label="AI 종목 검색" title="AI 종목 검색">🔍</button>
+        <FeedbackButton variant="icon" />
         <button type="button" className="apphd-search" onClick={() => router.push("/pwa/settings")} aria-label="설정" title="설정">⚙️</button>
       </div>
       <style jsx>{`

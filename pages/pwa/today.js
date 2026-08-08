@@ -25,6 +25,7 @@ import LastUpdated from "../../components/LastUpdated";
 import MarketStatusBadge from "../../components/MarketStatusBadge";
 import RotatingPageTitle from "../../components/RotatingPageTitle";
 import ShareButton from "../../components/ShareButton";
+import FeedbackButton from "../../components/FeedbackButton";
 
 const DAY = 86400000;
 const MATURE_DAYS = 3; // 판단 → 채점까지(나 vs AI)
@@ -117,6 +118,7 @@ export default function TodayPage({ reports }) {
     if (router.query.news) router.back();
   };
   const [nick, setNick] = useState("나"); // [닉네임] 나 vs AI에서 "나" 대신 표시
+  const [view, setView] = useState(0); // [OS-2] 0=대결 1=부동산 2=ETF 3=이야기 — 종목변경 순환에 맞춰 콘텐츠 필터
 
   const load = useCallback(() => {
     const tr = getTrader();
@@ -240,10 +242,11 @@ export default function TodayPage({ reports }) {
   const bd = ledger?.breakdown || {};
   const ukTxt = (v) => (v == null || !Number.isFinite(Number(v)) ? null : `${Number(v).toFixed(1)}억`);
 
-  // ── 뉴스: 카테고리로 타일 배분(①주식=증시, ②ETF·부동산=글로벌/거시/부동산/정책)
+  // ── 뉴스: 카테고리로 뷰 배분(대결=증시, 부동산=부동산, ETF=글로벌/거시/정책)
   const allNews = news || [];
   const stockNews = allNews.filter((n) => n.category === "markets").slice(0, 6);
-  const macroNews = allNews.filter((n) => ["global", "macro", "realestate", "policy"].includes(n.category)).slice(0, 8);
+  const realestateNews = allNews.filter((n) => n.category === "realestate").slice(0, 8);
+  const etfNews = allNews.filter((n) => ["global", "macro", "policy"].includes(n.category)).slice(0, 8);
 
   // ── 오늘 중요 알림(매매·손절·서킷 등) — 히어로에 접어 넣는다. OneHub 신고가·루틴 알림은 제외.
   const kd = new Date(Date.now() + 9 * 3600 * 1000);
@@ -265,6 +268,7 @@ export default function TodayPage({ reports }) {
         <div className="td-ic">
           <TraderBadge />
           <button className="td-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>
+          <FeedbackButton variant="icon" />
           <button className="td-search" onClick={() => router.push("/pwa/settings")} aria-label="설정">⚙️</button>
         </div>
       </header>
@@ -272,16 +276,17 @@ export default function TodayPage({ reports }) {
       <div className="td-titlewrap">
         <RotatingPageTitle
           fixed="오늘"
-          items={[{ suffix: "의 대결" }, { suffix: "의 부동산" }, { suffix: "의 뉴스" }, { suffix: "의 이야기" }]}
+          items={[{ suffix: "의 대결" }, { suffix: "의 부동산" }, { suffix: "의 ETF" }, { suffix: "의 이야기" }]}
+          onChange={(i) => setView(i)}
           onLabelClick={(item) => { if (item.suffix === "의 이야기") router.push("/pwa/story"); }}
         />
-        {at && <div className="td-fresh2"><LastUpdated timestamp={at} onRefresh={load} /></div>}
       </div>
-      <div className="td-market"><MarketStatusBadge /></div>
+      <div className="td-market"><MarketStatusBadge />{at && <span className="td-fresh3"><LastUpdated timestamp={at} onRefresh={load} /></span>}</div>
 
       <DataState status={status} hasData={!!dash || !!ledger} onRetry={load} skeletonLines={4} skeletonBlock>
 
-        {/* ══ ① 히어로: 주식 · 나 vs AI ══ */}
+        {/* ══ "오늘의 대결" — 주식 · 나 vs AI 결과만 ══ */}
+        {view === 0 && (<>
         <section className="hero" onClick={() => router.push("/pwa?tab=report&sec=vs")} role="button" tabIndex={0}>
           <div className="hero-eyebrow">
             <span className="hero-lbl">📈 주식 · 나 vs AI{daysCompeting > 0 ? ` · ${daysCompeting}일째` : ""}{vsShowdown ? ` · ${vsShowdown.n}종목` : ""}</span>
@@ -368,52 +373,88 @@ export default function TodayPage({ reports }) {
 
         {/* 내 보유종목 관련 뉴스 — 있을 때만 (히어로 바로 아래, 같은 도메인) */}
         <HoldingsNews trader={trader} />
+        </>)}
 
-        {/* ══ ② ETF & 부동산 ══ */}
-        <section className="card tile">
-          <div className="tile-h">📊🏠 ETF & 부동산</div>
-          <div className="tile-2col">
-            <button className="mini-stat" onClick={() => router.push("/pwa/etf")}>
-              <span className="mini-ic etf">📊</span>
-              <span className="mini-body">
-                <span className="mini-t">ETF</span>
-                <span className="mini-s">{ukTxt(bd.etf_uk) ? `평가 ${ukTxt(bd.etf_uk)}` : "국내/해외 배분 보기"}</span>
-              </span>
-              <span className="mini-go">→</span>
-            </button>
-            <button className="mini-stat" onClick={() => router.push("/pwa/realestate")}>
+        {/* ══ "오늘의 부동산" — 부동산 뉴스·신고가·정보만 ══ */}
+        {view === 1 && (
+          <section className="card tile">
+            <div className="tile-h">🏠 오늘의 부동산</div>
+            <button className="mini-stat mini-stat-full" onClick={() => router.push("/pwa/realestate")}>
               <span className="mini-ic re">🏠</span>
               <span className="mini-body">
-                <span className="mini-t">부동산</span>
+                <span className="mini-t">부동산 홈</span>
                 <span className="mini-s">{myComplex ? `내 단지 ${myComplex}` : "관심 단지 동향 보기"}</span>
               </span>
               <span className="mini-go">→</span>
             </button>
-          </div>
 
-          {opNotes.length > 0 && (
-            <div className="tile-spot">🏢 OneHub 신고가 · {opNotes[0].complex_name} {opNotes[0].price_manwon ? `${(opNotes[0].price_manwon / 10000).toFixed(2)}억` : ""}{opNotes.length > 1 ? ` 외 ${opNotes.length - 1}건` : ""}</div>
-          )}
+            {opNotes.length > 0 && (
+              <div className="tile-spot">🏢 OneHub 신고가 · {opNotes[0].complex_name} {opNotes[0].price_manwon ? `${(opNotes[0].price_manwon / 10000).toFixed(2)}억` : ""}{opNotes.length > 1 ? ` 외 ${opNotes.length - 1}건` : ""}</div>
+            )}
 
-          {macroNews.length > 0 && (
-            <div className="tile-news">
-              <div className="tile-news-h">글로벌 · 거시 · 부동산 뉴스</div>
-              {(newsOpen ? macroNews : macroNews.slice(0, 3)).map((n) => (
-                <button className="tile-news-row" key={n.id} onClick={() => openNewsDetail(n)}>
-                  <span className={`tile-news-cat c-${n.category}`}>{CAT_KO[n.category] || "뉴스"}</span>
-                  <span className="tile-news-t">{n.headline}</span>
-                </button>
-              ))}
-              {macroNews.length > 3 && (
-                <button className="tile-more" onClick={() => setNewsOpen((v) => !v)}>{newsOpen ? "접기" : `+${macroNews.length - 3}건 더보기`}</button>
-              )}
-            </div>
-          )}
+            {realestateNews.length > 0 ? (
+              <div className="tile-news">
+                <div className="tile-news-h">부동산 뉴스</div>
+                {(newsOpen ? realestateNews : realestateNews.slice(0, 4)).map((n) => (
+                  <button className="tile-news-row" key={n.id} onClick={() => openNewsDetail(n)}>
+                    <span className={`tile-news-cat c-${n.category}`}>{CAT_KO[n.category] || "뉴스"}</span>
+                    <span className="tile-news-t">{n.headline}</span>
+                  </button>
+                ))}
+                {realestateNews.length > 4 && (
+                  <button className="tile-more" onClick={() => setNewsOpen((v) => !v)}>{newsOpen ? "접기" : `+${realestateNews.length - 4}건 더보기`}</button>
+                )}
+              </div>
+            ) : (
+              <div className="tile-empty">오늘 새로 올라온 부동산 뉴스가 없어요.</div>
+            )}
 
-          <ReportTeaser />
-        </section>
+            <ReportTeaser />
+          </section>
+        )}
 
-        {/* ══ ③ 종합자산 · 오늘의 할일 ══ */}
+        {/* ══ "오늘의 ETF" — 글로벌·거시·정책 뉴스 + 관련 할일 ══ */}
+        {view === 2 && (
+          <section className="card tile">
+            <div className="tile-h">📊 오늘의 ETF</div>
+            <button className="mini-stat mini-stat-full" onClick={() => router.push("/pwa/etf")}>
+              <span className="mini-ic etf">📊</span>
+              <span className="mini-body">
+                <span className="mini-t">ETF 홈</span>
+                <span className="mini-s">{ukTxt(bd.etf_uk) ? `평가 ${ukTxt(bd.etf_uk)} · 리밸런싱 확인` : "국내/해외 배분 보기"}</span>
+              </span>
+              <span className="mini-go">→</span>
+            </button>
+
+            {etfNews.length > 0 ? (
+              <div className="tile-news">
+                <div className="tile-news-h">글로벌 · 거시 · 정책 뉴스</div>
+                {(newsOpen ? etfNews : etfNews.slice(0, 4)).map((n) => (
+                  <button className="tile-news-row" key={n.id} onClick={() => openNewsDetail(n)}>
+                    <span className={`tile-news-cat c-${n.category}`}>{CAT_KO[n.category] || "뉴스"}</span>
+                    <span className="tile-news-t">{n.headline}</span>
+                  </button>
+                ))}
+                {etfNews.length > 4 && (
+                  <button className="tile-more" onClick={() => setNewsOpen((v) => !v)}>{newsOpen ? "접기" : `+${etfNews.length - 4}건 더보기`}</button>
+                )}
+              </div>
+            ) : (
+              <div className="tile-empty">오늘 새로 올라온 ETF 관련 뉴스가 없어요.</div>
+            )}
+          </section>
+        )}
+
+        {/* ══ "오늘의 이야기" — 지역 커뮤니티 미리보기 ══ */}
+        {view === 3 && (
+          <section className="card tile story-teaser" onClick={() => router.push("/pwa/story")} role="button" tabIndex={0}>
+            <div className="tile-h">💬 오늘의 이야기</div>
+            <div className="tile-empty">우리 동네 이웃들과 오늘의 시장·부동산·ETF 이야기를 나눠보세요.</div>
+            <div className="story-teaser-go">이야기 보러가기 →</div>
+          </section>
+        )}
+
+        {/* ══ 종합자산 · 오늘의 할일 (공통) ══ */}
         <section className="card tile">
           <div className="tile-h">💼 종합자산 · 오늘의 할일</div>
 
@@ -502,11 +543,9 @@ export default function TodayPage({ reports }) {
         .td-dot { color: var(--color-success); }
         .td-ic { display: flex; align-items: center; gap: 8px; }
         .td-search { width: 34px; height: 34px; border-radius: 50%; background: var(--color-card); border: none; display: grid; place-items: center; font-size: 15px; cursor: pointer; box-shadow: var(--shadow-card); }
-        .td-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 6px; font-family: var(--font-display, var(--font-sans)); }
-        .td-fresh { margin-left: auto; }
         .td-titlewrap { display: flex; align-items: center; gap: 8px; margin: 6px 2px 6px; }
-        .td-fresh2 { margin-left: auto; flex-shrink: 0; }
-        .td-market { margin: 0 2px 14px; }
+        .td-market { display: flex; align-items: center; gap: 10px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 8px 12px; margin: 0 2px 14px; box-shadow: var(--shadow-card); }
+        .td-fresh3 { margin-left: auto; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .td-modal-bg { position: fixed; inset: 0; z-index: 300; background: rgba(10,15,25,.5); display: flex; align-items: flex-end; justify-content: center; }
         .td-modal { position: relative; width: 100%; max-width: 480px; max-height: 78vh; overflow-y: auto; background: var(--color-card); border-radius: 18px 18px 0 0; padding: 22px 20px calc(env(safe-area-inset-bottom, 0px) + 22px); }
@@ -558,6 +597,10 @@ export default function TodayPage({ reports }) {
         .tile-h { font-size: 0.92rem; font-weight: 800; color: var(--color-ink); margin-bottom: 12px; }
         .tile-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
         .mini-stat { display: flex; align-items: center; gap: 8px; text-align: left; padding: 12px 10px; border-radius: 12px; background: var(--color-card-soft, var(--color-bg)); border: 1px solid var(--color-line); cursor: pointer; font-family: var(--font-sans); min-height: 64px; }
+        .mini-stat-full { width: 100%; margin-bottom: 12px; }
+        .tile-empty { font-size: 0.8rem; color: var(--color-ink-3); padding: 10px 2px; }
+        .story-teaser { cursor: pointer; }
+        .story-teaser-go { text-align: right; font-size: 0.8rem; font-weight: 800; color: var(--color-primary); margin-top: 6px; }
         .mini-ic { flex: none; font-size: 20px; width: 26px; text-align: center; }
         .mini-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
         .mini-t { font-size: 0.8rem; font-weight: 800; color: var(--color-ink); }

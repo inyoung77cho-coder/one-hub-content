@@ -6,6 +6,7 @@ import { useRouter } from "next/router";
 import { getTrader } from "../../lib/trader";
 import { recordDecision, getTodayDecision } from "../../lib/verdictLedger";
 import { getSeed, SEED_OPTIONS, setSeed } from "../../lib/gameWallet";
+import { getKrxSession } from "../../lib/marketHours";
 
 export default function PwaPick() {
   const router = useRouter();
@@ -24,12 +25,17 @@ export default function PwaPick() {
         const buys = d?.today_buys || [];
         const screen = d?.screening_candidates || [];
         const pool = buys.length ? buys : screen;
-        const list = pool.slice(0, 6).map((s) => ({
-          code: s.code, name: s.stock || s.name || s.code,
-          score: Math.round(s.final_score ?? s.score ?? 0),
-          reason: s.reason || (Array.isArray(s.reasons) ? s.reasons[0] : "") || "",
-          action: buys.length ? "BUY" : "관심",
-        }));
+        // [버그수정] 주말·휴장 등 일부 응답엔 code가 비어있는 항목이 섞여있어(예: 캐시된 요약행),
+        //   그런 카드가 그려지면 recordDecision(code 없으면 no-op)이 조용히 실패해 클릭이 안 먹는 것처럼 보였다.
+        const list = pool
+          .filter((s) => s.code || s.symbol)
+          .slice(0, 6)
+          .map((s) => ({
+            code: s.code || s.symbol, name: s.stock || s.name || s.code || s.symbol,
+            score: Math.round(s.final_score ?? s.score ?? 0),
+            reason: s.reason || (Array.isArray(s.reasons) ? s.reasons[0] : "") || "",
+            action: buys.length ? "BUY" : "관심",
+          }));
         setCands(list);
       })
       .catch(() => setCands([]));
@@ -70,7 +76,10 @@ export default function PwaPick() {
       {cands === null ? (
         <div className="pk-loading">오늘의 추천을 불러오는 중…</div>
       ) : cands.length === 0 ? (
-        <div className="pk-empty">오늘은 새로 나온 AI 추천이 없어요. 바로 대결 결과를 확인해보세요.</div>
+        <div className="pk-empty">
+          {getKrxSession().phase === "closed" ? `😴 ${getKrxSession().label} — 오늘은 새 AI 추천이 없어요.` : "오늘은 새로 나온 AI 추천이 없어요."}
+          <br />바로 대결 결과를 확인해보세요.
+        </div>
       ) : (
         <div className="pk-list">
           {cands.map((c) => {

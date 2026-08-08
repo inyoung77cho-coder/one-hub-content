@@ -24,7 +24,7 @@ function screenName(pathname) {
   return seg.length ? seg[seg.length - 1] : "홈";
 }
 
-export default function FeedbackButton() {
+export default function FeedbackButton({ variant = "float" }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [cat, setCat] = useState("inconvenience");
@@ -56,11 +56,16 @@ export default function FeedbackButton() {
 
   const close = () => { setOpen(false); setTimeout(() => setDone(false), 200); };
 
+  // [OS-2] 헤더 아이콘 버전 — 🔍 검색 버튼과 같은 크기로 상단에 배치(전역 플로팅 버튼 대체, 당분간만 사용).
+  const iconStyle = { width: 34, height: 34, borderRadius: "50%", background: "var(--color-card)",
+    border: "none", display: "grid", placeItems: "center", fontSize: 15, cursor: "pointer", boxShadow: "var(--shadow-card)" };
+  const floatStyle = { position: "fixed", left: 14, bottom: 78, zIndex: 900, width: 46, height: 46, borderRadius: 23,
+    border: "none", background: "#4f46e5", color: "#fff", fontSize: 20, boxShadow: "0 4px 14px rgba(79,70,229,0.45)", cursor: "pointer" };
+
   return (
     <>
-      <button aria-label="의견 보내기" onClick={() => setOpen(true)}
-        style={{ position: "fixed", left: 14, bottom: 78, zIndex: 900, width: 46, height: 46, borderRadius: 23,
-          border: "none", background: "#4f46e5", color: "#fff", fontSize: 20, boxShadow: "0 4px 14px rgba(79,70,229,0.45)", cursor: "pointer" }}>
+      <button aria-label="의견 보내기" title="의견 보내기" onClick={() => setOpen(true)}
+        style={variant === "icon" ? iconStyle : floatStyle}>
         💬
       </button>
 

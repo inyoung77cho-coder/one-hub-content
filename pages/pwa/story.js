@@ -7,12 +7,13 @@ import { useEffect, useState } from "react";
 import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import Comments from "../../components/Comments";
-import { getStoryRegionOverride, setStoryRegionOverride, guessMyDong, KNOWN_DONGS } from "../../lib/storyRegion";
+import { getStoryRegionOverride, setStoryRegionOverride, guessMyDong, guOf, REGIONS } from "../../lib/storyRegion";
 
 export default function PwaStory() {
   const [region, setRegion] = useState("");
   const [guessed, setGuessed] = useState(null);
   const [picking, setPicking] = useState(false);
+  const [pickGu, setPickGu] = useState(null); // [구→동] 1단계에서 고른 구 — null이면 구 선택 화면
 
   useEffect(() => {
     const override = getStoryRegionOverride();
@@ -23,10 +24,15 @@ export default function PwaStory() {
         const map = d?.map || (Array.isArray(d?.items) ? Object.fromEntries(d.items.map((x) => [x.단지명, x.법정동])) : null);
         const g = guessMyDong(map || {});
         setGuessed(g);
-        setRegion(g || KNOWN_DONGS[0]);
+        setRegion(g || Object.values(REGIONS)[0][0]);
       })
-      .catch(() => setRegion(KNOWN_DONGS[0]));
+      .catch(() => setRegion(Object.values(REGIONS)[0][0]));
   }, []);
+
+  const openPicker = () => {
+    setPickGu(guOf(region) || Object.keys(REGIONS)[0]);
+    setPicking(true);
+  };
 
   const pick = (dong) => {
     setStoryRegionOverride(dong);
@@ -42,18 +48,30 @@ export default function PwaStory() {
       <AppHeader />
       <div className="story-title">
         💬 <span className="story-region">{region}</span> 이야기
-        <button type="button" className="story-change" onClick={() => setPicking((v) => !v)}>지역변경</button>
+        <button type="button" className="story-change" onClick={() => (picking ? setPicking(false) : openPicker())}>지역변경</button>
       </div>
       <div className="story-sub">우리 동네 이웃들과 나누는 이야기{guessed === region ? " · 내 등록 단지 기준" : ""}</div>
 
       {picking && (
         <section className="card story-picker">
-          <div className="story-picker-h">동네 선택</div>
+          {/* [구→동] 1단계: 구 선택 */}
+          <div className="story-picker-h">구 선택</div>
           <div className="story-picker-list">
-            {KNOWN_DONGS.map((d) => (
-              <button key={d} className={`story-chip ${d === region ? "on" : ""}`} onClick={() => pick(d)}>{d}</button>
+            {Object.keys(REGIONS).map((gu) => (
+              <button key={gu} className={`story-chip ${gu === pickGu ? "on" : ""}`} onClick={() => setPickGu(gu)}>{gu}</button>
             ))}
           </div>
+          {/* [구→동] 2단계: 선택한 구 안의 동 */}
+          {pickGu && (
+            <>
+              <div className="story-picker-h story-picker-h2">{pickGu} 안에서 동 선택</div>
+              <div className="story-picker-list">
+                {(REGIONS[pickGu] || []).map((d) => (
+                  <button key={d} className={`story-chip ${d === region ? "on" : ""}`} onClick={() => pick(d)}>{d}</button>
+                ))}
+              </div>
+            </>
+          )}
         </section>
       )}
 
@@ -69,6 +87,7 @@ export default function PwaStory() {
         .story-sub { font-size: 12px; font-weight: 600; color: var(--color-ink-3); margin: 0 2px 14px; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .story-picker-h { font-size: 12px; font-weight: 800; color: var(--color-ink-2); margin-bottom: 10px; }
+        .story-picker-h2 { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--color-line); }
         .story-picker-list { display: flex; flex-wrap: wrap; gap: 8px; }
         .story-chip { border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink-2); font-size: 12.5px; font-weight: 700; padding: 7px 13px; border-radius: 999px; cursor: pointer; font-family: var(--font-sans); }
         .story-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }

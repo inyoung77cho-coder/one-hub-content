@@ -11,6 +11,7 @@ import QuickAddSheet from "../../components/shared/QuickAddSheet";
 import { APP_VERSION, BUILD_STAMP } from "../../lib/version";
 import { logout } from "../../lib/session";
 import ExitScreen from "../../components/ExitScreen";
+import FeedbackButton from "../../components/FeedbackButton";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -193,7 +194,15 @@ export default function Settings() {
 
   return (
     <div className="m pwa-shell">
-      <div className="hd"><h1>⚙️ 설정</h1></div>
+      {/* [OS-2] 다른 페이지와 동일한 상단 메뉴바 — ONE·HUB 로고 + 검색 + 피드백 */}
+      <header className="hd">
+        <button type="button" className="hd-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">ONE<span className="hd-dot">·</span>HUB</button>
+        <div className="hd-ic">
+          <button type="button" className="hd-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색" title="AI 종목 검색">🔍</button>
+          <FeedbackButton variant="icon" />
+        </div>
+      </header>
+      <h1 className="hd-title">⚙️ 설정</h1>
 
       {/* [NI-5-d] 베타 테스터 배지 — 정식 출시 후에도 무료 */}
       {me && !isAdmin && (
@@ -526,7 +535,12 @@ export default function Settings() {
 
       <style jsx>{`
         .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--color-bg); padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 84px); font-family: var(--font-sans); color: var(--color-ink); }
-        .hd { display: flex; align-items: center; gap: 10px; padding: 12px 2px; } .hd h1 { font-size: 1.05rem; font-weight: 800; margin: 0; }
+        .hd { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; background: var(--color-bg); padding: calc(env(safe-area-inset-top, 0px) + 10px) 4px 12px; }
+        .hd-logo { font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--color-ink); font-family: var(--font-sans); background: none; border: none; padding: 0; cursor: pointer; }
+        .hd-dot { color: var(--color-success); }
+        .hd-ic { display: flex; align-items: center; gap: 8px; }
+        .hd-search { width: 34px; height: 34px; border-radius: 50%; background: var(--color-card); border: none; display: grid; place-items: center; font-size: 15px; cursor: pointer; box-shadow: var(--shadow-card); }
+        .hd-title { font-size: 1.05rem; font-weight: 800; margin: 6px 2px 12px; }
         .seg { display: flex; gap: 3px; background: var(--color-card-soft); border: 1px solid var(--color-line); padding: 3px; border-radius: var(--radius-pill); margin-bottom: 12px; }
         .seg button { flex: 1; padding: 8px 0; border: none; background: none; border-radius: var(--radius-pill); font-family: var(--font-sans); font-size: 0.82rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
         .seg button.on { background: var(--color-card); color: var(--color-primary); box-shadow: var(--shadow-card); }
