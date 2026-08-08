@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 import ReportShell from "../../components/shared/ReportShell";
+import ShareButton from "../../components/ShareButton";
 
 const REGIME = { BULL: { l: "상승장", c: "var(--color-success)" }, BEAR: { l: "하락장", c: "var(--color-danger)" }, SIDEWAYS: { l: "횡보장", c: "var(--color-ink-2)" } };
 const rg = (r) => REGIME[r] || REGIME.SIDEWAYS;
@@ -35,7 +36,12 @@ export default function PwaDaily({ posts, postsB }) {
                 <span className="dc-trades">매매 {p.trade_count}</span>
                 <span className="dc-caret">{isOpen ? "▾" : "▸"}</span>
               </button>
-              {isOpen && p.insight && <div className="dc-insight">{p.insight}</div>}
+              {isOpen && p.insight && (
+                <div className="dc-insight">
+                  {p.insight}
+                  <div className="dc-share"><ShareButton title={`ONE-HUB 일간 리포트 ${p.date}`} text={`${p.date} · ${r.l} · Heat ${p.heat_score ?? "-"}`} url={`https://one-hub-content.vercel.app/pwa/daily`} /></div>
+                </div>
+              )}
             </div>
           );
         })
@@ -53,6 +59,7 @@ export default function PwaDaily({ posts, postsB }) {
         .dc-trades { font-size: 0.72rem; color: var(--color-ink-3); }
         .dc-caret { margin-left: auto; color: var(--color-ink-3); }
         .dc-insight { padding: 0 15px 14px; font-size: 0.84rem; color: var(--color-ink-2); line-height: 1.6; word-break: keep-all; white-space: pre-wrap; }
+        .dc-share { margin-top: 10px; display: flex; justify-content: flex-end; }
       `}</style>
     </ReportShell>
   );

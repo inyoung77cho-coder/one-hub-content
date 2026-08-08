@@ -38,6 +38,7 @@ export default async function handler(req, res) {
       id: session.sub,
       uid: uid ?? null,
       nickname: session.nickname || "",
+      picture: session.picture || null,
       provider: session.provider || "kakao",
       role: t.role || "member",
       tier: t.tier || "beta",

@@ -23,6 +23,8 @@ import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
 import LastUpdated from "../../components/LastUpdated";
 import MarketStatusBadge from "../../components/MarketStatusBadge";
+import RotatingPageTitle from "../../components/RotatingPageTitle";
+import ShareButton from "../../components/ShareButton";
 
 const DAY = 86400000;
 const MATURE_DAYS = 3; // 판단 → 채점까지(나 vs AI)
@@ -267,7 +269,14 @@ export default function TodayPage({ reports }) {
         </div>
       </header>
 
-      <div className="td-title">오늘{at && <span className="td-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}</div>
+      <div className="td-titlewrap">
+        <RotatingPageTitle
+          fixed="오늘"
+          items={[{ suffix: "의 대결" }, { suffix: "의 부동산" }, { suffix: "의 뉴스" }, { suffix: "의 이야기" }]}
+          onLabelClick={(item) => { if (item.suffix === "의 이야기") router.push("/pwa/story"); }}
+        />
+        {at && <div className="td-fresh2"><LastUpdated timestamp={at} onRefresh={load} /></div>}
+      </div>
       <div className="td-market"><MarketStatusBadge /></div>
 
       <DataState status={status} hasData={!!dash || !!ledger} onRetry={load} skeletonLines={4} skeletonBlock>
@@ -279,6 +288,7 @@ export default function TodayPage({ reports }) {
             {regime && (
               <span className={`hero-regime r-${regimeRaw.toLowerCase()}`}>{regime}{heat != null ? ` · 온도 ${heat}` : ""}</span>
             )}
+            <ShareButton compact title="ONE-HUB · 나 vs AI" text={vsShowdown ? `나 ${pctTxt(vsShowdown.myRet)} vs AI ${pctTxt(vsShowdown.aiRet)} — 나도 AI랑 대결해볼래?` : "AI와 투자 판단 대결, ONE-HUB에서 해보세요"} url="https://one-hub-content.vercel.app/pwa/today" />
           </div>
 
           {vsShowdown ? (
@@ -478,6 +488,7 @@ export default function TodayPage({ reports }) {
             <div className="td-modal-body">
               {String(newsDetail.summary_md || "").split("\n").map((l, i) => l.trim() && <p key={i}>{l.replace(/^\s*[-*]\s*/, "")}</p>)}
             </div>
+            <div className="td-modal-share"><ShareButton title={newsDetail.headline} text={newsDetail.headline} url="https://one-hub-content.vercel.app/pwa/today" /></div>
           </div>
         </div>
       )}
@@ -493,6 +504,8 @@ export default function TodayPage({ reports }) {
         .td-search { width: 34px; height: 34px; border-radius: 50%; background: var(--color-card); border: none; display: grid; place-items: center; font-size: 15px; cursor: pointer; box-shadow: var(--shadow-card); }
         .td-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 6px; font-family: var(--font-display, var(--font-sans)); }
         .td-fresh { margin-left: auto; }
+        .td-titlewrap { display: flex; align-items: center; gap: 8px; margin: 6px 2px 6px; }
+        .td-fresh2 { margin-left: auto; flex-shrink: 0; }
         .td-market { margin: 0 2px 14px; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .td-modal-bg { position: fixed; inset: 0; z-index: 300; background: rgba(10,15,25,.5); display: flex; align-items: flex-end; justify-content: center; }
@@ -501,6 +514,7 @@ export default function TodayPage({ reports }) {
         .td-modal-h { font-size: 1.02rem; font-weight: 800; color: var(--color-ink); line-height: 1.4; margin: 10px 40px 6px 0; word-break: keep-all; }
         .td-modal-meta { font-size: 0.72rem; color: var(--color-ink-3); margin-bottom: 14px; }
         .td-modal-body { font-size: 0.86rem; color: var(--color-ink-2); line-height: 1.7; word-break: keep-all; display: flex; flex-direction: column; gap: 8px; }
+        .td-modal-share { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); display: flex; justify-content: flex-end; }
 
         /* ══ 히어로: 주식 · 나 vs AI ══ */
         .hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero, 22px); padding: 20px 18px; box-shadow: var(--shadow-float); margin-bottom: 12px; cursor: pointer; }

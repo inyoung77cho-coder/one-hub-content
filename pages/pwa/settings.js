@@ -10,6 +10,7 @@ import { setTraderGlobal } from "../../lib/trader";
 import QuickAddSheet from "../../components/shared/QuickAddSheet";
 import { APP_VERSION, BUILD_STAMP } from "../../lib/version";
 import { logout } from "../../lib/session";
+import ExitScreen from "../../components/ExitScreen";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -41,6 +42,8 @@ export default function Settings() {
   const [ops, setOps] = useState(null);   // [§3-9 #18] /api/ops/traders (매수/차단/에러/채널/자율)
   const [usage, setUsage] = useState(null); // [§3-9 #19] /api/ops/usage (KIS/Claude/서버 비용)
   const [me, setMe] = useState(null); // [NI-5] 로그인 사용자 등급(tier/role) — 운영자 탭 분기·베타 배지
+  const [exiting, setExiting] = useState(false); // [OS-1] 로그아웃 시 1.1초 작별 화면 표시
+  const [infoTab, setInfoTab] = useState("info"); // [OS-2] 좌 "나의 정보" / 우 "내 설정변경"
   const [fb, setFb] = useState(null); // [NI-6] 피드백 대시보드(admin 전용)
   const [fbFilter, setFbFilter] = useState("all"); // [NI-6] 카테고리 필터
   const tick = useRef(null);
@@ -209,6 +212,34 @@ export default function Settings() {
 
       {!showOps ? (
         <>
+          {/* [OS-2] 좌 "나의 정보" / 우 "내 설정변경" — 공통 상단 메뉴 패턴 */}
+          <div className="itab">
+            <button className={infoTab === "info" ? "on" : ""} onClick={() => setInfoTab("info")}>나의 정보</button>
+            <button className={infoTab === "settings" ? "on" : ""} onClick={() => setInfoTab("settings")}>내 설정 변경</button>
+          </div>
+
+          {infoTab === "info" && (
+            <div className="card idcard">
+              <div className="idrow">
+                {me?.user?.picture ? (
+                  <img className="idpic" src={me.user.picture} alt="프로필 사진" />
+                ) : (
+                  <div className="idpic idpic-ph">🙂</div>
+                )}
+                <div className="idmeta">
+                  <div className="idnick">{me?.user?.nickname || "닉네임 없음"}</div>
+                  <div className="idbeta">{isAdmin ? "운영자" : "베타 테스터"}</div>
+                </div>
+              </div>
+              <div className="idline"><span className="idl">카카오톡 ID</span><span className="idv mono">{me?.user?.id || "-"}</span></div>
+              <div className="idline"><span className="idl">One-hub ID</span><span className="idv mono">{me?.user?.uid ?? "-"}</span></div>
+              <div className="idline"><span className="idl">이용 등급</span><span className="idv">{me?.user?.tier || "beta"}{me?.user?.lifetimeFree ? " · 평생 무료" : ""}</span></div>
+              <div className="hint">프로필 사진은 카카오 계정 사진을 그대로 표시합니다.</div>
+            </div>
+          )}
+
+          {infoTab !== "settings" ? null : (
+          <>
           {/* ── 일반 뷰: 알림 · 테마 · 계정 · 연동 ── */}
           {/* 알림 */}
           <div className="card">
@@ -243,7 +274,8 @@ export default function Settings() {
             <div className="hint">화면의 모든 자산·주문이 선택한 계좌 기준으로 표시됩니다. B를 선택하면 상단에 표시가 나타납니다.</div>
             <div className="row" style={{ marginTop: 12, borderTop: "1px solid var(--color-line)", paddingTop: 12 }}>
               <span className="l">로그아웃</span>
-              <button className="tbtn" onClick={logout}>로그아웃</button>
+              <button className="tbtn" onClick={() => setExiting(true)}>로그아웃</button>
+              {exiting && <ExitScreen onDone={logout} />}
             </div>
             <div className="hint">로그아웃하면 이 기기에 저장된 내 자산·게임·설정이 함께 지워집니다(공용 기기 보호).</div>
           </div>
@@ -316,6 +348,8 @@ export default function Settings() {
             </div>
             <div className="hint">모든 정보는 참고용이며 투자자문이 아닙니다. 마케팅 정보 수신은 동의 항목 관리에서 언제든 켜고 끌 수 있어요.</div>
           </div>
+          </>
+          )}
         </>
       ) : (
         <>
@@ -496,6 +530,19 @@ export default function Settings() {
         .seg { display: flex; gap: 3px; background: var(--color-card-soft); border: 1px solid var(--color-line); padding: 3px; border-radius: var(--radius-pill); margin-bottom: 12px; }
         .seg button { flex: 1; padding: 8px 0; border: none; background: none; border-radius: var(--radius-pill); font-family: var(--font-sans); font-size: 0.82rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
         .seg button.on { background: var(--color-card); color: var(--color-primary); box-shadow: var(--shadow-card); }
+        .itab { display: flex; gap: 3px; background: var(--color-card-soft); border: 1px solid var(--color-line); padding: 3px; border-radius: var(--radius-pill); margin-bottom: 12px; }
+        .itab button { flex: 1; padding: 8px 0; border: none; background: none; border-radius: var(--radius-pill); font-family: var(--font-sans); font-size: 0.82rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
+        .itab button.on { background: var(--color-card); color: var(--color-primary); box-shadow: var(--shadow-card); }
+        .idrow { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+        .idpic { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: var(--color-card-soft); }
+        .idpic-ph { display: grid; place-items: center; font-size: 24px; }
+        .idmeta { display: flex; flex-direction: column; gap: 2px; }
+        .idnick { font-size: 1rem; font-weight: 800; color: var(--color-ink); }
+        .idbeta { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-3); }
+        .idline { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-top: 1px solid var(--color-line); }
+        .idl { font-size: 0.82rem; color: var(--color-ink-2); }
+        .idv { font-size: 0.86rem; font-weight: 700; color: var(--color-ink); }
+        .mono { font-family: ui-monospace, monospace; }
         .opsnote { font-size: 0.72rem; color: var(--color-ink-3); margin: -2px 2px 10px; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .k { font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); margin-bottom: 12px; } .rt { font-weight: 400; font-size: 0.66rem; }

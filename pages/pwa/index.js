@@ -22,6 +22,7 @@ import BottomNav from '../../components/BottomNav';
 import { getStockHoldings, removeStock, buyStock } from '../../lib/stockHoldings';
 import { fetchStockQuotes } from '../../lib/stockLive';
 import { getKrxSession } from '../../lib/marketHours';
+import ShareButton from '../../components/ShareButton';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
@@ -277,7 +278,8 @@ export default function PWADashboard({ latestReport }) {
   }, []);
   // [S3/G2] AI 트러스트 3섹션 서브내비(vs/verify/archive)를 URL(?sec=)로 유지 — 뒤로가기·딥링크(F4) 지원
   // [FB-4 §4.2] 정직성 브랜드 강화 — AI 페이지는 '자기검증'을 앞세운다(기본 진입 섹션).
-  const [trustSec, setTrustSec] = useTabState('sec', ['verify', 'vs', 'archive'], 'verify');
+  // [OS-2] AI 페이지 3탭 — "AI vs 나 대결" 우선 노출로 재정렬(사용자 지시, FB-4의 '자기검증 우선'을 대체).
+  const [trustSec, setTrustSec] = useTabState('sec', ['vs', 'verify', 'archive'], 'vs');
   const [recSort, setRecSort] = useState('interest'); // [S7.2] 추천 정렬(interest/upside)
   const [holdSort, setHoldSort] = useState('urgency'); // [S-2] 보유 정렬(urgency/value)
   const [autoWatchNote, setAutoWatchNote] = useState([]); // [S-6] 추천해제→자동 관망 편입 알림
@@ -339,16 +341,16 @@ export default function PWADashboard({ latestReport }) {
     // [N2] 종합자산 지도는 /pwa/assets 하나로 통합 — 구 dashboard로 오는 경로를 전부 리다이렉트.
     //   지도가 2개면 총자산이 같아도 '어느 화면이 정답인지' 알 수 없어 신뢰가 무너진다.
     if (tabParam === 'dashboard') { router.replace('/pwa/assets'); return; }
-    // [2026-08-03] 탭 없이 /pwa 진입(로고 클릭·PWA start_url)은 "오늘"이 기본 홈.
-    //   구버전은 여기서 /pwa/assets로 보냈는데, manifest start_url이 /pwa/today로
-    //   바뀐 뒤에도 이 경로만 안 따라와서 "로고 눌러도 오늘로 안 감" 버그가 남아있었다.
+    // [OS-2] 탭 없이 /pwa 진입(로고 클릭·PWA start_url)은 "AI 추천 선택→대결결과" 흐름이 첫 화면.
+    //   구버전엔 "오늘"이 기본 홈이었으나, 앱 첫 후킹을 주식 판단 게임에 맞추도록 사용자 지시로 교체.
+    //   manifest.json의 start_url도 /pwa/pick으로 함께 바뀌었다(이 리다이렉트는 로고 클릭 등 재진입용).
     if (!tabParam && !code) {
       let onboarded = false;
       try {
         onboarded = !!window.localStorage.getItem('onehub_profile')
           || window.localStorage.getItem('onehub_onboarded') === '1';
       } catch (e) {}
-      if (onboarded) { router.replace('/pwa/today'); return; }
+      if (onboarded) { router.replace('/pwa/pick'); return; }
       // 최초 사용자(프로필·온보딩 모두 없음) → 위저드 1회 진입.
       //   ★ 딥링크(?tab=·?code=)로 들어온 경우엔 절대 튕기지 않는다. isReady 이후라 판정이 정확하다.
       router.replace('/pwa/onboarding');
@@ -2382,9 +2384,9 @@ export default function PWADashboard({ latestReport }) {
               <div className="trust-hero-sub">이 AI를 왜 믿나 — 판단 흐름 · 나 vs AI · 자기검증 · 성적표를 한 곳에서 투명하게 공개합니다.</div>
             </section>
 
-            {/* [S2.2] AI 트러스트 3섹션 서브내비 — 나vsAI 승부 / 자기검증 / 리포트 아카이브 */}
+            {/* [OS-2] AI 3탭 — "AI vs 나 대결" / "AI 자기 검증" / "AI 리포트" 순서로 통일 */}
             <div className="trust-nav" role="tablist" aria-label="AI 트러스트 섹션">
-              {[['verify','🔬 자기검증'],['vs','🥊 나 vs AI'],['archive','🗂 리포트 아카이브']].map(([k,l]) => (
+              {[['vs','🥊 AI vs 나 대결'],['verify','🔬 AI 자기 검증'],['archive','🗂 AI 리포트']].map(([k,l]) => (
                 <button key={k} role="tab" aria-selected={trustSec===k} className={`trust-nav-btn ${trustSec===k?'on':''}`} onClick={() => setTrustSec(k)}>{l}</button>
               ))}
             </div>
@@ -2420,7 +2422,11 @@ export default function PWADashboard({ latestReport }) {
                     <div className="gd-w ai"><span className="gd-wl">AI 지갑 🤖</span><b className="gd-wb">{wonG(g.aiBalance)}</b>{g.aiGain !== 0 && <span className={`gd-wg ${g.aiGain >= 0 ? 'up' : 'dn'}`}>{g.aiGain >= 0 ? '+' : ''}{wonG(g.aiGain)}</span>}</div>
                   </div>
                   <div className="gd-bar"><div className="gd-bar-me" style={{ width: `${Math.max(6, Math.min(94, pct))}%` }} /></div>
-                  <div className="gd-lead">{g.leader === 'me' ? <b className="up">🏆 내가 {wonG(Math.abs(g.diff))} 앞섬</b> : g.leader === 'ai' ? <b className="dn">🤖 AI가 {wonG(Math.abs(g.diff))} 앞섬</b> : <b>⚖️ 접전</b>} · 판당 베팅 {wonG(g.bet)}(가상)</div>
+                  <div className="gd-lead">{g.leader === 'me' ? <b className="up">🏆 내가 {wonG(Math.abs(g.diff))} 앞섬</b> : g.leader === 'ai' ? <b className="dn">🤖 AI가 {wonG(Math.abs(g.diff))} 앞섬</b> : <b>⚖️ 접전</b>} · 판당 베팅 {wonG(g.bet)}(가상)
+                    <ShareButton compact title="ONE-HUB 나 vs AI 대결"
+                      text={g.leader === 'me' ? `내가 AI보다 ${wonG(Math.abs(g.diff))} 앞서고 있어요! 나도 AI랑 대결해볼래?` : g.leader === 'ai' ? `AI한테 ${wonG(Math.abs(g.diff))} 지고 있어요 — 나도 AI랑 대결해볼래?` : "AI와 팽팽한 접전 중! 나도 대결해볼래?"}
+                      url="https://one-hub-content.vercel.app/pwa/today" />
+                  </div>
                   {(() => {
                     // [2026-08-03] 며칠차·몇종목 대결 + 일자별 누적 금액 추이 그래프.
                     //   x축=정산된 날짜, 시드(출발점)부터 판이 정산될 때마다 잔고가 누적된다.

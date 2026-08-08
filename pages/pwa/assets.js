@@ -12,9 +12,16 @@ import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
 import LastUpdated from "../../components/LastUpdated";
 import QuickAddSheet from "../../components/shared/QuickAddSheet";
+import RotatingPageTitle from "../../components/RotatingPageTitle";
 
 const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || null);
 const uk = (v) => (v == null ? "-" : `${Number(v).toFixed(2)}억`);
+// [OS-2] "자산지도" 옆 순환 표시 — 클릭(종목변경)마다 다음 자산군으로 넘어가며 해당 상세 페이지로 이동.
+const ASSET_VIEWS = [
+  { label: "주식", href: "/pwa?tab=portfolio" },
+  { label: "ETF", href: "/pwa/etf" },
+  { label: "부동산", href: "/pwa/realestate" },
+];
 
 // 변화액 표기 헬퍼(억). 부호·색 구분.
 const dvUk = (v) => (v == null ? null : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}억`);
@@ -248,7 +255,15 @@ export default function AssetsMapPage() {
         </div>
       </header>
 
-      <div className="as-title">💼 종합자산 <span className="as-sub">자산 지도</span>{at && <span className="as-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}</div>
+      <div className="as-title">
+        💼 종합자산 <span className="as-sub">자산 지도</span>
+        <RotatingPageTitle
+          compact
+          items={ASSET_VIEWS.map((v) => ({ suffix: v.label }))}
+          onLabelClick={(item) => { const v = ASSET_VIEWS.find((x) => x.label === item.suffix); if (v) router.push(v.href); }}
+        />
+        {at && <span className="as-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
+      </div>
 
       <DataState status={status} hasData={!!assets} onRetry={load} skeletonLines={5} skeletonBlock>
         {/* ── 1층 ── */}

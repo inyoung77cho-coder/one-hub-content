@@ -4,6 +4,7 @@ import path from "path";
 import matter from "gray-matter";
 import { useRouter } from "next/router";
 import ReportShell from "../../components/shared/ReportShell";
+import ShareButton from "../../components/ShareButton";
 
 const REGIME = { BULL: { l: "상승장", c: "var(--color-success)" }, BEAR: { l: "하락장", c: "var(--color-danger)" }, SIDEWAYS: { l: "횡보장", c: "var(--color-ink-2)" } };
 const rg = (r) => REGIME[r] || REGIME.SIDEWAYS;
@@ -19,25 +20,30 @@ export default function PwaWeekly({ reports }) {
         reports.map((w, i) => {
           const r = rg(w.dominant_regime);
           return (
-            <button className="wc" key={w.week || i} onClick={() => router.push(`/weekly/${w.week}`)}>
-              <div className="wc-top">
-                <span className="wc-week">{w.week}</span>
-                <span className="wc-regime" style={{ color: r.c }}>{r.l}</span>
-                <span className="wc-go">→</span>
-              </div>
-              {(w.monday || w.friday) && <div className="wc-range">{w.monday}{w.friday ? ` ~ ${w.friday}` : ""}</div>}
-              <div className="wc-stats">
-                <div className="ws"><span>평균 과열도</span><b style={w.avg_heat != null ? { color: heatColor(w.avg_heat) } : undefined}>{w.avg_heat != null ? w.avg_heat : "—"}</b></div>
-                <div className="ws"><span>매매</span><b>{w.total_trades}건</b></div>
-              </div>
-            </button>
+            <div className="wc" key={w.week || i}>
+              <button className="wc-body" onClick={() => router.push(`/weekly/${w.week}`)}>
+                <div className="wc-top">
+                  <span className="wc-week">{w.week}</span>
+                  <span className="wc-regime" style={{ color: r.c }}>{r.l}</span>
+                  <span className="wc-go">→</span>
+                </div>
+                {(w.monday || w.friday) && <div className="wc-range">{w.monday}{w.friday ? ` ~ ${w.friday}` : ""}</div>}
+                <div className="wc-stats">
+                  <div className="ws"><span>평균 과열도</span><b style={w.avg_heat != null ? { color: heatColor(w.avg_heat) } : undefined}>{w.avg_heat != null ? w.avg_heat : "—"}</b></div>
+                  <div className="ws"><span>매매</span><b>{w.total_trades}건</b></div>
+                </div>
+              </button>
+              <div className="wc-share"><ShareButton title={`ONE-HUB 주간 리포트 ${w.week}`} text={`${w.week} · ${r.l} · 평균 과열도 ${w.avg_heat ?? "-"}`} url={`https://one-hub-content.vercel.app/weekly/${w.week}`} /></div>
+            </div>
           );
         })
       )}
       <style jsx>{`
         .rp-empty { text-align: center; color: var(--color-ink-3); padding: 40px 0; font-size: 0.85rem; }
-        .wc { display: block; width: 100%; text-align: left; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px; margin-bottom: 12px; cursor: pointer; font-family: var(--font-sans); }
-        .wc:active { background: var(--color-card-soft, var(--color-line)); }
+        .wc { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px; margin-bottom: 12px; }
+        .wc-body { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
+        .wc-body:active { opacity: .7; }
+        .wc-share { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-line); display: flex; justify-content: flex-end; }
         .wc-top { display: flex; align-items: baseline; gap: 10px; }
         .wc-week { font-size: 0.95rem; font-weight: 800; font-family: ui-monospace, monospace; }
         .wc-regime { font-size: 0.8rem; font-weight: 700; }

@@ -2,6 +2,7 @@ import "../styles/globals.css";
 import Nav from "../components/Nav";
 import EngineVersionBanner from "../components/EngineVersionBanner";
 import FeedbackButton from "../components/FeedbackButton";
+import SplashScreen from "../components/SplashScreen";
 import Head from "next/head";
 import { useEffect } from "react";
 import { useRouter } from "next/router";
@@ -84,6 +85,7 @@ export default function App({ Component, pageProps }) {
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="ONE-HUB" />
       </Head>
+      {isPWARoute && <SplashScreen />}
       {!isPWARoute && <Nav />}
       {/* [S17-0 Part3] 엔진 버전·계약 불일치를 PWA 전 화면에서 알린다.
           한 화면만 정직하면 의미가 없다. 정상이면 아무것도 그리지 않는다. */}
