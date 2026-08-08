@@ -27,7 +27,7 @@ export default function ShareButton({ title, text, url, label = "공유", compac
   return (
     <span className="shb-wrap">
       <button type="button" className={`shb ${compact ? "compact" : ""}`} onClick={share} aria-label="공유하기">
-        🔗 {!compact && label}
+        ➡️ {!compact && label}
       </button>
       {toast && <span className="shb-toast">링크 복사됨</span>}
       <style jsx>{`

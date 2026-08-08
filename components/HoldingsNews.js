@@ -8,7 +8,7 @@ import { getStockHoldings } from "../lib/stockHoldings";
 
 const MACRO_CATS = new Set(["global", "macro", "policy"]);
 
-export default function HoldingsNews({ trader = "A" }) {
+export default function HoldingsNews({ trader = "A", onOpenNews }) {
   const [rows, setRows] = useState([]);
 
   useEffect(() => {
@@ -36,8 +36,7 @@ export default function HoldingsNews({ trader = "A" }) {
           const hit = names.find((n) => hay.includes(n));
           if (hit) {
             matched.push({
-              id: it.id,
-              headline: it.headline,
+              ...it,
               hit,
               macro: MACRO_CATS.has(it.category),
               at: it.created_at || null,
@@ -57,13 +56,13 @@ export default function HoldingsNews({ trader = "A" }) {
       <div className="hn-h">📌 내 보유종목 뉴스 <span className="hn-sub">내가 산 종목 관련</span></div>
       <div className="hn-list">
         {rows.map((r) => (
-          <div className="hn-row" key={r.id}>
+          <button type="button" className="hn-row" key={r.id} onClick={() => onOpenNews && onOpenNews(r)}>
             <span className={`hn-badge ${r.macro ? "macro" : "rel"}`}>{r.macro ? "거시" : "관련"}</span>
             <div className="hn-b">
               <div className="hn-t">{r.headline}</div>
               <div className="hn-tag">내 보유 <b>{r.hit}</b> 관련{r.at ? ` · ${String(r.at).slice(5, 10)}` : ""}</div>
             </div>
-          </div>
+          </button>
         ))}
       </div>
       <p className="hn-foot">내 보유 주식이 오늘 뉴스에 언급된 경우만 모았습니다. onehub</p>
@@ -72,7 +71,7 @@ export default function HoldingsNews({ trader = "A" }) {
         .hn-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; display: flex; align-items: baseline; gap: 8px; }
         .hn-sub { font-size: 0.66rem; font-weight: 700; color: var(--color-ink-3); }
         .hn-list { display: flex; flex-direction: column; }
-        .hn-row { display: flex; gap: 9px; align-items: flex-start; padding: 9px 2px; border-bottom: 1px solid var(--color-line); }
+        .hn-row { display: flex; width: 100%; text-align: left; gap: 9px; align-items: flex-start; padding: 9px 2px; border: none; border-bottom: 1px solid var(--color-line); background: none; cursor: pointer; font-family: var(--font-sans); }
         .hn-row:last-child { border-bottom: none; }
         .hn-badge { flex: none; font-size: 0.58rem; font-weight: 800; padding: 2px 7px; border-radius: 999px; margin-top: 2px; }
         .hn-badge.macro { color: var(--color-primary); background: var(--color-primary-soft, rgba(47,107,255,.12)); }

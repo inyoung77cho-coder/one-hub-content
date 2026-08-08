@@ -3675,7 +3675,7 @@ export default function PWADashboard({ latestReport }) {
         .pwa-subtab.active { background: var(--accent-buy); color: #fff; }
 
         /* Layout */
-        .pwa-main { padding: 8px 16px 12px; display: flex; flex-direction: column; gap: 12px; }
+        .pwa-main { padding: 8px 14px 12px; display: flex; flex-direction: column; gap: 12px; }
         .pwa-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 16px; box-shadow: var(--card-shadow); }
         .pwa-card-label { display: block; font-size: 0.68rem; letter-spacing: 0.08em; color: var(--label-color); text-transform: uppercase; margin-bottom: 10px; font-weight: 700; }
 
@@ -4471,8 +4471,8 @@ export default function PWADashboard({ latestReport }) {
         .ml-rec-badge { font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: var(--inset-bg); }
         .ml-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 8px; line-height: 1.5; }
         /* [나 vs AI 대결] */
-        /* [OS-2] AI 3섹션 — RotatingPageTitle(고정단어+순환라벨+분석변경) 감싸는 카드 */
-        .trust-nav { display: flex; align-items: center; margin: 12px 0 14px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow-card); }
+        /* [사용자 피드백] 오늘·자산·이야기와 동일하게 카드 없이 — 위치/여백을 td-titlewrap과 픽셀 단위로 통일 */
+        .trust-nav { display: flex; align-items: center; gap: 8px; margin: 6px 2px 6px; }
         .aid-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .aid-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
         .aid-date { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); }

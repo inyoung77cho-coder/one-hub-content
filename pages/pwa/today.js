@@ -225,13 +225,14 @@ export default function TodayPage({ reports }) {
   const dailySeries = computeDailySeries(mine, getSeed(), tr2);
   // [며칠 경쟁] 첫 판단 기록일부터 오늘까지
   const daysCompeting = mine.length ? Math.max(1, Math.floor((Date.now() - Math.min(...mine.map((d) => d.ts))) / DAY) + 1) : 0;
-  // [주요 판단 차이] 내가 관망(pass)했는데 결과가 크게 갈린 종목을 최우선(details는 이미 |ret| 내림차순) — 없으면 최대 변동 종목.
-  const keyDiff = vsShowdown ? (vsShowdown.details.find((d) => d.decision === "pass") || vsShowdown.details[0]) : null;
-  const keyDiffLine = keyDiff
-    ? keyDiff.decision === "pass"
-      ? `${keyDiff.name} 관망 — ${keyDiff.ret >= 0 ? `AI만 매수해 ${pctTxt(keyDiff.ret)} 앞섰습니다` : `손실 ${pctTxt(keyDiff.ret)}를 피해 유리했습니다`}`
-      : `${keyDiff.name} — 나·AI 모두 매수, ${pctTxt(keyDiff.ret)}`
-    : null;
+  // [날짜별 판단 차이] details는 이미 |ret| 내림차순 — 가장 영향이 컸던 상위 2건을 날짜와 함께 설명.
+  const keyDiffLines = vsShowdown
+    ? vsShowdown.details.slice(0, 2).map((d) =>
+        `${mmdd(d.ts)} ${d.name} ${d.decision === "pass"
+          ? `관망 — ${d.ret >= 0 ? `AI만 매수해 ${pctTxt(d.ret)} 앞섰습니다` : `손실 ${pctTxt(d.ret)}를 피해 유리했습니다`}`
+          : `나·AI 모두 매수, ${pctTxt(d.ret)}`}`
+      )
+    : [];
 
   // ── AI 학습 진행도
   const pol = samplePolicy(mine.length);
@@ -299,24 +300,54 @@ export default function TodayPage({ reports }) {
 
           {vsShowdown ? (
             <>
-              <div className={`hero-winner w-${vsShowdown.winner}`}>
-                {vsShowdown.winner === "me" ? "🏆 내 판단 승" : vsShowdown.winner === "ai" ? "💀 AI 승" : "⚖️ 무승부"}
-              </div>
-              <div className="vsbars">
-                <div className="vsrow">
-                  <span className="vsrow-lbl" onClick={editNickname} role="button" tabIndex={0} title="닉네임 바꾸기">{nick} ✎</span>
-                  <span className="vsrow-track"><span className={`vsrow-fill ${vsShowdown.myRet >= 0 ? "up" : "dn"}`} style={{ width: `${Math.min(100, (Math.abs(vsShowdown.myRet) / vsMax) * 100)}%` }} /></span>
-                  <span className={`vsrow-val ${vsShowdown.myRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.myRet)}{wallet ? <em className="vsrow-won">{wonG(wallet.myGain)}</em> : null}</span>
-                </div>
-                <div className="vsrow">
-                  <span className="vsrow-lbl">AI</span>
-                  <span className="vsrow-track"><span className={`vsrow-fill ${vsShowdown.aiRet >= 0 ? "up" : "dn"}`} style={{ width: `${Math.min(100, (Math.abs(vsShowdown.aiRet) / vsMax) * 100)}%` }} /></span>
-                  <span className={`vsrow-val ${vsShowdown.aiRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.aiRet)}{wallet ? <em className="vsrow-won">{wonG(wallet.aiGain)}</em> : null}</span>
-                </div>
-              </div>
+              {wallet ? (
+                <>
+                  {/* [사용자 지시] AI 페이지의 "나 vs AI 가상 지갑 대결" 형식 재사용 — 지갑 잔고 박스 + VS + 진행률 바 */}
+                  <div className={`hero-winner w-${wallet.leader}`}>
+                    {wallet.leader === "me" ? "🏆 내 판단 승" : wallet.leader === "ai" ? "💀 AI 승" : "⚖️ 접전"}
+                  </div>
+                  <div className="hero-wallets">
+                    <div className="hero-w">
+                      <button type="button" className="hero-wl" onClick={editNickname} title="닉네임 바꾸기">🙋 {nick} ✎</button>
+                      <b className="hero-wb">{wonG(wallet.myBalance)}</b>
+                      {wallet.myGain !== 0 && <span className={`hero-wg ${wallet.myGain >= 0 ? "up" : "dn"}`}>{wallet.myGain >= 0 ? "+" : ""}{wonG(wallet.myGain)}</span>}
+                    </div>
+                    <div className="hero-vs">VS</div>
+                    <div className="hero-w">
+                      <span className="hero-wl">AI 지갑 🤖</span>
+                      <b className="hero-wb">{wonG(wallet.aiBalance)}</b>
+                      {wallet.aiGain !== 0 && <span className={`hero-wg ${wallet.aiGain >= 0 ? "up" : "dn"}`}>{wallet.aiGain >= 0 ? "+" : ""}{wonG(wallet.aiGain)}</span>}
+                    </div>
+                  </div>
+                  <div className="hero-bar"><div className="hero-bar-me" style={{ width: `${Math.max(6, Math.min(94, wallet.myBalance + wallet.aiBalance > 0 ? (wallet.myBalance / (wallet.myBalance + wallet.aiBalance)) * 100 : 50))}%` }} /></div>
+                  <div className="hero-watermark">가상 시드머니 {wonG(wallet.seed)} 기준 · 실제 매매 아님</div>
+                </>
+              ) : (
+                <>
+                  <div className={`hero-winner w-${vsShowdown.winner}`}>
+                    {vsShowdown.winner === "me" ? "🏆 내 판단 승" : vsShowdown.winner === "ai" ? "💀 AI 승" : "⚖️ 무승부"}
+                  </div>
+                  <div className="vsbars">
+                    <div className="vsrow">
+                      <span className="vsrow-lbl" onClick={editNickname} role="button" tabIndex={0} title="닉네임 바꾸기">{nick} ✎</span>
+                      <span className="vsrow-track"><span className={`vsrow-fill ${vsShowdown.myRet >= 0 ? "up" : "dn"}`} style={{ width: `${Math.min(100, (Math.abs(vsShowdown.myRet) / vsMax) * 100)}%` }} /></span>
+                      <span className={`vsrow-val ${vsShowdown.myRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.myRet)}</span>
+                    </div>
+                    <div className="vsrow">
+                      <span className="vsrow-lbl">AI</span>
+                      <span className="vsrow-track"><span className={`vsrow-fill ${vsShowdown.aiRet >= 0 ? "up" : "dn"}`} style={{ width: `${Math.min(100, (Math.abs(vsShowdown.aiRet) / vsMax) * 100)}%` }} /></span>
+                      <span className={`vsrow-val ${vsShowdown.aiRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.aiRet)}</span>
+                    </div>
+                  </div>
+                </>
+              )}
               <DuelChart series={dailySeries} myLabel={nick} />
-              {wallet && <div className="hero-watermark">가상 시드머니 {wonG(wallet.seed)} 기준 · 실제 매매 아님</div>}
-              {keyDiffLine && <div className="hero-keydiff">🔍 {keyDiffLine}</div>}
+              {keyDiffLines.length > 0 && (
+                <div className="hero-keydiff-list">
+                  <div className="hero-keydiff-h">🔍 날짜별 판단 차이</div>
+                  {keyDiffLines.map((l, i) => <div className="hero-keydiff-row" key={i}>{l}</div>)}
+                </div>
+              )}
               <div className="hero-sub">{pendingJudge.length > 0 ? `채점 중 ${pendingJudge.length}건 · ` : ""}기록 전체 보기 →</div>
             </>
           ) : pendingJudge.length > 0 ? (
@@ -372,8 +403,8 @@ export default function TodayPage({ reports }) {
           )}
         </section>
 
-        {/* 내 보유종목 관련 뉴스 — 있을 때만 (히어로 바로 아래, 같은 도메인) */}
-        <HoldingsNews trader={trader} />
+        {/* 내 보유종목 관련 뉴스 — 있을 때만 (히어로 바로 아래, 같은 도메인). 클릭 시 상세 뉴스 팝업 */}
+        <HoldingsNews trader={trader} onOpenNews={openNewsDetail} />
         </>)}
 
         {/* ══ "오늘의 부동산" — 부동산 뉴스·신고가·정보만 ══ */}
@@ -515,8 +546,8 @@ export default function TodayPage({ reports }) {
           <div className="ai-prog-mini">누적 판단 {pol.count}건{pol.remaining > 0 ? ` · ${pol.remaining}건 남으면 채점 통계 공개` : ` · 채점 기준(${pol.target}건) 충족`}</div>
         </section>
 
-        {/* ══ ④ Daily & Weekly 리포트 — 맨 아래 ══ */}
-        <AutoReportCard reports={reports} />
+        {/* ══ ④ Daily & Weekly 리포트 — 맨 아래. "오늘의 대결" 탭에는 표시 안 함(AI 페이지에 전용 AI 리포트 탭 있음) ══ */}
+        {view !== 0 && <AutoReportCard reports={reports} />}
 
       </DataState>
 
@@ -578,8 +609,21 @@ export default function TodayPage({ reports }) {
         .vsrow-val.up { color: var(--hero-accent); }
         .vsrow-val.dn { color: var(--hero-danger); }
         .vsrow-won { display: block; font-style: normal; font-size: 10px; font-weight: 600; color: var(--hero-ink-faint); margin-top: 1px; }
+        /* [사용자 지시] AI 페이지 "나 vs AI 가상 지갑 대결" 형식 — 지갑 잔고 박스 + VS + 진행률 바 */
+        .hero-wallets { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .hero-w { flex: 1; display: flex; flex-direction: column; gap: 3px; align-items: center; background: var(--hero-fill); border-radius: 12px; padding: 12px 6px; text-align: center; }
+        .hero-wl { font-size: 11px; font-weight: 700; color: var(--hero-ink-sub); background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
+        .hero-wb { font-size: 1.05rem; font-weight: 900; font-family: ui-monospace, monospace; color: var(--hero-ink); }
+        .hero-wg { font-size: 11px; font-weight: 800; font-family: ui-monospace, monospace; }
+        .hero-wg.up { color: var(--hero-accent); } .hero-wg.dn { color: var(--hero-danger); }
+        .hero-vs { font-size: 12px; font-weight: 900; color: var(--hero-ink-faint); flex-shrink: 0; }
+        .hero-bar { height: 8px; border-radius: 4px; background: var(--hero-fill); overflow: hidden; margin-bottom: 10px; }
+        .hero-bar-me { height: 100%; background: var(--hero-accent); border-radius: 4px; transition: width .4s; }
         .hero-watermark { font-size: 10px; color: var(--hero-ink-faint); margin-bottom: 8px; }
-        .hero-keydiff { font-size: 0.78rem; color: var(--hero-ink-soft); line-height: 1.5; word-break: keep-all; margin-bottom: 8px; padding: 8px 10px; background: var(--hero-fill); border-radius: 9px; }
+        .hero-keydiff-list { margin-bottom: 8px; }
+        .hero-keydiff-h { font-size: 0.7rem; font-weight: 800; color: var(--hero-ink-sub); margin-bottom: 4px; }
+        .hero-keydiff-row { font-size: 0.76rem; color: var(--hero-ink-soft); line-height: 1.5; word-break: keep-all; padding: 8px 10px; background: var(--hero-fill); border-radius: 9px; margin-bottom: 4px; }
+        .hero-keydiff-row:last-child { margin-bottom: 0; }
         .hero-note { font-size: 0.78rem; color: var(--hero-ink-soft); line-height: 1.5; word-break: keep-all; margin: 2px 0 8px; padding: 8px 10px; background: var(--hero-fill); border-radius: 9px; }
         .hero-big { font-size: 26px; font-weight: 800; letter-spacing: -.4px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
         .hero-big.hero-quiet { color: var(--hero-ink-soft); font-size: 22px; }
