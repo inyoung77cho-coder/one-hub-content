@@ -5,6 +5,26 @@ from datetime import datetime, timedelta, date
 from pathlib import Path
 import anthropic
 
+# ── API 비용 계측 (1층) — 모듈이 없어도 기존 동작 유지 ──────
+try:
+    from claude_usage import call_and_log, MODEL_REPORT
+except Exception:
+    MODEL_REPORT = "claude-sonnet-4-6"
+    def call_and_log(_client, _feature, **kwargs):
+        return _client.messages.create(**kwargs)
+
+# ── ThinkingBlock 안전 파싱 — 모듈이 없어도 폴백으로 동작 ──
+try:
+    from claude_text import extract_text
+except Exception:
+    def extract_text(message):
+        parts = []
+        for block in getattr(message, "content", None) or []:
+            t = getattr(block, "text", None)
+            if t:
+                parts.append(t)
+        return "".join(parts)
+
 PUBLISH_DIR = Path(__file__).parent
 DAILY_DIR   = PUBLISH_DIR / "content" / "daily"
 WEEKLY_DIR  = PUBLISH_DIR / "content" / "weekly"
@@ -113,12 +133,13 @@ def generate_ai_review(days, stats, week_str):
         insights_text = "\n".join([f"- {i['date']}: {i['text']}" for i in stats["insights"]])
         improvements_text = "\n".join([f"- {i['date']}: {i['text']}" for i in stats["improvements"]])
         prompt = f"{week_str} ONE-HUB 주간 운영 데이터:\n- 운영일수: {stats['total_days']}일\n- 총 매매건수: {stats['total_trades']}건\n- 총 차단건수: {stats['total_blocks']}건\n- 차단율: {stats['block_rate']}%\n- 평균 Heat Score: {stats['avg_heat']}\n- 지배 Regime: {stats['dominant_regime']}\n\n일별 Insight:\n{insights_text}\n\n개선사항:\n{improvements_text}\n\n위 데이터를 바탕으로 이번 주 ONE-HUB 운영 회고를 3~4문장으로 작성해주세요. (시장환경 -> 시스템반응 -> 다음주전망 순서로. 투자 권유 아닙니다.)"
-        msg = client.messages.create(
-            model="claude-sonnet-4-6",
+        msg = call_and_log(
+            client, "weekly_review",
+            model=MODEL_REPORT,
             max_tokens=400,
             messages=[{"role": "user", "content": prompt}]
         )
-        return msg.content[0].text.strip()
+        return extract_text(msg).strip()
     except Exception as e:
         print(f"[AI] {e}")
         return f"{stats['dominant_regime']} 장세에서 총 {stats['total_trades']}건 매매, {stats['total_blocks']}건 차단. 평균 Heat {stats['avg_heat']}/100."
@@ -127,12 +148,13 @@ def generate_market_outlook(stats, week_str):
     try:
         client = anthropic.Anthropic(api_key=os.getenv("CLAUDE_API_KEY"))
         prompt = f"{week_str} 기준 ONE-HUB 다음 주 시장 전망을 2~3문장으로 작성해주세요.\n- 현재 Regime: {stats['dominant_regime']}\n- 평균 Heat Score: {stats['avg_heat']}\n- 차단율: {stats['block_rate']}%\n(투자 권유 아닙니다. 시스템 관점의 관찰만.)"
-        msg = client.messages.create(
-            model="claude-sonnet-4-6",
+        msg = call_and_log(
+            client, "weekly_outlook",
+            model=MODEL_REPORT,
             max_tokens=200,
             messages=[{"role": "user", "content": prompt}]
         )
-        return msg.content[0].text.strip()
+        return extract_text(msg).strip()
     except Exception as e:
         print(f"[AI Outlook] {e}")
         return "다음 주 시장 방향은 Heat Score와 Regime 변화를 모니터링하며 판단합니다."
