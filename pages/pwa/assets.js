@@ -17,6 +17,13 @@ import FeedbackButton from "../../components/FeedbackButton";
 
 const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || null);
 const uk = (v) => (v == null ? "-" : `${Number(v).toFixed(2)}억`);
+const pctTxt = (v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(2)}%`;
+// 백엔드가 positions를 문자열로 주는 경우가 있어 방어적으로 파싱(today.js와 동일 로직)
+function parsePositions(dash) {
+  let p = dash?.balance?.positions;
+  if (typeof p === "string") { try { p = JSON.parse(p); } catch { p = null; } }
+  return Array.isArray(p) ? p : [];
+}
 // [OS-2] "자산지도" 옆 순환 표시 — 종목변경 버튼으로 순환, 라벨을 탭하면 해당 상세 페이지로 이동.
 //   key는 QuickAddSheet의 initialAsset과 동일 값 — 선택된 뷰의 "+"가 그 자산군으로 바로 열리게.
 const ASSET_VIEWS = [
@@ -159,6 +166,9 @@ export default function AssetsMapPage() {
   const regime = regimeKo(dash?.market?.regime);
   const buys = (dash?.recommend_stocks ?? []).filter((s) => (s.score ?? 0) >= 70);
   const blocked = dash?.today_blocked ?? [];
+  // [사용자 지시] "주식" 뷰 — 주식 페이지(보유·추천)와 연결되는 계좌현황 요약 카드용 데이터.
+  const positions = parsePositions(dash);
+  const recTop = [...(dash?.recommend_stocks ?? [])].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 3);
   const headline = domPct >= 60 && dominant
     ? `${scopeLbl} ${Math.round(domPct)}%가 ${dominant.label.replace(/^[^\s]+\s/, "")}입니다 — 쏠림을 줄일 때인지 살펴보세요.`
     : regime
@@ -447,6 +457,47 @@ export default function AssetsMapPage() {
         )}
 
         {/* ── 뷰별 전용 카드 ── */}
+        {/* [사용자 지시] "주식" 뷰 — 주식 페이지(보유·추천)와 연결. 같은 계좌현황 카드 밑에
+            보유 종목·추천 종목을 나눠서 요약, 각각 자세히 보기는 자식 페이지로 위임(종합자산 원칙). */}
+        {view === 0 && (
+          <section className="card as-viewcard">
+            <div className="as-h">📈 계좌 현황 · 주식</div>
+            <div className="as-vc-acct">
+              <div className="as-vc-acct-total">{dash?.balance?.total_asset != null ? `${Number(dash.balance.total_asset).toLocaleString()}원` : "-"}</div>
+              <div className="as-vc-acct-sub">
+                평가손익 <b className={(dash?.balance?.unrealized_pnl ?? 0) >= 0 ? "up" : "dn"}>{(dash?.balance?.unrealized_pnl ?? 0) >= 0 ? "+" : ""}{(dash?.balance?.unrealized_pnl ?? 0).toLocaleString()}원</b>
+              </div>
+            </div>
+            <div className="as-vc-split">
+              <div className="as-vc-col">
+                <div className="as-vc-col-h">보유 종목 <span>{positions.length}</span></div>
+                {positions.length === 0 ? (
+                  <div className="as-vc-empty">보유 종목 없음</div>
+                ) : positions.slice(0, 3).map((p) => (
+                  <div className="as-vc-row" key={p.code}>
+                    <span className="as-vc-name">{p.name}</span>
+                    <span className={p.pnl_rate >= 0 ? "up" : "dn"}>{pctTxt(p.pnl_rate)}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="as-vc-col">
+                <div className="as-vc-col-h">추천 종목 <span>{recTop.length}</span></div>
+                {recTop.length === 0 ? (
+                  <div className="as-vc-empty">추천 없음</div>
+                ) : recTop.map((s) => (
+                  <div className="as-vc-row" key={s.code}>
+                    <span className="as-vc-name">{s.name}</span>
+                    <span className="as-vc-score">{Math.round(s.score ?? 0)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="as-vc-ctas">
+              <button className="as-vc-cta" onClick={() => router.push("/pwa?tab=portfolio")}>보유 자세히 →</button>
+              <button className="as-vc-cta" onClick={() => router.push("/pwa?tab=recommend")}>추천 자세히 →</button>
+            </div>
+          </section>
+        )}
         {view === 1 && (
           <section className="card as-viewcard">
             <div className="as-h">📊 ETF 요약</div>
@@ -604,6 +655,24 @@ export default function AssetsMapPage() {
         .as-vc-line { font-size: 0.86rem; color: var(--color-ink-2); margin-bottom: 12px; }
         .as-vc-line b { color: var(--color-ink); font-weight: 800; }
         .as-vc-cta { width: 100%; min-height: 42px; border: 1px solid var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-primary); border-radius: 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        /* [사용자 지시] "주식" 뷰 — 계좌현황 + 보유/추천 분할 요약 */
+        .as-vc-acct { margin-bottom: 12px; }
+        .as-vc-acct-total { font-size: 1.2rem; font-weight: 900; font-family: ui-monospace, monospace; color: var(--color-ink); }
+        .as-vc-acct-sub { font-size: 0.78rem; color: var(--color-ink-2); margin-top: 2px; }
+        .as-vc-acct-sub b { font-weight: 800; }
+        .as-vc-acct-sub b.up { color: var(--color-success); } .as-vc-acct-sub b.dn { color: var(--color-danger); }
+        .as-vc-split { display: flex; gap: 10px; margin-bottom: 12px; padding-top: 10px; border-top: 1px solid var(--color-line); }
+        .as-vc-col { flex: 1; min-width: 0; }
+        .as-vc-col-h { font-size: 0.7rem; font-weight: 800; color: var(--color-ink-3); margin-bottom: 6px; }
+        .as-vc-col-h span { color: var(--color-ink-2); }
+        .as-vc-empty { font-size: 0.72rem; color: var(--color-ink-3); }
+        .as-vc-row { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font-size: 0.78rem; padding: 3px 0; }
+        .as-vc-name { color: var(--color-ink); font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .as-vc-row .up { color: var(--color-success); font-weight: 700; flex: none; }
+        .as-vc-row .dn { color: var(--color-danger); font-weight: 700; flex: none; }
+        .as-vc-score { color: var(--color-primary); font-weight: 800; flex: none; }
+        .as-vc-ctas { display: flex; gap: 8px; }
+        .as-vc-ctas .as-vc-cta { width: auto; flex: 1; min-width: 0; }
         .as-note { font-size: 0.7rem; color: var(--color-ink-3); text-align: center; margin-top: 6px; line-height: 1.5; word-break: keep-all; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>

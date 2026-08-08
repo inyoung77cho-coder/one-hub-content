@@ -32,6 +32,8 @@ const MATURE_DAYS = 3; // 판단 → 채점까지(나 vs AI)
 const CAT_KO = { global: "글로벌", macro: "거시", markets: "증시", realestate: "부동산", policy: "정책", affairs: "시사" };
 const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || null);
 const pctTxt = (v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(2)}%`;
+// [사용자 지시] 지갑 큰 숫자는 "원" 없이, 그 아래 증감(+xx원)에만 "원"을 남긴다.
+const wonNum = (n) => wonG(n).replace(/원$/, "");
 const mmdd = (ms) => { const d = new Date(ms); return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
 // [2026-08-05] 일자별 잔고 비교 그래프 — "당일 종가 기준부터 일자별로 계속 update" 피드백.
@@ -338,14 +340,14 @@ export default function TodayPage({ reports }) {
                   <div className="hero-wallets">
                     <div className="hero-w">
                       <button type="button" className="hero-wl" onClick={editNickname} title="닉네임 바꾸기">{nick} ✎</button>
-                      <b className="hero-wb">{wonG(wallet.myBalance)}</b>
-                      {wallet.myGain !== 0 && <span className={`hero-wg ${wallet.myGain >= 0 ? "up" : "dn"}`}>{wallet.myGain >= 0 ? "+" : ""}{wonG(wallet.myGain)}</span>}
+                      <b className="hero-wb">{wonNum(wallet.myBalance)}</b>
+                      <span className={`hero-wg ${wallet.myGain > 0 ? "up" : wallet.myGain < 0 ? "dn" : ""}`}>{wallet.myGain > 0 ? "+" : ""}{wonG(wallet.myGain)}</span>
                     </div>
                     <div className="hero-vs">VS</div>
                     <div className="hero-w">
                       <span className="hero-wl">AI</span>
-                      <b className="hero-wb">{wonG(wallet.aiBalance)}</b>
-                      {wallet.aiGain !== 0 && <span className={`hero-wg ${wallet.aiGain >= 0 ? "up" : "dn"}`}>{wallet.aiGain >= 0 ? "+" : ""}{wonG(wallet.aiGain)}</span>}
+                      <b className="hero-wb">{wonNum(wallet.aiBalance)}</b>
+                      <span className={`hero-wg ${wallet.aiGain > 0 ? "up" : wallet.aiGain < 0 ? "dn" : ""}`}>{wallet.aiGain > 0 ? "+" : ""}{wonG(wallet.aiGain)}</span>
                     </div>
                   </div>
                   <div className="hero-bar"><div className="hero-bar-me" style={{ width: `${Math.max(6, Math.min(94, wallet.myBalance + wallet.aiBalance > 0 ? (wallet.myBalance / (wallet.myBalance + wallet.aiBalance)) * 100 : 50))}%` }} /></div>
