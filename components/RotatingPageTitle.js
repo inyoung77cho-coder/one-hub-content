@@ -7,7 +7,7 @@
 //   허브의 ?sec= 쿼리)는 이 값을 넘겨 라벨이 항상 실제 상태와 일치하게 한다.
 import { useEffect, useState } from "react";
 
-export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "종목변경", onLabelClick, onChange, compact = false, controlledIndex }) {
+export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "종목변경", onLabelClick, onChange, compact = false, controlledIndex, mutedSuffix = false }) {
   const [idx, setIdx] = useState(controlledIndex ?? 0);
   const [anim, setAnim] = useState(false);
   const cur = items[idx % items.length];
@@ -30,7 +30,7 @@ export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "�
 
   const label = (
     <span
-      className={`rpt-suffix ${anim ? "fade" : ""} ${onLabelClick ? "clickable" : ""}`}
+      className={`rpt-suffix ${anim ? "fade" : ""} ${onLabelClick ? "clickable" : ""} ${mutedSuffix ? "muted" : ""}`}
       onClick={onLabelClick ? () => onLabelClick(cur, idx) : undefined}
       role={onLabelClick ? "button" : undefined}
       tabIndex={onLabelClick ? 0 : undefined}
@@ -56,6 +56,8 @@ export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "�
         .rpt-fixed { color: var(--color-ink); }
         .rpt-suffix { color: var(--color-ink); font-weight: 800; opacity: 1; transform: translateY(0); transition: opacity .18s ease, transform .18s ease, color .28s ease; }
         .rpt-suffix.fade { opacity: 0; transform: translateY(3px); color: var(--color-ink-3); }
+        /* [사용자 피드백] 고정 단어("오늘"/"AI")를 강조하기 위해 접미사는 항상 회색으로 표시 */
+        .rpt-suffix.muted { color: var(--color-ink-3); }
         .rpt-suffix.clickable { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
         .rpt.compact .rpt-suffix { font-size: 12px; }
         /* [사용자 피드백] compact(자산)와 일반(오늘) 모드가 버튼 크기·위치까지 달랐던 버그 — "이야기"

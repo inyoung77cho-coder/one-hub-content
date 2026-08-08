@@ -24,11 +24,10 @@ export default function AppHeader({ onSearch }) {
       </div>
       <style jsx>{`
         .apphd {
-          position: sticky; top: 0; z-index: 100;
           max-width: 480px; margin: 0 auto;
           display: flex; align-items: center; justify-content: space-between;
           background: var(--color-bg);
-          padding: calc(env(safe-area-inset-top, 0px) + 10px) 4px 12px;
+          padding: calc(env(safe-area-inset-top, 0px) + 12px) 2px 10px;
         }
         .apphd-logo {
           font-weight: 800; font-size: 20px; letter-spacing: -.5px;

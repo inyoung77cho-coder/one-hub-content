@@ -260,7 +260,7 @@ export default function AssetsMapPage() {
       </header>
 
       <div className="as-title">
-        <span className="as-fixed">💼 종합자산 <span className="as-sub">자산 지도</span></span>
+        <span className="as-fixed">종합자산 <span className="as-sub">자산 지도</span></span>
         <RotatingPageTitle
           compact
           items={ASSET_VIEWS.map((v) => ({ suffix: v.label }))}

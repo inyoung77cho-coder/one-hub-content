@@ -276,6 +276,7 @@ export default function TodayPage({ reports }) {
       <div className="td-titlewrap">
         <RotatingPageTitle
           fixed="오늘"
+          mutedSuffix
           items={[{ suffix: "의 대결" }, { suffix: "의 부동산" }, { suffix: "의 ETF" }, { suffix: "의 이야기" }]}
           onChange={(i) => setView(i)}
           onLabelClick={(item) => { if (item.suffix === "의 이야기") router.push("/pwa/story"); }}

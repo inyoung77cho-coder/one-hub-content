@@ -2380,17 +2380,12 @@ export default function PWADashboard({ latestReport }) {
         {tab === 'report' && (
           <main className="pwa-main">
 
-            {/* [S2 IA] 트러스트 허브 인트로 — 나vsAI·자기검증·성적표·차단정확도가 여기 모임 */}
-            <section className="trust-hero">
-              <div className="trust-hero-lbl">🛡️ AI 신뢰도</div>
-              <div className="trust-hero-sub">이 AI를 왜 믿나 — 판단 흐름 · 나 vs AI · 자기검증 · 성적표를 한 곳에서 투명하게 공개합니다.</div>
-            </section>
-
             {/* [OS-2] 오늘·자산·이야기와 동일한 패턴 — "AI" 고정 + vs 나 대결/자기 검증/리포트 순환,
                 분석변경 버튼은 항상 행 맨 오른쪽. ?sec= 딥링크로도 진입하므로 controlledIndex로 동기화. */}
             <div className="trust-nav">
               <RotatingPageTitle
                 fixed="AI"
+                mutedSuffix
                 buttonLabel="분석변경"
                 items={[{ suffix: ' vs 나 대결' }, { suffix: ' 자기 검증' }, { suffix: ' 리포트' }]}
                 controlledIndex={TRUST_TABS.indexOf(trustSec)}
@@ -4476,10 +4471,6 @@ export default function PWADashboard({ latestReport }) {
         .ml-rec-badge { font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; background: var(--inset-bg); }
         .ml-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 8px; line-height: 1.5; }
         /* [나 vs AI 대결] */
-        /* [S2 IA] 트러스트 허브 인트로 */
-        .trust-hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 16px 18px; box-shadow: var(--shadow-float); margin-bottom: 4px; }
-        .trust-hero-lbl { font-size: 1rem; font-weight: 800; }
-        .trust-hero-sub { font-size: 0.76rem; color: var(--hero-ink-soft); line-height: 1.55; margin-top: 6px; word-break: keep-all; }
         /* [OS-2] AI 3섹션 — RotatingPageTitle(고정단어+순환라벨+분석변경) 감싸는 카드 */
         .trust-nav { display: flex; align-items: center; margin: 12px 0 14px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow-card); }
         .aid-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
@@ -4510,7 +4501,18 @@ export default function PWADashboard({ latestReport }) {
         .gonb-opt { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 14px 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--inset-bg); color: var(--color-ink); font-size: 0.84rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .gonb-opt span { font-size: 0.56rem; font-weight: 800; color: var(--purple, var(--color-primary)); background: var(--purple-soft, var(--color-primary-soft)); padding: 1px 6px; border-radius: 4px; }
         .gonb-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 12px; line-height: 1.5; word-break: keep-all; }
-        .game-dash { border: 1px solid var(--color-primary); }
+        /* [사용자 지시] 삭제된 "AI 신뢰도" 소개카드 대신, 이 페이지에서 가장 중요한 실제 결과인
+           나 vs AI 대결 카드를 짙은 곤색(hero) 카드로 강조 — 자식 요소들은 대부분 CSS 변수(--color-ink 등)를
+           참조하므로 여기서 그 변수들만 hero 톤으로 재정의하면 하위 전부가 함께 톤이 바뀐다. */
+        .game-dash {
+          border: none; background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2));
+          color: var(--hero-ink); box-shadow: var(--shadow-float);
+          --text-secondary: var(--hero-ink-soft); --text-tertiary: var(--hero-ink-faint);
+          --color-ink: var(--hero-ink); --color-ink-2: var(--hero-ink-soft); --color-ink-3: var(--hero-ink-faint);
+          --label-color: var(--hero-ink-sub);
+          --border: rgba(255,255,255,.16); --inset-bg: rgba(255,255,255,.09);
+          --purple-soft: rgba(255,255,255,.16); --color-primary-soft: rgba(255,255,255,.16);
+        }
         .gd-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .gd-virtual { font-size: 0.6rem; font-weight: 800; color: var(--purple, var(--color-primary)); background: var(--purple-soft, var(--color-primary-soft)); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
         .gd-narr { font-size: 0.76rem; color: var(--color-ink-2); background: var(--inset-bg); border-radius: 9px; padding: 8px 11px; margin: 10px 0 0; line-height: 1.5; word-break: keep-all; }

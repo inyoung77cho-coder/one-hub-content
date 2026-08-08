@@ -47,10 +47,9 @@ export default function PwaStory() {
       <Head><title>이야기 | ONE-HUB</title></Head>
       <AppHeader />
       <div className="story-title">
-        💬 <span className="story-region">{region}</span> 이야기
+        <span className="story-fixed"><span className="story-region">{region}</span> 이야기 <span className="story-sub-inline">동네 수다{guessed === region ? " · 내 등록 단지 기준" : ""}</span></span>
         <button type="button" className="story-change" onClick={() => (picking ? setPicking(false) : openPicker())}>지역변경</button>
       </div>
-      <div className="story-sub">우리 동네 이웃들과 나누는 이야기{guessed === region ? " · 내 등록 단지 기준" : ""}</div>
 
       {picking && (
         <section className="card story-picker">
@@ -81,10 +80,11 @@ export default function PwaStory() {
       <BottomNav active="story" />
       <style jsx>{`
         .story { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 140px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
-        .story-title { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 4px; }
+        .story-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; }
+        .story-fixed { flex-shrink: 0; }
         .story-region { color: var(--color-primary); }
+        .story-sub-inline { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
         .story-change { margin-left: auto; flex-shrink: 0; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 999px; cursor: pointer; font-family: var(--font-sans); }
-        .story-sub { font-size: 12px; font-weight: 600; color: var(--color-ink-3); margin: 0 2px 14px; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .story-picker-h { font-size: 12px; font-weight: 800; color: var(--color-ink-2); margin-bottom: 10px; }
         .story-picker-h2 { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--color-line); }
