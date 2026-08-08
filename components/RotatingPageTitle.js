@@ -52,7 +52,10 @@ export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "�
       )}
       <style jsx>{`
         .rpt { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
-        .rpt-title { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.4px; font-family: var(--font-display, var(--font-sans)); display: flex; }
+        /* [사용자 피드백] AI 페이지(index.js .pwa-wrapper)에서만 --font-display가 'Syne'로 로컬
+           재정의되어 있어 이 타이틀만 다른 폰트로 보였다 — font-sans를 직접 써서 전 페이지 통일,
+           letter-spacing도 조금 더 좁게. */
+        .rpt-title { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.6px; font-family: var(--font-sans); display: flex; }
         .rpt-fixed { color: var(--color-ink); }
         .rpt-suffix { color: var(--color-ink); font-weight: 800; opacity: 1; transform: translateY(0); transition: opacity .18s ease, transform .18s ease, color .28s ease; }
         .rpt-suffix.fade { opacity: 0; transform: translateY(3px); color: var(--color-ink-3); }

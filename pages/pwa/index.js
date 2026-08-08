@@ -3631,7 +3631,11 @@ export default function PWADashboard({ latestReport }) {
         /* [v8.6] 라이트(기본) — Apple Finance / Toss / Notion 톤. */
         /* [v10 UI] 레거시 로컬 변수 → 디자인 토큰 브리지는 globals.css 로 이전(전역·비스코프)해
            styled-jsx 스코프 문제로 다크모드가 안 먹던 버그를 해결. 여기서는 레이아웃만. */
-        .pwa-wrapper { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--bg); color: var(--text-primary); font-family: var(--font-body); padding-bottom: 88px; transition: background 0.2s ease, color 0.2s ease; }
+        /* [사용자 피드백] AppHeader(ONE-HUB 로고+우측 버튼)가 다른 페이지(오늘/자산/이야기/부동산 등)와
+           달리 좌우 14px 여백 없이 화면 끝에 붙어있었다 — 그 페이지들은 모두 14px 패딩 컨테이너 안에
+           AppHeader를 두는데 index.js만 pwa-wrapper에 그 여백이 없었던 게 원인. 여기로 옮기고
+           pwa-main의 중복 14px은 제거(아래 .pwa-main 참고) — 이중 패딩 방지. */
+        .pwa-wrapper { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--bg); color: var(--text-primary); font-family: var(--font-body); padding: 0 14px 88px; transition: background 0.2s ease, color 0.2s ease; }
         button, input { font-family: inherit; }
         button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-info); outline-offset: 2px; }
         :global(.pwa-wrapper a:focus-visible) { outline: 2px solid var(--accent-info); outline-offset: 2px; }
@@ -3675,7 +3679,7 @@ export default function PWADashboard({ latestReport }) {
         .pwa-subtab.active { background: var(--accent-buy); color: #fff; }
 
         /* Layout */
-        .pwa-main { padding: 8px 14px 12px; display: flex; flex-direction: column; gap: 12px; }
+        .pwa-main { padding: 8px 0 12px; display: flex; flex-direction: column; gap: 12px; }
         .pwa-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 16px; box-shadow: var(--card-shadow); }
         .pwa-card-label { display: block; font-size: 0.68rem; letter-spacing: 0.08em; color: var(--label-color); text-transform: uppercase; margin-bottom: 10px; font-weight: 700; }
 
