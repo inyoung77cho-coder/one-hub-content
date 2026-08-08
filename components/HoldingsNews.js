@@ -8,7 +8,7 @@ import { getStockHoldings } from "../lib/stockHoldings";
 
 const MACRO_CATS = new Set(["global", "macro", "policy"]);
 
-export default function HoldingsNews({ trader = "A", onOpenNews }) {
+export default function HoldingsNews({ trader = "A", onOpenNews, bare = false }) {
   const [rows, setRows] = useState([]);
 
   useEffect(() => {
@@ -51,9 +51,9 @@ export default function HoldingsNews({ trader = "A", onOpenNews }) {
 
   if (rows.length === 0) return null;
 
-  return (
-    <section className="card hn">
-      <div className="hn-h">📌 내 보유종목 뉴스 <span className="hn-sub">내가 산 종목 관련</span></div>
+  const inner = (
+    <>
+      <div className="hn-h">{bare ? "보유 종목 관련" : <>📌 내 보유종목 뉴스 <span className="hn-sub">내가 산 종목 관련</span></>}</div>
       <div className="hn-list">
         {rows.map((r) => (
           <button type="button" className="hn-row" key={r.id} onClick={() => onOpenNews && onOpenNews(r)}>
@@ -65,8 +65,7 @@ export default function HoldingsNews({ trader = "A", onOpenNews }) {
           </button>
         ))}
       </div>
-      <p className="hn-foot">내 보유 주식이 오늘 뉴스에 언급된 경우만 모았습니다. onehub</p>
-
+      {!bare && <p className="hn-foot">내 보유 주식이 오늘 뉴스에 언급된 경우만 모았습니다. onehub</p>}
       <style jsx>{`
         .hn-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; display: flex; align-items: baseline; gap: 8px; }
         .hn-sub { font-size: 0.66rem; font-weight: 700; color: var(--color-ink-3); }
@@ -82,6 +81,8 @@ export default function HoldingsNews({ trader = "A", onOpenNews }) {
         .hn-tag b { color: var(--color-ink-2); font-weight: 800; }
         .hn-foot { font-size: 0.62rem; color: var(--color-ink-3); margin-top: 9px; line-height: 1.5; word-break: keep-all; }
       `}</style>
-    </section>
+    </>
   );
+
+  return bare ? inner : <section className="card hn">{inner}</section>;
 }

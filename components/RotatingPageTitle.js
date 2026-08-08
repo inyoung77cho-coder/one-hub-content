@@ -65,7 +65,7 @@ export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "�
         /* [사용자 지시] "AI" 뒤 접미사("vs 나 대결" 등) 사이 한 칸 — 라벨 문자열에 공백을 심는 대신
            명시적 margin으로 처리(브라우저의 공백 트리밍/자간에 영향받지 않도록). "오늘"+"의 대결"처럼
            붙여 써야 하는 페이지는 이 prop을 안 쓰면 된다. */
-        .rpt-suffix.spaced { margin-left: .3em; }
+        .rpt-suffix.spaced { margin-left: 6px; }
         .rpt.compact .rpt-suffix { font-size: 12px; }
         /* [사용자 피드백] compact(자산)와 일반(오늘) 모드가 버튼 크기·위치까지 달랐던 버그 — "이야기"
            페이지의 지역변경 버튼과 동일 규격(패딩 6px 12px·폰트 11.5px)으로 항상 통일, 항상 맨 오른쪽. */

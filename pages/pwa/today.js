@@ -66,18 +66,18 @@ function DuelChart({ series, myLabel }) {
       <style jsx>{`
         .dc-row { display: flex; align-items: center; gap: 10px; margin: 10px 0 2px; }
         .dc-chart { flex: 1; min-width: 0; }
-        .dc-daterange { font-size: 0.6rem; color: var(--hero-ink-sub, rgba(255,255,255,0.55)); margin-top: 2px; text-align: center; }
+        .dc-daterange { font-size: 0.6rem; color: var(--color-ink-3); margin-top: 2px; text-align: center; }
         .dc-line { stroke-width: 2; vector-effect: non-scaling-stroke; }
-        .dc-line.dc-me { stroke: #fff; }
-        .dc-line.dc-ai { stroke: rgba(255,255,255,0.4); stroke-dasharray: 3 3; }
-        .dc-dot.dc-me { fill: #fff; }
-        .dc-dot.dc-ai { fill: rgba(255,255,255,0.6); }
+        .dc-line.dc-me { stroke: var(--color-success); }
+        .dc-line.dc-ai { stroke: var(--purple, var(--color-ink-3)); stroke-dasharray: 3 3; }
+        .dc-dot.dc-me { fill: var(--color-success); }
+        .dc-dot.dc-ai { fill: var(--purple, var(--color-ink-3)); }
         .dc-finals { flex: none; display: flex; flex-direction: column; gap: 5px; min-width: 72px; }
         .dc-final-item { display: flex; flex-direction: column; line-height: 1.2; }
-        .dc-fk { font-size: 0.6rem; font-weight: 700; opacity: 0.65; }
+        .dc-fk { font-size: 0.6rem; font-weight: 700; color: var(--color-ink-3); }
         .dc-fv { font-size: 0.78rem; font-weight: 800; font-family: var(--font-mono); }
-        .dc-final-item.me .dc-fv { color: #fff; }
-        .dc-final-item.ai .dc-fv { color: rgba(255,255,255,0.75); }
+        .dc-final-item.me .dc-fv { color: var(--color-success); }
+        .dc-final-item.ai .dc-fv { color: var(--purple, var(--color-ink-2)); }
       `}</style>
     </div>
   );
@@ -187,8 +187,6 @@ export default function TodayPage({ reports }) {
 
   const positions = parsePositions(dash);
   const regime = regimeKo(dash?.market?.regime);
-  const regimeRaw = String(dash?.market?.regime || "").toUpperCase();
-  const heat = dash?.market?.heat_score;
   const cands = dash?.recommend_stocks ?? [];
   const blocked = dash?.today_blocked ?? [];
   const pendItems = pend?.ok ? (pend.items ?? []) : [];
@@ -223,16 +221,6 @@ export default function TodayPage({ reports }) {
   // [2026-08-05] 일자별 그래프 — 3거래일 확정 판정(vsShowdown)을 기다리지 않고 스냅샷이 쌓인
   //   첫날부터 매일 마크투마켓으로 반영(당일 종가 기준 즉시 업데이트 요구사항).
   const dailySeries = computeDailySeries(mine, getSeed(), tr2);
-  // [며칠 경쟁] 첫 판단 기록일부터 오늘까지
-  const daysCompeting = mine.length ? Math.max(1, Math.floor((Date.now() - Math.min(...mine.map((d) => d.ts))) / DAY) + 1) : 0;
-  // [날짜별 판단 차이] details는 이미 |ret| 내림차순 — 가장 영향이 컸던 상위 2건을 날짜와 함께 설명.
-  const keyDiffLines = vsShowdown
-    ? vsShowdown.details.slice(0, 2).map((d) =>
-        `${mmdd(d.ts)} ${d.name} ${d.decision === "pass"
-          ? `관망 — ${d.ret >= 0 ? `AI만 매수해 ${pctTxt(d.ret)} 앞섰습니다` : `손실 ${pctTxt(d.ret)}를 피해 유리했습니다`}`
-          : `나·AI 모두 매수, ${pctTxt(d.ret)}`}`
-      )
-    : [];
 
   // ── AI 학습 진행도
   const pol = samplePolicy(mine.length);
@@ -262,6 +250,52 @@ export default function TodayPage({ reports }) {
     return ts.startsWith(todayStr) && (isCrit || IMP.test(txt)) && !isRoutine;
   }).slice(0, 3);
 
+  // ── [사용자 지시] "오늘의 대결" 탭 카드3 — 주식 관련 할일 체크리스트(손절임박·AI매수제안·중요알림).
+  //   체크 상태는 오늘 날짜(todayStr) 키로 저장 — 자정 넘어가면 다른 키가 되어 자동 초기화된다.
+  //   (체크는 "확인함" 표시일 뿐, 실제 포트폴리오 위험이 해소된 게 아니므로 매일 새로 보여줘야 안전)
+  const stockTodos = [
+    ...nearStop.slice(0, 3).map((p, i) => {
+      const sl = Number(p.stop_loss) || 0;
+      const cur = Number(p.current_price) || 0;
+      const breached = sl > 0 && cur > 0 && cur < sl;
+      const distPct = sl > 0 && cur > 0 ? (cur / sl - 1) * 100 : null;
+      return {
+        key: `stop-${p.code || i}`,
+        title: `${p.name} ${pctTxt(p.pnl_rate)}`,
+        sub: breached ? `손절선 ${sl.toLocaleString()}원 이탈 — 매도 검토 필요` : `손절선까지 ${Math.abs(distPct).toFixed(1)}% 남음`,
+        onClick: () => router.push("/pwa?tab=portfolio"),
+      };
+    }),
+    ...pendItems.slice(0, 3).map((p, i) => ({
+      key: `pend-${p.code || i}`,
+      title: p.name || p.stock || p.code,
+      sub: p.reason || "AI 매수 제안 — 승인/거절 필요",
+      onClick: () => router.push("/pwa?tab=portfolio"),
+    })),
+    ...criticalNotis.map((n, i) => ({
+      key: `noti-${n.id ?? i}`,
+      title: n.title || n.message || "알림",
+      sub: null,
+      onClick: null,
+    })),
+  ];
+  const [checked, setChecked] = useState(() => new Set());
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(`onehub_today_check_${todayStr}`);
+      if (raw) setChecked(new Set(JSON.parse(raw)));
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const toggleCheck = (key) => {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      try { localStorage.setItem(`onehub_today_check_${todayStr}`, JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
+
   return (
     <div className="td">
       <header className="td-hd">
@@ -287,14 +321,13 @@ export default function TodayPage({ reports }) {
 
       <DataState status={status} hasData={!!dash || !!ledger} onRetry={load} skeletonLines={4} skeletonBlock>
 
-        {/* ══ "오늘의 대결" — 주식 · 나 vs AI 결과만 ══ */}
+        {/* ══ "오늘의 대결" — 카드1(대결) · 카드2(주식 뉴스) · 카드3(주식 할일) 3장으로 통일 ══ */}
         {view === 0 && (<>
-        <section className="hero" onClick={() => router.push("/pwa?tab=report&sec=vs")} role="button" tabIndex={0}>
+        {/* 카드1 — AI vs 나 · 주식. [사용자 지시] AI 페이지 "나 vs AI 가상 지갑 대결" 카드 형식을
+            그대로 재사용하되 이 카드는 밝은 카드로(다른 두 카드와 통일), 최대한 한 줄 요약. */}
+        <section className="card hero" onClick={() => router.push("/pwa?tab=report&sec=vs")} role="button" tabIndex={0}>
           <div className="hero-eyebrow">
-            <span className="hero-lbl">📈 주식 · 나 vs AI{daysCompeting > 0 ? ` · ${daysCompeting}일째` : ""}{vsShowdown ? ` · ${vsShowdown.n}종목` : ""}</span>
-            {regime && (
-              <span className={`hero-regime r-${regimeRaw.toLowerCase()}`}>{regime}{heat != null ? ` · 온도 ${heat}` : ""}</span>
-            )}
+            <span className="hero-lbl">AI vs 나 · 주식{regime ? ` · ${regime}` : ""}</span>
             <ShareButton compact title="ONE-HUB · 나 vs AI" text={vsShowdown ? `나 ${pctTxt(vsShowdown.myRet)} vs AI ${pctTxt(vsShowdown.aiRet)} — 나도 AI랑 대결해볼래?` : "AI와 투자 판단 대결, ONE-HUB에서 해보세요"} url="https://one-hub-content.vercel.app/pwa/today" />
           </div>
 
@@ -302,31 +335,24 @@ export default function TodayPage({ reports }) {
             <>
               {wallet ? (
                 <>
-                  {/* [사용자 지시] AI 페이지의 "나 vs AI 가상 지갑 대결" 형식 재사용 — 지갑 잔고 박스 + VS + 진행률 바 */}
-                  <div className={`hero-winner w-${wallet.leader}`}>
-                    {wallet.leader === "me" ? "🏆 내 판단 승" : wallet.leader === "ai" ? "💀 AI 승" : "⚖️ 접전"}
-                  </div>
                   <div className="hero-wallets">
                     <div className="hero-w">
-                      <button type="button" className="hero-wl" onClick={editNickname} title="닉네임 바꾸기">🙋 {nick} ✎</button>
+                      <button type="button" className="hero-wl" onClick={editNickname} title="닉네임 바꾸기">{nick} ✎</button>
                       <b className="hero-wb">{wonG(wallet.myBalance)}</b>
                       {wallet.myGain !== 0 && <span className={`hero-wg ${wallet.myGain >= 0 ? "up" : "dn"}`}>{wallet.myGain >= 0 ? "+" : ""}{wonG(wallet.myGain)}</span>}
                     </div>
                     <div className="hero-vs">VS</div>
                     <div className="hero-w">
-                      <span className="hero-wl">AI 지갑 🤖</span>
+                      <span className="hero-wl">AI</span>
                       <b className="hero-wb">{wonG(wallet.aiBalance)}</b>
                       {wallet.aiGain !== 0 && <span className={`hero-wg ${wallet.aiGain >= 0 ? "up" : "dn"}`}>{wallet.aiGain >= 0 ? "+" : ""}{wonG(wallet.aiGain)}</span>}
                     </div>
                   </div>
                   <div className="hero-bar"><div className="hero-bar-me" style={{ width: `${Math.max(6, Math.min(94, wallet.myBalance + wallet.aiBalance > 0 ? (wallet.myBalance / (wallet.myBalance + wallet.aiBalance)) * 100 : 50))}%` }} /></div>
-                  <div className="hero-watermark">가상 시드머니 {wonG(wallet.seed)} 기준 · 실제 매매 아님</div>
+                  <div className="hero-sub">{wallet.leader === "me" ? `내가 ${wonG(Math.abs(wallet.diff))} 앞섬` : wallet.leader === "ai" ? `AI가 ${wonG(Math.abs(wallet.diff))} 앞섬` : "접전"} · 가상 시드 {wonG(wallet.seed)} 기준{pendingJudge.length > 0 ? ` · 채점 중 ${pendingJudge.length}건` : ""}</div>
                 </>
               ) : (
                 <>
-                  <div className={`hero-winner w-${vsShowdown.winner}`}>
-                    {vsShowdown.winner === "me" ? "🏆 내 판단 승" : vsShowdown.winner === "ai" ? "💀 AI 승" : "⚖️ 무승부"}
-                  </div>
                   <div className="vsbars">
                     <div className="vsrow">
                       <span className="vsrow-lbl" onClick={editNickname} role="button" tabIndex={0} title="닉네임 바꾸기">{nick} ✎</span>
@@ -339,25 +365,16 @@ export default function TodayPage({ reports }) {
                       <span className={`vsrow-val ${vsShowdown.aiRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.aiRet)}</span>
                     </div>
                   </div>
+                  <div className="hero-sub">{vsShowdown.winner === "me" ? "내 판단 승" : vsShowdown.winner === "ai" ? "AI 승" : "무승부"}{pendingJudge.length > 0 ? ` · 채점 중 ${pendingJudge.length}건` : ""}</div>
                 </>
               )}
               <DuelChart series={dailySeries} myLabel={nick} />
-              {keyDiffLines.length > 0 && (
-                <div className="hero-keydiff-list">
-                  <div className="hero-keydiff-h">🔍 날짜별 판단 차이</div>
-                  {keyDiffLines.map((l, i) => <div className="hero-keydiff-row" key={i}>{l}</div>)}
-                </div>
-              )}
-              <div className="hero-sub">{pendingJudge.length > 0 ? `채점 중 ${pendingJudge.length}건 · ` : ""}기록 전체 보기 →</div>
             </>
           ) : pendingJudge.length > 0 ? (
             <>
               <div className="hero-big"><span className="live-dot" />{pendingJudge.length}건 채점 중</div>
-              {/* [FB-8 이슈1] 결과가 왜 아직 없는지 + 무엇이 언제 나오는지 설명 */}
-              <div className="hero-note">내 판단과 AI를 3거래일 뒤 비교해요. 승부 결과는 {soonest ? mmdd(soonest) : "-"}부터 — 그때 여기에 ‘내 지갑 vs AI’ 스코어가 나옵니다.</div>
-              {/* [2026-08-05] 확정 판정 전에도 스냅샷이 있으면 잠정 그래프를 바로 보여준다(당일 종가부터 업데이트). */}
+              <div className="hero-sub">내 판단과 AI를 3거래일 뒤 비교해요 · 결과는 {soonest ? mmdd(soonest) : "-"}부터</div>
               {dailySeries.length >= 2 && <DuelChart series={dailySeries} myLabel={nick} />}
-              <div className="hero-sub">가장 빠른 결과 {soonest ? mmdd(soonest) : "-"} · 기록 보기 →</div>
             </>
           ) : cands.length > 0 ? (
             <>
@@ -376,35 +393,49 @@ export default function TodayPage({ reports }) {
               ) : null}
             </>
           )}
+          <div className="hero-foot">누적 판단 {pol.count}건{pol.remaining > 0 ? ` · ${pol.remaining}건 남으면 채점 통계 공개` : ""}</div>
+        </section>
 
-          {/* 결정 대기 칩 — 손절 임박·승인 대기가 있을 때만 */}
-          {decideCount > 0 && (
-            <button className="hero-alert" onClick={(e) => { e.stopPropagation(); router.push("/pwa?tab=portfolio"); }}>
-              ⚠️ 결정 대기 {decideCount}건 — 지금 확인 →
-            </button>
-          )}
-
-          {/* 오늘 중요 알림 — 매매·손절·서킷 등, 있을 때만 */}
-          {criticalNotis.length > 0 && (
-            <div className="hero-notis">
-              {criticalNotis.map((n, i) => (
-                <div className="hero-noti-row" key={n.id ?? i}>🔔 {n.title || n.message || "알림"}</div>
+        {/* 카드2 — 주식 뉴스(보유 종목 관련 + 주요 뉴스 통합) */}
+        <section className="card sn">
+          <div className="sn-h">주식 뉴스</div>
+          <HoldingsNews trader={trader} onOpenNews={openNewsDetail} bare />
+          {stockNews.length > 0 ? (
+            <div className="sn-sub">
+              <div className="sn-sub-h">주요 뉴스</div>
+              {stockNews.slice(0, 4).map((n) => (
+                <button className="tile-news-row" key={n.id} onClick={() => openNewsDetail(n)}>
+                  <span className="tile-news-t">{n.headline}</span>
+                </button>
               ))}
             </div>
-          )}
-
-          {/* 증시 뉴스 — 있을 때만, 최대 2줄 */}
-          {stockNews.length > 0 && (
-            <div className="hero-news">
-              {stockNews.slice(0, 2).map((n) => (
-                <button className="hero-news-row" key={n.id} onClick={(e) => { e.stopPropagation(); openNewsDetail(n); }}>📰 {n.headline}</button>
-              ))}
-            </div>
+          ) : (
+            <div className="tile-empty">오늘 새로 올라온 증시 뉴스가 없어요.</div>
           )}
         </section>
 
-        {/* 내 보유종목 관련 뉴스 — 있을 때만 (히어로 바로 아래, 같은 도메인). 클릭 시 상세 뉴스 팝업 */}
-        <HoldingsNews trader={trader} onOpenNews={openNewsDetail} />
+        {/* 카드3 — 오늘의 할 일 · 주식(체크리스트, 매일 자정 초기화) */}
+        <section className="card sc">
+          <div className="sc-h">오늘의 할 일 · 주식</div>
+          {stockTodos.length === 0 ? (
+            <div className="sc-empty">오늘은 특별히 할 일이 없어요 · 관망</div>
+          ) : (
+            <div className="sc-list">
+              {stockTodos.map((t) => {
+                const done = checked.has(t.key);
+                return (
+                  <div className={`sc-row ${done ? "done" : ""}`} key={t.key}>
+                    <button type="button" className="sc-check" onClick={() => toggleCheck(t.key)} aria-label={done ? "완료 취소" : "완료 표시"}>{done ? "✓" : ""}</button>
+                    <button type="button" className="sc-body" onClick={() => (t.onClick ? t.onClick() : toggleCheck(t.key))}>
+                      <span className="sc-t">{t.title}</span>
+                      {t.sub && <span className="sc-s">{t.sub}</span>}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
         </>)}
 
         {/* ══ "오늘의 부동산" — 부동산 뉴스·신고가·정보만 ══ */}
@@ -486,7 +517,8 @@ export default function TodayPage({ reports }) {
           </section>
         )}
 
-        {/* ══ 종합자산 · 오늘의 할일 (공통) ══ */}
+        {/* ══ 종합자산 · 오늘의 할일 — "오늘의 대결" 탭(view 0)은 카드3(주식 할일 체크리스트)으로 대체 ══ */}
+        {view !== 0 && (
         <section className="card tile">
           <div className="tile-h">💼 종합자산 · 오늘의 할일</div>
 
@@ -545,6 +577,7 @@ export default function TodayPage({ reports }) {
 
           <div className="ai-prog-mini">누적 판단 {pol.count}건{pol.remaining > 0 ? ` · ${pol.remaining}건 남으면 채점 통계 공개` : ` · 채점 기준(${pol.target}건) 충족`}</div>
         </section>
+        )}
 
         {/* ══ ④ Daily & Weekly 리포트 — 맨 아래. "오늘의 대결" 탭에는 표시 안 함(AI 페이지에 전용 AI 리포트 탭 있음) ══ */}
         {view !== 0 && <AutoReportCard reports={reports} />}
@@ -587,56 +620,57 @@ export default function TodayPage({ reports }) {
         .td-modal-body { font-size: 0.86rem; color: var(--color-ink-2); line-height: 1.7; word-break: keep-all; display: flex; flex-direction: column; gap: 8px; }
         .td-modal-share { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); display: flex; justify-content: flex-end; }
 
-        /* ══ 히어로: 주식 · 나 vs AI ══ */
-        .hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero, 22px); padding: 20px 18px; box-shadow: var(--shadow-float); margin-bottom: 12px; cursor: pointer; }
+        /* ══ 카드1: AI vs 나 · 주식 — [사용자 지시] 3카드 모두 밝은 카드로 통일(.card가 배경/테두리/
+           그림자 제공), 여기선 클릭 가능 커서만 추가. 하위 요소는 전부 잉크 토큰(라이트 카드용)으로. ══ */
+        .hero { cursor: pointer; }
         .hero-eyebrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
-        .hero-lbl { font-size: 12px; font-weight: 700; color: var(--hero-ink-sub); }
-        .hero-regime { font-size: 10px; font-weight: 800; padding: 3px 9px; border-radius: 999px; background: var(--hero-fill); border: 1px solid var(--hero-fill-line); letter-spacing: .3px; }
-        .hero-regime.r-bull { color: var(--hero-accent); }
-        .hero-regime.r-bear { color: var(--hero-danger); }
-        .hero-winner { font-size: 22px; font-weight: 800; letter-spacing: -.4px; margin-bottom: 12px; }
-        .hero-winner.w-me { color: var(--hero-accent); }
-        .hero-winner.w-ai { color: var(--hero-danger); }
-        .hero-winner.w-tie { color: var(--hero-ink-soft); }
-        .vsbars { display: flex; flex-direction: column; gap: 9px; margin-bottom: 12px; }
+        .hero-lbl { font-size: 12px; font-weight: 700; color: var(--color-ink-3); }
+        .vsbars { display: flex; flex-direction: column; gap: 9px; margin-bottom: 10px; }
         .vsrow { display: flex; align-items: center; gap: 9px; }
-        .vsrow-lbl { flex: none; width: 22px; font-size: 12px; font-weight: 800; color: var(--hero-ink-sub); }
-        .vsrow-track { flex: 1; height: 9px; border-radius: 999px; background: var(--hero-fill); overflow: hidden; }
+        .vsrow-lbl { flex: none; width: 22px; font-size: 12px; font-weight: 800; color: var(--color-ink-2); background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
+        .vsrow-track { flex: 1; height: 9px; border-radius: 999px; background: var(--color-card-soft); overflow: hidden; }
         .vsrow-fill { display: block; height: 100%; border-radius: 999px; }
-        .vsrow-fill.up { background: var(--hero-accent); }
-        .vsrow-fill.dn { background: var(--hero-danger); }
+        .vsrow-fill.up { background: var(--color-success); }
+        .vsrow-fill.dn { background: var(--color-danger); }
         .vsrow-val { flex: none; width: 62px; text-align: right; font-family: ui-monospace, monospace; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
-        .vsrow-val.up { color: var(--hero-accent); }
-        .vsrow-val.dn { color: var(--hero-danger); }
-        .vsrow-won { display: block; font-style: normal; font-size: 10px; font-weight: 600; color: var(--hero-ink-faint); margin-top: 1px; }
+        .vsrow-val.up { color: var(--color-success); }
+        .vsrow-val.dn { color: var(--color-danger); }
         /* [사용자 지시] AI 페이지 "나 vs AI 가상 지갑 대결" 형식 — 지갑 잔고 박스 + VS + 진행률 바 */
         .hero-wallets { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-        .hero-w { flex: 1; display: flex; flex-direction: column; gap: 3px; align-items: center; background: var(--hero-fill); border-radius: 12px; padding: 12px 6px; text-align: center; }
-        .hero-wl { font-size: 11px; font-weight: 700; color: var(--hero-ink-sub); background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
-        .hero-wb { font-size: 1.05rem; font-weight: 900; font-family: ui-monospace, monospace; color: var(--hero-ink); }
+        .hero-w { flex: 1; display: flex; flex-direction: column; gap: 3px; align-items: center; background: var(--color-card-soft); border-radius: 12px; padding: 12px 6px; text-align: center; }
+        .hero-wl { font-size: 11px; font-weight: 700; color: var(--color-ink-2); background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
+        .hero-wb { font-size: 1.05rem; font-weight: 900; font-family: ui-monospace, monospace; color: var(--color-ink); }
         .hero-wg { font-size: 11px; font-weight: 800; font-family: ui-monospace, monospace; }
-        .hero-wg.up { color: var(--hero-accent); } .hero-wg.dn { color: var(--hero-danger); }
-        .hero-vs { font-size: 12px; font-weight: 900; color: var(--hero-ink-faint); flex-shrink: 0; }
-        .hero-bar { height: 8px; border-radius: 4px; background: var(--hero-fill); overflow: hidden; margin-bottom: 10px; }
-        .hero-bar-me { height: 100%; background: var(--hero-accent); border-radius: 4px; transition: width .4s; }
-        .hero-watermark { font-size: 10px; color: var(--hero-ink-faint); margin-bottom: 8px; }
-        .hero-keydiff-list { margin-bottom: 8px; }
-        .hero-keydiff-h { font-size: 0.7rem; font-weight: 800; color: var(--hero-ink-sub); margin-bottom: 4px; }
-        .hero-keydiff-row { font-size: 0.76rem; color: var(--hero-ink-soft); line-height: 1.5; word-break: keep-all; padding: 8px 10px; background: var(--hero-fill); border-radius: 9px; margin-bottom: 4px; }
-        .hero-keydiff-row:last-child { margin-bottom: 0; }
-        .hero-note { font-size: 0.78rem; color: var(--hero-ink-soft); line-height: 1.5; word-break: keep-all; margin: 2px 0 8px; padding: 8px 10px; background: var(--hero-fill); border-radius: 9px; }
-        .hero-big { font-size: 26px; font-weight: 800; letter-spacing: -.4px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
-        .hero-big.hero-quiet { color: var(--hero-ink-soft); font-size: 22px; }
-        .hero-sub { font-size: 13px; color: var(--hero-ink-soft); line-height: 1.5; word-break: keep-all; margin-bottom: 4px; }
-        .hero-cta { width: 100%; margin-top: 10px; min-height: 46px; border: none; border-radius: 12px; background: #fff; color: var(--hero-grad-2); font-size: 0.88rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
-        .hero-cta.ghost { background: var(--hero-fill); color: var(--hero-ink); border: 1px solid var(--hero-fill-line); }
-        .hero-alert { width: 100%; margin-top: 12px; min-height: 42px; border: 1px solid var(--hero-danger); border-radius: 11px; background: color-mix(in srgb, var(--hero-danger) 18%, transparent); color: var(--hero-ink); font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
-        .hero-notis { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hero-fill-line); display: flex; flex-direction: column; gap: 4px; }
-        .hero-noti-row { font-size: 0.76rem; color: var(--hero-ink-soft); line-height: 1.5; word-break: keep-all; }
-        .hero-news { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--hero-fill-line); display: flex; flex-direction: column; gap: 4px; }
-        .hero-news-row { display: block; width: 100%; text-align: left; border: none; background: none; padding: 0; font-family: var(--font-sans); cursor: pointer; font-size: 0.74rem; color: var(--hero-ink-faint); line-height: 1.5; word-break: keep-all; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--hero-accent); display: inline-block; animation: td-pulse 1.6s ease-in-out infinite; }
+        .hero-wg.up { color: var(--color-success); } .hero-wg.dn { color: var(--color-danger); }
+        .hero-vs { font-size: 12px; font-weight: 900; color: var(--color-ink-3); flex-shrink: 0; }
+        .hero-bar { height: 8px; border-radius: 4px; background: var(--color-card-soft); overflow: hidden; margin-bottom: 10px; }
+        .hero-bar-me { height: 100%; background: var(--color-success); border-radius: 4px; transition: width .4s; }
+        .hero-big { font-size: 22px; font-weight: 800; letter-spacing: -.4px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; color: var(--color-ink); }
+        .hero-big.hero-quiet { color: var(--color-ink-2); font-size: 19px; }
+        .hero-sub { font-size: 12.5px; color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; margin-bottom: 4px; }
+        .hero-cta { width: 100%; margin-top: 10px; min-height: 46px; border: none; border-radius: 12px; background: var(--color-primary); color: #fff; font-size: 0.88rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .hero-cta.ghost { background: var(--color-card-soft); color: var(--color-ink); border: 1px solid var(--color-line); }
+        .hero-foot { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--color-line); }
+        .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-success); display: inline-block; animation: td-pulse 1.6s ease-in-out infinite; }
         @keyframes td-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* ══ 카드2: 주식 뉴스 ══ */
+        .sn-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
+        .sn-sub { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-line); }
+        .sn-sub-h { font-size: 0.68rem; font-weight: 800; color: var(--color-ink-3); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+
+        /* ══ 카드3: 오늘의 할 일 · 주식(체크리스트, 매일 자정 초기화) ══ */
+        .sc-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 10px; }
+        .sc-empty { font-size: 0.82rem; color: var(--color-ink-2); padding: 6px 2px; }
+        .sc-list { display: flex; flex-direction: column; }
+        .sc-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--color-line); }
+        .sc-row:last-child { border-bottom: none; }
+        .sc-check { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 7px; border: 1.5px solid var(--color-line); background: var(--color-card-soft); color: #fff; font-size: 13px; font-weight: 900; display: grid; place-items: center; cursor: pointer; }
+        .sc-row.done .sc-check { background: var(--color-success); border-color: var(--color-success); }
+        .sc-body { flex: 1; min-width: 0; text-align: left; background: none; border: none; padding: 0; display: flex; flex-direction: column; gap: 2px; cursor: pointer; font-family: var(--font-sans); }
+        .sc-t { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); }
+        .sc-s { font-size: 0.72rem; color: var(--color-ink-2); word-break: keep-all; line-height: 1.4; }
+        .sc-row.done .sc-t, .sc-row.done .sc-s { text-decoration: line-through; color: var(--color-ink-3); }
 
         /* ══ 타일 공통 ══ */
         .tile-h { font-size: 0.92rem; font-weight: 800; color: var(--color-ink); margin-bottom: 12px; }
