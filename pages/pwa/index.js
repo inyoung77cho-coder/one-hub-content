@@ -1,4 +1,4 @@
-﻿import Head from 'next/head';
+import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useState, useEffect, useCallback } from 'react';
@@ -2386,8 +2386,9 @@ export default function PWADashboard({ latestReport }) {
               <RotatingPageTitle
                 fixed="AI"
                 mutedSuffix
+                spaced
                 buttonLabel="분석변경"
-                items={[{ suffix: ' vs 나 대결' }, { suffix: ' 자기 검증' }, { suffix: ' 리포트' }]}
+                items={[{ suffix: 'vs 나 대결' }, { suffix: '자기 검증' }, { suffix: '리포트' }]}
                 controlledIndex={TRUST_TABS.indexOf(trustSec)}
                 onChange={(i) => setTrustSec(TRUST_TABS[i])}
               />
@@ -3679,7 +3680,7 @@ export default function PWADashboard({ latestReport }) {
         .pwa-subtab.active { background: var(--accent-buy); color: #fff; }
 
         /* Layout */
-        .pwa-main { padding: 8px 0 12px; display: flex; flex-direction: column; gap: 12px; }
+        .pwa-main { padding: 0 0 12px; display: flex; flex-direction: column; gap: 12px; }
         .pwa-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 16px; box-shadow: var(--card-shadow); }
         .pwa-card-label { display: block; font-size: 0.68rem; letter-spacing: 0.08em; color: var(--label-color); text-transform: uppercase; margin-bottom: 10px; font-weight: 700; }
 

@@ -7,7 +7,7 @@
 //   허브의 ?sec= 쿼리)는 이 값을 넘겨 라벨이 항상 실제 상태와 일치하게 한다.
 import { useEffect, useState } from "react";
 
-export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "종목변경", onLabelClick, onChange, compact = false, controlledIndex, mutedSuffix = false }) {
+export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "종목변경", onLabelClick, onChange, compact = false, controlledIndex, mutedSuffix = false, spaced = false }) {
   const [idx, setIdx] = useState(controlledIndex ?? 0);
   const [anim, setAnim] = useState(false);
   const cur = items[idx % items.length];
@@ -30,7 +30,7 @@ export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "�
 
   const label = (
     <span
-      className={`rpt-suffix ${anim ? "fade" : ""} ${onLabelClick ? "clickable" : ""} ${mutedSuffix ? "muted" : ""}`}
+      className={`rpt-suffix ${anim ? "fade" : ""} ${onLabelClick ? "clickable" : ""} ${mutedSuffix ? "muted" : ""} ${spaced ? "spaced" : ""}`}
       onClick={onLabelClick ? () => onLabelClick(cur, idx) : undefined}
       role={onLabelClick ? "button" : undefined}
       tabIndex={onLabelClick ? 0 : undefined}
@@ -62,6 +62,10 @@ export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "�
         /* [사용자 피드백] 고정 단어("오늘"/"AI")를 강조하기 위해 접미사는 항상 회색으로 표시 */
         .rpt-suffix.muted { color: var(--color-ink-3); }
         .rpt-suffix.clickable { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+        /* [사용자 지시] "AI" 뒤 접미사("vs 나 대결" 등) 사이 한 칸 — 라벨 문자열에 공백을 심는 대신
+           명시적 margin으로 처리(브라우저의 공백 트리밍/자간에 영향받지 않도록). "오늘"+"의 대결"처럼
+           붙여 써야 하는 페이지는 이 prop을 안 쓰면 된다. */
+        .rpt-suffix.spaced { margin-left: .3em; }
         .rpt.compact .rpt-suffix { font-size: 12px; }
         /* [사용자 피드백] compact(자산)와 일반(오늘) 모드가 버튼 크기·위치까지 달랐던 버그 — "이야기"
            페이지의 지역변경 버튼과 동일 규격(패딩 6px 12px·폰트 11.5px)으로 항상 통일, 항상 맨 오른쪽. */
