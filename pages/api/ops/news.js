@@ -34,8 +34,9 @@ export default async function handler(req, res) {
       const status = (req.query.status || "").toString();
       const qs = status ? `?status=${encodeURIComponent(status)}&limit=50` : "?limit=50";
       const r = await fetch(`${NEWS_API}/admin/news${qs}`, { headers: hdr, signal: AbortSignal.timeout(8000) });
-      const items = await r.json().catch(() => []);
-      return res.status(200).json({ ok: r.ok, items: Array.isArray(items) ? items : [] });
+      const body = await r.json().catch(() => null);
+      if (!r.ok) return res.status(200).json({ ok: false, error: `뉴스엔진 ${r.status}: ${body?.detail || "알 수 없는 오류"}` });
+      return res.status(200).json({ ok: true, items: Array.isArray(body) ? body : [] });
     }
 
     if (req.method === "POST") {
