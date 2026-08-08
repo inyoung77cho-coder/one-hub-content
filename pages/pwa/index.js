@@ -23,6 +23,7 @@ import { getStockHoldings, removeStock, buyStock } from '../../lib/stockHoldings
 import { fetchStockQuotes } from '../../lib/stockLive';
 import { getKrxSession } from '../../lib/marketHours';
 import ShareButton from '../../components/ShareButton';
+import RotatingPageTitle from '../../components/RotatingPageTitle';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
@@ -279,7 +280,8 @@ export default function PWADashboard({ latestReport }) {
   // [S3/G2] AI 트러스트 3섹션 서브내비(vs/verify/archive)를 URL(?sec=)로 유지 — 뒤로가기·딥링크(F4) 지원
   // [FB-4 §4.2] 정직성 브랜드 강화 — AI 페이지는 '자기검증'을 앞세운다(기본 진입 섹션).
   // [OS-2] AI 페이지 3탭 — "AI vs 나 대결" 우선 노출로 재정렬(사용자 지시, FB-4의 '자기검증 우선'을 대체).
-  const [trustSec, setTrustSec] = useTabState('sec', ['vs', 'verify', 'archive'], 'vs');
+  const TRUST_TABS = ['vs', 'verify', 'archive']; // [OS-2] RotatingPageTitle 순환 순서 = 탭 순서
+  const [trustSec, setTrustSec] = useTabState('sec', TRUST_TABS, 'vs');
   const [recSort, setRecSort] = useState('interest'); // [S7.2] 추천 정렬(interest/upside)
   const [holdSort, setHoldSort] = useState('urgency'); // [S-2] 보유 정렬(urgency/value)
   const [autoWatchNote, setAutoWatchNote] = useState([]); // [S-6] 추천해제→자동 관망 편입 알림
@@ -2384,11 +2386,16 @@ export default function PWADashboard({ latestReport }) {
               <div className="trust-hero-sub">이 AI를 왜 믿나 — 판단 흐름 · 나 vs AI · 자기검증 · 성적표를 한 곳에서 투명하게 공개합니다.</div>
             </section>
 
-            {/* [OS-2] AI 3탭 — "AI vs 나 대결" / "AI 자기 검증" / "AI 리포트" 순서로 통일 */}
-            <div className="trust-nav" role="tablist" aria-label="AI 트러스트 섹션">
-              {[['vs','🥊 AI vs 나 대결'],['verify','🔬 AI 자기 검증'],['archive','🗂 AI 리포트']].map(([k,l]) => (
-                <button key={k} role="tab" aria-selected={trustSec===k} className={`trust-nav-btn ${trustSec===k?'on':''}`} onClick={() => setTrustSec(k)}>{l}</button>
-              ))}
+            {/* [OS-2] 오늘·자산·이야기와 동일한 패턴 — "AI" 고정 + vs 나 대결/자기 검증/리포트 순환,
+                분석변경 버튼은 항상 행 맨 오른쪽. ?sec= 딥링크로도 진입하므로 controlledIndex로 동기화. */}
+            <div className="trust-nav">
+              <RotatingPageTitle
+                fixed="AI"
+                buttonLabel="분석변경"
+                items={[{ suffix: ' vs 나 대결' }, { suffix: ' 자기 검증' }, { suffix: ' 리포트' }]}
+                controlledIndex={TRUST_TABS.indexOf(trustSec)}
+                onChange={(i) => setTrustSec(TRUST_TABS[i])}
+              />
             </div>
 
             {/* [나 vs AI 대결] AI 추천 중 내가 산 것 vs AI 단독매매, 3일·7일 수익 승부 */}
@@ -4473,8 +4480,8 @@ export default function PWADashboard({ latestReport }) {
         .trust-hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 16px 18px; box-shadow: var(--shadow-float); margin-bottom: 4px; }
         .trust-hero-lbl { font-size: 1rem; font-weight: 800; }
         .trust-hero-sub { font-size: 0.76rem; color: var(--hero-ink-soft); line-height: 1.55; margin-top: 6px; word-break: keep-all; }
-        /* [S2.2] AI 트러스트 3섹션 서브내비 */
-        .trust-nav { display: flex; gap: 6px; margin: 12px 0 14px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 4px; box-shadow: var(--shadow-card); }
+        /* [OS-2] AI 3섹션 — RotatingPageTitle(고정단어+순환라벨+분석변경) 감싸는 카드 */
+        .trust-nav { display: flex; align-items: center; margin: 12px 0 14px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow-card); }
         .aid-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .aid-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
         .aid-date { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); }
@@ -4492,9 +4499,6 @@ export default function PWADashboard({ latestReport }) {
         .aid-tag.act { color: #2F6BFF; background: #EAF1FF; }
         .aid-tag.sc { color: #B45309; background: #FEF3C7; }
         .aid-tag.gone { color: #94A3B8; background: #F1F5F9; }
-        .trust-nav-btn { flex: 1 1 0; min-width: 0; white-space: nowrap; border: none; background: none; color: var(--color-ink-3); font-family: var(--font-sans); font-size: 12px; font-weight: 700; padding: 9px 4px; border-radius: 10px; cursor: pointer; transition: background .15s, color .15s; }
-        .trust-nav-btn.on { background: var(--hero-grad-1); color: #fff; }
-        :global([data-theme="dark"]) .trust-nav-btn.on { background: var(--color-primary); }
         .vs-card { border: 1px solid var(--color-line); }
         .vs-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
         .vs-overall { font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }

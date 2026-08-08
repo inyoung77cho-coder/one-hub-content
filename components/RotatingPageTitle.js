@@ -3,12 +3,20 @@
 //   자리잡는 애니메이션(사용자 피드백 반영 — 전엔 계속 회색이었음).
 //   onChange(index): 버튼으로 순환할 때마다 호출(콘텐츠 필터링용). onLabelClick: 라벨 텍스트 자체를
 //   탭했을 때만 호출(예: 즉시 다른 페이지로 이동) — 버튼 순환과는 분리된 별개 동작.
-import { useState } from "react";
+//   controlledIndex(선택): 딥링크 등 버튼 밖에서 현재 인덱스가 바뀔 수 있는 페이지(예: AI 트러스트
+//   허브의 ?sec= 쿼리)는 이 값을 넘겨 라벨이 항상 실제 상태와 일치하게 한다.
+import { useEffect, useState } from "react";
 
-export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "종목변경", onLabelClick, onChange, compact = false }) {
-  const [idx, setIdx] = useState(0);
+export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "종목변경", onLabelClick, onChange, compact = false, controlledIndex }) {
+  const [idx, setIdx] = useState(controlledIndex ?? 0);
   const [anim, setAnim] = useState(false);
   const cur = items[idx % items.length];
+
+  // 버튼이 아니라 외부(딥링크·다른 버튼)에서 인덱스가 바뀐 경우 라벨을 즉시 맞춘다(애니메이션 없이).
+  useEffect(() => {
+    if (controlledIndex != null && controlledIndex !== idx) setIdx(controlledIndex);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [controlledIndex]);
 
   const advance = () => {
     setAnim(true);
@@ -50,13 +58,13 @@ export default function RotatingPageTitle({ fixed = "", items, buttonLabel = "�
         .rpt-suffix.fade { opacity: 0; transform: translateY(3px); color: var(--color-ink-3); }
         .rpt-suffix.clickable { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
         .rpt.compact .rpt-suffix { font-size: 12px; }
+        /* [사용자 피드백] compact(자산)와 일반(오늘) 모드가 버튼 크기·위치까지 달랐던 버그 — "이야기"
+           페이지의 지역변경 버튼과 동일 규격(패딩 6px 12px·폰트 11.5px)으로 항상 통일, 항상 맨 오른쪽. */
         .rpt-btn {
-          flex-shrink: 0; border: 1px solid var(--color-line); background: var(--color-card);
-          color: var(--color-ink-2); font-weight: 700; padding: 6px 12px; border-radius: 999px;
+          flex-shrink: 0; margin-left: auto; border: 1px solid var(--color-line); background: var(--color-card);
+          color: var(--color-ink-2); font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 999px;
           cursor: pointer; font-family: var(--font-sans);
         }
-        .rpt:not(.compact) .rpt-btn { margin-left: auto; font-size: 11.5px; }
-        .rpt.compact .rpt-btn { font-size: 10px; padding: 3px 9px; }
       `}</style>
     </div>
   );
