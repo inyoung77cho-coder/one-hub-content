@@ -238,8 +238,12 @@ export default function RealEstateDashboard() {
     if (!sparse && perUk != null) return { uk: perUk, source: "pyeong", tradeN, locked: false };
     return { uk: null, source: null, tradeN, locked: true };
   };
-  // [PI-1] 분당구 법정동 폴백(complex-dongs 미도달 시 드롭다운 공백 방지). raw_transactions 실측 13개.
-  const BUNDANG_DONGS = ["정자동", "야탑동", "구미동", "서현동", "이매동", "수내동", "금곡동", "분당동", "삼평동", "판교동", "백현동", "운중동", "대장동"];
+  // [PI-1] 법정동 폴백(complex-dongs 미도달 시 드롭다운 공백 방지). raw_transactions 실측 기준.
+  // [2026-08-09] 수지구·영통구 13개 동이 백엔드에 이미 수집돼 있었으나 노출만 안 되고 있던 것을 확인해 추가.
+  const ALL_DONGS = [
+    "정자동", "야탑동", "구미동", "서현동", "이매동", "수내동", "금곡동", "분당동", "삼평동", "판교동", "백현동", "운중동", "대장동",
+    "동천동", "상현동", "성복동", "신봉동", "죽전동", "풍덕천동", "망포동", "매탄동", "신동", "영통동", "원천동", "이의동", "하동",
+  ];
   // [#4 평가금액] 부동산 자산가치 = 대표(평형별 평가시세, 없으면 매수가) + 추가 보유 평가금액 합 → 총자산 원장(onboard)에 반영.
   //   주식·ETF와 동일하게 '평가금액' 기준으로 통일. 대표 평형 시세가 잠금이면(희소평형) 매수가로 보수적 대체.
   const repEvalUk = (() => { const p = myPyeongPrice(); return p.uk != null ? p.uk : (Number(myProp?.buyUk) || 0); })();
@@ -294,7 +298,7 @@ export default function RealEstateDashboard() {
                 </div>
                 <div className="resr-sec">📍 관심지역 <span>동 선택 → 갈아타기 목표</span></div>
                 <div className="resr-chips">
-                  {[...new Set([...Object.values(dongMap || {}).filter(Boolean), ...BUNDANG_DONGS])].slice(0, 14).map((d, i) => (
+                  {[...new Set([...Object.values(dongMap || {}).filter(Boolean), ...ALL_DONGS])].slice(0, 14).map((d, i) => (
                     <button className="resr-chip dong" key={i} onClick={() => { setMoveScope("region"); pickGapC(d); setReSearchOpen(false); try { document.querySelector(".scr-card")?.scrollIntoView({ behavior: "smooth" }); } catch (e) {} }}>{d}</button>
                   ))}
                 </div>
@@ -740,9 +744,9 @@ export default function RealEstateDashboard() {
                     <div className="gap-empty" style={{ marginTop: 12 }}>목표 지역 갭 추적은 <b>내 단지</b> 등록 후 이용할 수 있습니다. <button className="scr-reg" onClick={openWiz}>내 단지 등록 →</button></div>
                   ) : (() => {
                     const myDongC = dongOf(myProp.name);
-                    // [PI-1] complex-dongs 전체맵 우선 + 분당 폴백 병합 → 드롭다운이 비지 않게.
+                    // [PI-1] complex-dongs 전체맵 우선 + 폴백 병합 → 드롭다운이 비지 않게.
                     const fromMap = Object.values(dongMap || {}).filter(Boolean);
-                    const dongs = [...new Set([...fromMap, ...BUNDANG_DONGS])].filter((d) => d && d !== myDongC).sort();
+                    const dongs = [...new Set([...fromMap, ...ALL_DONGS])].filter((d) => d && d !== myDongC).sort();
                     return (
                       <div className="gap5">
                         <div className="gap5-h">🎯 목표 지역 갭 추적 <span>{myDongC || "내 동"} → 목표 동 · 전용 {myProp?.pyeong || 84}㎡</span></div>
