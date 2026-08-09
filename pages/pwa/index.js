@@ -2389,7 +2389,7 @@ export default function PWADashboard({ latestReport }) {
                 mutedSuffix
                 spaced
                 buttonLabel="분석변경"
-                items={[{ suffix: 'vs 나 대결' }, { suffix: '자기 검증' }, { suffix: '리포트' }]}
+                items={[{ suffix: ' vs 나 대결' }, { suffix: ' 자기 검증' }, { suffix: ' 리포트' }]}
                 controlledIndex={TRUST_TABS.indexOf(trustSec)}
                 onChange={(i) => setTrustSec(TRUST_TABS[i])}
               />
@@ -4564,15 +4564,6 @@ export default function PWADashboard({ latestReport }) {
         /* [사용자 지시] 삭제된 "AI 신뢰도" 소개카드 대신, 이 페이지에서 가장 중요한 실제 결과인
            나 vs AI 대결 카드를 짙은 곤색(hero) 카드로 강조 — 자식 요소들은 대부분 CSS 변수(--color-ink 등)를
            참조하므로 여기서 그 변수들만 hero 톤으로 재정의하면 하위 전부가 함께 톤이 바뀐다. */
-        .game-dash {
-          border: none; background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2));
-          color: var(--hero-ink); box-shadow: var(--shadow-float);
-          --text-secondary: var(--hero-ink-soft); --text-tertiary: var(--hero-ink-faint);
-          --color-ink: var(--hero-ink); --color-ink-2: var(--hero-ink-soft); --color-ink-3: var(--hero-ink-faint);
-          --label-color: var(--hero-ink-sub);
-          --border: rgba(255,255,255,.16); --inset-bg: rgba(255,255,255,.09);
-          --purple-soft: rgba(255,255,255,.16); --color-primary-soft: rgba(255,255,255,.16);
-        }
         .gd-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .gd-virtual { font-size: 0.6rem; font-weight: 800; color: var(--purple, var(--color-primary)); background: var(--purple-soft, var(--color-primary-soft)); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
         .gd-narr { font-size: 0.76rem; color: var(--color-ink-2); background: var(--inset-bg); border-radius: 9px; padding: 8px 11px; margin: 10px 0 0; line-height: 1.5; word-break: keep-all; }
@@ -4588,6 +4579,9 @@ export default function PWADashboard({ latestReport }) {
         .gd-lead { text-align: center; font-size: 0.74rem; color: var(--text-secondary); line-height: 1.5; word-break: keep-all; }
         .gd-lead b.up { color: var(--color-success); } .gd-lead b.dn { color: var(--purple, var(--color-danger)); }
         .gd-trend { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+        .gd-trend :global(.recharts-wrapper),
+        .gd-trend :global(.recharts-surface),
+        .gd-trend :global(.recharts-wrapper *) { outline: none !important; }
         .gd-trend-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
         .gd-trend-days { font-size: 0.7rem; font-weight: 700; color: var(--text-tertiary); }
         .gd-trend-final { font-size: 0.72rem; color: var(--text-secondary); text-align: right; }
