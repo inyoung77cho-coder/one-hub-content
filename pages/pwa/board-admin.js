@@ -12,12 +12,29 @@ const NEWS_CATEGORIES = [
 ];
 
 export default function BoardAdmin() {
-  const [tab, setTab] = useState("gathered"); // gathered | reports | news
+  const [tab, setTab] = useState("gathered"); // gathered | reports | news | users
   const [gathered, setGathered] = useState(null);
   const [reports, setReports] = useState(null);
   const [news, setNews] = useState(null);
+  const [users, setUsers] = useState(null);
   const [err, setErr] = useState("");
   const [toast, setToast] = useState("");
+  // [보안 강화] 이 페이지는 middleware(ADMIN_ONLY_PAGES)가 1차로 막지만, 지인 계정이 탭 UI를
+  //   본 사례가 보고돼 방어를 이중화한다 — 클라이언트도 /api/auth/me로 role을 직접 확인하기
+  //   전까지는 탭·버튼 등 어떤 화면도 그리지 않는다(서버 응답을 신뢰, 클라 판단 없음).
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isAdminUser, setIsAdminUser] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/auth/me").then((r) => r.json())
+      .then((d) => {
+        if (!alive) return;
+        setIsAdminUser(!!d?.authenticated && d?.user?.role === "admin");
+        setAuthChecked(true);
+      })
+      .catch(() => { if (alive) { setIsAdminUser(false); setAuthChecked(true); } });
+    return () => { alive = false; };
+  }, []);
 
   const load = useCallback(async (kind) => {
     try {
@@ -44,7 +61,34 @@ export default function BoardAdmin() {
     } catch (e) { setErr("네트워크 오류"); }
   }, []);
 
-  useEffect(() => { load("gathered"); load("reports"); loadNews(); }, [load, loadNews]);
+  // [사용자 지시] 회원 목록·상태 관리 탭
+  const loadUsers = useCallback(async () => {
+    try {
+      const r = await fetch("/api/ops/users");
+      if (r.status === 403) { setErr("운영자만 접근할 수 있습니다."); return; }
+      const d = await r.json();
+      if (!d.ok) { setErr(d.error || "불러오기 실패"); return; }
+      setErr("");
+      setUsers(d.items || []);
+    } catch (e) { setErr("네트워크 오류"); }
+  }, []);
+
+  async function updateUserStatus(userId, status, label) {
+    const CONFIRM = { suspended: `"${label}" 계정을 정지할까요?`, withdrawn: `"${label}" 계정을 탈퇴 처리할까요? (되돌리려면 다시 활성화하면 됩니다)`, active: null };
+    if (CONFIRM[status] && !window.confirm(CONFIRM[status])) return;
+    const r = await fetch("/api/ops/users", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId, status }),
+    });
+    const d = await r.json();
+    if (d.ok) { flash("상태가 변경됐습니다"); loadUsers(); }
+    else flash("변경 실패: " + (d.error || ""));
+  }
+
+  useEffect(() => {
+    if (!isAdminUser) return;
+    load("gathered"); load("reports"); loadNews(); loadUsers();
+  }, [isAdminUser, load, loadNews, loadUsers]);
 
   const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 2200); };
 
@@ -84,12 +128,28 @@ export default function BoardAdmin() {
     await saveNews(id, { status: "hidden" });
   }
 
+  // [보안 강화] 서버(/api/auth/me) 확인이 끝나기 전엔 아무 것도 그리지 않는다 — 탭 구조·라벨조차
+  //   비운영자에게 노출하지 않는다. 확인 결과 운영자가 아니면 탭/버튼 없이 안내만 표시.
+  if (!authChecked) return null;
+  if (!isAdminUser) {
+    return (
+      <div className="ba ba-denied">
+        <p>운영자만 접근할 수 있는 페이지입니다.</p>
+        <Link href="/pwa/settings" className="ba-back">← 설정으로</Link>
+        <style jsx>{`
+          .ba-denied { max-width: 480px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; font-family: var(--font-sans); color: var(--color-ink); padding: 0 20px; text-align: center; }
+          .ba-denied .ba-back { color: var(--color-primary); font-weight: 700; text-decoration: none; }
+        `}</style>
+      </div>
+    );
+  }
+
   return (
     <div className="ba">
       <header className="ba-head">
         <Link href="/pwa/settings" className="ba-back">← 설정</Link>
         <h1>운영자 · 콘텐츠 관리</h1>
-        <p className="ba-sub">텔레그램 봇으로 올린 부동산 정보·리포트·뉴스를 이 화면에서 확인하고 바로 수정합니다. 변경은 공개 화면에 곧바로 반영됩니다.</p>
+        <p className="ba-sub">텔레그램 봇으로 올린 부동산 정보·리포트·뉴스를 확인·수정하고, 회원 목록·상태도 관리합니다. 콘텐츠 변경은 공개 화면에 곧바로 반영됩니다.</p>
       </header>
 
       <div className="ba-tabs">
@@ -101,6 +161,9 @@ export default function BoardAdmin() {
         </button>
         <button className={tab === "news" ? "on" : ""} onClick={() => setTab("news")}>
           뉴스 {news ? `(${news.length})` : ""}
+        </button>
+        <button className={tab === "users" ? "on" : ""} onClick={() => setTab("users")}>
+          회원 {users ? `(${users.length})` : ""}
         </button>
       </div>
 
@@ -138,6 +201,17 @@ export default function BoardAdmin() {
               <NewsCard key={it.id} item={it}
                 onSave={(p) => saveNews(it.id, p)}
                 onHide={() => hideNews(it.id, it.headline || "뉴스")} />
+            ))}
+        </div>
+      )}
+
+      {/* [사용자 지시] 회원 목록·상태 관리 — accounts.db(닉네임·카카오연동·티어·가입일) 실데이터 */}
+      {tab === "users" && (
+        <div className="ba-list">
+          {users === null ? <div className="ba-empty">불러오는 중…</div>
+            : users.length === 0 ? <div className="ba-empty">가입한 회원이 없습니다.</div>
+            : users.map((u) => (
+              <UserCard key={u.id} item={u} onChangeStatus={(status) => updateUserStatus(u.id, status, u.nickname || `#${u.id}`)} />
             ))}
         </div>
       )}
@@ -285,6 +359,43 @@ function NewsCard({ item, onSave, onHide }) {
       </div>
       <style jsx>{cardCss}</style>
       <style jsx>{`.pin { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 700; color: #475569; }`}</style>
+    </div>
+  );
+}
+
+const STATUS_KO = { active: "활성", suspended: "정지", withdrawn: "탈퇴" };
+
+function UserCard({ item, onChangeStatus }) {
+  const isSelf = item.role === "admin";
+  return (
+    <div className="card">
+      <div className="urow">
+        <div className="umeta">
+          <div className="unick">{item.nickname || `#${item.id}`} {isSelf && <span className="uadmin">운영자</span>}</div>
+          <div className="usub">{item.provider === "kakao" ? "카카오" : item.provider || "-"} · 가입 {String(item.created_at || "").slice(0, 10)} · 최근 로그인 {String(item.last_login_at || "-").slice(0, 10)}</div>
+          <div className="usub">티어 {item.tier || "free"} ({item.sub_status || "-"})</div>
+        </div>
+        <span className={`ubadge s-${item.status}`}>{STATUS_KO[item.status] || item.status}</span>
+      </div>
+      {!isSelf && (
+        <div className="acts">
+          {item.status !== "active" && <button className="save" onClick={() => onChangeStatus("active")}>활성화</button>}
+          {item.status !== "suspended" && <button className="del" onClick={() => onChangeStatus("suspended")}>정지</button>}
+          {item.status !== "withdrawn" && <button className="del" onClick={() => onChangeStatus("withdrawn")}>탈퇴 처리</button>}
+        </div>
+      )}
+      <style jsx>{cardCss}</style>
+      <style jsx>{`
+        .urow { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+        .umeta { display: flex; flex-direction: column; gap: 3px; }
+        .unick { font-size: 0.98rem; font-weight: 800; color: #12213B; }
+        .uadmin { font-size: 0.68rem; font-weight: 800; color: #B45309; background: #FEF3C7; padding: 2px 7px; border-radius: 999px; margin-left: 6px; }
+        .usub { font-size: 0.76rem; color: #64748B; }
+        .ubadge { flex-shrink: 0; font-size: 0.74rem; font-weight: 800; padding: 4px 10px; border-radius: 999px; }
+        .ubadge.s-active { background: #DCFCE7; color: #15803D; }
+        .ubadge.s-suspended { background: #FEF3C7; color: #B45309; }
+        .ubadge.s-withdrawn { background: #FEE2E2; color: #B91C1C; }
+      `}</style>
     </div>
   );
 }
