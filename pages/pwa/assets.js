@@ -290,6 +290,13 @@ export default function AssetsMapPage() {
           {(assets?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && (
             <p className="as-incomplete">⚠ 증권사 연동 자산을 불러오지 못했습니다 — 이 총자산은 <b>실제보다 적습니다</b>. 잠시 후 다시 시도해 주세요.</p>
           )}
+          {/* [버그 수정 후 투명성] 증권사 연동과 동일 계좌로 판단해 직접입력분을 총자산에서
+              제외한 종목이 있으면 그 사실을 여기서 바로 알린다 — "왜 총액이 예상보다 적지?"를
+              사용자가 스스로 추적하지 않아도 되게. 실제로 다른 증권사 보유라면 입력 시 해당
+              증권사를 선택하면 합산된다(한국투자/기타만 중복으로 간주). */}
+          {(assets?.warnings || []).filter((w) => w.code === "DUPLICATE_WITH_KIS").map((w, i) => (
+            <p className="as-incomplete" key={i}>ℹ️ <b>{w.name}</b>은 증권사 연동 계좌와 같은 종목코드라 직접입력분은 총자산에 더하지 않았습니다. 실제로 다른 증권사 계좌라면 보유 목록에서 해당 증권사를 선택해 주세요.</p>
+          ))}
         </section>
 
         {/* [N6] 이상 평단 확인 — 총자산에서 뺀 사실은 총자산이 보이는 곳에서 설명한다.

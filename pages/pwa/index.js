@@ -3823,10 +3823,12 @@ export default function PWADashboard({ latestReport }) {
         .pwa-trader-toggle button { background: none; border: none; color: var(--text-secondary); padding: 5px 13px; border-radius: var(--radius-pill); cursor: pointer; font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; }
         .pwa-trader-toggle button.active { background: var(--card-bg); color: var(--accent-info); box-shadow: var(--card-shadow); }
 
-        /* [v11 IA] 주식 서브탭 (2차 내비) */
-        .pwa-subtabs { display: flex; align-items: center; gap: 8px; margin: 0 16px 12px; }
-        .pwa-subtab { padding: 9px 20px; background: var(--card-bg); border: none; border-radius: var(--radius-pill, 999px); cursor: pointer; color: var(--text-secondary); font-family: var(--font-display); font-size: 0.78rem; font-weight: 700; box-shadow: var(--card-shadow); }
-        .pwa-subtab.active { background: var(--accent-buy); color: #fff; }
+        /* [사용자 지시] 종합자산(assets.js)의 보유/추천 탭과 완전히 동일한 형태 유지 —
+           사각형 박스(카드) 안에 알약형 버튼, 선택 시 파란색(--color-primary). 이전엔 박스 없이
+           낱개 초록 알약(--accent-buy)이라 페이지 이동 시 모양·색이 달라 보였다. */
+        .pwa-subtabs { display: flex; gap: 6px; margin: 0 16px 12px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 4px; box-shadow: var(--card-shadow); }
+        .pwa-subtab { flex: 1; min-height: 36px; padding: 0; background: none; border: none; border-radius: 9px; cursor: pointer; color: var(--text-secondary); font-family: var(--font-sans); font-size: 0.8rem; font-weight: 700; }
+        .pwa-subtab.active { background: var(--color-primary); color: #fff; }
 
         /* Layout */
         .pwa-main { padding: 0 0 12px; display: flex; flex-direction: column; gap: 12px; }
