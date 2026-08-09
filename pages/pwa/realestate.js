@@ -944,7 +944,16 @@ export default function RealEstateDashboard() {
             const ymParts = String(mac.연월 || "").split(/[-.\/]/).map((x) => Number(x));
             const elapsed = (ymParts.length >= 2 && ymParts[0] > 1900 && ymParts[1] >= 1)
               ? (nowK.getUTCFullYear() * 12 + nowK.getUTCMonth()) - (ymParts[0] * 12 + (ymParts[1] - 1)) : null;
-            const freshTxt = elapsed == null ? `기준 ${mac.연월}` : elapsed <= 0 ? `이번 달(${mac.연월}) 기준 · 최신` : `${mac.연월} 기준 · ${elapsed}개월 전 데이터`;
+            const freshTxt = elapsed == null ? `기준 ${mac.연월}` : elapsed <= 0 ? `이번 달(${mac.연월}) 기준` : `${mac.연월} 기준 · ${elapsed}개월 전 데이터`;
+            // [사용자 지시] "이번 달 기준"이라 표시돼도 실제로는 값이 여러 달째 그대로일 수 있다 —
+            //   백엔드 macro_pipeline.py가 실시간 KOSPI/기준금리 자동수집이 아직 스텁(ECOS API키·
+            //   KOSPI 소스 미확정)이라 매달 같은 근사치를 그대로 재적재하기 때문(re_macro_scaffold의
+            //   보간값). "이번 달=최신"이라는 착시를 막기 위해, 최근 연속 월의 kospi 값이 동일한지
+            //   실제 반환된 series로 직접 확인해 알린다 — 숫자를 지어내지 않고 있는 데이터로만 판단.
+            const series = macro?.series || [];
+            let frozenMonths = 0;
+            for (let i = series.length - 1; i >= 0 && series[i]?.kospi === mac.kospi; i--) frozenMonths++;
+            const looksFrozen = frozenMonths >= 3;
             return (
               <div className="macro-read">
                 <div className="mr-top">
@@ -954,6 +963,9 @@ export default function RealEstateDashboard() {
                 <div className="mr-row"><span className="mr-k">금리</span><span className="mr-v">{rateTxt}</span></div>
                 <div className="mr-row"><span className="mr-k">정책</span><span className="mr-v">{polTxt}</span></div>
                 <div className={`mr-fresh ${elapsed != null && elapsed >= 2 ? "stale" : ""}`}>📅 {freshTxt}{elapsed != null && elapsed >= 2 ? " — 월 단위로 갱신되며 실시간 시세와 차이가 있을 수 있습니다." : ""}</div>
+                {looksFrozen && (
+                  <div className="mr-fresh stale">⚠️ KOSPI 값이 최근 {frozenMonths}개월째 동일합니다 — 실시간 자동수집이 아직 연결되지 않아 근사치가 반복 적재되고 있습니다(실제 시세와 다를 수 있음).</div>
+                )}
                 <div className="mr-disc">※ 금리·정책을 <b>규칙으로 해석한 방향성</b>일 뿐 <b>가격 예측이 아닙니다</b>. 실제 가격은 단지·수급에 따라 다릅니다.</div>
               </div>
             );

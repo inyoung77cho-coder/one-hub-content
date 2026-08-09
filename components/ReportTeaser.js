@@ -72,21 +72,22 @@ export default function ReportTeaser() {
       )}
 
       <style jsx>{`
-        .rt-card { display: block; text-decoration: none; background: linear-gradient(135deg,#FFFDF7 0%,#FFF7E8 100%);
-          border: 1px solid #F0D89A; border-radius: 18px; padding: 18px 20px; margin: 14px 0;
-          box-shadow: 0 6px 20px rgba(180,140,40,.08); transition: transform .12s ease, box-shadow .12s ease; }
+        /* [사용자 지시] 바탕색을 다른 카드와 동일하게 — 하드코딩된 노란 톤 대신 표준 카드 토큰 사용 */
+        .rt-card { display: block; text-decoration: none; background: var(--color-card);
+          border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin: 14px 0;
+          box-shadow: var(--shadow-card); transition: transform .12s ease, box-shadow .12s ease; }
         .rt-card:active { transform: scale(.99); }
         .rt-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-        .rt-flag { font-size: 11.5px; font-weight: 800; color: #B45309; }
-        .rt-go { font-size: 12.5px; font-weight: 800; color: #2F6BFF; }
-        .rt-title { font-size: 16px; font-weight: 800; color: #12213B; letter-spacing: -.3px; margin-bottom: 6px; line-height: 1.4; }
-        .rt-headline { font-size: 13px; color: #46566E; line-height: 1.58; margin: 0 0 10px; }
+        .rt-flag { font-size: 11.5px; font-weight: 800; color: var(--color-warning-ink, var(--color-warning)); }
+        .rt-go { font-size: 12.5px; font-weight: 800; color: var(--color-primary); }
+        .rt-title { font-size: 16px; font-weight: 800; color: var(--color-ink); letter-spacing: -.3px; margin-bottom: 6px; line-height: 1.4; }
+        .rt-headline { font-size: 13px; color: var(--color-ink-2); line-height: 1.58; margin: 0 0 10px; }
         .rt-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-        .rt-chip { font-size: 11px; font-weight: 700; color: #3A5C97; background: #EAF1FF; border-radius: 6px; padding: 3px 8px; }
-        .rt-chip.up { background: #FDECEC; color: #D0342C; }
-        .rt-chip.dn { background: #EAF3FF; color: #1D6FE0; }
-        .rt-more { background: #F1F5F9; color: #64748B; }
-        .rt-meta { font-size: 11.5px; color: #94A3B8; font-weight: 600; }
+        .rt-chip { font-size: 11px; font-weight: 700; color: var(--color-ink-2); background: var(--color-card-soft, var(--color-bg)); border-radius: 6px; padding: 3px 8px; }
+        .rt-chip.up { background: var(--color-success-soft, var(--color-success)); color: var(--color-success); }
+        .rt-chip.dn { background: var(--color-danger-soft, var(--color-danger)); color: var(--color-danger); }
+        .rt-more { background: var(--color-card-soft, var(--color-bg)); color: var(--color-ink-3); }
+        .rt-meta { font-size: 11.5px; color: var(--color-ink-3); font-weight: 600; }
       `}</style>
     </a>
   );
