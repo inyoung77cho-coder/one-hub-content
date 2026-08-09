@@ -322,7 +322,7 @@ export default function RealEstateDashboard() {
         );
       })()}
 
-      {/* 1) HERO — 시장 브리핑 (다크 네이비 히어로) */}
+      {/* 1) HERO — 시장 브리핑 (다른 페이지와 통일된 라이트 카드) */}
       <section className="hero">
         <div className="eyebrow">
           <span className="lbl">🏢 시장 브리핑{brief?.region ? ` · ${brief.region}` : ""}</span>
@@ -1009,17 +1009,18 @@ export default function RealEstateDashboard() {
         .mypos-r { color: var(--color-primary); font-weight: 800; }
         .mypos-trend { font-size: 0.76rem; font-weight: 600; color: var(--color-ink-3); margin-top: 6px; font-variant-numeric: tabular-nums; }
         .mypos-cta { margin-top: 11px; min-height: 42px; width: 100%; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-primary); border-radius: 10px; font-size: 0.8rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
-        .hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 20px 18px; box-shadow: var(--shadow-float); margin-bottom: 14px; }
+        /* [사용자 지시] 다른 페이지(ETF 등)와 동일하게 라이트 카드로 통일 */
+        .hero { background: var(--color-card); color: var(--color-ink); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; box-shadow: var(--shadow-card); margin-bottom: 12px; }
         .hero .eyebrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
-        .hero .lbl { font-size: 12px; font-weight: 700; color: var(--hero-ink-sub); }
+        .hero .lbl { font-size: 12px; font-weight: 700; color: var(--color-ink-2); }
         .live { background: var(--color-success); color: #04351f; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 5px; letter-spacing: .5px; }
         .hero .big { font-size: 28px; font-weight: 800; letter-spacing: -.6px; line-height: 1; }
-        .brief-lead { font-size: 12.5px; color: var(--hero-ink-soft); margin-top: 11px; }
-        .brief-lead b { color: var(--hero-ink); font-weight: 700; }
+        .brief-lead { font-size: 12.5px; color: var(--color-ink-2); margin-top: 11px; }
+        .brief-lead b { color: var(--color-ink); font-weight: 700; }
         .brief-stats { display: flex; gap: 9px; margin-top: 16px; }
-        .bstat { flex: 1; background: var(--hero-fill); border: 1px solid var(--hero-fill-line); border-radius: 13px; padding: 11px 13px; }
-        .bstat span { display: block; font-size: 11px; color: var(--hero-ink-sub); font-weight: 600; margin-bottom: 4px; }
-        .bstat b { font-size: 15px; font-weight: 800; color: var(--hero-accent); }
+        .bstat { flex: 1; background: var(--color-card-soft, var(--color-bg)); border: 1px solid var(--color-line); border-radius: 13px; padding: 11px 13px; }
+        .bstat span { display: block; font-size: 11px; color: var(--color-ink-3); font-weight: 600; margin-bottom: 4px; }
+        .bstat b { font-size: 15px; font-weight: 800; color: var(--color-primary); }
         /* [§3-7] #1 결론 strip */
         .re-verdict { background: var(--color-card); border: 1px solid var(--color-line); border-left: 4px solid var(--color-primary); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 14px 16px; margin-bottom: 12px; }
         .rv-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; }

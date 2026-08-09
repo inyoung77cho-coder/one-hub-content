@@ -12,7 +12,6 @@ import { classifyEtf } from "../../lib/etfClassify";
 import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress, pensionCreditLimitCombined } from "../../lib/taxRules";
 import Term from "../../components/Term";
 import REBAL_PRESETS from "../../data/rebalance_presets.json";
-import EtfBulkImport from "../../components/EtfBulkImport";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -28,8 +27,8 @@ const ACCT_EMOJI = { "일반": "💸", "개인연금": "🏦", "퇴직연금": "
 // [계좌 세분화] 연금 계열(개인연금·퇴직연금) 판별 — 세액공제 한도 합산 대상
 const isPensionAcct = (a) => a === "개인연금" || a === "퇴직연금";
 const ACCT_TAX = ACCOUNTS.reduce((m, a) => { m[a] = `${ACCT_EMOJI[a] || ""} ${acctTaxNote(a)}`; return m; }, {});
-// [S4] 계좌 필터 칩
-const ACCT_FILTERS = ["전체", ...ACCOUNTS];
+// [S4] 계좌 필터 칩. [사용자 지시] "전체"는 "일반"과 혼동돼 삭제 — 기본값은 "일반".
+const ACCT_FILTERS = [...ACCOUNTS];
 
 // [S18] 해외 보유 판정 — 시장(market) 기준. 통화(avgCcy)로 가르면 안 된다.
 //   해외 ETF 를 원화로 매수 기록하면 avgCcy 가 KRW 라 국내로 잡혔다(실측 버그).
@@ -50,6 +49,7 @@ export default function EtfDashboard() {
   const [quotes, setQuotes] = useState({}); // { TICKER: {price, currency, date} }
   const [form, setForm] = useState({ side: "buy", ticker: "", shares: "", price: "", ccy: "USD", account: "일반", market: "auto" });
   const [formMsg, setFormMsg] = useState("");
+  const [editingHolding, setEditingHolding] = useState(null); // [사용자 지시] 수정 클릭 시에만 인라인 폼 노출
   // [양도세 올해 실현 누계] 브로커 매도내역 기준 실현 양도차익 기록(클라 원장) — 연 250만 공제 추적.
   const [realized, setRealized] = useState([]); // [{id, ticker, gainKrw, date}]
   const [addReal, setAddReal] = useState(false);
@@ -69,7 +69,7 @@ export default function EtfDashboard() {
   const [quotesAt, setQuotesAt] = useState(null); // [실시간] 마지막 시세 갱신 시각(ms)
   const [nowTick, setNowTick] = useState(0);      // [실시간] 상대시간 표시용 1초 틱
   const [refreshing, setRefreshing] = useState(false); // [실시간] 수동 새로고침 진행중
-  const [acctFilter, setAcctFilter] = useState("전체"); // [S4] 계좌 유형 필터([전체][일반][연금][ISA])
+  const [acctFilter, setAcctFilter] = useState("일반"); // [S4] 계좌 유형 필터([일반][개인연금][퇴직연금][ISA])
   const [detailOpen, setDetailOpen] = useState(false); // [D4] 종목별 수익 분해 접기(페이지 길이 축약)
   const [fcOpen, setFcOpen] = useState(false); // [S7.4] 예측 섹션 기본 접기
   const [pensionContrib, setPensionContrib] = useState(""); // [S4] 올해 연금 납입액(원, 세액공제 진행률)
@@ -252,12 +252,16 @@ export default function EtfDashboard() {
   // [S18 D-1] 수정 = 기존값 프리필 후 매수 폼 재사용. 재입력을 요구하지 않는다.
   //   buyEtf 는 같은 티커+통화+계좌+증권사를 가중평균으로 합친다 → 값을 "대체"하려면
   //   삭제 후 재입력이 맞다. 그래서 프리필과 함께 그 사실을 안내한다(조용히 합쳐지면 오해).
+  // [사용자 지시] 신규 매수/매도 등록은 "+" 버튼(EtfForm)으로 옮기고, 이 인라인 폼은
+  //   기존 보유 "수정" 전용으로만 남긴다 — 평소엔 숨어 있다가 수정 클릭 시에만 나타난다.
   const editHolding = (h) => {
+    setEditingHolding(h.id);
     setForm({ side: "buy", ticker: h.ticker, shares: String(h.shares), price: String(h.avgPrice),
               ccy: h.avgCcy || "USD", account: h.account || "일반", market: h.market || "auto" });
     setFormMsg("수정: 값을 고쳐 기록하면 가중평균으로 합쳐집니다. 값을 대체하려면 먼저 삭제하세요.");
-    try { document.querySelector(".me-form")?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
+    setTimeout(() => { try { document.querySelector(".me-form")?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 0);
   };
+  const closeEditForm = () => { setEditingHolding(null); setFormMsg(""); };
 
   // [등록 ETF] 수량 입력 → 실측 종가로 실시간 평가금액 재계산
   const onQtyChange = (ticker, val) => {
@@ -888,13 +892,12 @@ export default function EtfDashboard() {
         </section>
       )}
 
-      {/* 6) 내 ETF — 자동 시세 갱신. [사용자 지시] 단건 직접입력 폼은 우측 하단 "+" 버튼과
-          중복이라 삭제 — 대량 가져오기(EtfBulkImport)만 유지(단건 빠른입력과 역할이 다름). */}
+      {/* 6) 내 ETF — 자동 시세 갱신. [사용자 지시] 신규 매수/매도 입력(대량가져오기·매수매도
+          기록 폼)은 우측 하단 "+" 버튼과 중복이라 삭제 — 목록·수정·삭제는 이 카드에 유지. */}
       <section className="card myetf">
         <div className="label">🧾 내 ETF <span className="sub">시세 자동 갱신</span>
           {myTotal > 0 && <span className="me-total">평가 {won(myTotal)}원</span>}
         </div>
-        <EtfBulkImport onDone={() => { const tr = getTrader(); const l = getHoldings(tr); setHoldings(l); refreshQuotes(l); }} />
         {holdings.length > 0 ? (
           <div className="me-groups">
             {/* [S4·계좌 세분화] 계좌 유형별 그룹 — 세제가 다르므로 버킷별 평가·세제 안내 분리 · 상단 필터 반영 */}
@@ -979,16 +982,17 @@ export default function EtfDashboard() {
         ) : (
           <div className="me-empty">보유 ETF를 추가하면 <b>현재가·평가액·손익</b>이 자동으로 갱신됩니다. 미국 ETF는 티커(<b>SCHD</b>), 국내는 숫자코드(<b>069500</b>)로 입력하세요.</div>
         )}
-        {/* [S18 D-1] 매수·매도 기록 폼 — submitTrade 를 부르는 UI 가 아예 없었다.
-            함수(209행)·form state(49행)·editHolding 프리필까지 다 있는데 렌더될 폼이 없어
-            매수 기록도, 수정도 불가능했다("편집이 안 된다"의 뿌리).
-            editHolding 이 .me-form 으로 스크롤하는데 그 요소가 존재하지 않았다. */}
+        {/* [사용자 지시] 신규 매수/매도 등록용 상시 노출 폼은 "+" 버튼과 중복이라 삭제하고,
+            기존 보유 "수정" 전용으로만 남긴다 — editHolding 클릭 시에만 나타난다. */}
+        {editingHolding && (
         <div className="me-form">
           <div className="mf-tabs">
+            <span className="mf-editing">✎ 보유 수정 중</span>
             {[["buy", "매수 기록"], ["sell", "매도 기록"]].map(([k, l]) => (
               <button key={k} type="button" className={`mf-tab ${form.side === k ? "on" : ""}`}
                 onClick={() => { setForm((f) => ({ ...f, side: k })); setFormMsg(""); }}>{l}</button>
             ))}
+            <button type="button" className="mf-close" onClick={closeEditForm} aria-label="수정 닫기">✕</button>
           </div>
           <div className="mf-grid">
             <label className="mf-f mf-tk">
@@ -1038,7 +1042,8 @@ export default function EtfDashboard() {
           </button>
           {formMsg && <div className="mf-msg">{formMsg}</div>}
         </div>
-        <div className="me-foot">시세는 공개 소스(stooq)에서 5분 캐시로 자동 갱신 · USD는 오늘 환율({fxRate ? `${Math.round(fxRate).toLocaleString()}원` : "조회 중"})로 원화 환산 · 참고용</div>
+        )}
+        <div className="me-foot">시세는 공개 소스(stooq)에서 5분 캐시로 자동 갱신 · USD는 오늘 환율({fxRate ? `${Math.round(fxRate).toLocaleString()}원` : "조회 중"})로 원화 환산 · 참고용 · 신규 매수/매도는 우측 하단 “+”</div>
       </section>
 
       <div className="foot">확정 계산(수익·세금·중복도)은 입력값 기반. 예측(Forecast)은 통계적 시나리오(참고용·확정 아님). · 세무자문 아님</div>
@@ -1270,7 +1275,9 @@ export default function EtfDashboard() {
         .me-empty b { color: var(--color-ink); font-weight: 700; }
         /* [S18 D-1] 매수·매도 기록 폼 */
         .me-form { border-top: 1px solid var(--color-line); margin-top: 12px; padding-top: 12px; }
-        .mf-tabs { display: flex; gap: 6px; margin-bottom: 10px; }
+        .mf-tabs { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+        .mf-editing { font-size: 0.76rem; font-weight: 800; color: var(--color-ink-2); }
+        .mf-close { flex: none; width: 26px; height: 26px; border: none; background: var(--color-card-soft, var(--color-line)); border-radius: 50%; color: var(--color-ink-2); font-size: 12px; cursor: pointer; }
         .mf-tab { flex: 1 1 0; min-height: 36px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; font-size: 0.78rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .mf-tab.on { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-card-soft); }
         .mf-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }

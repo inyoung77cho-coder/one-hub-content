@@ -15,7 +15,6 @@ import QuickAddSheet from "../../components/shared/QuickAddSheet";
 import AssetMapTitle from "../../components/AssetMapTitle";
 import FeedbackButton from "../../components/FeedbackButton";
 
-const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || null);
 const uk = (v) => (v == null ? "-" : `${Number(v).toFixed(2)}억`);
 const pctTxt = (v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(2)}%`;
 // 백엔드가 positions를 문자열로 주는 경우가 있어 방어적으로 파싱(today.js와 동일 로직)
@@ -73,7 +72,6 @@ export default function AssetsMapPage() {
   const [status, setStatus] = useState("loading");
   const [at, setAt] = useState(null);
   const [qaOpen, setQaOpen] = useState(false);
-  const [open3, setOpen3] = useState({}); // 3층 아코디언 열림 상태(기본 전부 닫힘)
   const [fixId, setFixId] = useState(null);      // [N6] 평단 수정 중인 종목 id
   const [fixVal, setFixVal] = useState("");      // [N6] 사용자가 직접 입력하는 평단(앱이 추정하지 않는다)
   const [delta, setDelta] = useState(null);      // [추세] 전일 대비 총자산·자산별 변화(브라우저 스냅샷 기반)
@@ -82,7 +80,17 @@ export default function AssetsMapPage() {
   const [invProps, setInvProps] = useState([]);  // [§3.1] 추가 보유 부동산(투자용) = onehub_re_properties
   const [myComplex, setMyComplex] = useState(""); // [§3.1] 대표단지(실거주)명
   const [view, setView] = useState(0); // [OS-2] 0=주식 1=ETF 2=부동산 — 종목변경 순환에 맞춰 아래 카드 필터
-  const [stockTab, setStockTab] = useState("hold"); // [사용자 지시] 주식 뷰 전용 — 보유/추천 탭
+  // [사용자 지시] 보유/추천 "자세히" 페이지에서 back·"주식" 탭 클릭으로 돌아왔을 때 원래 보던
+  //   탭 그대로 복귀하도록 localStorage에 기억(이 페이지는 라우트 이동이라 리마운트되며 state가
+  //   초기화되므로, 컴포넌트 state가 아니라 localStorage로 넘겨야 살아남는다).
+  const [stockTab, setStockTabState] = useState(() => {
+    if (typeof window === "undefined") return "hold";
+    try { return localStorage.getItem("onehub_assets_stocktab") === "recommend" ? "recommend" : "hold"; } catch { return "hold"; }
+  });
+  const setStockTab = (v) => {
+    setStockTabState(v);
+    try { localStorage.setItem("onehub_assets_stocktab", v); } catch {}
+  };
 
   const load = useCallback(() => {
     const tr = getTrader();
@@ -139,8 +147,6 @@ export default function AssetsMapPage() {
     val: bd[`${k}_uk`] != null ? Number(bd[`${k}_uk`]) : null,
   }));
   const total = assets?.total_uk != null ? Number(assets.total_uk) : rows.reduce((s, r) => s + (r.val || 0), 0);
-  const pctFull = (v) => (total > 0 && v != null ? (v / total) * 100 : 0); // [§3.1] 전체 총자산 기준(단일 소스 유지)
-
   // [§3.1] 실거주(대표단지) 분리 — realestate_uk = 대표단지 + 추가부동산. 추가부동산(투자용)만 빼면 실거주값.
   const realtyUk = bd.realestate_uk != null ? Number(bd.realestate_uk) : 0;
   const invRealtyUk = invProps.reduce((s, p) => s + (Number(p.valueUk) || 0), 0);
@@ -159,22 +165,9 @@ export default function AssetsMapPage() {
   ).filter((r) => !(useEx && r.k === "realestate" && !(invRealtyUk > 0.005)));
   const pctOf = (v) => (mapDenom > 0 && v != null ? (v / mapDenom) * 100 : 0);
 
-  // 1층 판단 1문장 — 쏠림 or 국면 (뷰 분모 기준)
-  const dominant = [...mapRows].filter((r) => r.val != null).sort((a, b) => (b.val || 0) - (a.val || 0))[0];
-  const domPct = dominant ? pctOf(dominant.val) : 0;
-  const scopeLbl = useEx ? "운용 가능 자산의" : "자산의";
-  const regime = regimeKo(dash?.market?.regime);
-  const buys = (dash?.recommend_stocks ?? []).filter((s) => (s.score ?? 0) >= 70);
-  const blocked = dash?.today_blocked ?? [];
   // [사용자 지시] "주식" 뷰 — 주식 페이지(보유·추천)와 연결되는 계좌현황 요약 카드용 데이터.
   const positions = parsePositions(dash);
   const recAll = [...(dash?.recommend_stocks ?? [])].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-  const headline = domPct >= 60 && dominant
-    ? `${scopeLbl} ${Math.round(domPct)}%가 ${dominant.label.replace(/^[^\s]+\s/, "")}입니다 — 쏠림을 줄일 때인지 살펴보세요.`
-    : regime
-    ? `시장은 ${regime} 국면입니다. ${buys.length > 0 ? `주식 매수 후보 ${buys.length}건.` : "뚜렷한 매수 후보는 없습니다."}`
-    : "자산을 입력하면 오늘의 판단을 요약해 드립니다.";
-
 
   // 도넛(stroke-dasharray) — 뷰 분모(mapDenom) 기준
   const donut = (() => {
@@ -187,29 +180,6 @@ export default function AssetsMapPage() {
       return seg;
     });
   })();
-
-  // [§3.4] 시장 맥락을 나열하지 말고 '내 position'을 장기 관점으로 해석한다(규칙 기반·결정적).
-  //   국면 × 운용가능 구성(쏠림/현금)으로 큰 그림의 방향성을 한 문장으로.
-  const positionRead = (() => {
-    const rg = String(dash?.market?.regime || "").toUpperCase();
-    const cashPct = pctFull(bd.cash_uk);
-    const domName = dominant ? dominant.label.replace(/^[^\s]+\s/, "") : null;
-    if (rg === "BULL") {
-      if (useEx && domPct >= 60) return `상승 국면인데 운용 가능 자산이 ${domName}에 몰려 있어 시장 상승을 폭넓게 누리긴 어렵습니다. 장기적으론 새로 들어오는 현금을 운용 자산으로 분산해 참여도를 높이는 방향이 유효합니다.`;
-      return `상승 국면입니다. 지금의 배분을 유지하되, 쏠린 자산군이 있다면 신규 자금은 부족한 쪽에 채워 균형을 맞춰가는 게 장기적으로 안전합니다.`;
-    }
-    if (rg === "BEAR") {
-      if (cashPct != null && cashPct < 3) return `하락 국면인데 현금이 ${cashPct < 1 ? "1% 미만" : `${Math.round(cashPct)}%`}뿐이라 방어·저가 매수 여력이 제한됩니다. 장기적으론 일정 현금 완충을 두는 편이 변동성 국면에 유리합니다.`;
-      return `하락 국면입니다. 급하게 움직이기보다 원칙을 지키며 저평가 기회를 기다리기 좋은 구간입니다.`;
-    }
-    return `뚜렷한 방향이 없는 국면입니다 — 큰 베팅보다 배분 균형을 다지고 원칙을 점검하기 좋은 시기입니다.`;
-  })();
-
-  const tgl3 = (id) => setOpen3((o) => ({ ...o, [id]: !o[id] }));
-  const acc3 = [
-    { id: "market", title: "시장 맥락 · 내 position", summary: `${regime || "-"} 국면 · 온도 ${dash?.market?.heat_score ?? "-"} · 심리 ${dash?.market?.fear_greed ?? "-"}`, href: "/pwa?tab=report", body: positionRead },
-    { id: "briefing", title: "오늘의 브리핑·판단 근거", summary: buys.length > 0 || blocked.length > 0 ? `매수 ${buys.length} · 차단 ${blocked.length}` : "요약 보기", href: "/pwa?tab=report" },
-  ];
 
   return (
     <div className="as">
@@ -291,9 +261,9 @@ export default function AssetsMapPage() {
           <button className="as-add" onClick={() => setQaOpen(true)}>＋ 자산 추가·수정</button>
         </section>
 
-        {/* ── 총자산 헤드라인+추세(공통) — [사용자 지시] 운용자산(실거주 제외 토글) 섹션은 삭제 ── */}
+        {/* ── 총자산+추세(공통) — [사용자 지시] 자산군 쏠림/국면 코멘트 문구 삭제(주식 탭은 주식
+            이야기만) + 운용자산(실거주 제외 토글) 섹션도 삭제 ── */}
         <section className="card as-hero">
-          <p className="as-headline">{headline}</p>
           <div className="as-total">
             <span>총자산</span>
             <b>{uk(total)}</b>
@@ -386,28 +356,9 @@ export default function AssetsMapPage() {
           </section>
         )}
         {/* [사용자 지시] ETF·부동산은 이제 탭 선택 즉시 해당 페이지로 이동하므로(RotatingPageTitle onChange
-            참고) 여기엔 요약 카드를 두지 않는다 — view는 실질적으로 항상 0(주식)만 남는다. */}
-
-        {/* ── 3층: 상세(기본 닫힘) — 시장 맥락은 주식 시황 중심이라 "주식" 뷰에서만 ── */}
-        {view === 0 && (
-        <section className="card as-acc">
-          {acc3.map((a) => (
-            <div className="as-accitem" key={a.id}>
-              <button className="as-acch" onClick={() => tgl3(a.id)} aria-expanded={!!open3[a.id]}>
-                <span className="as-acct">{a.title}</span>
-                <span className="as-accsum">{a.summary}</span>
-                <span className="as-caret">{open3[a.id] ? "▾" : "▸"}</span>
-              </button>
-              {open3[a.id] && (
-                <div className="as-accbody">
-                  {a.body && <p className="as-posread">{a.body}</p>}
-                  <button className="as-acclink" onClick={() => router.push(a.href)}>자세히 보기 →</button>
-                </div>
-              )}
-            </div>
-          ))}
-        </section>
-        )}
+            참고) 여기엔 요약 카드를 두지 않는다 — view는 실질적으로 항상 0(주식)만 남는다.
+            [사용자 지시] "시장 맥락·내 position"/"오늘의 브리핑" 아코디언 삭제 — 판단 근거는
+            AI 페이지에서 다룬다. 이 탭은 주식 이야기만. */}
 
         <div className="as-note">종합자산은 읽기 전용 지도예요. 상세 확인·수정은 각 자산 페이지에서 이어집니다.</div>
       </DataState>
@@ -435,7 +386,6 @@ export default function AssetsMapPage() {
         .as-st-btn { flex: 1; min-height: 36px; border: none; background: none; border-radius: 9px; color: var(--color-ink-2); font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .as-st-btn.on { background: var(--color-primary); color: #fff; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
-        .as-hero .as-headline { font-size: 0.94rem; line-height: 1.55; font-weight: 700; color: var(--color-ink); margin: 0 0 12px; word-break: keep-all; }
         .as-total { display: flex; align-items: baseline; gap: 8px; }
         .as-total span { font-size: 0.78rem; font-weight: 600; color: var(--color-ink-3); }
         .as-total b { font-size: 1.5rem; font-weight: 800; color: var(--color-ink); }
@@ -478,16 +428,6 @@ export default function AssetsMapPage() {
         .as-rv em { font-style: normal; font-weight: 600; color: var(--color-ink-3); font-size: 0.72rem; }
         .as-rp { font-size: 0.68rem; color: var(--color-ink-3); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; min-width: 38px; }
         .as-add { width: 100%; margin-top: 14px; min-height: 44px; border: 1px dashed var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-ink-2); border-radius: 11px; font-size: 0.84rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
-        .as-acc { padding: 4px 16px; }
-        .as-accitem { border-bottom: 1px solid var(--color-line); }
-        .as-accitem:last-child { border-bottom: none; }
-        .as-acch { width: 100%; display: flex; align-items: center; gap: 8px; min-height: 52px; padding: 10px 0; background: none; border: none; cursor: pointer; font-family: var(--font-sans); text-align: left; }
-        .as-acct { font-size: 0.84rem; font-weight: 700; color: var(--color-ink); flex-shrink: 0; }
-        .as-accsum { flex: 1; min-width: 0; font-size: 0.72rem; color: var(--color-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: right; }
-        .as-caret { color: var(--color-ink-3); font-size: 0.8rem; width: 14px; text-align: center; }
-        .as-accbody { padding: 0 0 12px; }
-        .as-posread { font-size: 0.82rem; line-height: 1.6; color: var(--color-ink-2); word-break: keep-all; margin: 0 0 8px; }
-        .as-acclink { border: none; background: none; color: var(--color-primary); font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); padding: 4px 0; }
         /* [N1] 총자산 불완전 고지 — 숫자 바로 아래. 눈에 띄되 공포를 팔지 않는다. */
         .as-incomplete { margin: 8px 0 0; font-size: 0.74rem; line-height: 1.5; color: var(--color-warning); word-break: keep-all; }
         /* [N6] 이상 평단 확인 — 경고색(빨강) 아님. 사용자 잘못이라 단정하지 않는다. */

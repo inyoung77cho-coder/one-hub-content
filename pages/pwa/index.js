@@ -24,6 +24,7 @@ import { fetchStockQuotes } from '../../lib/stockLive';
 import { getKrxSession } from '../../lib/marketHours';
 import ShareButton from '../../components/ShareButton';
 import RotatingPageTitle from '../../components/RotatingPageTitle';
+import AssetMapTitle from '../../components/AssetMapTitle';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
@@ -1068,6 +1069,12 @@ export default function PWADashboard({ latestReport }) {
         {/* [N2] 상단 5탭 제거 — 하단 4탭(BottomNav)과 공존해 '내비가 둘'인 상태가 원 지적이었다.
             도달성은 유지된다: 종합자산·AI = 하단탭, 주식·ETF·부동산 = 자산 지도 범례.
             주식 내부 이동은 아래 서브탭(보유·추천)이 담당한다. */}
+        {/* [사용자 지시] 종합자산 자산지도에서 "보유/추천 자세히"로 들어온 경우에도 상단 메뉴(종합자산
+            자산지도)가 그대로 이어지도록. "주식" 탭 클릭 시 assets.js로 복귀 — stockTab은 그쪽에서
+            localStorage로 기억해 원 위치(보유/추천)로 복귀한다. */}
+        {['recommend','portfolio'].includes(tab) && (
+          <AssetMapTitle current="주식" />
+        )}
         {/* [S2 IA] 주식 카테고리 서브탭 — 보유 · 추천 (기록은 트러스트 탭으로) */}
         {['recommend','portfolio'].includes(tab) && (
           <nav className="pwa-subtabs">
