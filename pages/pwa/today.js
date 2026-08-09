@@ -2,15 +2,11 @@
 //   설계 원칙: 텍스트 단락 대신 숫자·막대·배지로 한눈에. 나 vs AI를 첫 화면 최상단 히어로로 승격.
 //   데이터는 전부 기존 소스: 원장(lib/ledger) · /api/pwa-dashboard · /api/pwa-pending ·
 //   /api/pwa/re/feed · lib/verdictLedger(판단 기록) · /api/today/news. 새로 만든 저장소 없음.
-import fs from "fs";
-import path from "path";
-import matter from "gray-matter";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import { getTrader, useTrader } from "../../lib/trader";
 import { dedupBy } from "../../lib/useDedup";
 import { getLedger as getAssetLedger } from "../../lib/ledger";
-import AutoReportCard from "../../components/AutoReportCard";
 import HoldingsNews from "../../components/HoldingsNews";
 import ReportTeaser from "../../components/ReportTeaser";
 import { getLedger as getDecisionLedger, computeShowdown, matureLedger } from "../../lib/verdictLedger";
@@ -18,7 +14,7 @@ import { computeWallets, getSeed, resetSeed, streakNarrative, wonG, getNickname,
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { initGameSync } from "../../lib/gameSync";
 import { samplePolicy } from "../../lib/sampleSize";
-import { pickInsight } from "../../lib/crossInsight";
+import { getStoryRegionOverride, REGIONS } from "../../lib/storyRegion";
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
@@ -31,6 +27,9 @@ import FeedbackButton from "../../components/FeedbackButton";
 const DAY = 86400000;
 const MATURE_DAYS = 3; // 판단 → 채점까지(나 vs AI)
 const CAT_KO = { global: "글로벌", macro: "거시", markets: "증시", realestate: "부동산", policy: "정책", affairs: "시사" };
+// [사용자 지시] 오늘의 이야기 — 주식/부동산/ETF/기타 카드 구분. Comments.js 카테고리는 전체/주식/ETF/부동산이라
+//   "전체"(미지정) 글은 여기서 "기타"로 보여준다.
+const STORY_CATS = [["주식", "📈"], ["부동산", "🏠"], ["ETF", "📊"], ["기타", "💬"]];
 const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || null);
 const pctTxt = (v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(2)}%`;
 const rePct = (v) => (v == null ? "-" : `${v > 0 ? "+" : ""}${Number(v).toFixed(1)}%`);
@@ -45,7 +44,7 @@ function parsePositions(dash) {
   return Array.isArray(p) ? p : [];
 }
 
-export default function TodayPage({ reports }) {
+export default function TodayPage() {
   const router = useRouter();
   const [trader] = useTrader();
   const [dash, setDash] = useState(null);
@@ -59,6 +58,7 @@ export default function TodayPage({ reports }) {
   const [notis, setNotis] = useState([]); // [알림] 텔레그램/리포트 알림 피드
   const [opNotes, setOpNotes] = useState([]); // [알림] OneHub 신고가(spot_price)
   const [reBrief, setReBrief] = useState(null); // [사용자 지시] 내 부동산 vs 지역 대장단지 가격 비교(re/briefing 재사용)
+  const [storyComments, setStoryComments] = useState([]); // [사용자 지시] 오늘의 이야기 — 카테고리별(주식/부동산/ETF/기타) 미리보기
   const [news, setNews] = useState(null); // [뉴스 통합] 오늘의 뉴스 — 부모가 한 번 fetch 해 카테고리별로 나눠 쓴다
   const [newsOpen, setNewsOpen] = useState(false); // ETF·부동산 타일 뉴스 더보기
   // [2026-08-05] 뉴스 상세는 useState가 아니라 URL(?news=id)에서 파생 — history에 진짜 항목이
@@ -75,6 +75,7 @@ export default function TodayPage({ reports }) {
   };
   const [nick, setNick] = useState("나"); // [닉네임] 나 vs AI에서 "나" 대신 표시
   const [view, setView] = useState(0); // [OS-2] 0=대결 1=부동산 2=ETF 3=이야기 — 종목변경 순환에 맞춰 콘텐츠 필터
+  const [trendClick, setTrendClick] = useState(null); // [사용자 지시] 그래프 클릭 시 그 시점 판단 차이를 그 자리에서 설명(AI 페이지로 이동 안 함)
 
   const load = useCallback(() => {
     const tr = getTrader();
@@ -109,6 +110,11 @@ export default function TodayPage({ reports }) {
       .then((d) => { setNews(Array.isArray(d?.items) ? d.items : []); }).catch(() => setNews([]));
     fetch(`/api/pwa/re/briefing`).then((r) => r.json())
       .then((b) => { if (b && !b.error) setReBrief(b); }).catch(() => {});
+    {
+      const region = getStoryRegionOverride() || Object.values(REGIONS)[0][0];
+      fetch(`/api/comments?date=${encodeURIComponent(region)}`).then((r) => r.json())
+        .then((d) => { if (Array.isArray(d?.comments)) setStoryComments(d.comments); }).catch(() => {});
+    }
     try {
       const mp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null");
       if (mp?.name) fetch(`/api/input/re-spot?complex_name=${encodeURIComponent(mp.name)}`).then((r) => r.json())
@@ -154,7 +160,6 @@ export default function TodayPage({ reports }) {
     const sl = Number(p.stop_loss) || 0, cur = Number(p.current_price) || 0;
     return sl > 0 && cur > 0 && cur <= sl * 1.02;
   });
-  const decideCount = pendItems.length + nearStop.length;
 
   const blockLine = blocked.length > 0
     ? `AI가 ${cands.length + blocked.length > 0 ? `후보 ${cands.length + blocked.length}종목 중 ` : ""}${blocked.length}종목을 매수 기준 미달로 걸렀습니다.`
@@ -184,23 +189,29 @@ export default function TodayPage({ reports }) {
     const chron = [...wallet.settled].sort((a, b) => a.ts - b.ts);
     let myCum = wallet.seed, aiCum = wallet.seed;
     const start = new Date(chron[0].ts);
-    const t = [{ label: `${start.getMonth() + 1}/${start.getDate()} 시작`, [nick]: myCum, AI: aiCum }];
+    const t = [{ label: `${start.getMonth() + 1}/${start.getDate()} 시작`, [nick]: myCum, AI: aiCum, _ev: null }];
     chron.forEach((s) => {
       myCum += s.myPnl; aiCum += s.aiPnl;
       const d = new Date(s.ts);
-      t.push({ label: `${d.getMonth() + 1}/${d.getDate()}`, [nick]: myCum, AI: aiCum });
+      t.push({ label: `${d.getMonth() + 1}/${d.getDate()}`, [nick]: myCum, AI: aiCum, _ev: s });
     });
     return t;
   })();
+  // [사용자 지시] 그래프 클릭 → AI 페이지로 안 넘어가고 그 지점 판단 차이를 간단히 설명
+  const onWalletTrendClick = (e) => setTrendClick(e?.activePayload?.[0]?.payload?._ev || null);
 
   // ── AI 학습 진행도
   const pol = samplePolicy(mine.length);
 
-  // ── 자산군 교차 판단 — 하루 1개
-  const insight = pickInsight(ledger, { regime: dash?.market?.regime, heat: dash?.market?.heat_score, blockedCount: blocked.length });
-
   const bd = ledger?.breakdown || {};
   const ukTxt = (v) => (v == null || !Number.isFinite(Number(v)) ? null : `${Number(v).toFixed(1)}억`);
+
+  // [사용자 지시] 내 부동산 가격 평균 변동 — 이미 받아오던 feed(실거래 피드)에서 내 단지만 추출.
+  //   평형별 상세 비교는 이 페이지의 데이터로는 어려워(부동산 페이지 전용 API 필요) 링크로 안내.
+  const myFeedEntry = myComplex ? (feed?.feed || []).find((f) => f.단지명 === myComplex) || null : null;
+  const myLeaderGapPct = myFeedEntry?.거래금액_억 && reBrief?.leader_price
+    ? (Number(myFeedEntry.거래금액_억) / Number(reBrief.leader_price)) * 100
+    : null;
 
   // ── 뉴스: 카테고리로 뷰 배분(대결=증시, 부동산=부동산, ETF=글로벌/거시/정책)
   const allNews = news || [];
@@ -288,7 +299,8 @@ export default function TodayPage({ reports }) {
           onLabelClick={(item) => { if (item.suffix === "의 이야기") router.push("/pwa/story"); }}
         />
       </div>
-      <div className="td-market"><MarketStatusBadge />{at && <span className="td-fresh3"><LastUpdated timestamp={at} onRefresh={load} /></span>}</div>
+      {/* [사용자 지시] KRX/NXT 장운영 배지는 "오늘의 대결"(주식) 탭에서만 — 부동산/ETF/이야기엔 불필요 */}
+      <div className="td-market">{view === 0 && <MarketStatusBadge />}{at && <span className="td-fresh3"><LastUpdated timestamp={at} onRefresh={load} /></span>}</div>
 
       <DataState status={status} hasData={!!dash || !!ledger} onRetry={load} skeletonLines={4} skeletonBlock>
 
@@ -326,24 +338,56 @@ export default function TodayPage({ reports }) {
                   url="https://one-hub-content.vercel.app/pwa/today" />
               </div>
               {walletTrend.length > 1 && (
-                <div className="hero-trend">
+                // [사용자 지시] 그래프는 클릭해도 AI 페이지로 이동하지 않고 그 자리에서 설명 — 카드 전체의
+                //   onClick(navigate)이 버블링으로 걸려도 여기서 멈춘다.
+                <div className="hero-trend" onClick={(e) => e.stopPropagation()}>
                   <ResponsiveContainer width="100%" height={130}>
-                    <LineChart data={walletTrend} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+                    <LineChart data={walletTrend} margin={{ top: 6, right: 8, left: 0, bottom: 0 }} onClick={onWalletTrendClick}>
                       <XAxis dataKey="label" stroke="var(--color-ink-3)" fontSize={10} tickLine={false} />
                       <YAxis hide domain={["dataMin", "dataMax"]} />
                       <Tooltip formatter={(v) => wonG(v)} contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-line)", borderRadius: 8, fontSize: 12 }} />
-                      <Line type="monotone" dataKey={nick} stroke="var(--color-success)" strokeWidth={2} dot={false} />
-                      <Line type="monotone" dataKey="AI" stroke="var(--purple)" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey={nick} stroke="var(--color-success)" strokeWidth={2} dot={{ r: 2, cursor: "pointer" }} activeDot={{ r: 5, cursor: "pointer" }} />
+                      <Line type="monotone" dataKey="AI" stroke="var(--purple)" strokeWidth={2} dot={{ r: 2, cursor: "pointer" }} activeDot={{ r: 5, cursor: "pointer" }} />
                     </LineChart>
                   </ResponsiveContainer>
+                  {trendClick ? (
+                    <div className="hero-trend-explain">
+                      <button type="button" className="hero-trend-x" onClick={() => setTrendClick(null)} aria-label="닫기">✕</button>
+                      <div className="hero-trend-explain-t">{trendClick.name} · 나:{trendClick.decision === "take" ? "매수" : "관망"} · AI:매수</div>
+                      <div className="hero-trend-explain-b">
+                        가격 {trendClick.ret >= 0 ? "+" : ""}{trendClick.ret}% · {nick} <b className={trendClick.myPnl >= 0 ? "up" : "dn"}>{wonG(trendClick.myPnl)}</b> vs AI <b className={trendClick.aiPnl >= 0 ? "up" : "dn"}>{wonG(trendClick.aiPnl)}</b>
+                        {" "}(차이 <b className={(trendClick.myPnl - trendClick.aiPnl) >= 0 ? "up" : "dn"}>{(trendClick.myPnl - trendClick.aiPnl) >= 0 ? "+" : ""}{wonG(trendClick.myPnl - trendClick.aiPnl)}</b>)
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="hero-trend-hint">점을 눌러보세요 — 그날 차이를 바로 설명해 드립니다</div>
+                  )}
                 </div>
               )}
               {pendingJudge.length > 0 && (
                 <div className="hero-pending">
-                  <div className="hero-ph">⏳ 진행 중 대결 {pendingJudge.length}건 (3일 후 정산)</div>
+                  <div className="hero-ph">⏳ 진행 중 대결 {pendingJudge.length}건 — 매일 마크투마켓, 3일째 확정</div>
                   {pendingJudge.slice(0, 4).map((e, i) => {
-                    const dday = Math.max(0, MATURE_DAYS - Math.floor((Date.now() - e.ts) / DAY));
-                    return <div className="hero-prow" key={i}><span className="hero-pn">{e.name}</span><span className="hero-pj">나:{e.decision === "take" ? "매수" : "관망"} · AI:{e.decision === "take" ? "동일 베팅" : "매수"}</span><span className="hero-dday">D-{dday}</span></div>;
+                    const elapsed = Math.floor((Date.now() - e.ts) / DAY);
+                    const dday = Math.max(0, MATURE_DAYS - elapsed);
+                    // [사용자 지시] 1일/3일/5일 체크포인트로 나열 — 최종 판정(3일)은 그대로,
+                    //   이미 쌓인 일별 가격 스냅샷(entry.snaps)으로 진행상황만 매일 미리보기.
+                    const snapAt = (daysAfter) => {
+                      const target = e.ts + daysAfter * DAY;
+                      const list = (e.snaps || []).filter((s) => s.ts <= target).sort((a, b) => b.ts - a.ts);
+                      return list[0] || null;
+                    };
+                    const retAt = (daysAfter) => {
+                      const s = snapAt(daysAfter);
+                      return s && e.entry ? (s.price / e.entry - 1) * 100 : null;
+                    };
+                    const ret1 = elapsed >= 1 ? retAt(1) : null;
+                    return (
+                      <div className="hero-prow2" key={i}>
+                        <div className="hero-prow-top"><span className="hero-pn">{e.name}</span><span className="hero-pj">나:{e.decision === "take" ? "매수" : "관망"} · AI:매수</span><span className="hero-dday">D-{dday}</span></div>
+                        <div className="hero-pcheck">1일차 {ret1 != null ? pctTxt(ret1) : "당일"} · 3일차(확정) D-{dday} · 5일차 참고 예정</div>
+                      </div>
+                    );
                   })}
                 </div>
               )}
@@ -454,11 +498,22 @@ export default function TodayPage({ reports }) {
               </span>
               <span className="mini-go">→</span>
             </button>
+            {/* [사용자 지시] 내 단지 실거래 변동 — feed(실거래 피드)에서 내 단지 최근 거래만 뽑아 표시 */}
+            {myFeedEntry && (
+              <div className="tile-spot">
+                {myComplex} 최근 실거래 <b>{myFeedEntry.거래금액_억}억</b>{myFeedEntry.거래일 ? ` · ${String(myFeedEntry.거래일).slice(5)}` : ""}
+                {myFeedEntry.변동률 != null && <> · 직전 대비 <b className={myFeedEntry.변동률 >= 0 ? "up" : "dn"}>{rePct(myFeedEntry.변동률)}</b></>}
+                {myLeaderGapPct != null && <> · 대장 대비 <b>{myLeaderGapPct.toFixed(1)}% 수준</b></>}
+              </div>
+            )}
             {reBrief && !reBrief.error && (
               <div className="tile-spot">
                 지역 대장 <b>{reBrief.leader}</b>{reBrief.leader_price != null ? ` ${Number(reBrief.leader_price).toFixed(2)}억` : ""}
                 {" · "}분기 <b className={reBrief.chg_q >= 0 ? "up" : "dn"}>{rePct(reBrief.chg_q)}</b>{" · "}연간 <b className={reBrief.chg_yr >= 0 ? "up" : "dn"}>{rePct(reBrief.chg_yr)}</b>
               </div>
+            )}
+            {myComplex && (
+              <div className="tile-empty">평형별 상세 비교는 부동산 페이지에서 확인하세요.</div>
             )}
           </section>
 
@@ -535,6 +590,8 @@ export default function TodayPage({ reports }) {
                   <button className="tile-news-row" key={n.id} onClick={() => openNewsDetail(n)}>
                     <span className={`tile-news-cat c-${n.category}`}>{CAT_KO[n.category] || "뉴스"}</span>
                     <span className="tile-news-t">{n.headline}</span>
+                    {/* [사용자 지시] 뉴스/정보 업데이트에는 날짜 기입 */}
+                    {n.created_at && <span className="tile-news-date">{String(n.created_at).slice(5, 10)}</span>}
                   </button>
                 ))}
                 {etfNews.length > 4 && (
@@ -547,79 +604,29 @@ export default function TodayPage({ reports }) {
           </section>
         )}
 
-        {/* ══ "오늘의 이야기" — 지역 커뮤니티 미리보기 ══ */}
-        {view === 3 && (
-          <section className="card tile story-teaser" onClick={() => router.push("/pwa/story")} role="button" tabIndex={0}>
-            <div className="tile-h">💬 오늘의 이야기</div>
-            <div className="tile-empty">우리 동네 이웃들과 오늘의 시장·부동산·ETF 이야기를 나눠보세요.</div>
-            <div className="story-teaser-go">이야기 보러가기 →</div>
-          </section>
-        )}
-
-        {/* ══ 종합자산 · 오늘의 할일 — "오늘의 대결" 탭(view 0)은 카드3(주식 할일 체크리스트)으로 대체 ══ */}
-        {view !== 0 && (
-        <section className="card tile">
-          <div className="tile-h">💼 종합자산 · 오늘의 할일</div>
-
-          {decideCount === 0 && !insight ? (
-            <div className="todo-empty">오늘은 특별히 할 일이 없어요 · 관망</div>
-          ) : (
-            <div className="todo-list">
-              {nearStop.slice(0, 2).map((p, i) => {
-                const sl = Number(p.stop_loss) || 0;
-                const cur = Number(p.current_price) || 0;
-                const breached = sl > 0 && cur > 0 && cur < sl;
-                const distPct = sl > 0 && cur > 0 ? ((cur / sl - 1) * 100) : null;
-                return (
-                  <div className="todo-row urgent" key={p.code || i}>
-                    <span className="todo-ic">⚠️</span>
-                    <span className="todo-body">
-                      <span className="todo-t">{p.name} <em className="todo-pct">{pctTxt(p.pnl_rate)}</em></span>
-                      <span className="todo-s">{breached ? `손절선 ${sl.toLocaleString()}원 이탈 — 매도 검토 필요` : `손절선까지 ${Math.abs(distPct).toFixed(1)}% 남음`}{p.ai_verdict ? ` · AI: ${p.ai_verdict}` : ""}</span>
-                    </span>
-                  </div>
-                );
-              })}
-              {pendItems.slice(0, 2).map((p, i) => (
-                <div className="todo-row urgent" key={p.code || `p${i}`}>
-                  <span className="todo-ic">✅</span>
-                  <span className="todo-body">
-                    <span className="todo-t">{p.name || p.stock || p.code}</span>
-                    <span className="todo-s">{p.reason || "AI 매수 제안 — 승인/거절이 필요합니다"}</span>
-                  </span>
+        {/* ══ "오늘의 이야기" — [사용자 지시] 주식/부동산/ETF/기타로 나눠 카드 작성 ══ */}
+        {view === 3 && STORY_CATS.map(([cat, ic]) => {
+          const items = cat === "기타"
+            ? storyComments.filter((c) => (c.category || "전체") === "전체")
+            : storyComments.filter((c) => c.category === cat);
+          return (
+            <section className="card tile story-cat" key={cat} onClick={() => router.push("/pwa/story")} role="button" tabIndex={0}>
+              <div className="tile-h">{ic} {cat} 이야기 <span className="story-cat-n">{items.length}</span></div>
+              {items.length > 0 ? (
+                <div className="story-cat-list">
+                  {items.slice(-2).reverse().map((c) => (
+                    <div className="story-cat-row" key={c.id}>
+                      <span className="story-cat-nick">{c.nick}</span>
+                      <span className="story-cat-text">{c.text}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-              {decideCount > 0 && (
-                <button className="todo-cta" onClick={() => router.push("/pwa?tab=portfolio")}>지금 판단하기 →</button>
+              ) : (
+                <div className="tile-empty">아직 {cat} 이야기가 없어요. 첫 글을 남겨보세요.</div>
               )}
-              {insight && (
-                <div className="todo-row insight">
-                  <span className="todo-ic">🔗</span>
-                  <span className="todo-body">
-                    <span className="todo-t">자산을 묶어 보면</span>
-                    <span className="todo-s">{insight.text}</span>
-                    <button className="todo-link" onClick={() => router.push(insight.cta.href)}>{insight.cta.label}</button>
-                  </span>
-                </div>
-              )}
-            </div>
-          )}
-
-          <button className="tile-nav-row" onClick={() => router.push("/pwa/assets")}>
-            <span className="tile-nav-ic">💰</span>
-            <span className="tile-nav-body">
-              <span className="tile-nav-t">종합자산</span>
-              <span className="tile-nav-s">{ukTxt(ledger?.total_uk) ? `총자산 ${ukTxt(ledger.total_uk)}` : "자산을 입력하면 한눈에 모입니다"}</span>
-            </span>
-            <span className="tile-nav-go">→</span>
-          </button>
-
-          <div className="ai-prog-mini">누적 판단 {pol.count}건{pol.remaining > 0 ? ` · ${pol.remaining}건 남으면 채점 통계 공개` : ` · 채점 기준(${pol.target}건) 충족`}</div>
-        </section>
-        )}
-
-        {/* ══ ④ Daily & Weekly 리포트 — 맨 아래. "오늘의 대결" 탭에는 표시 안 함(AI 페이지에 전용 AI 리포트 탭 있음) ══ */}
-        {view !== 0 && <AutoReportCard reports={reports} />}
+            </section>
+          );
+        })}
 
       </DataState>
 
@@ -689,9 +696,17 @@ export default function TodayPage({ reports }) {
         .hero-bar-me { height: 100%; background: var(--color-success); border-radius: 4px; transition: width .4s; }
         .hero-lead { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 0.76rem; color: var(--color-ink-2); word-break: keep-all; }
         .hero-trend { margin: 10px -4px 2px; }
+        .hero-trend-hint { font-size: 0.64rem; color: var(--color-ink-3); text-align: center; margin-top: 2px; }
+        .hero-trend-explain { position: relative; margin-top: 6px; padding: 9px 24px 9px 9px; background: var(--color-card-soft); border-radius: 9px; }
+        .hero-trend-x { position: absolute; top: 5px; right: 5px; width: 18px; height: 18px; border: none; background: none; color: var(--color-ink-3); font-size: 10px; cursor: pointer; }
+        .hero-trend-explain-t { font-size: 0.74rem; font-weight: 800; color: var(--color-ink); margin-bottom: 3px; }
+        .hero-trend-explain-b { font-size: 0.72rem; color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; }
         .hero-pending, .hero-recent { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--color-line); display: flex; flex-direction: column; gap: 5px; }
         .hero-ph { font-size: 0.68rem; font-weight: 800; color: var(--color-ink-3); margin-bottom: 2px; }
         .hero-prow, .hero-rrow { display: flex; align-items: center; gap: 7px; font-size: 0.74rem; }
+        .hero-prow2 { display: flex; flex-direction: column; gap: 2px; padding: 3px 0; }
+        .hero-prow-top { display: flex; align-items: center; gap: 7px; }
+        .hero-pcheck { font-size: 0.64rem; color: var(--color-ink-3); }
         .hero-pn { flex: 1; min-width: 0; color: var(--color-ink); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .hero-pj { flex: none; color: var(--color-ink-3); font-size: 0.68rem; }
         .hero-dday { flex: none; color: var(--color-warning-ink, var(--color-warning)); font-weight: 800; font-size: 0.68rem; }
@@ -732,8 +747,12 @@ export default function TodayPage({ reports }) {
         .mini-stat { display: flex; align-items: center; gap: 8px; text-align: left; padding: 12px 10px; border-radius: 12px; background: var(--color-card-soft, var(--color-bg)); border: 1px solid var(--color-line); cursor: pointer; font-family: var(--font-sans); min-height: 64px; }
         .mini-stat-full { width: 100%; margin-bottom: 12px; }
         .tile-empty { font-size: 0.8rem; color: var(--color-ink-3); padding: 10px 2px; }
-        .story-teaser { cursor: pointer; }
-        .story-teaser-go { text-align: right; font-size: 0.8rem; font-weight: 800; color: var(--color-primary); margin-top: 6px; }
+        .story-cat { cursor: pointer; }
+        .story-cat-n { font-size: 0.68rem; font-weight: 700; color: var(--color-ink-3); margin-left: 4px; }
+        .story-cat-list { display: flex; flex-direction: column; gap: 6px; }
+        .story-cat-row { display: flex; gap: 7px; align-items: baseline; font-size: 0.78rem; }
+        .story-cat-nick { flex: none; font-weight: 800; color: var(--color-ink-2); }
+        .story-cat-text { flex: 1; min-width: 0; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .mini-ic { flex: none; font-size: 20px; width: 26px; text-align: center; }
         .mini-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
         .mini-t { font-size: 0.8rem; font-weight: 800; color: var(--color-ink); }
@@ -749,56 +768,13 @@ export default function TodayPage({ reports }) {
         .tile-news-cat.c-realestate { background: #FFF6E5; color: #B45309; }
         .tile-news-cat.c-policy { background: #F6EEFF; color: #7A4CE0; }
         .tile-news-t { font-size: 0.78rem; color: var(--color-ink); line-height: 1.4; word-break: keep-all; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
+        .tile-news-date { flex: none; font-size: 0.64rem; color: var(--color-ink-3); }
         .tile-more { width: 100%; margin-top: 4px; border: none; background: none; color: var(--color-primary); font-size: 0.74rem; font-weight: 800; cursor: pointer; padding: 4px 2px; text-align: left; font-family: var(--font-sans); }
 
         /* ══ 종합자산 · 할일 ══ */
-        .todo-empty { font-size: 0.82rem; color: var(--color-ink-2); padding: 10px 2px 4px; }
-        .todo-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-        .todo-row { display: flex; gap: 9px; align-items: flex-start; padding: 9px 10px; border-radius: 11px; }
-        .todo-row.urgent { background: var(--color-danger-soft); }
-        .todo-row.insight { background: var(--color-primary-soft); }
-        .todo-ic { flex: none; font-size: 15px; line-height: 1.5; }
-        .todo-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-        .todo-t { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); }
-        .todo-pct { font-style: normal; font-weight: 800; color: var(--color-danger); }
-        .todo-s { font-size: 0.74rem; color: var(--color-ink-2); word-break: keep-all; line-height: 1.45; }
-        .todo-link { align-self: flex-start; margin-top: 4px; border: none; background: none; color: var(--color-primary); font-size: 0.76rem; font-weight: 800; cursor: pointer; padding: 0; font-family: var(--font-sans); }
-        .todo-cta { width: 100%; min-height: 44px; border: none; border-radius: 11px; background: var(--color-primary); color: #fff; font-size: 0.84rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
-        .todo-cta.soft { background: var(--color-card-soft, var(--color-line)); color: var(--color-ink); }
-        .tile-nav-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 11px 2px; background: none; border: none; border-top: 1px solid var(--color-line); cursor: pointer; font-family: var(--font-sans); min-height: 48px; margin-top: 4px; }
-        .tile-nav-ic { flex: none; font-size: 17px; width: 24px; text-align: center; }
-        .tile-nav-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-        .tile-nav-t { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); }
-        .tile-nav-s { font-size: 0.72rem; font-weight: 600; color: var(--color-ink-2); word-break: keep-all; }
-        .tile-nav-go { flex: none; font-size: 0.9rem; font-weight: 800; color: var(--color-primary); }
-        .ai-prog-mini { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--color-line); font-size: 0.66rem; color: var(--color-ink-3); }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>
   );
 }
 
-// [FB-2 §2.7] 자동 리포트 최신 요약을 빌드타임에 읽어 AutoReportCard 로 주입.
-//   런타임 API 없이 content/*.md frontmatter 의 실제 insight 만 사용(날조 없음).
-function latestFrontmatter(subdir) {
-  try {
-    const dir = path.join(process.cwd(), "content", subdir);
-    if (!fs.existsSync(dir)) return null;
-    const files = fs.readdirSync(dir).filter((f) => f.endsWith(".md")).sort().reverse();
-    for (const f of files) {
-      const { data } = matter(fs.readFileSync(path.join(dir, f), "utf8"));
-      if (data && data.published !== false) return data;
-    }
-  } catch (e) {}
-  return null;
-}
-
-export async function getStaticProps() {
-  const d = latestFrontmatter("daily");
-  const w = latestFrontmatter("weekly");
-  const reports = {
-    daily: d ? { insight: d.insight || d.title || null, date: d.date || null, slug: d.slug || null } : null,
-    weekly: w ? { insight: w.insight || w.title || null, week: w.week || null, date: w.date || null, slug: w.slug || null } : null,
-  };
-  return { props: { reports }, revalidate: 600 };
-}
