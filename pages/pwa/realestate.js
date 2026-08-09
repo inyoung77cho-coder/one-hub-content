@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import BottomNav from "../../components/BottomNav";
 import AppHeader from "../../components/AppHeader";
+import AssetMapTitle from "../../components/AssetMapTitle";
 import { dedupBy } from "../../lib/useDedup";
 import { ReForm } from "../../components/shared/AssetForms";
 import Term from "../../components/Term";
@@ -265,6 +266,8 @@ export default function RealEstateDashboard() {
   return (
     <div className="re pwa-shell">
       <AppHeader onSearch={() => setReSearchOpen(true)} />
+      {/* [사용자 지시] "종합자산 자산지도"에서 direct 연결되므로 상위 메뉴바를 그대로 이어 붙인다 */}
+      <AssetMapTitle current="부동산" />
 
       {/* [item1] 부동산 찾기 — 단지 검색 + 대장 아파트 + 관심지역(동) */}
       {reSearchOpen && (

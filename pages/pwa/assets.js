@@ -12,7 +12,7 @@ import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
 import LastUpdated from "../../components/LastUpdated";
 import QuickAddSheet from "../../components/shared/QuickAddSheet";
-import RotatingPageTitle from "../../components/RotatingPageTitle";
+import AssetMapTitle from "../../components/AssetMapTitle";
 import FeedbackButton from "../../components/FeedbackButton";
 
 const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || null);
@@ -74,7 +74,6 @@ export default function AssetsMapPage() {
   const [at, setAt] = useState(null);
   const [qaOpen, setQaOpen] = useState(false);
   const [open3, setOpen3] = useState({}); // 3층 아코디언 열림 상태(기본 전부 닫힘)
-  const [simOpen, setSimOpen] = useState(false); // [N9] 처방 시뮬 — 같은 카드 안에서 결과를 보여준다
   const [fixId, setFixId] = useState(null);      // [N6] 평단 수정 중인 종목 id
   const [fixVal, setFixVal] = useState("");      // [N6] 사용자가 직접 입력하는 평단(앱이 추정하지 않는다)
   const [delta, setDelta] = useState(null);      // [추세] 전일 대비 총자산·자산별 변화(브라우저 스냅샷 기반)
@@ -189,40 +188,6 @@ export default function AssetsMapPage() {
     });
   })();
 
-  // [N9] 처방 = 숫자 + 수단 + 제약. 세 가지가 다 있어야 실행 가능한 말이 된다.
-  //   숫자: 쏠림 기준선(60%)까지 옮겨야 하는 금액을 원장 값에서 계산(재합산 아님 — breakdown 값만 사용).
-  //   수단: 자산군별로 실제로 쓸 수 있는 통로.
-  //   제약: 그 수단이 당장 안 되는 이유를 먼저 밝힌다(부동산 분할매도 불가·현금 부족).
-  const TARGET_PCT = 60;
-  const rx = (() => {
-    if (!(domPct >= 55) || !dominant || !(mapDenom > 0)) return null;
-    const name = dominant.label.replace(/^[^\s]+\s/, "");
-    const moveUk = Math.max(0, Number(dominant.val) - mapDenom * (TARGET_PCT / 100));
-    const cashUk = bd.cash_uk != null ? Number(bd.cash_uk) : null;
-    const cashPct = bd.cash_uk != null ? pctOf(bd.cash_uk) : null;
-    const means =
-      dominant.k === "realestate" ? "연금계좌 ETF(세액공제 한도 안에서)"
-      : dominant.k === "stock" ? "지수 ETF로 나눠 담기"
-      : dominant.k === "etf" ? "종목·계좌 분산(연금/ISA)"
-      : "투자 자산군으로 이동";
-    const limits = [];
-    if (dominant.k === "realestate") limits.push("부동산은 나눠 팔 수 없어 오늘 당장 옮기는 건 현실적이지 않습니다 — 실제 수단은 ‘앞으로 새로 넣는 돈을 부동산 아닌 곳에’ 쪽입니다");
-    if (cashPct != null && cashPct < 3) limits.push(`현금이 ${cashPct < 1 ? "1% 미만" : `${Math.round(cashPct)}%`}뿐이라 한 번에 옮길 여력이 적습니다`);
-    if (cashUk == null) limits.push("현금이 입력되지 않아 실제 여력은 이 계산보다 클 수 있습니다");
-    return { name, moveUk, means, limits, targetPct: TARGET_PCT };
-  })();
-
-  // [N9] 시뮬 = 처방대로 옮겼을 때의 비중(before → after). 결정적 산수이며 예측이 아니다.
-  const simRows = (() => {
-    if (!rx || !(rx.moveUk > 0)) return null;
-    return mapRows.filter((r) => r.val != null).map((r) => {
-      const after = r.k === dominant.k ? Number(r.val) - rx.moveUk
-        : r.k === "etf" ? Number(r.val) + rx.moveUk
-        : Number(r.val);
-      return { k: r.k, label: r.label, color: r.color, before: pctOf(r.val), after: mapDenom > 0 ? (after / mapDenom) * 100 : 0 };
-    });
-  })();
-
   // [§3.4] 시장 맥락을 나열하지 말고 '내 position'을 장기 관점으로 해석한다(규칙 기반·결정적).
   //   국면 × 운용가능 구성(쏠림/현금)으로 큰 그림의 방향성을 한 문장으로.
   const positionRead = (() => {
@@ -258,20 +223,8 @@ export default function AssetsMapPage() {
         </div>
       </header>
 
-      <div className="as-title">
-        <span className="as-fixed">종합자산 <span className="as-sub">자산 지도</span></span>
-        <RotatingPageTitle
-          compact
-          items={ASSET_VIEWS.map((v) => ({ suffix: v.label }))}
-          onChange={(i) => {
-            // [사용자 지시] ETF·부동산은 자산 페이지 안에 요약을 두지 않고 해당 페이지로 바로 이동.
-            //   주식만 이 페이지 안에 남아 보유/추천 탭으로 이어진다.
-            const v = ASSET_VIEWS[i];
-            if (v.key === "stock") setView(i); else router.push(v.href);
-          }}
-          onLabelClick={(item) => { const v = ASSET_VIEWS.find((x) => x.label === item.suffix); if (v) router.push(v.href); }}
-        />
-      </div>
+      {/* [사용자 지시] ETF·부동산 페이지로 이동해도 이 타이틀 바가 그대로 이어지도록 공용 컴포넌트로 통일 */}
+      <AssetMapTitle current="주식" onChangeView={(i) => setView(i)} />
 
       {/* [사용자 지시] 주식 페이지의 보유/추천을 상위 메뉴바 바로 아래 탭으로 — "주식" 뷰에서만 노출 */}
       {view === 0 && (
@@ -304,9 +257,11 @@ export default function AssetsMapPage() {
               <text x="50" y="47" textAnchor="middle" className="as-donut-t">{useEx ? "운용" : "총"}</text>
               <text x="50" y="60" textAnchor="middle" className="as-donut-v">{uk(mapDenom)}</text>
             </svg>
+            {/* [사용자 지시] 주식/부동산/ETF/현금 링크 삭제 — 이제 클릭해 이동하는 용도가 아니라
+                순수 배분 정보 표시로만 쓴다. */}
             <div className="as-legend">
               {mapRows.map((r) => (
-                <button className="as-row" key={r.k} onClick={() => (r.href ? router.push(r.href) : setQaOpen(true))}>
+                <div className="as-row" key={r.k}>
                   <span className="as-dotc" style={{ background: r.color }} />
                   <span className="as-rl">{r.label}</span>
                   <span className="as-rv">
@@ -320,25 +275,23 @@ export default function AssetsMapPage() {
                     })()}
                   </span>
                   <span className="as-rp">{r.val != null ? `${pctOf(r.val).toFixed(1)}%` : ""}</span>
-                  <span className="as-arrow sm">→</span>
-                </button>
+                </div>
               ))}
               {/* [§3.1] 실거주는 운용 분모에서 빠진 '못 파는 자산'으로 별도 표기(회색). */}
               {useEx && (
-                <button className="as-row ex" onClick={() => router.push("/pwa/realestate")}>
+                <div className="as-row ex">
                   <span className="as-dotc ex" />
                   <span className="as-rl">🔑 실거주{myComplex ? ` ${myComplex}` : ""}</span>
                   <span className="as-rv">{uk(residenceUk)}</span>
                   <span className="as-rp">제외</span>
-                  <span className="as-arrow sm">→</span>
-                </button>
+                </div>
               )}
             </div>
           </div>
           <button className="as-add" onClick={() => setQaOpen(true)}>＋ 자산 추가·수정</button>
         </section>
 
-        {/* ── 총자산 헤드라인+추세(공통) ── */}
+        {/* ── 총자산 헤드라인+추세(공통) — [사용자 지시] 운용자산(실거주 제외 토글) 섹션은 삭제 ── */}
         <section className="card as-hero">
           <p className="as-headline">{headline}</p>
           <div className="as-total">
@@ -358,23 +311,6 @@ export default function AssetsMapPage() {
           {/* [N1] 총자산이 불완전하면 숫자와 같은 카드에서 말한다. 다른 화면으로 미루지 않는다. */}
           {(assets?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && (
             <p className="as-incomplete">⚠ 증권사 연동 자산을 불러오지 못했습니다 — 이 총자산은 <b>실제보다 적습니다</b>. 잠시 후 다시 시도해 주세요.</p>
-          )}
-          {/* [§3.1] 실거주 제외 — '못 파는 자산'을 빼고 실제 운용 가능 자산을 본다. 총자산 수치는 위에 그대로 유지. */}
-          {hasResidence && (
-            <div className="as-ex">
-              <label className="as-ex-tg">
-                <input type="checkbox" checked={exRes} onChange={(e) => setExRes(e.target.checked)} />
-                <span>실거주 아파트 제외</span>
-              </label>
-              {useEx ? (
-                <div className="as-ex-line">
-                  운용 가능 <b>{uk(opTotal)}</b>
-                  <span className="as-ex-sub">· 실거주 {uk(residenceUk)} 제외(못 파는 자산)</span>
-                </div>
-              ) : (
-                <div className="as-ex-line off">실거주 {uk(residenceUk)} 포함 · 전체 기준</div>
-              )}
-            </div>
           )}
         </section>
 
@@ -410,52 +346,6 @@ export default function AssetsMapPage() {
             )}
           </section>
         ))}
-
-        {/* [A4] 쏠림 진단 — 충격 숫자(쏠림)에 원인+다음 수를 같은 카드에. 중립색(빨강 금지). */}
-        {domPct >= 55 && dominant && (
-          <section className="card as-a4">
-            <div className="as-h">시장 대비 · 왜 이런가</div>
-            <div className="as-a4-num">{scopeLbl} <b>{Math.round(domPct)}%</b>가 {dominant.label.replace(/^[^\s]+\s/, "")}입니다</div>
-            <p className="as-a4-why">한 자산군에 크게 쏠려 있으면 시장이 오르내릴 때 내 자산은 상대적으로 <b>덜 따라갑니다</b> — 손실이 아니라 ‘덜 오름’일 수 있어요.</p>
-            {/* [N9] 처방: 숫자 + 수단 + 제약 */}
-            {rx && (
-              <div className="as-rx">
-                <p className="as-rx-do">
-                  {rx.moveUk > 0
-                    ? <>{rx.name} 비중을 {rx.targetPct}%까지 낮추려면 <b>{uk(rx.moveUk)}</b>을 다른 자산군으로 옮겨야 합니다. 수단은 <b>{rx.means}</b>입니다.</>
-                    : <>{rx.name} 비중은 이미 {rx.targetPct}% 근처입니다 — 지금 옮길 금액은 없습니다.</>}
-                  <span className="as-est">가정·추정</span>
-                </p>
-                {rx.limits.length > 0 && (
-                  <p className="as-rx-lim">다만, {rx.limits.join(". 그리고 ")}.</p>
-                )}
-                {simRows && (
-                  <button className="as-rx-sim" onClick={() => setSimOpen((v) => !v)} aria-expanded={simOpen}>
-                    {simOpen ? "시뮬 접기" : "이 안으로 시뮬 →"}
-                  </button>
-                )}
-                {simOpen && simRows && (
-                  <div className="as-sim">
-                    <div className="as-sim-h">{uk(rx.moveUk)}을 ETF로 옮기면 (산수일 뿐, 수익 예측 아님)</div>
-                    {simRows.map((s) => (
-                      <div className="as-sim-row" key={s.k}>
-                        <span className="as-dotc" style={{ background: s.color }} />
-                        <span className="as-sim-l">{s.label}</span>
-                        <span className="as-sim-v">{s.before.toFixed(1)}%</span>
-                        <span className="as-sim-ar">→</span>
-                        <span className="as-sim-v b">{s.after.toFixed(1)}%</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            {/* [OS-2] CTA는 선택된 뷰(주식/ETF/부동산)에 맞는 한 가지만 — "페이지별 카드 분리" */}
-            <div className="as-a4-cta">
-              <button onClick={() => router.push(ASSET_VIEWS[view].href)}>{ASSET_VIEWS[view].label === "ETF" ? "ETF 리밸런싱 →" : ASSET_VIEWS[view].label === "부동산" ? "부동산 살펴보기 →" : "포트폴리오 보기 →"}</button>
-            </div>
-          </section>
-        )}
 
         {/* ── 뷰별 전용 카드 ── */}
         {/* [사용자 지시] "주식" 뷰 — 상단 탭(보유/추천) 선택에 따라 실제 목록을 보여준다.
@@ -529,14 +419,6 @@ export default function AssetsMapPage() {
       <style jsx>{`
         /* [N5-3] 하단 여백 = 하단탭(56) + FAB 상단(68+52) 여유. 88px이면 FAB가 마지막 문구를 가렸다. */
         .as { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 140px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
-        /* [§3.1] 실거주 제외 토글 + 운용가능 요약 */
-        .as-ex { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--color-line); }
-        .as-ex-tg { display: flex; align-items: center; gap: 7px; font-size: 0.8rem; font-weight: 800; color: var(--color-ink-2); cursor: pointer; }
-        .as-ex-tg input { width: 16px; height: 16px; accent-color: var(--color-primary); cursor: pointer; }
-        .as-ex-line { margin-top: 7px; font-size: 0.9rem; font-weight: 700; color: var(--color-ink); }
-        .as-ex-line b { font-size: 1.05rem; font-weight: 800; color: var(--color-primary); }
-        .as-ex-line.off { font-size: 0.78rem; font-weight: 600; color: var(--color-ink-3); }
-        .as-ex-sub { font-size: 0.72rem; font-weight: 600; color: var(--color-ink-3); margin-left: 6px; word-break: keep-all; }
         .as-row.ex { opacity: 0.72; }
         .as-dotc.ex { background: repeating-linear-gradient(45deg, var(--color-ink-3) 0 2px, transparent 2px 4px); }
         .as-hd { display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top, 0px) + 12px) 2px 10px; }
@@ -587,7 +469,8 @@ export default function AssetsMapPage() {
         .as-legend { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
         /* [N5-2] 범례 잘림 — 그리드 아이템 기본 min-width:auto 라 이름 칸이 안 줄어 잘렸다(M1과 동일 원인).
            min-width:0 을 줘야 ellipsis 가 실제로 동작한다. 숫자는 tabular-nums 로 자릿수 정렬. */
-        .as-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto 14px; align-items: center; gap: 7px; padding: 7px 2px; background: none; border: none; border-bottom: 1px solid var(--color-line); cursor: pointer; font-family: var(--font-sans); text-align: left; }
+        .as-row { display: grid; grid-template-columns: 12px minmax(0, 1fr) auto auto; align-items: center; gap: 7px; padding: 7px 2px; border-bottom: 1px solid var(--color-line); }
+        .as-row:last-child { border-bottom: none; }
         .as-row:last-child { border-bottom: none; }
         .as-dotc { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
         .as-rl { min-width: 0; font-size: 0.78rem; font-weight: 700; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -605,13 +488,6 @@ export default function AssetsMapPage() {
         .as-accbody { padding: 0 0 12px; }
         .as-posread { font-size: 0.82rem; line-height: 1.6; color: var(--color-ink-2); word-break: keep-all; margin: 0 0 8px; }
         .as-acclink { border: none; background: none; color: var(--color-primary); font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); padding: 4px 0; }
-        /* [A4] 쏠림 진단 — 중립 톤(빨강 없음) */
-        .as-a4 { border-left: 4px solid var(--color-ink-3); }
-        .as-a4-num { font-size: 1rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
-        .as-a4-num b { color: var(--color-ink); }
-        .as-a4-why, .as-a4-next { font-size: 0.82rem; line-height: 1.55; color: var(--color-ink-2); margin: 0 0 8px; word-break: keep-all; }
-        .as-a4-why b { color: var(--color-ink); font-weight: 700; }
-        .as-est { font-size: 0.68rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 5px; padding: 1px 6px; }
         /* [N1] 총자산 불완전 고지 — 숫자 바로 아래. 눈에 띄되 공포를 팔지 않는다. */
         .as-incomplete { margin: 8px 0 0; font-size: 0.74rem; line-height: 1.5; color: var(--color-warning); word-break: keep-all; }
         /* [N6] 이상 평단 확인 — 경고색(빨강) 아님. 사용자 잘못이라 단정하지 않는다. */
@@ -620,22 +496,6 @@ export default function AssetsMapPage() {
         .as-fix-b { flex: 0 0 auto; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; padding: 9px 14px; font-size: 0.78rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .as-fix-b.p { border-color: var(--color-primary); color: var(--color-primary); }
         .as-fix-in { flex: 1 1 0; min-width: 0; border: 1px solid var(--color-line); border-radius: 9px; padding: 9px 10px; font-size: 0.82rem; font-family: var(--font-sans); background: var(--color-card); color: var(--color-ink); font-variant-numeric: tabular-nums; }
-        /* [N9] 처방(숫자·수단·제약) + 인라인 시뮬 */
-        .as-rx { border-top: 1px dashed var(--color-line); margin-top: 10px; padding-top: 10px; }
-        .as-rx-do { font-size: 0.82rem; line-height: 1.55; color: var(--color-ink); margin: 0 0 6px; word-break: keep-all; }
-        .as-rx-do b { font-weight: 800; }
-        .as-rx-do .as-est { margin-left: 6px; }
-        .as-rx-lim { font-size: 0.76rem; line-height: 1.5; color: var(--color-ink-3); margin: 0 0 8px; word-break: keep-all; }
-        .as-rx-sim { border: none; background: none; padding: 4px 0; color: var(--color-primary); font-size: 0.8rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
-        .as-sim { margin-top: 6px; background: var(--color-card-soft); border-radius: 10px; padding: 10px 12px; }
-        .as-sim-h { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-3); margin-bottom: 8px; word-break: keep-all; }
-        .as-sim-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto 14px auto; align-items: center; gap: 8px; min-height: 26px; }
-        .as-sim-l { min-width: 0; font-size: 0.78rem; color: var(--color-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .as-sim-v { font-size: 0.78rem; color: var(--color-ink-3); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
-        .as-sim-v.b { color: var(--color-ink); font-weight: 800; }
-        .as-sim-ar { font-size: 0.72rem; color: var(--color-ink-3); text-align: center; }
-        .as-a4-cta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
-        .as-a4-cta button { flex: 1 1 0; min-width: 0; min-height: 40px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-primary); border-radius: 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .as-vc-cta { width: 100%; min-height: 42px; border: 1px solid var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-primary); border-radius: 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         /* [사용자 지시] "주식" 뷰 — 계좌현황 + 보유/추천 분할 요약 */
         .as-vc-acct { margin-bottom: 12px; }

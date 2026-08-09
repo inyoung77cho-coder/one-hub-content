@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import BottomNav from "../../components/BottomNav";
 import AppHeader from "../../components/AppHeader";
+import AssetMapTitle from "../../components/AssetMapTitle";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS } from "../../lib/etfHoldings";
 import { classifyEtf } from "../../lib/etfClassify";
@@ -12,7 +13,6 @@ import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress,
 import Term from "../../components/Term";
 import REBAL_PRESETS from "../../data/rebalance_presets.json";
 import EtfBulkImport from "../../components/EtfBulkImport";
-import { EtfForm } from "../../components/shared/AssetForms";
 
 const won = (n) => {
   if (n == null) return "-";
@@ -391,8 +391,11 @@ export default function EtfDashboard() {
   return (
     <div className="etf pwa-shell">
       <AppHeader />
+      {/* [사용자 지시] "종합자산 자산지도" 탭에서 이 페이지로 direct 연결되므로, 상위 메뉴바가
+          사라진 것처럼 보이지 않도록 동일한 타이틀 바를 여기도 얹는다. */}
+      <AssetMapTitle current="ETF" />
 
-      {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해 (시안: 다크 네이비 히어로) */}
+      {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해. [사용자 지시] 다른 페이지처럼 밝은 카드로 통일 */}
       <section className="hero">
         <div className="eyebrow">
           <span className="lbl">📊 ETF 평가 기준{priceDate ? ` · ${priceDate}` : ""}{priceDate ? <span className={`date-flag ${priceStale ? "stale" : "fresh"}`}>{priceStale ? `지연 ${priceDaysAgo}일` : (priceFromLive ? "실시간" : "최신")}</span> : null}</span>
@@ -442,14 +445,14 @@ export default function EtfDashboard() {
         )}
       </section>
 
-      {/* [§3-6 피드백11] #1 결론 VerdictCard — 대표지표(실질 원화수익)를 못박고 핵심 리스크 노출 */}
+      {/* [§3-6 피드백11] #1 결론 VerdictCard — 대표지표(실질 원화수익)를 못박고 핵심 리스크 노출.
+          [사용자 지시] 분해 내역(ETF/환/교차)은 위 히어로 "수익 분해" 아코디언과 중복이라 삭제. */}
       {s && (
         <div className="etf-verdict">
           <div className="ev-lead">
             <span className="ev-lbl">📌 이 포트폴리오의 결론</span>
             <span className={`ev-metric ${sign(s.total_pnl_pct)}`}>환율 반영 수익 {pct(s.total_pnl_pct)} <span className="ev-period">(누적)</span></span>
           </div>
-          <div className="ev-decomp">ETF <b>{pct(s.etf_self_pct)}</b> + 환 <b>{pct(s.fx_pure_pct)}</b> + 교차 <b>{pct(s.cross_pct)}</b></div>
           {topRisk && <div className="ev-risk">⚠️ 핵심 리스크 · {topRisk}</div>}
         </div>
       )}
@@ -885,13 +888,12 @@ export default function EtfDashboard() {
         </section>
       )}
 
-      {/* 6) 내 ETF — 직접 매수/매도 입력 + 자동 시세 갱신 */}
+      {/* 6) 내 ETF — 자동 시세 갱신. [사용자 지시] 단건 직접입력 폼은 우측 하단 "+" 버튼과
+          중복이라 삭제 — 대량 가져오기(EtfBulkImport)만 유지(단건 빠른입력과 역할이 다름). */}
       <section className="card myetf">
-        <div className="label">🧾 내 ETF · 직접 입력 <span className="sub">시세 자동 갱신</span>
+        <div className="label">🧾 내 ETF <span className="sub">시세 자동 갱신</span>
           {myTotal > 0 && <span className="me-total">평가 {won(myTotal)}원</span>}
         </div>
-        {/* [폼 일원화] 빠른입력과 동일한 공용 EtfForm 사용 */}
-        <EtfForm onSaved={() => { const tr = getTrader(); const l = getHoldings(tr); setHoldings(l); refreshQuotes(l); }} />
         <EtfBulkImport onDone={() => { const tr = getTrader(); const l = getHoldings(tr); setHoldings(l); refreshQuotes(l); }} />
         {holdings.length > 0 ? (
           <div className="me-groups">
@@ -1051,48 +1053,48 @@ export default function EtfDashboard() {
         .err { background: var(--color-danger-soft); color: var(--color-danger); padding: 10px 12px; border-radius: 10px; font-size: 0.82rem; margin-bottom: 12px; }
         .loading { color: var(--color-ink-2); padding: 24px; text-align: center; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
-        /* HERO */
-        .hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 20px 18px; box-shadow: var(--shadow-float); margin-bottom: 14px; }
+        /* HERO — [사용자 지시] 다른 페이지처럼 밝은 카드로 통일(짙은 네이비 배경 삭제) */
+        .hero { background: var(--color-card); color: var(--color-ink); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; box-shadow: var(--shadow-card); margin-bottom: 12px; }
         .hero .eyebrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
-        .hero .lbl { font-size: 12px; font-weight: 700; color: var(--hero-ink-sub); }
+        .hero .lbl { font-size: 12px; font-weight: 700; color: var(--color-ink-2); }
         .live { background: var(--color-success); color: #04351f; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 5px; letter-spacing: .5px; display: inline-flex; align-items: center; gap: 4px; }
         /* [실시간] 갱신 표기 · 새로고침 · 라이브 점멸 */
         .live-wrap { display: inline-flex; align-items: center; gap: 8px; }
-        .fresh-ago { font-size: 10px; font-weight: 700; color: var(--hero-ink-sub); white-space: nowrap; }
-        .refresh-btn { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--hero-fill-line); background: var(--hero-fill); color: var(--hero-ink); font-size: 13px; line-height: 1; cursor: pointer; display: grid; place-items: center; font-family: var(--font-sans); }
+        .fresh-ago { font-size: 10px; font-weight: 700; color: var(--color-ink-2); white-space: nowrap; }
+        .refresh-btn { width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink); font-size: 13px; line-height: 1; cursor: pointer; display: grid; place-items: center; font-family: var(--font-sans); }
         .refresh-btn.spin { animation: etf-spin .7s linear; }
         @keyframes etf-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
         .live-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: etf-pulse 1.4s ease-in-out infinite; }
         @keyframes etf-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
-        .hero .big { font-size: 32px; font-weight: 800; letter-spacing: -.8px; line-height: 1; }
+        .hero .big { font-size: 32px; font-weight: 800; letter-spacing: -.8px; line-height: 1; color: var(--color-ink); }
         .big-live { font-size: 11px; font-weight: 800; color: var(--color-success); background: color-mix(in srgb, var(--color-success) 20%, transparent); padding: 3px 8px; border-radius: 6px; margin-left: 9px; vertical-align: middle; letter-spacing: 0; }
-        .hsub-note { color: var(--hero-ink-sub); font-weight: 500; }
+        .hsub-note { color: var(--color-ink-3); font-weight: 500; }
         .hero .big span { font-size: 19px; font-weight: 700; }
         .date-flag { display: inline-block; margin-left: 7px; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 6px; letter-spacing: .2px; vertical-align: middle; }
         .date-flag.fresh { background: color-mix(in srgb, var(--color-success) 22%, transparent); color: var(--color-success); }
         .date-flag.stale { background: color-mix(in srgb, var(--color-warning) 22%, transparent); color: var(--color-warning); }
-        .fx-note { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--hero-ink-soft); margin: -6px 0 4px; }
-        .fx-note b { color: var(--hero-ink); font-weight: 700; }
+        .fx-note { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--color-ink-2); margin: -6px 0 4px; }
+        .fx-note b { color: var(--color-ink); font-weight: 700; }
         .fx-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success); flex-shrink: 0; }
         .fx-note.stale { color: var(--color-warning); }
         .fx-note.stale .fx-dot { background: var(--color-warning); }
         .fx-note.stale b { color: var(--color-warning); }
-        .hero .hsub { font-size: 12.5px; color: var(--hero-ink-soft); margin-top: 9px; }
-        .hero .hsub b { color: var(--hero-accent); font-weight: 700; }
-        .decomp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-top: 16px; padding: 11px 13px; background: var(--hero-fill); border: 1px solid var(--hero-fill-line); border-radius: 12px; color: var(--hero-ink); font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }
-        .decomp-sum { font-size: 12px; font-weight: 600; color: var(--hero-ink-faint); }
-        .decomp-sum b { color: var(--hero-ink); font-weight: 800; }
+        .hero .hsub { font-size: 12.5px; color: var(--color-ink-2); margin-top: 9px; }
+        .hero .hsub b { color: var(--color-success); font-weight: 700; }
+        .decomp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-top: 16px; padding: 11px 13px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 12px; color: var(--color-ink); font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }
+        .decomp-sum { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
+        .decomp-sum b { color: var(--color-ink); font-weight: 800; }
         .decomp-caret { display: inline-block; transition: transform .2s; }
         .decomp-caret.open { transform: rotate(180deg); }
-        .decomp { background: var(--hero-fill); border: 1px solid var(--hero-fill-line); border-radius: 14px; padding: 14px; margin-top: 8px; }
+        .decomp { background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 14px; padding: 14px; margin-top: 8px; }
         .drow { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; }
-        .drow .dk { font-size: 12.5px; color: var(--hero-ink-soft); font-weight: 500; }
-        .drow .dv { font-size: 13px; font-weight: 700; color: var(--hero-accent); }
-        .drow .dv.neg { color: var(--hero-danger); }
-        .drow.total { border-top: 1px solid var(--hero-fill-line); margin-top: 6px; padding-top: 11px; }
-        .drow.total .dk { color: var(--hero-ink); font-weight: 700; font-size: 13px; }
+        .drow .dk { font-size: 12.5px; color: var(--color-ink-2); font-weight: 500; }
+        .drow .dv { font-size: 13px; font-weight: 700; color: var(--color-success); }
+        .drow .dv.neg { color: var(--color-danger); }
+        .drow.total { border-top: 1px solid var(--color-line); margin-top: 6px; padding-top: 11px; }
+        .drow.total .dk { color: var(--color-ink); font-weight: 700; font-size: 13px; }
         .drow.total .dv { font-size: 16px; font-weight: 800; }
-        .hero .foot-note { font-size: 11px; color: var(--hero-ink-faint); margin-top: 12px; line-height: 1.5; }
+        .hero .foot-note { font-size: 11px; color: var(--color-ink-3); margin-top: 12px; line-height: 1.5; }
         .label { font-size: 0.9rem; font-weight: 700; color: var(--color-ink); margin-bottom: 12px; display: flex; align-items: center; }
         .label .sub, .sub { font-weight: 600; color: var(--color-ink-3); font-size: 0.68rem; margin-left: 6px; }
         /* [v10 UI §1] 초록=수익, 빨강=손실/비용 */
@@ -1180,8 +1182,6 @@ export default function EtfDashboard() {
         .ev-lbl { font-size: 0.74rem; font-weight: 700; color: var(--color-ink-2); }
         .ev-metric { font-size: 1.05rem; font-weight: 800; }
         .ev-metric.pos { color: var(--color-success); } .ev-metric.neg { color: var(--color-danger); }
-        .ev-decomp { font-size: 0.8rem; color: var(--color-ink-2); margin-top: 6px; }
-        .ev-decomp b { color: var(--color-ink); font-weight: 700; }
         .ev-risk { font-size: 0.8rem; color: var(--color-warning-ink); background: var(--color-warning-soft); border-radius: 10px; padding: 9px 12px; margin-top: 11px; line-height: 1.45; word-break: keep-all; }
         /* [§3-6] 리밸런싱 왜(조정 이유) */
         .rb-why { background: var(--color-card-soft); border-radius: 12px; padding: 12px 13px; margin-bottom: 12px; }
