@@ -14,7 +14,8 @@ import AutoReportCard from "../../components/AutoReportCard";
 import HoldingsNews from "../../components/HoldingsNews";
 import ReportTeaser from "../../components/ReportTeaser";
 import { getLedger as getDecisionLedger, computeShowdown, matureLedger } from "../../lib/verdictLedger";
-import { computeWallets, computeDailySeries, getSeed, wonG, getNickname, setNickname } from "../../lib/gameWallet";
+import { computeWallets, getSeed, resetSeed, streakNarrative, wonG, getNickname, setNickname } from "../../lib/gameWallet";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { initGameSync } from "../../lib/gameSync";
 import { samplePolicy } from "../../lib/sampleSize";
 import { pickInsight } from "../../lib/crossInsight";
@@ -32,58 +33,10 @@ const MATURE_DAYS = 3; // 판단 → 채점까지(나 vs AI)
 const CAT_KO = { global: "글로벌", macro: "거시", markets: "증시", realestate: "부동산", policy: "정책", affairs: "시사" };
 const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || null);
 const pctTxt = (v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(2)}%`;
+const rePct = (v) => (v == null ? "-" : `${v > 0 ? "+" : ""}${Number(v).toFixed(1)}%`);
 // [사용자 지시] 지갑 큰 숫자는 "원" 없이, 그 아래 증감(+xx원)에만 "원"을 남긴다.
 const wonNum = (n) => wonG(n).replace(/원$/, "");
 const mmdd = (ms) => { const d = new Date(ms); return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
-
-// [2026-08-05] 일자별 잔고 비교 그래프 — "당일 종가 기준부터 일자별로 계속 update" 피드백.
-//   computeDailySeries(gameWallet.js)가 매일 마크투마켓한 시리즈를 그대로 그린다. 최종 금액은
-//   요청대로 그래프 오른쪽에 표기.
-function DuelChart({ series, myLabel }) {
-  if (!series || series.length < 2) return null;
-  const W = 200, H = 76, PAD = 4;
-  const vals = series.flatMap((s) => [s.my, s.ai]);
-  const min = Math.min(...vals), max = Math.max(...vals);
-  const range = Math.max(1, max - min);
-  const x = (i) => PAD + (i / (series.length - 1)) * (W - PAD * 2);
-  const y = (v) => H - PAD - ((v - min) / range) * (H - PAD * 2);
-  const path = (key) => series.map((s, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(s[key]).toFixed(1)}`).join(" ");
-  const last = series[series.length - 1];
-  const first = series[0];
-  return (
-    <div className="dc-row">
-      <div className="dc-chart">
-        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
-          <path d={path("ai")} className="dc-line dc-ai" fill="none" />
-          <path d={path("my")} className="dc-line dc-me" fill="none" />
-          <circle cx={x(series.length - 1)} cy={y(last.ai)} r="2.5" className="dc-dot dc-ai" />
-          <circle cx={x(series.length - 1)} cy={y(last.my)} r="2.5" className="dc-dot dc-me" />
-        </svg>
-        <div className="dc-daterange">{first.date.slice(5)} → {last.date.slice(5)}</div>
-      </div>
-      <div className="dc-finals">
-        <div className="dc-final-item me"><span className="dc-fk">{myLabel}</span><span className="dc-fv">{wonG(last.my)}</span></div>
-        <div className="dc-final-item ai"><span className="dc-fk">AI</span><span className="dc-fv">{wonG(last.ai)}</span></div>
-      </div>
-      <style jsx>{`
-        .dc-row { display: flex; align-items: center; gap: 10px; margin: 10px 0 2px; }
-        .dc-chart { flex: 1; min-width: 0; }
-        .dc-daterange { font-size: 0.6rem; color: var(--color-ink-3); margin-top: 2px; text-align: center; }
-        .dc-line { stroke-width: 2; vector-effect: non-scaling-stroke; }
-        .dc-line.dc-me { stroke: var(--color-success); }
-        .dc-line.dc-ai { stroke: var(--purple, var(--color-ink-3)); stroke-dasharray: 3 3; }
-        .dc-dot.dc-me { fill: var(--color-success); }
-        .dc-dot.dc-ai { fill: var(--purple, var(--color-ink-3)); }
-        .dc-finals { flex: none; display: flex; flex-direction: column; gap: 5px; min-width: 72px; }
-        .dc-final-item { display: flex; flex-direction: column; line-height: 1.2; }
-        .dc-fk { font-size: 0.6rem; font-weight: 700; color: var(--color-ink-3); }
-        .dc-fv { font-size: 0.78rem; font-weight: 800; font-family: var(--font-mono); }
-        .dc-final-item.me .dc-fv { color: var(--color-success); }
-        .dc-final-item.ai .dc-fv { color: var(--purple, var(--color-ink-2)); }
-      `}</style>
-    </div>
-  );
-}
 
 // 백엔드가 positions를 문자열로 주는 경우가 있어 방어적으로 파싱
 function parsePositions(dash) {
@@ -105,6 +58,7 @@ export default function TodayPage({ reports }) {
   const [at, setAt] = useState(null);
   const [notis, setNotis] = useState([]); // [알림] 텔레그램/리포트 알림 피드
   const [opNotes, setOpNotes] = useState([]); // [알림] OneHub 신고가(spot_price)
+  const [reBrief, setReBrief] = useState(null); // [사용자 지시] 내 부동산 vs 지역 대장단지 가격 비교(re/briefing 재사용)
   const [news, setNews] = useState(null); // [뉴스 통합] 오늘의 뉴스 — 부모가 한 번 fetch 해 카테고리별로 나눠 쓴다
   const [newsOpen, setNewsOpen] = useState(false); // ETF·부동산 타일 뉴스 더보기
   // [2026-08-05] 뉴스 상세는 useState가 아니라 URL(?news=id)에서 파생 — history에 진짜 항목이
@@ -153,6 +107,8 @@ export default function TodayPage({ reports }) {
       .then((n) => { if (n?.ok && Array.isArray(n.items)) setNotis(dedupBy(n.items, (x) => x.id ?? `${x.title || ""}|${x.body || ""}|${x.sent_at || x.created_at || ""}`)); }).catch(() => {});
     fetch(`/api/today/news`).then((r) => r.json())
       .then((d) => { setNews(Array.isArray(d?.items) ? d.items : []); }).catch(() => setNews([]));
+    fetch(`/api/pwa/re/briefing`).then((r) => r.json())
+      .then((b) => { if (b && !b.error) setReBrief(b); }).catch(() => {});
     try {
       const mp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null");
       if (mp?.name) fetch(`/api/input/re-spot?complex_name=${encodeURIComponent(mp.name)}`).then((r) => r.json())
@@ -218,11 +174,24 @@ export default function TodayPage({ reports }) {
     return w7.ready ? w7 : null;
   })();
   const vsMax = vsShowdown ? Math.max(Math.abs(vsShowdown.myRet), Math.abs(vsShowdown.aiRet), 1) : 1;
-  // [금액 표기] 가상 시드머니 지갑(설정된 경우만) — 실제 매매와 완전 분리된 게임머니. 미설정이면 %만 표시.
-  const wallet = vsShowdown ? computeWallets(vsShowdown, getSeed()) : null;
-  // [2026-08-05] 일자별 그래프 — 3거래일 확정 판정(vsShowdown)을 기다리지 않고 스냅샷이 쌓인
-  //   첫날부터 매일 마크투마켓으로 반영(당일 종가 기준 즉시 업데이트 요구사항).
-  const dailySeries = computeDailySeries(mine, getSeed(), tr2);
+  // [사용자 지시] AI 페이지 "나 vs AI 가상 지갑 대결" 카드와 동일한 방식 — 시드가 설정돼 있으면
+  //   vsShowdown(3·7일 채점 완료)을 기다리지 않고 항상 지갑 대시보드를 보여준다(3일 창으로 고정,
+  //   AI 페이지 game-dash와 동일). 정산분이 없으면 seed 그대로 잔고만 보여주고 그래프는 숨김.
+  const wallet = computeWallets(computeShowdown(mine, 3), getSeed());
+  const walletNarr = wallet ? streakNarrative(wallet.settled) : null;
+  const walletTrend = (() => {
+    if (!wallet || !wallet.settled.length) return [];
+    const chron = [...wallet.settled].sort((a, b) => a.ts - b.ts);
+    let myCum = wallet.seed, aiCum = wallet.seed;
+    const start = new Date(chron[0].ts);
+    const t = [{ label: `${start.getMonth() + 1}/${start.getDate()} 시작`, [nick]: myCum, AI: aiCum }];
+    chron.forEach((s) => {
+      myCum += s.myPnl; aiCum += s.aiPnl;
+      const d = new Date(s.ts);
+      t.push({ label: `${d.getMonth() + 1}/${d.getDate()}`, [nick]: myCum, AI: aiCum });
+    });
+    return t;
+  })();
 
   // ── AI 학습 진행도
   const pol = samplePolicy(mine.length);
@@ -329,54 +298,86 @@ export default function TodayPage({ reports }) {
             그대로 재사용하되 이 카드는 밝은 카드로(다른 두 카드와 통일), 최대한 한 줄 요약. */}
         <section className="card hero" onClick={() => router.push("/pwa?tab=report&sec=vs")} role="button" tabIndex={0}>
           <div className="hero-eyebrow">
-            <span className="hero-lbl">AI vs 나 · 주식{regime ? ` · ${regime}` : ""}</span>
-            <ShareButton compact title="ONE-HUB · 나 vs AI" text={vsShowdown ? `나 ${pctTxt(vsShowdown.myRet)} vs AI ${pctTxt(vsShowdown.aiRet)} — 나도 AI랑 대결해볼래?` : "AI와 투자 판단 대결, ONE-HUB에서 해보세요"} url="https://one-hub-content.vercel.app/pwa/today" />
+            <span className="hero-lbl">⚔ AI vs 나 · 주식 대결{regime ? ` · ${regime}` : ""}</span>
+            <span className="hero-virtual">가상·모의</span>
           </div>
 
-          {vsShowdown ? (
+          {wallet ? (
             <>
-              {wallet ? (
-                <>
-                  <div className="hero-wallets">
-                    <div className="hero-w">
-                      <button type="button" className="hero-wl" onClick={editNickname} title="닉네임 바꾸기">{nick} ✎</button>
-                      <b className="hero-wb">{wonNum(wallet.myBalance)}</b>
-                      <span className={`hero-wg ${wallet.myGain > 0 ? "up" : wallet.myGain < 0 ? "dn" : ""}`}>{wallet.myGain > 0 ? "+" : ""}{wonG(wallet.myGain)}</span>
-                    </div>
-                    <div className="hero-vs">VS</div>
-                    <div className="hero-w">
-                      <span className="hero-wl">AI</span>
-                      <b className="hero-wb">{wonNum(wallet.aiBalance)}</b>
-                      <span className={`hero-wg ${wallet.aiGain > 0 ? "up" : wallet.aiGain < 0 ? "dn" : ""}`}>{wallet.aiGain > 0 ? "+" : ""}{wonG(wallet.aiGain)}</span>
-                    </div>
-                  </div>
-                  <div className="hero-bar"><div className="hero-bar-me" style={{ width: `${Math.max(6, Math.min(94, wallet.myBalance + wallet.aiBalance > 0 ? (wallet.myBalance / (wallet.myBalance + wallet.aiBalance)) * 100 : 50))}%` }} /></div>
-                  <div className="hero-sub">{wallet.leader === "me" ? `내가 ${wonG(Math.abs(wallet.diff))} 앞섬` : wallet.leader === "ai" ? `AI가 ${wonG(Math.abs(wallet.diff))} 앞섬` : "접전"} · 가상 시드 {wonG(wallet.seed)} 기준{pendingJudge.length > 0 ? ` · 채점 중 ${pendingJudge.length}건` : ""}</div>
-                </>
-              ) : (
-                <>
-                  <div className="vsbars">
-                    <div className="vsrow">
-                      <span className="vsrow-lbl" onClick={editNickname} role="button" tabIndex={0} title="닉네임 바꾸기">{nick} ✎</span>
-                      <span className="vsrow-track"><span className={`vsrow-fill ${vsShowdown.myRet >= 0 ? "up" : "dn"}`} style={{ width: `${Math.min(100, (Math.abs(vsShowdown.myRet) / vsMax) * 100)}%` }} /></span>
-                      <span className={`vsrow-val ${vsShowdown.myRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.myRet)}</span>
-                    </div>
-                    <div className="vsrow">
-                      <span className="vsrow-lbl">AI</span>
-                      <span className="vsrow-track"><span className={`vsrow-fill ${vsShowdown.aiRet >= 0 ? "up" : "dn"}`} style={{ width: `${Math.min(100, (Math.abs(vsShowdown.aiRet) / vsMax) * 100)}%` }} /></span>
-                      <span className={`vsrow-val ${vsShowdown.aiRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.aiRet)}</span>
-                    </div>
-                  </div>
-                  <div className="hero-sub">{vsShowdown.winner === "me" ? "내 판단 승" : vsShowdown.winner === "ai" ? "AI 승" : "무승부"}{pendingJudge.length > 0 ? ` · 채점 중 ${pendingJudge.length}건` : ""}</div>
-                </>
+              {walletNarr && <div className="hero-narr">📖 {walletNarr}</div>}
+              <div className="hero-wallets">
+                <div className="hero-w">
+                  <button type="button" className="hero-wl" onClick={editNickname} title="닉네임 바꾸기">{nick} ✎</button>
+                  <b className="hero-wb">{wonNum(wallet.myBalance)}</b>
+                  <span className={`hero-wg ${wallet.myGain > 0 ? "up" : wallet.myGain < 0 ? "dn" : ""}`}>{wallet.myGain > 0 ? "+" : ""}{wonG(wallet.myGain)}</span>
+                </div>
+                <div className="hero-vs">VS</div>
+                <div className="hero-w">
+                  <span className="hero-wl">AI</span>
+                  <b className="hero-wb">{wonNum(wallet.aiBalance)}</b>
+                  <span className={`hero-wg ${wallet.aiGain > 0 ? "up" : wallet.aiGain < 0 ? "dn" : ""}`}>{wallet.aiGain > 0 ? "+" : ""}{wonG(wallet.aiGain)}</span>
+                </div>
+              </div>
+              <div className="hero-bar"><div className="hero-bar-me" style={{ width: `${Math.max(6, Math.min(94, wallet.myBalance + wallet.aiBalance > 0 ? (wallet.myBalance / (wallet.myBalance + wallet.aiBalance)) * 100 : 50))}%` }} /></div>
+              <div className="hero-lead">
+                {wallet.leader === "me" ? <b className="up">🏆 내가 {wonG(Math.abs(wallet.diff))} 앞섬</b> : wallet.leader === "ai" ? <b className="dn">🤖 AI가 {wonG(Math.abs(wallet.diff))} 앞섬</b> : <b>⚖️ 접전</b>} · 판당 베팅 {wonG(wallet.bet)}(가상)
+                <ShareButton compact title="ONE-HUB 나 vs AI 대결"
+                  text={wallet.leader === "me" ? `내가 AI보다 ${wonG(Math.abs(wallet.diff))} 앞서고 있어요! 나도 AI랑 대결해볼래?` : wallet.leader === "ai" ? `AI한테 ${wonG(Math.abs(wallet.diff))} 지고 있어요 — 나도 AI랑 대결해볼래?` : "AI와 팽팽한 접전 중! 나도 대결해볼래?"}
+                  url="https://one-hub-content.vercel.app/pwa/today" />
+              </div>
+              {walletTrend.length > 1 && (
+                <div className="hero-trend">
+                  <ResponsiveContainer width="100%" height={130}>
+                    <LineChart data={walletTrend} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
+                      <XAxis dataKey="label" stroke="var(--color-ink-3)" fontSize={10} tickLine={false} />
+                      <YAxis hide domain={["dataMin", "dataMax"]} />
+                      <Tooltip formatter={(v) => wonG(v)} contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-line)", borderRadius: 8, fontSize: 12 }} />
+                      <Line type="monotone" dataKey={nick} stroke="var(--color-success)" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="AI" stroke="var(--purple)" strokeWidth={2} dot={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               )}
-              <DuelChart series={dailySeries} myLabel={nick} />
+              {pendingJudge.length > 0 && (
+                <div className="hero-pending">
+                  <div className="hero-ph">⏳ 진행 중 대결 {pendingJudge.length}건 (3일 후 정산)</div>
+                  {pendingJudge.slice(0, 4).map((e, i) => {
+                    const dday = Math.max(0, MATURE_DAYS - Math.floor((Date.now() - e.ts) / DAY));
+                    return <div className="hero-prow" key={i}><span className="hero-pn">{e.name}</span><span className="hero-pj">나:{e.decision === "take" ? "매수" : "관망"} · AI:{e.decision === "take" ? "동일 베팅" : "매수"}</span><span className="hero-dday">D-{dday}</span></div>;
+                  })}
+                </div>
+              )}
+              {wallet.settled.length > 0 && (
+                <div className="hero-recent">
+                  <div className="hero-ph">🏁 최근 결과</div>
+                  {wallet.settled.slice(0, 4).map((s, i) => (
+                    <div className="hero-rrow" key={i}><span className="hero-rw">{s.winner === "me" ? "🏆" : s.winner === "ai" ? "💀" : "⚖️"}</span><span className="hero-pn">{s.name}</span><span className={`hero-rret ${s.ret >= 0 ? "up" : "dn"}`}>{s.ret >= 0 ? "+" : ""}{s.ret}%</span><span className="hero-rwin">{s.winner === "me" ? "나 승" : s.winner === "ai" ? "AI 승" : "무"}</span></div>
+                  ))}
+                </div>
+              )}
+              <div className="hero-foot">🎮 가상·모의 게임 · 실제 자산 아님 · 판단은 본인 책임(투자자문 아님) · <button type="button" className="hero-reset" onClick={(e) => { e.stopPropagation(); if (typeof window === "undefined" || window.confirm("게임을 초기화할까요? (가상 지갑만 리셋, 판단 기록은 유지)")) resetSeed(); }}>시드 변경</button></div>
+            </>
+          ) : vsShowdown ? (
+            <>
+              <div className="vsbars">
+                <div className="vsrow">
+                  <span className="vsrow-lbl" onClick={editNickname} role="button" tabIndex={0} title="닉네임 바꾸기">{nick} ✎</span>
+                  <span className="vsrow-track"><span className={`vsrow-fill ${vsShowdown.myRet >= 0 ? "up" : "dn"}`} style={{ width: `${Math.min(100, (Math.abs(vsShowdown.myRet) / vsMax) * 100)}%` }} /></span>
+                  <span className={`vsrow-val ${vsShowdown.myRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.myRet)}</span>
+                </div>
+                <div className="vsrow">
+                  <span className="vsrow-lbl">AI</span>
+                  <span className="vsrow-track"><span className={`vsrow-fill ${vsShowdown.aiRet >= 0 ? "up" : "dn"}`} style={{ width: `${Math.min(100, (Math.abs(vsShowdown.aiRet) / vsMax) * 100)}%` }} /></span>
+                  <span className={`vsrow-val ${vsShowdown.aiRet >= 0 ? "up" : "dn"}`}>{pctTxt(vsShowdown.aiRet)}</span>
+                </div>
+              </div>
+              <div className="hero-sub">{vsShowdown.winner === "me" ? "내 판단 승" : vsShowdown.winner === "ai" ? "AI 승" : "무승부"}{pendingJudge.length > 0 ? ` · 채점 중 ${pendingJudge.length}건` : ""}</div>
+              <ShareButton compact title="ONE-HUB · 나 vs AI" text={`나 ${pctTxt(vsShowdown.myRet)} vs AI ${pctTxt(vsShowdown.aiRet)} — 나도 AI랑 대결해볼래?`} url="https://one-hub-content.vercel.app/pwa/today" />
             </>
           ) : pendingJudge.length > 0 ? (
             <>
               <div className="hero-big"><span className="live-dot" />{pendingJudge.length}건 채점 중</div>
               <div className="hero-sub">내 판단과 AI를 3거래일 뒤 비교해요 · 결과는 {soonest ? mmdd(soonest) : "-"}부터</div>
-              {dailySeries.length >= 2 && <DuelChart series={dailySeries} myLabel={nick} />}
             </>
           ) : cands.length > 0 ? (
             <>
@@ -395,7 +396,7 @@ export default function TodayPage({ reports }) {
               ) : null}
             </>
           )}
-          <div className="hero-foot">누적 판단 {pol.count}건{pol.remaining > 0 ? ` · ${pol.remaining}건 남으면 채점 통계 공개` : ""}</div>
+          {!wallet && <div className="hero-foot">누적 판단 {pol.count}건{pol.remaining > 0 ? ` · ${pol.remaining}건 남으면 채점 통계 공개` : ""}</div>}
         </section>
 
         {/* 카드2 — 주식 뉴스(보유 종목 관련 + 주요 뉴스 통합) */}
@@ -440,26 +441,46 @@ export default function TodayPage({ reports }) {
         </section>
         </>)}
 
-        {/* ══ "오늘의 부동산" — 부동산 뉴스·신고가·정보만 ══ */}
-        {view === 1 && (
+        {/* ══ "오늘의 부동산" — [사용자 지시] 4카드: 내부동산·지역비교 / 신고가 공지 / 뉴스 / 오늘 할일(관심단지) ══ */}
+        {view === 1 && (<>
+          {/* 카드1 — 내 부동산 및 지역 가격 비교 현황 */}
           <section className="card tile">
-            <div className="tile-h">🏠 오늘의 부동산</div>
+            <div className="tile-h">🏠 내 부동산 · 지역 비교</div>
             <button className="mini-stat mini-stat-full" onClick={() => router.push("/pwa/realestate")}>
               <span className="mini-ic re">🏠</span>
               <span className="mini-body">
-                <span className="mini-t">부동산 홈</span>
-                <span className="mini-s">{myComplex ? `내 단지 ${myComplex}` : "관심 단지 동향 보기"}</span>
+                <span className="mini-t">{myComplex || "부동산 홈"}</span>
+                <span className="mini-s">{myComplex ? "내 단지 상세·시세 보기" : "관심 단지를 등록하면 시세를 비교합니다"}</span>
               </span>
               <span className="mini-go">→</span>
             </button>
-
-            {opNotes.length > 0 && (
-              <div className="tile-spot">🏢 OneHub 신고가 · {opNotes[0].complex_name} {opNotes[0].price_manwon ? `${(opNotes[0].price_manwon / 10000).toFixed(2)}억` : ""}{opNotes.length > 1 ? ` 외 ${opNotes.length - 1}건` : ""}</div>
+            {reBrief && !reBrief.error && (
+              <div className="tile-spot">
+                지역 대장 <b>{reBrief.leader}</b>{reBrief.leader_price != null ? ` ${Number(reBrief.leader_price).toFixed(2)}억` : ""}
+                {" · "}분기 <b className={reBrief.chg_q >= 0 ? "up" : "dn"}>{rePct(reBrief.chg_q)}</b>{" · "}연간 <b className={reBrief.chg_yr >= 0 ? "up" : "dn"}>{rePct(reBrief.chg_yr)}</b>
+              </div>
             )}
+          </section>
 
+          {/* 카드2 — 신고가 공지 */}
+          {opNotes.length > 0 && (
+            <section className="card tile">
+              <div className="tile-h">🏢 신고가 공지</div>
+              <div className="tile-news">
+                {opNotes.slice(0, 4).map((o, i) => (
+                  <button className="tile-news-row" key={o.id || i} onClick={() => router.push("/pwa/realestate")}>
+                    <span className="tile-news-t">{o.complex_name}{o.price_manwon ? ` · ${(o.price_manwon / 10000).toFixed(2)}억` : ""}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* 카드3 — 부동산 뉴스 */}
+          <section className="card tile">
+            <div className="tile-h">📰 부동산 뉴스</div>
             {realestateNews.length > 0 ? (
               <div className="tile-news">
-                <div className="tile-news-h">부동산 뉴스</div>
                 {(newsOpen ? realestateNews : realestateNews.slice(0, 4)).map((n) => (
                   <button className="tile-news-row" key={n.id} onClick={() => openNewsDetail(n)}>
                     <span className={`tile-news-cat c-${n.category}`}>{CAT_KO[n.category] || "뉴스"}</span>
@@ -473,10 +494,26 @@ export default function TodayPage({ reports }) {
             ) : (
               <div className="tile-empty">오늘 새로 올라온 부동산 뉴스가 없어요.</div>
             )}
-
             <ReportTeaser />
           </section>
-        )}
+
+          {/* 카드4 — 오늘의 할 일: 관심(저평가) 단지 */}
+          <section className="card tile">
+            <div className="tile-h">✅ 오늘의 할 일 · 부동산</div>
+            {reBrief?.under?.length > 0 ? (
+              <div className="tile-news">
+                <div className="tile-news-h">확인해볼 저평가 관심 단지</div>
+                {reBrief.under.slice(0, 3).map((u, i) => (
+                  <button className="tile-news-row" key={i} onClick={() => router.push("/pwa/realestate")}>
+                    <span className="tile-news-t">{u.단지명} <b className="up">+{Number(u.gap).toFixed(1)}% 저평가</b></span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="tile-empty">오늘은 새로 확인할 관심 단지 정보가 없어요.</div>
+            )}
+          </section>
+        </>)}
 
         {/* ══ "오늘의 ETF" — 글로벌·거시·정책 뉴스 + 관련 할일 ══ */}
         {view === 2 && (
@@ -627,6 +664,9 @@ export default function TodayPage({ reports }) {
         .hero { cursor: pointer; }
         .hero-eyebrow { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
         .hero-lbl { font-size: 12px; font-weight: 700; color: var(--color-ink-3); }
+        .hero-virtual { font-size: 10px; font-weight: 800; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 999px; padding: 2px 8px; flex-shrink: 0; }
+        .hero-narr { font-size: 0.76rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 9px; padding: 7px 10px; margin-bottom: 10px; word-break: keep-all; }
+        .up { color: var(--color-success); } .dn { color: var(--purple, var(--color-danger)); }
         .vsbars { display: flex; flex-direction: column; gap: 9px; margin-bottom: 10px; }
         .vsrow { display: flex; align-items: center; gap: 9px; }
         .vsrow-lbl { flex: none; width: 22px; font-size: 12px; font-weight: 800; color: var(--color-ink-2); background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
@@ -647,6 +687,18 @@ export default function TodayPage({ reports }) {
         .hero-vs { font-size: 12px; font-weight: 900; color: var(--color-ink-3); flex-shrink: 0; }
         .hero-bar { height: 8px; border-radius: 4px; background: var(--color-card-soft); overflow: hidden; margin-bottom: 10px; }
         .hero-bar-me { height: 100%; background: var(--color-success); border-radius: 4px; transition: width .4s; }
+        .hero-lead { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 0.76rem; color: var(--color-ink-2); word-break: keep-all; }
+        .hero-trend { margin: 10px -4px 2px; }
+        .hero-pending, .hero-recent { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--color-line); display: flex; flex-direction: column; gap: 5px; }
+        .hero-ph { font-size: 0.68rem; font-weight: 800; color: var(--color-ink-3); margin-bottom: 2px; }
+        .hero-prow, .hero-rrow { display: flex; align-items: center; gap: 7px; font-size: 0.74rem; }
+        .hero-pn { flex: 1; min-width: 0; color: var(--color-ink); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hero-pj { flex: none; color: var(--color-ink-3); font-size: 0.68rem; }
+        .hero-dday { flex: none; color: var(--color-warning-ink, var(--color-warning)); font-weight: 800; font-size: 0.68rem; }
+        .hero-rw { flex: none; }
+        .hero-rret { flex: none; font-weight: 800; font-family: ui-monospace, monospace; }
+        .hero-rwin { flex: none; color: var(--color-ink-3); font-size: 0.68rem; }
+        .hero-reset { border: none; background: none; color: var(--color-primary); font-weight: 800; cursor: pointer; padding: 0; font-family: var(--font-sans); font-size: inherit; }
         .hero-big { font-size: 22px; font-weight: 800; letter-spacing: -.4px; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; color: var(--color-ink); }
         .hero-big.hero-quiet { color: var(--color-ink-2); font-size: 19px; }
         .hero-sub { font-size: 12.5px; color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; margin-bottom: 4px; }

@@ -176,18 +176,6 @@ export default function AssetsMapPage() {
     ? `시장은 ${regime} 국면입니다. ${buys.length > 0 ? `주식 매수 후보 ${buys.length}건.` : "뚜렷한 매수 후보는 없습니다."}`
     : "자산을 입력하면 오늘의 판단을 요약해 드립니다.";
 
-  // 1층 액션 카드(최대 3) — %는 전체 총자산 기준(pctFull) 유지(다른 화면과 일치)
-  //   [§3.2] '선별 관망 · 0건 차단'은 현 시장을 못 대변한다 — 국면·사유를 함께 담아 왜 관망인지 맥락을 준다.
-  const stockSub = buys.length > 0
-    ? `매수 후보 ${buys.length}건 검토`
-    : blocked.length > 0
-    ? `${regime ? `${regime} 국면 · ` : ""}${blocked.length}종목 기준 미달로 관망`
-    : `${regime ? `${regime} 국면 · ` : ""}오늘 기준 통과 종목 없음`;
-  const actions = [
-    { label: "📈 주식", sub: stockSub, href: "/pwa?tab=portfolio" },
-    { label: "💹 ETF", sub: `보유 비중 ${pctFull(bd.etf_uk).toFixed(1)}% · 계좌·세제 점검`, href: "/pwa/etf" },
-    { label: "🏠 부동산", sub: pctFull(bd.realestate_uk) >= 60 ? `${Math.round(pctFull(bd.realestate_uk))}% 쏠림 · 신규 매입 신중` : "ONE Score·저평가 확인", href: "/pwa/realestate" },
-  ].slice(0, 3);
 
   // 도넛(stroke-dasharray) — 뷰 분모(mapDenom) 기준
   const donut = (() => {
@@ -275,7 +263,12 @@ export default function AssetsMapPage() {
         <RotatingPageTitle
           compact
           items={ASSET_VIEWS.map((v) => ({ suffix: v.label }))}
-          onChange={(i) => setView(i)}
+          onChange={(i) => {
+            // [사용자 지시] ETF·부동산은 자산 페이지 안에 요약을 두지 않고 해당 페이지로 바로 이동.
+            //   주식만 이 페이지 안에 남아 보유/추천 탭으로 이어진다.
+            const v = ASSET_VIEWS[i];
+            if (v.key === "stock") setView(i); else router.push(v.href);
+          }}
           onLabelClick={(item) => { const v = ASSET_VIEWS.find((x) => x.label === item.suffix); if (v) router.push(v.href); }}
         />
       </div>
@@ -289,56 +282,7 @@ export default function AssetsMapPage() {
       )}
 
       <DataState status={status} hasData={!!assets} onRetry={load} skeletonLines={5} skeletonBlock>
-        {/* ── 1층(공통): 자산지도 + 통합분석은 선택된 자산군과 무관하게 항상 먼저 ── */}
-        <section className="card as-hero">
-          <p className="as-headline">{headline}</p>
-          <div className="as-total">
-            <span>총자산</span>
-            <b>{uk(total)}</b>
-            {at && <span className="as-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
-          </div>
-          {/* [추세] 전일 대비 변화 + 스파크라인을 별도 줄에. 데이터가 하루뿐이면 '기록 시작' 안내. */}
-          {delta && delta.total != null ? (
-            <div className="as-trend">
-              <span className={`as-dchip ${dCls(delta.total)}`}>{delta.total >= 0 ? "▲" : "▼"} {dvUk(delta.total)}</span>
-              <span className="as-dlabel">{delta.prevDate} 대비</span>
-            </div>
-          ) : (
-            <p className="as-dnew">📈 오늘부터 총자산 추이를 기록합니다 — 내일부터 전일 대비 변화가 표시됩니다.</p>
-          )}
-          {/* [N1] 총자산이 불완전하면 숫자와 같은 카드에서 말한다. 다른 화면으로 미루지 않는다. */}
-          {(assets?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && (
-            <p className="as-incomplete">⚠ 증권사 연동 자산을 불러오지 못했습니다 — 이 총자산은 <b>실제보다 적습니다</b>. 잠시 후 다시 시도해 주세요.</p>
-          )}
-          {/* [§3.1] 실거주 제외 — '못 파는 자산'을 빼고 실제 운용 가능 자산을 본다. 총자산 수치는 위에 그대로 유지. */}
-          {hasResidence && (
-            <div className="as-ex">
-              <label className="as-ex-tg">
-                <input type="checkbox" checked={exRes} onChange={(e) => setExRes(e.target.checked)} />
-                <span>실거주 아파트 제외</span>
-              </label>
-              {useEx ? (
-                <div className="as-ex-line">
-                  운용 가능 <b>{uk(opTotal)}</b>
-                  <span className="as-ex-sub">· 실거주 {uk(residenceUk)} 제외(못 파는 자산)</span>
-                </div>
-              ) : (
-                <div className="as-ex-line off">실거주 {uk(residenceUk)} 포함 · 전체 기준</div>
-              )}
-            </div>
-          )}
-        </section>
-
-        <div className="as-actions">
-          {actions.map((a) => (
-            <button className="as-act" key={a.label} onClick={() => router.push(a.href)}>
-              <span className="as-act-l"><b>{a.label}</b><span>{a.sub}</span></span>
-              <span className="as-arrow">→</span>
-            </button>
-          ))}
-        </div>
-
-        {/* ── 2층: 자산 지도 — [사용자 지시] "주식" 뷰에서는 계좌현황 요약을 이 카드 맨 위에 병합 ── */}
+        {/* ── [사용자 지시] 자산 지도 카드를 맨 위로 — "주식" 뷰에서는 계좌현황 요약을 카드 맨 위에 병합 ── */}
         <section className="card">
           <div className="as-h">자산 지도</div>
           {view === 0 && (
@@ -392,6 +336,46 @@ export default function AssetsMapPage() {
             </div>
           </div>
           <button className="as-add" onClick={() => setQaOpen(true)}>＋ 자산 추가·수정</button>
+        </section>
+
+        {/* ── 총자산 헤드라인+추세(공통) ── */}
+        <section className="card as-hero">
+          <p className="as-headline">{headline}</p>
+          <div className="as-total">
+            <span>총자산</span>
+            <b>{uk(total)}</b>
+            {at && <span className="as-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
+          </div>
+          {/* [추세] 전일 대비 변화 + 스파크라인을 별도 줄에. 데이터가 하루뿐이면 '기록 시작' 안내. */}
+          {delta && delta.total != null ? (
+            <div className="as-trend">
+              <span className={`as-dchip ${dCls(delta.total)}`}>{delta.total >= 0 ? "▲" : "▼"} {dvUk(delta.total)}</span>
+              <span className="as-dlabel">{delta.prevDate} 대비</span>
+            </div>
+          ) : (
+            <p className="as-dnew">📈 오늘부터 총자산 추이를 기록합니다 — 내일부터 전일 대비 변화가 표시됩니다.</p>
+          )}
+          {/* [N1] 총자산이 불완전하면 숫자와 같은 카드에서 말한다. 다른 화면으로 미루지 않는다. */}
+          {(assets?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && (
+            <p className="as-incomplete">⚠ 증권사 연동 자산을 불러오지 못했습니다 — 이 총자산은 <b>실제보다 적습니다</b>. 잠시 후 다시 시도해 주세요.</p>
+          )}
+          {/* [§3.1] 실거주 제외 — '못 파는 자산'을 빼고 실제 운용 가능 자산을 본다. 총자산 수치는 위에 그대로 유지. */}
+          {hasResidence && (
+            <div className="as-ex">
+              <label className="as-ex-tg">
+                <input type="checkbox" checked={exRes} onChange={(e) => setExRes(e.target.checked)} />
+                <span>실거주 아파트 제외</span>
+              </label>
+              {useEx ? (
+                <div className="as-ex-line">
+                  운용 가능 <b>{uk(opTotal)}</b>
+                  <span className="as-ex-sub">· 실거주 {uk(residenceUk)} 제외(못 파는 자산)</span>
+                </div>
+              ) : (
+                <div className="as-ex-line off">실거주 {uk(residenceUk)} 포함 · 전체 기준</div>
+              )}
+            </div>
+          )}
         </section>
 
         {/* [N6] 이상 평단 확인 — 총자산에서 뺀 사실은 총자산이 보이는 곳에서 설명한다.
@@ -511,20 +495,8 @@ export default function AssetsMapPage() {
             <button className="as-vc-cta" onClick={() => router.push(stockTab === "hold" ? "/pwa?tab=portfolio" : "/pwa?tab=recommend")}>{stockTab === "hold" ? "보유 자세히 · 매도 →" : "추천 자세히 · 승인 →"}</button>
           </section>
         )}
-        {view === 1 && (
-          <section className="card as-viewcard">
-            <div className="as-h">📊 ETF 요약</div>
-            <div className="as-vc-line">보유 비중 <b>{pctFull(bd.etf_uk).toFixed(1)}%</b>{bd.etf_uk != null ? ` · 평가 ${uk(bd.etf_uk)}` : ""}</div>
-            <button className="as-vc-cta" onClick={() => router.push("/pwa/etf")}>ETF 리밸런싱·계좌·세제 점검 →</button>
-          </section>
-        )}
-        {view === 2 && (
-          <section className="card as-viewcard">
-            <div className="as-h">🏠 부동산 요약</div>
-            <div className="as-vc-line">{myComplex ? `실거주 ${myComplex}` : "실거주 단지 미등록"}{invProps.length > 0 ? ` · 투자용 ${invProps.length}건` : ""}</div>
-            <button className="as-vc-cta" onClick={() => router.push("/pwa/realestate")}>부동산 살펴보기 →</button>
-          </section>
-        )}
+        {/* [사용자 지시] ETF·부동산은 이제 탭 선택 즉시 해당 페이지로 이동하므로(RotatingPageTitle onChange
+            참고) 여기엔 요약 카드를 두지 않는다 — view는 실질적으로 항상 0(주식)만 남는다. */}
 
         {/* ── 3층: 상세(기본 닫힘) — 시장 맥락은 주식 시황 중심이라 "주식" 뷰에서만 ── */}
         {view === 0 && (
@@ -597,11 +569,6 @@ export default function AssetsMapPage() {
         .as-rd.up { color: var(--color-success, #0E9E6A); }
         .as-rd.down { color: var(--color-danger, #E5484D); }
         .as-rd.flat { color: var(--color-ink-3); }
-        .as-actions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-        .as-act { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 56px; padding: 12px 14px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; box-shadow: var(--shadow-card); cursor: pointer; font-family: var(--font-sans); text-align: left; }
-        .as-act-l { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-        .as-act-l b { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); }
-        .as-act-l span { font-size: 0.76rem; color: var(--color-ink-2); word-break: keep-all; }
         .as-arrow { color: var(--color-primary); font-weight: 800; flex-shrink: 0; }
         .as-arrow.sm { font-size: 0.8rem; }
         .as-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 12px; }
@@ -669,8 +636,6 @@ export default function AssetsMapPage() {
         .as-sim-ar { font-size: 0.72rem; color: var(--color-ink-3); text-align: center; }
         .as-a4-cta { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
         .as-a4-cta button { flex: 1 1 0; min-width: 0; min-height: 40px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-primary); border-radius: 10px; font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
-        .as-vc-line { font-size: 0.86rem; color: var(--color-ink-2); margin-bottom: 12px; }
-        .as-vc-line b { color: var(--color-ink); font-weight: 800; }
         .as-vc-cta { width: 100%; min-height: 42px; border: 1px solid var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-primary); border-radius: 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         /* [사용자 지시] "주식" 뷰 — 계좌현황 + 보유/추천 분할 요약 */
         .as-vc-acct { margin-bottom: 12px; }
