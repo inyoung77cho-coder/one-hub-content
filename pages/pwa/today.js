@@ -15,6 +15,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "rec
 import { initGameSync } from "../../lib/gameSync";
 import { samplePolicy } from "../../lib/sampleSize";
 import { getStoryRegionOverride, REGIONS } from "../../lib/storyRegion";
+import { getHoldings as getEtfHoldings } from "../../lib/etfHoldings";
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
@@ -189,7 +190,9 @@ export default function TodayPage() {
     const chron = [...wallet.settled].sort((a, b) => a.ts - b.ts);
     let myCum = wallet.seed, aiCum = wallet.seed;
     const start = new Date(chron[0].ts);
-    const t = [{ label: `${start.getMonth() + 1}/${start.getDate()} 시작`, [nick]: myCum, AI: aiCum, _ev: null }];
+    // [사용자 지시] x축은 하루 날짜(M/D)로 통일 — 첫 점만 "시작"이 붙어 있던 걸 없애 모든 점이
+    //   동일한 날짜 표기가 되도록.
+    const t = [{ label: `${start.getMonth() + 1}/${start.getDate()}`, [nick]: myCum, AI: aiCum, _ev: null }];
     chron.forEach((s) => {
       myCum += s.myPnl; aiCum += s.aiPnl;
       const d = new Date(s.ts);
@@ -199,6 +202,12 @@ export default function TodayPage() {
   })();
   // [사용자 지시] 그래프 클릭 → AI 페이지로 안 넘어가고 그 지점 판단 차이를 간단히 설명
   const onWalletTrendClick = (e) => setTrendClick(e?.activePayload?.[0]?.payload?._ev || null);
+  // [사용자 지시] 그래프 아래 날짜별 차이 금액 옆에 왜 차이 나는지(종목·금액) 간단히 나열 —
+  //   클릭하지 않아도 바로 보이도록. 최근 정산분부터 최대 4건.
+  const walletDiffLines = wallet ? [...wallet.settled].sort((a, b) => b.ts - a.ts).slice(0, 4).map((s) => ({
+    key: s.ts, date: `${new Date(s.ts).getMonth() + 1}/${new Date(s.ts).getDate()}`, name: s.name,
+    diff: (s.myPnl || 0) - (s.aiPnl || 0),
+  })) : [];
 
   // ── AI 학습 진행도
   const pol = samplePolicy(mine.length);
@@ -224,28 +233,43 @@ export default function TodayPage() {
   const todayStr = `${kd.getUTCFullYear()}-${String(kd.getUTCMonth() + 1).padStart(2, "0")}-${String(kd.getUTCDate()).padStart(2, "0")}`;
 
   // [사용자 지시] 대결 탭 이외 탭들도 맨 위 카드가 비어 보이지 않도록 — 그날 가장 중요한 항목 한 줄
-  //   요약. 우선순위 폭포: 실제 이벤트(신고가·저평가·뉴스) → 배경 정보(지역 시황) → 마지막 안내 문구.
-  const reHeadline = opNotes.length > 0
+  //   요약. 우선순위 폭포: 내 보유 관련 실제 변동 → 그 외 실제 이벤트(신고가·저평가) → 배경 정보(지역
+  //   시황) → 마지막 안내 문구. "내 것"이 있으면 항상 최우선(가장 개인적으로 의미 있는 정보이므로).
+  const reHeadline = myFeedEntry?.변동률 != null
+    ? `🏠 ${myComplex} 최근 실거래 ${myFeedEntry.거래금액_억}억 · 직전 대비 ${rePct(myFeedEntry.변동률)}`
+    : opNotes.length > 0
     ? `🏢 ${opNotes[0].complex_name}${opNotes[0].price_manwon ? ` ${(opNotes[0].price_manwon / 10000).toFixed(2)}억` : ""} 신고가 발생`
     : reBrief?.under?.length > 0
     ? `📉 ${reBrief.under[0].단지명} 지역 대비 +${Number(reBrief.under[0].gap).toFixed(1)}% 저평가`
     : reBrief?.leader
     ? `🏠 지역 대장 ${reBrief.leader}${reBrief.leader_price != null ? ` ${Number(reBrief.leader_price).toFixed(2)}억` : ""} · 분기 ${rePct(reBrief.chg_q)}`
     : "오늘의 부동산 뉴스와 신고가를 아래에서 확인하세요.";
-  const etfHeadline = etfNews.length > 0
+  // [사용자 지시] ETF 헤드라인 — 보유 중인 ETF 티커가 언급된 뉴스를 최우선으로.
+  const myEtfTickers = getEtfHoldings(trader).map((h) => String(h.ticker || "").trim()).filter((t) => t.length >= 2);
+  const myEtfNews = myEtfTickers.length > 0
+    ? allNews.find((n) => myEtfTickers.some((tk) => `${n.headline || ""} ${n.summary_md || ""}`.includes(tk)))
+    : null;
+  const etfHeadline = myEtfNews
+    ? `📌 보유 ETF 관련 · ${myEtfNews.headline}`
+    : etfNews.length > 0
     ? `📰 ${etfNews[0].headline}`
     : "오늘은 특별한 ETF 관련 이슈가 없어요 — 평소 배분을 유지하세요.";
   const storySorted = [...storyComments].sort((a, b) => (b.ts || 0) - (a.ts || 0));
-  const storyLatest = storySorted[0] || null;
   // ts는 클라 시각(ms) — KST 자정 이후분만 "오늘"로 센다(todayStr은 위에서 이미 계산).
-  const storyTodayCount = storySorted.filter((c) => {
+  const isToday = (c) => {
     const kd2 = new Date((c.ts || 0) + 9 * 3600 * 1000);
     return `${kd2.getUTCFullYear()}-${String(kd2.getUTCMonth() + 1).padStart(2, "0")}-${String(kd2.getUTCDate()).padStart(2, "0")}` === todayStr;
-  }).length;
-  const storyHeadline = storyLatest
-    ? storyTodayCount > 0
-      ? `💬 오늘 ${storyTodayCount}개의 새 이야기 · 최근 "${String(storyLatest.text || "").slice(0, 28)}${String(storyLatest.text || "").length > 28 ? "…" : ""}"`
-      : `💬 최근 이야기 "${String(storyLatest.text || "").slice(0, 28)}${String(storyLatest.text || "").length > 28 ? "…" : ""}"`
+  };
+  const storyTodayList = storySorted.filter(isToday);
+  // [사용자 지시] "가장 중요하거나 재미있는" 댓글 — 좋아요 등 참여 데이터가 없어 가장 가까운 대리
+  //   지표로 "오늘 중 가장 긴(내용이 실린) 글"을 쓴다. 오늘 글이 없으면 최근 글로 대체.
+  const storyPick = storyTodayList.length > 0
+    ? [...storyTodayList].sort((a, b) => String(b.text || "").length - String(a.text || "").length)[0]
+    : storySorted[0] || null;
+  const storyHeadline = storyPick
+    ? storyTodayList.length > 0
+      ? `💬 오늘 ${storyTodayList.length}개의 새 이야기 · "${String(storyPick.text || "").slice(0, 28)}${String(storyPick.text || "").length > 28 ? "…" : ""}"`
+      : `💬 최근 이야기 "${String(storyPick.text || "").slice(0, 28)}${String(storyPick.text || "").length > 28 ? "…" : ""}"`
     : "아직 등록된 동네 이야기가 없어요 — 첫 이야기를 남겨보세요.";
 
   // ── 오늘 중요 알림(매매·손절·서킷 등) — 히어로에 접어 넣는다. OneHub 신고가·루틴 알림은 제외.
@@ -388,6 +412,18 @@ export default function TodayPage() {
                     </div>
                   ) : (
                     <div className="hero-trend-hint">점을 눌러보세요 — 그날 차이를 바로 설명해 드립니다</div>
+                  )}
+                  {/* [사용자 지시] 날짜별 차이 금액 옆에 원인(종목)을 클릭 없이 바로 표기 */}
+                  {walletDiffLines.length > 0 && (
+                    <div className="hero-diff-list">
+                      {walletDiffLines.map((l) => (
+                        <div className="hero-diff-row" key={l.key}>
+                          <span className="hero-diff-date">{l.date}</span>
+                          <span className="hero-diff-name">{l.name}</span>
+                          <span className={`hero-diff-amt ${l.diff >= 0 ? "up" : "dn"}`}>{l.diff >= 0 ? "+" : ""}{wonG(l.diff)}</span>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               )}
@@ -633,6 +669,29 @@ export default function TodayPage() {
           </section>
         )}
 
+        {/* 카드2 — [사용자 지시] 오늘의 할 일 · ETF */}
+        {view === 2 && (() => {
+          const todo = [myEtfNews, ...etfNews].filter(Boolean).filter((n, i, arr) => arr.findIndex((x) => x.id === n.id) === i).slice(0, 3);
+          return (
+            <section className="card tile">
+              <div className="tile-h">✅ 오늘의 할 일 · ETF</div>
+              {todo.length > 0 ? (
+                <div className="tile-news">
+                  <div className="tile-news-h">확인해볼 것</div>
+                  {todo.map((n) => (
+                    <button className="tile-news-row" key={n.id} onClick={() => openNewsDetail(n)}>
+                      <span className="tile-news-t">{n.headline}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="tile-empty">오늘은 특별히 확인할 ETF 이슈가 없어요.</div>
+              )}
+              <button className="tile-more" onClick={() => router.push("/pwa/etf")}>ETF 리밸런싱 확인하러 가기 →</button>
+            </section>
+          );
+        })()}
+
         {/* ══ "오늘의 이야기" — [사용자 지시] 주식/부동산/ETF/기타로 나눠 카드 작성 ══ */}
         {view === 3 && (
           <section className="card tile" onClick={() => router.push("/pwa/story")} role="button" tabIndex={0}>
@@ -736,6 +795,11 @@ export default function TodayPage() {
         .hero-trend-x { position: absolute; top: 5px; right: 5px; width: 18px; height: 18px; border: none; background: none; color: var(--color-ink-3); font-size: 10px; cursor: pointer; }
         .hero-trend-explain-t { font-size: 0.74rem; font-weight: 800; color: var(--color-ink); margin-bottom: 3px; }
         .hero-trend-explain-b { font-size: 0.72rem; color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; }
+        .hero-diff-list { display: flex; flex-direction: column; margin-top: 6px; }
+        .hero-diff-row { display: flex; align-items: center; gap: 8px; padding: 4px 2px; font-size: 0.7rem; }
+        .hero-diff-date { flex: none; color: var(--color-ink-3); font-family: ui-monospace, monospace; }
+        .hero-diff-name { flex: 1; min-width: 0; color: var(--color-ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .hero-diff-amt { flex: none; font-weight: 800; font-family: ui-monospace, monospace; }
         .hero-pending, .hero-recent { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--color-line); display: flex; flex-direction: column; gap: 5px; }
         .hero-ph { font-size: 0.68rem; font-weight: 800; color: var(--color-ink-3); margin-bottom: 2px; }
         .hero-prow, .hero-rrow { display: flex; align-items: center; gap: 7px; font-size: 0.74rem; }
