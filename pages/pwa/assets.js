@@ -83,6 +83,7 @@ export default function AssetsMapPage() {
   const [invProps, setInvProps] = useState([]);  // [§3.1] 추가 보유 부동산(투자용) = onehub_re_properties
   const [myComplex, setMyComplex] = useState(""); // [§3.1] 대표단지(실거주)명
   const [view, setView] = useState(0); // [OS-2] 0=주식 1=ETF 2=부동산 — 종목변경 순환에 맞춰 아래 카드 필터
+  const [stockTab, setStockTab] = useState("hold"); // [사용자 지시] 주식 뷰 전용 — 보유/추천 탭
 
   const load = useCallback(() => {
     const tr = getTrader();
@@ -168,7 +169,7 @@ export default function AssetsMapPage() {
   const blocked = dash?.today_blocked ?? [];
   // [사용자 지시] "주식" 뷰 — 주식 페이지(보유·추천)와 연결되는 계좌현황 요약 카드용 데이터.
   const positions = parsePositions(dash);
-  const recTop = [...(dash?.recommend_stocks ?? [])].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 3);
+  const recAll = [...(dash?.recommend_stocks ?? [])].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   const headline = domPct >= 60 && dominant
     ? `${scopeLbl} ${Math.round(domPct)}%가 ${dominant.label.replace(/^[^\s]+\s/, "")}입니다 — 쏠림을 줄일 때인지 살펴보세요.`
     : regime
@@ -279,6 +280,14 @@ export default function AssetsMapPage() {
         />
       </div>
 
+      {/* [사용자 지시] 주식 페이지의 보유/추천을 상위 메뉴바 바로 아래 탭으로 — "주식" 뷰에서만 노출 */}
+      {view === 0 && (
+        <div className="as-stocktabs">
+          <button type="button" className={`as-st-btn ${stockTab === "hold" ? "on" : ""}`} onClick={() => setStockTab("hold")}>보유</button>
+          <button type="button" className={`as-st-btn ${stockTab === "recommend" ? "on" : ""}`} onClick={() => setStockTab("recommend")}>추천</button>
+        </div>
+      )}
+
       <DataState status={status} hasData={!!assets} onRetry={load} skeletonLines={5} skeletonBlock>
         {/* ── 1층(공통): 자산지도 + 통합분석은 선택된 자산군과 무관하게 항상 먼저 ── */}
         <section className="card as-hero">
@@ -329,9 +338,17 @@ export default function AssetsMapPage() {
           ))}
         </div>
 
-        {/* ── 2층: 자산 지도 ── */}
+        {/* ── 2층: 자산 지도 — [사용자 지시] "주식" 뷰에서는 계좌현황 요약을 이 카드 맨 위에 병합 ── */}
         <section className="card">
           <div className="as-h">자산 지도</div>
+          {view === 0 && (
+            <div className="as-vc-acct">
+              <div className="as-vc-acct-total">{dash?.balance?.total_asset != null ? `${Number(dash.balance.total_asset).toLocaleString()}원` : "-"}</div>
+              <div className="as-vc-acct-sub">
+                평가손익 <b className={(dash?.balance?.unrealized_pnl ?? 0) >= 0 ? "up" : "dn"}>{(dash?.balance?.unrealized_pnl ?? 0) >= 0 ? "+" : ""}{(dash?.balance?.unrealized_pnl ?? 0).toLocaleString()}원</b>
+              </div>
+            </div>
+          )}
           <div className="as-map">
             <svg className="as-donut" viewBox="0 0 100 100" role="img" aria-label="자산 구성 도넛">
               <circle cx="50" cy="50" r="42" fill="none" stroke="var(--color-line)" strokeWidth="12" />
@@ -457,45 +474,41 @@ export default function AssetsMapPage() {
         )}
 
         {/* ── 뷰별 전용 카드 ── */}
-        {/* [사용자 지시] "주식" 뷰 — 주식 페이지(보유·추천)와 연결. 같은 계좌현황 카드 밑에
-            보유 종목·추천 종목을 나눠서 요약, 각각 자세히 보기는 자식 페이지로 위임(종합자산 원칙). */}
+        {/* [사용자 지시] "주식" 뷰 — 상단 탭(보유/추천) 선택에 따라 실제 목록을 보여준다.
+            핵심 정보만 간결하게(종목명·수익률/점수) — 승인·거절 등 실제 조작은 자식 페이지로 위임. */}
         {view === 0 && (
-          <section className="card as-viewcard">
-            <div className="as-h">📈 계좌 현황 · 주식</div>
-            <div className="as-vc-acct">
-              <div className="as-vc-acct-total">{dash?.balance?.total_asset != null ? `${Number(dash.balance.total_asset).toLocaleString()}원` : "-"}</div>
-              <div className="as-vc-acct-sub">
-                평가손익 <b className={(dash?.balance?.unrealized_pnl ?? 0) >= 0 ? "up" : "dn"}>{(dash?.balance?.unrealized_pnl ?? 0) >= 0 ? "+" : ""}{(dash?.balance?.unrealized_pnl ?? 0).toLocaleString()}원</b>
-              </div>
-            </div>
-            <div className="as-vc-split">
-              <div className="as-vc-col">
-                <div className="as-vc-col-h">보유 종목 <span>{positions.length}</span></div>
-                {positions.length === 0 ? (
-                  <div className="as-vc-empty">보유 종목 없음</div>
-                ) : positions.slice(0, 3).map((p) => (
-                  <div className="as-vc-row" key={p.code}>
-                    <span className="as-vc-name">{p.name}</span>
-                    <span className={p.pnl_rate >= 0 ? "up" : "dn"}>{pctTxt(p.pnl_rate)}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="as-vc-col">
-                <div className="as-vc-col-h">추천 종목 <span>{recTop.length}</span></div>
-                {recTop.length === 0 ? (
-                  <div className="as-vc-empty">추천 없음</div>
-                ) : recTop.map((s) => (
-                  <div className="as-vc-row" key={s.code}>
-                    <span className="as-vc-name">{s.name}</span>
-                    <span className="as-vc-score">{Math.round(s.score ?? 0)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="as-vc-ctas">
-              <button className="as-vc-cta" onClick={() => router.push("/pwa?tab=portfolio")}>보유 자세히 →</button>
-              <button className="as-vc-cta" onClick={() => router.push("/pwa?tab=recommend")}>추천 자세히 →</button>
-            </div>
+          <section className="card as-stocklist">
+            <div className="as-h">{stockTab === "hold" ? "보유 종목" : "추천 종목"}</div>
+            {stockTab === "hold" ? (
+              positions.length === 0 ? (
+                <div className="as-vc-empty">보유 종목이 없어요</div>
+              ) : (
+                <div className="as-sl-list">
+                  {positions.map((p) => (
+                    <div className="as-sl-row" key={p.code}>
+                      <span className="as-sl-name">{p.name}</span>
+                      <span className="as-sl-mid">{Number(p.current_price || 0).toLocaleString()}원 · {p.qty}주</span>
+                      <span className={p.pnl_rate >= 0 ? "up" : "dn"}>{pctTxt(p.pnl_rate)}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : (
+              recAll.length === 0 ? (
+                <div className="as-vc-empty">추천 종목이 없어요</div>
+              ) : (
+                <div className="as-sl-list">
+                  {recAll.map((s) => (
+                    <div className="as-sl-row" key={s.code}>
+                      <span className="as-sl-name">{s.name}</span>
+                      {s.reason && <span className="as-sl-mid">{s.reason}</span>}
+                      <span className="as-vc-score">{Math.round(s.score ?? 0)}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+            <button className="as-vc-cta" onClick={() => router.push(stockTab === "hold" ? "/pwa?tab=portfolio" : "/pwa?tab=recommend")}>{stockTab === "hold" ? "보유 자세히 · 매도 →" : "추천 자세히 · 승인 →"}</button>
           </section>
         )}
         {view === 1 && (
@@ -563,6 +576,10 @@ export default function AssetsMapPage() {
         .as-fixed { flex-shrink: 0; }
         .as-sub { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
         .as-fresh { margin-left: auto; font-size: 0.68rem; }
+        /* [사용자 지시] "주식" 뷰 전용 보유/추천 탭 — 상위 메뉴바(타이틀) 바로 아래 */
+        .as-stocktabs { display: flex; gap: 6px; margin: 0 2px 12px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 4px; box-shadow: var(--shadow-card); }
+        .as-st-btn { flex: 1; min-height: 36px; border: none; background: none; border-radius: 9px; color: var(--color-ink-2); font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .as-st-btn.on { background: var(--color-primary); color: #fff; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .as-hero .as-headline { font-size: 0.94rem; line-height: 1.55; font-weight: 700; color: var(--color-ink); margin: 0 0 12px; word-break: keep-all; }
         .as-total { display: flex; align-items: baseline; gap: 8px; }
@@ -661,18 +678,16 @@ export default function AssetsMapPage() {
         .as-vc-acct-sub { font-size: 0.78rem; color: var(--color-ink-2); margin-top: 2px; }
         .as-vc-acct-sub b { font-weight: 800; }
         .as-vc-acct-sub b.up { color: var(--color-success); } .as-vc-acct-sub b.dn { color: var(--color-danger); }
-        .as-vc-split { display: flex; gap: 10px; margin-bottom: 12px; padding-top: 10px; border-top: 1px solid var(--color-line); }
-        .as-vc-col { flex: 1; min-width: 0; }
-        .as-vc-col-h { font-size: 0.7rem; font-weight: 800; color: var(--color-ink-3); margin-bottom: 6px; }
-        .as-vc-col-h span { color: var(--color-ink-2); }
-        .as-vc-empty { font-size: 0.72rem; color: var(--color-ink-3); }
-        .as-vc-row { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; font-size: 0.78rem; padding: 3px 0; }
-        .as-vc-name { color: var(--color-ink); font-weight: 700; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .as-vc-row .up { color: var(--color-success); font-weight: 700; flex: none; }
-        .as-vc-row .dn { color: var(--color-danger); font-weight: 700; flex: none; }
+        .as-vc-empty { font-size: 0.78rem; color: var(--color-ink-2); padding: 6px 2px; }
         .as-vc-score { color: var(--color-primary); font-weight: 800; flex: none; }
-        .as-vc-ctas { display: flex; gap: 8px; }
-        .as-vc-ctas .as-vc-cta { width: auto; flex: 1; min-width: 0; }
+        /* [사용자 지시] 보유/추천 탭 전체 목록(핵심 정보만 간결하게) */
+        .as-sl-list { display: flex; flex-direction: column; margin-bottom: 12px; }
+        .as-sl-row { display: flex; align-items: baseline; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--color-line); font-size: 0.8rem; }
+        .as-sl-row:last-child { border-bottom: none; }
+        .as-sl-name { color: var(--color-ink); font-weight: 700; flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .as-sl-mid { flex: 1; min-width: 0; color: var(--color-ink-3); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .as-sl-row .up { color: var(--color-success); font-weight: 700; flex: none; }
+        .as-sl-row .dn { color: var(--color-danger); font-weight: 700; flex: none; }
         .as-note { font-size: 0.7rem; color: var(--color-ink-3); text-align: center; margin-top: 6px; line-height: 1.5; word-break: keep-all; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
