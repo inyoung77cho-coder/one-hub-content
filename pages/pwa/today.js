@@ -219,9 +219,36 @@ export default function TodayPage() {
   const realestateNews = allNews.filter((n) => n.category === "realestate").slice(0, 8);
   const etfNews = allNews.filter((n) => ["global", "macro", "policy"].includes(n.category)).slice(0, 8);
 
-  // ── 오늘 중요 알림(매매·손절·서킷 등) — 히어로에 접어 넣는다. OneHub 신고가·루틴 알림은 제외.
+  // ── 오늘(KST) 날짜 문자열 — 아래 헤드라인 계산과 criticalNotis 필터 둘 다에서 씀.
   const kd = new Date(Date.now() + 9 * 3600 * 1000);
   const todayStr = `${kd.getUTCFullYear()}-${String(kd.getUTCMonth() + 1).padStart(2, "0")}-${String(kd.getUTCDate()).padStart(2, "0")}`;
+
+  // [사용자 지시] 대결 탭 이외 탭들도 맨 위 카드가 비어 보이지 않도록 — 그날 가장 중요한 항목 한 줄
+  //   요약. 우선순위 폭포: 실제 이벤트(신고가·저평가·뉴스) → 배경 정보(지역 시황) → 마지막 안내 문구.
+  const reHeadline = opNotes.length > 0
+    ? `🏢 ${opNotes[0].complex_name}${opNotes[0].price_manwon ? ` ${(opNotes[0].price_manwon / 10000).toFixed(2)}억` : ""} 신고가 발생`
+    : reBrief?.under?.length > 0
+    ? `📉 ${reBrief.under[0].단지명} 지역 대비 +${Number(reBrief.under[0].gap).toFixed(1)}% 저평가`
+    : reBrief?.leader
+    ? `🏠 지역 대장 ${reBrief.leader}${reBrief.leader_price != null ? ` ${Number(reBrief.leader_price).toFixed(2)}억` : ""} · 분기 ${rePct(reBrief.chg_q)}`
+    : "오늘의 부동산 뉴스와 신고가를 아래에서 확인하세요.";
+  const etfHeadline = etfNews.length > 0
+    ? `📰 ${etfNews[0].headline}`
+    : "오늘은 특별한 ETF 관련 이슈가 없어요 — 평소 배분을 유지하세요.";
+  const storySorted = [...storyComments].sort((a, b) => (b.ts || 0) - (a.ts || 0));
+  const storyLatest = storySorted[0] || null;
+  // ts는 클라 시각(ms) — KST 자정 이후분만 "오늘"로 센다(todayStr은 위에서 이미 계산).
+  const storyTodayCount = storySorted.filter((c) => {
+    const kd2 = new Date((c.ts || 0) + 9 * 3600 * 1000);
+    return `${kd2.getUTCFullYear()}-${String(kd2.getUTCMonth() + 1).padStart(2, "0")}-${String(kd2.getUTCDate()).padStart(2, "0")}` === todayStr;
+  }).length;
+  const storyHeadline = storyLatest
+    ? storyTodayCount > 0
+      ? `💬 오늘 ${storyTodayCount}개의 새 이야기 · 최근 "${String(storyLatest.text || "").slice(0, 28)}${String(storyLatest.text || "").length > 28 ? "…" : ""}"`
+      : `💬 최근 이야기 "${String(storyLatest.text || "").slice(0, 28)}${String(storyLatest.text || "").length > 28 ? "…" : ""}"`
+    : "아직 등록된 동네 이야기가 없어요 — 첫 이야기를 남겨보세요.";
+
+  // ── 오늘 중요 알림(매매·손절·서킷 등) — 히어로에 접어 넣는다. OneHub 신고가·루틴 알림은 제외.
   const RT = /오늘 해야 하는 것|전략 성과|최근 30일|Report|리포트|브리핑|Morning|Evening|Started|Status/i;
   const IMP = /매수|매도|체결|손절|익절|승인|신호|차단|자율|서킷|circuit|오류|error|급등|급락|주문|대결|승부|채점|OPEN|CLOSED/i;
   const criticalNotis = notis.filter((n) => {
@@ -490,6 +517,7 @@ export default function TodayPage() {
           {/* 카드1 — 내 부동산 및 지역 가격 비교 현황 */}
           <section className="card tile">
             <div className="tile-h">🏠 내 부동산 · 지역 비교</div>
+            <p className="tile-headline">{reHeadline}</p>
             <button className="mini-stat mini-stat-full" onClick={() => router.push("/pwa/realestate")}>
               <span className="mini-ic re">🏠</span>
               <span className="mini-body">
@@ -574,6 +602,7 @@ export default function TodayPage() {
         {view === 2 && (
           <section className="card tile">
             <div className="tile-h">📊 오늘의 ETF</div>
+            <p className="tile-headline">{etfHeadline}</p>
             <button className="mini-stat mini-stat-full" onClick={() => router.push("/pwa/etf")}>
               <span className="mini-ic etf">📊</span>
               <span className="mini-body">
@@ -605,6 +634,12 @@ export default function TodayPage() {
         )}
 
         {/* ══ "오늘의 이야기" — [사용자 지시] 주식/부동산/ETF/기타로 나눠 카드 작성 ══ */}
+        {view === 3 && (
+          <section className="card tile" onClick={() => router.push("/pwa/story")} role="button" tabIndex={0}>
+            <div className="tile-h">💬 오늘의 이야기</div>
+            <p className="tile-headline">{storyHeadline}</p>
+          </section>
+        )}
         {view === 3 && STORY_CATS.map(([cat, ic]) => {
           const items = cat === "기타"
             ? storyComments.filter((c) => (c.category || "전체") === "전체")
@@ -743,6 +778,8 @@ export default function TodayPage() {
 
         /* ══ 타일 공통 ══ */
         .tile-h { font-size: 0.92rem; font-weight: 800; color: var(--color-ink); margin-bottom: 12px; }
+        /* [사용자 지시] 대결 탭 외 나머지 탭도 맨 위가 비어 보이지 않도록 — 오늘의 핵심 한 줄 */
+        .tile-headline { font-size: 0.82rem; color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; margin: -6px 0 12px; }
         .tile-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
         .mini-stat { display: flex; align-items: center; gap: 8px; text-align: left; padding: 12px 10px; border-radius: 12px; background: var(--color-card-soft, var(--color-bg)); border: 1px solid var(--color-line); cursor: pointer; font-family: var(--font-sans); min-height: 64px; }
         .mini-stat-full { width: 100%; margin-bottom: 12px; }
