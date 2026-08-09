@@ -3,7 +3,7 @@
 //   설정(⚙️)은 각 페이지 상단 헤더 버튼으로 이동(하단 탭에서 제거) — 페이지 어디서나 1탭 접근 유지.
 //   '자산' 내부 세그먼트(종합·주식·ETF·부동산)는 각 페이지 상단 세그먼트(TopNav)가 담당.
 import { useRouter } from "next/router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import QuickAddSheet from "./shared/QuickAddSheet";
 
 const TABS = [
@@ -13,9 +13,31 @@ const TABS = [
   ["ai", "🛡️", "AI", "/pwa?tab=report"],
 ];
 
+// [2026-08-09] Claude 비용 절감 step 3 — BottomNav는 사실상 모든 PWA 탭에서 마운트되므로
+// "앱이 열려있다"는 신호를 보내기 가장 적당한 지점. 10분 스로틀(localStorage)로 매 탭 이동마다
+// 재전송하지 않는다. 실패해도 무시(표시용 스킵 로직일 뿐, 없어도 기능에 영향 없음).
+const HEARTBEAT_KEY = "onehub_hb_sent_at";
+const HEARTBEAT_THROTTLE_MS = 10 * 60 * 1000;
+function pingHeartbeat() {
+  try {
+    const last = Number(localStorage.getItem(HEARTBEAT_KEY) || 0);
+    if (Date.now() - last < HEARTBEAT_THROTTLE_MS) return;
+    localStorage.setItem(HEARTBEAT_KEY, String(Date.now()));
+  } catch {}
+  fetch("/api/pwa-heartbeat", { method: "POST" }).catch(() => {});
+}
+
 export default function BottomNav({ active }) {
   const router = useRouter();
   const [qaOpen, setQaOpen] = useState(false);
+
+  useEffect(() => {
+    pingHeartbeat();
+    const onVisible = () => { if (document.visibilityState === "visible") pingHeartbeat(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
   return (
     <>
       <button className="bn-fab" onClick={() => setQaOpen(true)} aria-label="자산 빠른입력" title="자산 빠른입력">＋</button>
