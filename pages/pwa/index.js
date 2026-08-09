@@ -7,7 +7,7 @@ import LastUpdated from '../../components/LastUpdated';
 import MarketSession from '../../components/MarketSession';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
 import { recordDecision, matureLedger, computeShowdown, getTodayDecision, reconcileAutoWatch, getLedger } from '../../lib/verdictLedger';
-import { getSeed, setSeed, resetSeed, SEED_OPTIONS, computeWallets, streakNarrative, wonG, getNickname, setNickname } from '../../lib/gameWallet';
+import { getSeed, setSeed, resetSeed, SEED_OPTIONS, computeWallets, streakNarrative, wonG, wonNum, getNickname, setNickname } from '../../lib/gameWallet';
 import { initGameSync } from '../../lib/gameSync';
 // [N1] 자산 원장. lib/verdictLedger 의 getLedger(판단 기록)와 이름이 겹쳐 별칭으로 구분한다.
 import { getLedger as getAssetLedger } from '../../lib/ledger';
@@ -25,7 +25,8 @@ import { getKrxSession } from '../../lib/marketHours';
 import ShareButton from '../../components/ShareButton';
 import RotatingPageTitle from '../../components/RotatingPageTitle';
 import AssetMapTitle from '../../components/AssetMapTitle';
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { recordAccuracySnapshot, getAccuracyHistory } from '../../lib/aiAccuracyHistory';
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
 import { StockForm } from '../../components/shared/AssetForms';
@@ -595,6 +596,18 @@ export default function PWADashboard({ latestReport }) {
       .then(d => { if (d && d.ok) setAiDaily(d); })
       .catch(() => {});
   }, [mounted, trader]);
+
+  // [사용자 지시] AI 개선노트·학습 현황이 "지금 시점"만 보여줘 시점별 개선을 알 수 없던 문제 —
+  //   백엔드에 히스토리가 없어 앱을 열 때마다 이번 주(월요일 기준) 적중률을 로컬에 적립한다.
+  useEffect(() => {
+    if (!accuracy?.ok) return;
+    const s = accuracy.summary || {};
+    if (s.accuracy_pct == null) return;
+    const kst = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    const monday = new Date(kst); monday.setUTCDate(kst.getUTCDate() - ((kst.getUTCDay() + 6) % 7));
+    const applyDate = `${monday.getUTCFullYear()}-${String(monday.getUTCMonth() + 1).padStart(2, '0')}-${String(monday.getUTCDate()).padStart(2, '0')}`;
+    recordAccuracySnapshot({ date: applyDate, accuracyPct: s.accuracy_pct, totalChecked: s.total_checked ?? null });
+  }, [accuracy]);
 
   // [S-7] 판단근거 시트 열릴 때 기업개요 온디맨드 로드(캐시)
   useEffect(() => {
@@ -2396,7 +2409,7 @@ export default function PWADashboard({ latestReport }) {
                 mutedSuffix
                 spaced
                 buttonLabel="분석변경"
-                items={[{ suffix: ' vs 나 대결' }, { suffix: ' 자기 검증' }, { suffix: ' 리포트' }]}
+                items={[{ suffix: 'vs 나 대결' }, { suffix: '자기검증' }, { suffix: '리포트' }]}
                 controlledIndex={TRUST_TABS.indexOf(trustSec)}
                 onChange={(i) => setTrustSec(TRUST_TABS[i])}
               />
@@ -2427,10 +2440,20 @@ export default function PWADashboard({ latestReport }) {
                 <section className="pwa-card game-dash">
                   <div className="gd-top"><span className="pwa-card-label" style={{ margin: 0 }}>⚔ 나 vs AI · 가상 지갑 대결</span><span className="gd-virtual">가상·모의</span></div>
                   {narr && <div className="gd-narr">📖 {narr}</div>}
+                  {/* [사용자 지시] "원" 삭제(잔고는 숫자만, 증감액만 wonG로 원 표기) + 좌우 대칭(둘 다
+                      "이름/AI" 한 단어 + 잔고 + 증감) + "나"/"AI" 글자를 크게 */}
                   <div className="gd-wallets">
-                    <div className="gd-w me"><span className="gd-wl" onClick={editGameNickname} role="button" tabIndex={0} title="닉네임 바꾸기">🙋 {gameNick} ✎</span><b className="gd-wb">{wonG(g.myBalance)}</b>{g.myGain !== 0 && <span className={`gd-wg ${g.myGain >= 0 ? 'up' : 'dn'}`}>{g.myGain >= 0 ? '+' : ''}{wonG(g.myGain)}</span>}</div>
+                    <div className="gd-w me">
+                      <span className="gd-wl" onClick={editGameNickname} role="button" tabIndex={0} title="닉네임 바꾸기">{gameNick}<span className="gd-wl-ed">✎</span></span>
+                      <b className="gd-wb">{wonNum(g.myBalance)}</b>
+                      {g.myGain !== 0 && <span className={`gd-wg ${g.myGain >= 0 ? 'up' : 'dn'}`}>{g.myGain >= 0 ? '+' : ''}{wonG(g.myGain)}</span>}
+                    </div>
                     <div className="gd-vs">VS</div>
-                    <div className="gd-w ai"><span className="gd-wl">AI 지갑 🤖</span><b className="gd-wb">{wonG(g.aiBalance)}</b>{g.aiGain !== 0 && <span className={`gd-wg ${g.aiGain >= 0 ? 'up' : 'dn'}`}>{g.aiGain >= 0 ? '+' : ''}{wonG(g.aiGain)}</span>}</div>
+                    <div className="gd-w ai">
+                      <span className="gd-wl">AI</span>
+                      <b className="gd-wb">{wonNum(g.aiBalance)}</b>
+                      {g.aiGain !== 0 && <span className={`gd-wg ${g.aiGain >= 0 ? 'up' : 'dn'}`}>{g.aiGain >= 0 ? '+' : ''}{wonG(g.aiGain)}</span>}
+                    </div>
                   </div>
                   <div className="gd-bar"><div className="gd-bar-me" style={{ width: `${Math.max(6, Math.min(94, pct))}%` }} /></div>
                   <div className="gd-lead">{g.leader === 'me' ? <b className="up">🏆 내가 {wonG(Math.abs(g.diff))} 앞섬</b> : g.leader === 'ai' ? <b className="dn">🤖 AI가 {wonG(Math.abs(g.diff))} 앞섬</b> : <b>⚖️ 접전</b>} · 매판 잔고의 {Math.round((g.betPct ?? 0.1) * 100)}%(복리, 가상)
@@ -2472,32 +2495,42 @@ export default function PWADashboard({ latestReport }) {
                               <LineChart data={trend} margin={{ top: 6, right: 8, left: 0, bottom: 0 }} onClick={onTrendClick}>
                                 <XAxis dataKey="label" stroke="var(--color-ink-3)" fontSize={10} tickLine={false} />
                                 <YAxis hide domain={['dataMin', 'dataMax']} />
-                                <Tooltip
-                                  formatter={(v) => wonG(v)}
-                                  contentStyle={{ background: 'var(--color-card)', border: '1px solid var(--color-line)', borderRadius: 8, fontSize: 12 }}
-                                />
                                 <Line type="monotone" dataKey={gameNick} stroke="var(--color-success)" strokeWidth={2} dot={{ r: 2, cursor: 'pointer' }} activeDot={{ r: 5, cursor: 'pointer' }} />
                                 <Line type="monotone" dataKey="AI" stroke="var(--purple)" strokeWidth={2} dot={{ r: 2, cursor: 'pointer' }} activeDot={{ r: 5, cursor: 'pointer' }} />
                               </LineChart>
                             </ResponsiveContainer>
-                            <div className="gd-trend-hint">{trendClick ? null : '그래프의 점을 눌러보세요 — 그날 판단 차이를 설명해 드립니다'}</div>
-                            {trendClick && (() => {
-                              const diffWon = (trendClick.myPnl || 0) - (trendClick.aiPnl || 0);
-                              return (
-                                <div className="gd-trend-explain">
-                                  <button type="button" className="gd-trend-x" onClick={() => setTrendClick(null)} aria-label="닫기">✕</button>
-                                  <div className="gd-trend-explain-t">{trendClick.name} · {trendClick.decision === 'take' ? '나: 매수' : '나: 관망'} · AI: {trendClick.aiBought !== false ? '매수' : '관망'}</div>
-                                  <div className="gd-trend-explain-b">
-                                    가격 {trendClick.ret >= 0 ? '+' : ''}{trendClick.ret}% 움직였고, 베팅 기준(그 시점 잔고)이 서로 달라 손익도 갈렸습니다 —
-                                    {' '}{gameNick} <b className={trendClick.myPnl >= 0 ? 'up' : 'dn'}>{wonG(trendClick.myPnl)}</b>
-                                    {' vs '}AI <b className={trendClick.aiPnl >= 0 ? 'up' : 'dn'}>{wonG(trendClick.aiPnl)}</b>
-                                    {' '}(차이 <b className={diffWon >= 0 ? 'up' : 'dn'}>{diffWon >= 0 ? '+' : ''}{wonG(diffWon)}</b>)
-                                  </div>
-                                </div>
-                              );
-                            })()}
+                            <div className="gd-trend-hint">그래프의 점을 눌러보세요 — 그날 대결을 자세히 설명해 드립니다</div>
                           </>
                         )}
+                        {/* [사용자 지시] 점 클릭 시 팝업 카드로 더 상세히 설명(베팅액·승자 포함) */}
+                        {trendClick && (() => {
+                          const diffWon = (trendClick.myPnl || 0) - (trendClick.aiPnl || 0);
+                          return (
+                            <div className="gd-trend-modal-bg" onClick={() => setTrendClick(null)}>
+                              <div className="gd-trend-modal" onClick={(e) => e.stopPropagation()}>
+                                <button type="button" className="gd-trend-modal-x" onClick={() => setTrendClick(null)} aria-label="닫기">✕</button>
+                                <div className="gd-trend-modal-t">{trendClick.name}</div>
+                                <div className="gd-trend-modal-ret">가격 {trendClick.ret >= 0 ? '+' : ''}{trendClick.ret}%</div>
+                                <div className="gd-trend-modal-rows">
+                                  <div className="gd-trend-modal-row">
+                                    <span className="gd-trend-modal-who">🙋 {gameNick}</span>
+                                    <span className="gd-trend-modal-mid">{trendClick.decision === 'take' ? '매수' : '관망'} · 베팅 {wonG(trendClick.myBetAmt)}</span>
+                                    <b className={trendClick.myPnl >= 0 ? 'up' : 'dn'}>{trendClick.myPnl >= 0 ? '+' : ''}{wonG(trendClick.myPnl)}</b>
+                                  </div>
+                                  <div className="gd-trend-modal-row">
+                                    <span className="gd-trend-modal-who">🤖 AI</span>
+                                    <span className="gd-trend-modal-mid">{trendClick.aiBought !== false ? '매수' : '관망'} · 베팅 {wonG(trendClick.aiBetAmt)}</span>
+                                    <b className={trendClick.aiPnl >= 0 ? 'up' : 'dn'}>{trendClick.aiPnl >= 0 ? '+' : ''}{wonG(trendClick.aiPnl)}</b>
+                                  </div>
+                                </div>
+                                <div className="gd-trend-modal-diff">
+                                  {trendClick.winner === 'me' ? '🏆 내가' : trendClick.winner === 'ai' ? '🤖 AI가' : '⚖️ 무승부 ·'} {trendClick.winner !== 'tie' && <>{wonG(Math.abs(diffWon))} 앞섬</>}
+                                </div>
+                                <div className="gd-trend-modal-note">베팅 기준(그 시점 각자 잔고)이 서로 달라 같은 가격 변동에도 손익 금액이 달라집니다.</div>
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     );
                   })()}
@@ -2780,66 +2813,6 @@ export default function PWADashboard({ latestReport }) {
               );
             })()}
 
-            {/* [v9.0] 🎬 오늘 AI 분석 흐름 타임라인 */}
-            {data && (() => {
-              const regime = data.market?.regime ?? '-';
-              const heat   = data.market?.heat_score ?? '-';
-              const fearGreed = data.market?.fear_greed ?? '-';
-              const candidates = data.screening_candidates ?? [];
-              // [AI-6] 차단 건수는 전 화면 공통 소스(blockCount=data.market.block_count)로 단일화.
-              //   기존엔 blocked_stocks 슬라이스 length라 오늘/종합/보유(=4)와 어긋나 자기검증만 0/3으로 표시됐다.
-              const blockedNames = (data.today_blocked ?? data.blocked_stocks ?? []);
-              const blocked = dedupBy(blockedNames, (b) => b.code || b.stock || b.name).slice(0, 3);
-              const buys = (data.recommend_stocks ?? []).filter(s => (s.score ?? 0) >= 70).slice(0, 2);
-              const kst = new Date(Date.now() + 9*60*60*1000);
-              const fmtTime = (d, offsetMin) => {
-                const t = new Date(d.getTime() - offsetMin * 60 * 1000);
-                return `${String(t.getUTCHours()).padStart(2,'0')}:${String(t.getUTCMinutes()).padStart(2,'0')}`;
-              };
-              const now = fmtTime(kst, 0);
-              const steps = [
-                {
-                  icon: '🔍', time: '08:50',
-                  title: '시장 분석 시작',
-                  desc: `Regime: ${regime} / Heat: ${heat} / 공포탐욕: ${fearGreed}`,
-                },
-                {
-                  icon: '📊', time: '08:51',
-                  title: `${candidates.length > 0 ? candidates.length : 131}종목 스크리닝`,
-                  desc: `후보: ${candidates.length}종목 선별`,
-                },
-                ...(blockCount > 0 ? [{
-                  icon: '🤖', time: '08:52',
-                  title: 'AI 심층 분석',
-                  desc: (blocked.length > 0 ? blocked.map(b => `${b.name ?? b.stock ?? b.code} → 차단`).join(' · ') + (blockCount > blocked.length ? ` 외 ${blockCount - blocked.length}건` : '') : `${blockCount}종목 차단`) + (buys.length > 0 ? ' / ' + buys.map(b => `${b.name ?? b.code} → 추천`).join(' · ') : ''),
-                }] : []),
-                {
-                  icon: '✅', time: '08:53',
-                  title: '최종 결정',
-                  desc: `매수 ${buyCount}건 / 차단 ${blockCount}건 — ${regime === 'BEAR' ? '관망 결정' : '선별 실행'}`,
-                },
-              ];
-              return (
-                <section className="acc-hero">
-                  <div className="acc-hero-lbl" style={{ marginBottom: 4 }}>🎬 오늘 AI 분석 흐름</div>
-                  <div style={{ marginTop: 12, position: 'relative', paddingLeft: 20 }}>
-                    {/* 타임라인 선 */}
-                    <div style={{ position: 'absolute', left: 7, top: 8, bottom: 8, width: 2, background: 'var(--hero-fill-line)', borderRadius: 1 }} />
-                    {steps.map((s, i) => (
-                      <div key={i} style={{ position: 'relative', marginBottom: i < steps.length - 1 ? 18 : 0 }}>
-                        {/* 점 */}
-                        <div style={{ position: 'absolute', left: -16, top: 4, width: 8, height: 8, borderRadius: '50%', background: 'var(--hero-accent)', border: '2px solid var(--hero-grad-1)' }} />
-                        <div style={{ fontSize: '0.68rem', color: 'var(--hero-ink-sub)', fontFamily: 'var(--font-mono)', marginBottom: 2 }}>{s.time} KST</div>
-                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--hero-ink)', marginBottom: 2 }}>
-                          {s.icon} {s.title}
-                        </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--hero-ink-soft)', lineHeight: 1.4 }}>{s.desc}</div>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              );
-            })()}
 
             {/* [A-2] AI 개선노트 — 적중률보다 먼저. 틀린 것 → 고친 것 → 적용일 3단 서사(발전 스토리). */}
             {accuracy?.ok && accuracy.by_reason?.length > 0 && (() => {
@@ -2881,6 +2854,20 @@ export default function PWADashboard({ latestReport }) {
                     ))}
                   </div>
                   <p className="chlog-foot">※ {mlOn ? <>적용일 {applyDate}(매주 월 재학습). 규칙·가중치 변경을 사람 언어로 요약한 것입니다.</> : <>표본 {ML_MIN_SAMPLE}건 이상 쌓이고 백테스트를 통과해야 실제 규칙에 반영합니다. 현재는 후보만 표시합니다.</>}</p>
+                  {/* [사용자 지시] 개선노트가 실제 정확도 개선으로 이어지는지 — 직전 주 대비 변화.
+                      백엔드에 히스토리가 없어 앱을 열 때마다 로컬에 주차별로 적립(lib/aiAccuracyHistory). */}
+                  {(() => {
+                    const hist = getAccuracyHistory();
+                    if (hist.length < 2) return <p className="chlog-trend muted">📈 다음 주부터 개선노트 반영 전후 적중률 변화를 여기서 보여드립니다.</p>;
+                    const latest = hist[hist.length - 1];
+                    const prev = hist[hist.length - 2];
+                    const delta = Math.round((latest.accuracyPct - prev.accuracyPct) * 10) / 10;
+                    return (
+                      <p className="chlog-trend">
+                        📈 {prev.date} 주 대비 적중률 <b className={delta >= 0 ? 'up' : 'dn'}>{delta >= 0 ? '+' : ''}{delta}%p</b> {delta > 0 ? '개선' : delta < 0 ? '하락' : '변화 없음'} — 위 개선노트가 반영된 결과입니다.
+                      </p>
+                    );
+                  })()}
                 </section>
               );
             })()}
@@ -2923,6 +2910,32 @@ export default function PWADashboard({ latestReport }) {
                     <>
                       <div className="ml-bar"><div style={{ width: `${pct}%`, background: pctColor }} /></div>
                       <p className="ml-desc">매주 실제 결과와 대조해 자기채점 · 누적 <b>{s.total_blocked ?? 0}건</b>으로 판단 로직 보정.</p>
+                      {/* [사용자 지시] 시점별로 어떻게 개선되는지 — 백엔드 히스토리가 없어 앱을 열 때마다
+                          로컬에 주차별로 적립한 값(lib/aiAccuracyHistory)을 표시. 최소 2주치부터 노출. */}
+                      {(() => {
+                        const hist = getAccuracyHistory();
+                        if (hist.length < 2) return (
+                          <p className="ml-hist-empty">📅 이번 주부터 적중률을 주차별로 기록합니다 — 다음 주부터 여기서 추이를 볼 수 있어요.</p>
+                        );
+                        return (
+                          <div className="ml-hist">
+                            <div className="ml-reasons-h">시점별 적중률 추이</div>
+                            <div className="ml-hist-row">
+                              {hist.map((h, i) => {
+                                const prevH = hist[i - 1];
+                                const d = prevH ? Math.round((h.accuracyPct - prevH.accuracyPct) * 10) / 10 : null;
+                                return (
+                                  <div className="ml-hist-item" key={h.date}>
+                                    <span className="ml-hist-date">{h.date.slice(5)}</span>
+                                    <b>{h.accuracyPct}%</b>
+                                    {d != null && d !== 0 && <span className={d > 0 ? 'up' : 'dn'}>{d > 0 ? '▲' : '▼'}{Math.abs(d)}</span>}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
                       {(topReasons.length > 0 || hiddenReasons > 0) && (
                         <div className="ml-reasons">
                           {/* [N7] 신뢰를 유도하는 수식어를 제목에서 제거 — 사실만 적는다. */}
@@ -2966,7 +2979,69 @@ export default function PWADashboard({ latestReport }) {
                   ) : (
                     <p className="ml-desc">기록 모으는 중 — 누적 <b>{s.total_blocked ?? 0}건</b>, 검증 <b>5건</b>부터 정확도 표시.</p>
                   )}
-                  <button className="ml-more" onClick={() => router.push('/pwa/accuracy')}>전체 자기검증 내역 · 사유별 적중 보기 →</button>
+                  <button className="ml-more" onClick={() => router.push('/pwa/accuracy?from=verify')}>전체 자기검증 내역 · 사유별 적중 보기 →</button>
+                </section>
+              );
+            })()}
+
+            {/* [v9.0][사용자 지시] 오늘 AI 분석 흐름 — 다른 카드와 동일한 라이트 카드로 통일 + 맨
+                아래로 이동(참고용, 판단 근거의 핵심은 위 개선노트·학습현황) */}
+            {data && (() => {
+              const regime = data.market?.regime ?? '-';
+              const heat   = data.market?.heat_score ?? '-';
+              const fearGreed = data.market?.fear_greed ?? '-';
+              const candidates = data.screening_candidates ?? [];
+              // [AI-6] 차단 건수는 전 화면 공통 소스(blockCount=data.market.block_count)로 단일화.
+              //   기존엔 blocked_stocks 슬라이스 length라 오늘/종합/보유(=4)와 어긋나 자기검증만 0/3으로 표시됐다.
+              const blockedNames = (data.today_blocked ?? data.blocked_stocks ?? []);
+              const blocked = dedupBy(blockedNames, (b) => b.code || b.stock || b.name).slice(0, 3);
+              const buys = (data.recommend_stocks ?? []).filter(s => (s.score ?? 0) >= 70).slice(0, 2);
+              const kst = new Date(Date.now() + 9*60*60*1000);
+              const fmtTime = (d, offsetMin) => {
+                const t = new Date(d.getTime() - offsetMin * 60 * 1000);
+                return `${String(t.getUTCHours()).padStart(2,'0')}:${String(t.getUTCMinutes()).padStart(2,'0')}`;
+              };
+              const now = fmtTime(kst, 0);
+              const steps = [
+                {
+                  icon: '🔍', time: '08:50',
+                  title: '시장 분석 시작',
+                  desc: `Regime: ${regime} / Heat: ${heat} / 공포탐욕: ${fearGreed}`,
+                },
+                {
+                  icon: '📊', time: '08:51',
+                  title: `${candidates.length > 0 ? candidates.length : 131}종목 스크리닝`,
+                  desc: `후보: ${candidates.length}종목 선별`,
+                },
+                ...(blockCount > 0 ? [{
+                  icon: '🤖', time: '08:52',
+                  title: 'AI 심층 분석',
+                  desc: (blocked.length > 0 ? blocked.map(b => `${b.name ?? b.stock ?? b.code} → 차단`).join(' · ') + (blockCount > blocked.length ? ` 외 ${blockCount - blocked.length}건` : '') : `${blockCount}종목 차단`) + (buys.length > 0 ? ' / ' + buys.map(b => `${b.name ?? b.code} → 추천`).join(' · ') : ''),
+                }] : []),
+                {
+                  icon: '✅', time: '08:53',
+                  title: '최종 결정',
+                  desc: `매수 ${buyCount}건 / 차단 ${blockCount}건 — ${regime === 'BEAR' ? '관망 결정' : '선별 실행'}`,
+                },
+              ];
+              return (
+                <section className="pwa-card">
+                  <span className="pwa-card-label">🎬 오늘 AI 분석 흐름 <span className="flow-ref">참고용</span></span>
+                  <div style={{ marginTop: 12, position: 'relative', paddingLeft: 20 }}>
+                    {/* 타임라인 선 */}
+                    <div style={{ position: 'absolute', left: 7, top: 8, bottom: 8, width: 2, background: 'var(--color-line)', borderRadius: 1 }} />
+                    {steps.map((s, i) => (
+                      <div key={i} style={{ position: 'relative', marginBottom: i < steps.length - 1 ? 18 : 0 }}>
+                        {/* 점 */}
+                        <div style={{ position: 'absolute', left: -16, top: 4, width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)', border: '2px solid var(--color-card)' }} />
+                        <div style={{ fontSize: '0.68rem', color: 'var(--color-ink-3)', fontFamily: 'var(--font-mono)', marginBottom: 2 }}>{s.time} KST</div>
+                        <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--color-ink)', marginBottom: 2 }}>
+                          {s.icon} {s.title}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--color-ink-2)', lineHeight: 1.4 }}>{s.desc}</div>
+                      </div>
+                    ))}
+                  </div>
                 </section>
               );
             })()}
@@ -2975,6 +3050,28 @@ export default function PWADashboard({ latestReport }) {
 
             {/* [S2.2 G3] 리포트 아카이브 — 성적표 · 일간/주간/히스토리 */}
             {trustSec === 'archive' && (<>
+
+            {/* [사용자 지시] "오늘 요약"을 탭 맨 위로 이동 */}
+            {data && (
+              <section className="pwa-card">
+                <span className="pwa-card-label">오늘 요약</span>
+                <div className="report-kpi-grid">
+                  {[
+                    { label: 'Regime',   val: data.market?.regime ?? '-',    style: { color: regimeClass(data.market?.regime) === 'bull' ? 'var(--accent-buy)' : regimeClass(data.market?.regime) === 'bear' ? 'var(--accent-sell)' : 'var(--accent-warn)' } },
+                    { label: 'Heat',     val: `${heat ?? '-'}`,              style: { color: heatColor(heat) } },
+                    { label: '공포탐욕', val: fearGreed != null ? `${fearGreed} (${fgLabel(fearGreed)})` : '-', style: { color: fgColor(fearGreed) } },
+                    { label: '매수',     val: `${buyCount}건`,               style: { color: 'var(--accent-buy)' } },
+                    { label: '차단',     val: `${blockCount}건`,             style: { color: 'var(--accent-sell)' } },
+                    { label: '실현손익', val: `${(data.balance?.realized_pnl ?? 0).toLocaleString()}원`, style: { color: (data.balance?.realized_pnl ?? 0) >= 0 ? 'var(--accent-buy)' : 'var(--accent-sell)' } },
+                  ].map(({ label, val, style }) => (
+                    <div key={label} className="report-kpi-item">
+                      <span className="report-kpi-label">{label}</span>
+                      <span className="report-kpi-val" style={style}>{val}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
             {/* [§3-5 item3] AI 성적표 — 이번주 요약을 성적표로 격상(승률·차단적중률·손익비·MDD) */}
             <section className="pwa-card">
@@ -3189,11 +3286,11 @@ export default function PWADashboard({ latestReport }) {
               <span className="pwa-card-label">📂 상세 리포트</span>
               <div className="report-list">
                 {[
-                  ['/pwa/daily', '📅', '일간 리포트', '매일 장 마감 요약'],
-                  ['/pwa/weekly', '📊', '주간 리포트', '국면 · 과열도 · 매매'],
-                  ['/pwa/history', '🤖', 'AI 히스토리', 'AI 판단 기록 전체'],
-                  ['/pwa/accuracy', '🎯', 'AI 차단 정확도', '차단 신호 적중률 · 사유별 분석'],
-                  ['/pwa/heat-history', '🌡️', '히트 히스토리', '시장 과열도 추이'],
+                  ['/pwa/daily?from=archive', '📅', '일간 리포트', '매일 장 마감 요약'],
+                  ['/pwa/weekly?from=archive', '📊', '주간 리포트', '국면 · 과열도 · 매매'],
+                  ['/pwa/history?from=archive', '🤖', 'AI 히스토리', 'AI 판단 기록 전체'],
+                  ['/pwa/accuracy?from=archive', '🎯', 'AI 차단 정확도', '차단 신호 적중률 · 사유별 분석'],
+                  ['/pwa/heat-history?from=archive', '🌡️', '히트 히스토리', '시장 과열도 추이'],
                 ].map(([href, icon, title, desc]) => (
                   <Link href={href} key={href} className="report-row">
                     <span className="report-row-icon">{icon}</span>
@@ -3203,28 +3300,7 @@ export default function PWADashboard({ latestReport }) {
                 ))}
               </div>
             </section>
-            {data && (<>
-              <section className="pwa-card">
-                <span className="pwa-card-label">오늘 요약</span>
-                <div className="report-kpi-grid">
-                  {[
-                    { label: 'Regime',   val: data.market?.regime ?? '-',    style: { color: regimeClass(data.market?.regime) === 'bull' ? 'var(--accent-buy)' : regimeClass(data.market?.regime) === 'bear' ? 'var(--accent-sell)' : 'var(--accent-warn)' } },
-                    { label: 'Heat',     val: `${heat ?? '-'}`,              style: { color: heatColor(heat) } },
-                    { label: '공포탐욕', val: fearGreed != null ? `${fearGreed} (${fgLabel(fearGreed)})` : '-', style: { color: fgColor(fearGreed) } },
-                    { label: '매수',     val: `${buyCount}건`,               style: { color: 'var(--accent-buy)' } },
-                    { label: '차단',     val: `${blockCount}건`,             style: { color: 'var(--accent-sell)' } },
-                    { label: '실현손익', val: `${(data.balance?.realized_pnl ?? 0).toLocaleString()}원`, style: { color: (data.balance?.realized_pnl ?? 0) >= 0 ? 'var(--accent-buy)' : 'var(--accent-sell)' } },
-                  ].map(({ label, val, style }) => (
-                    <div key={label} className="report-kpi-item">
-                      <span className="report-kpi-label">{label}</span>
-                      <span className="report-kpi-val" style={style}>{val}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-
-              {/* [A-3] 중복 제거 — 'AI 차단 정확도'는 위 성적표 타일 + 상세 리포트 목록으로 일원화. */}
-            </>)}
+            {/* [A-3] 중복 제거 — 'AI 차단 정확도'는 위 성적표 타일 + 상세 리포트 목록으로 일원화. */}
 
             </>)}
           </main>
@@ -3745,6 +3821,7 @@ export default function PWADashboard({ latestReport }) {
         .pwa-main { padding: 0 0 12px; display: flex; flex-direction: column; gap: 12px; }
         .pwa-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 16px; box-shadow: var(--card-shadow); }
         .pwa-card-label { display: block; font-size: 0.68rem; letter-spacing: 0.08em; color: var(--label-color); text-transform: uppercase; margin-bottom: 10px; font-weight: 700; }
+        .flow-ref { text-transform: none; letter-spacing: normal; font-weight: 600; color: var(--color-ink-3); }
 
         /* [v10 UI] 홈 히어로 — 다크 네이비 결론 앵커 (시안) */
         .home-hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 26px 22px; box-shadow: var(--shadow-float); overflow: hidden; }
@@ -4516,6 +4593,14 @@ export default function PWADashboard({ latestReport }) {
         .ml-bar > div { height: 100%; border-radius: 4px; transition: width 0.7s ease; }
         .ml-desc { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.6; margin: 0 0 12px; }
         .ml-desc b { color: var(--text-primary); font-weight: 700; }
+        .ml-hist-empty { font-size: 0.74rem; color: var(--text-tertiary); line-height: 1.5; margin: 0 0 12px; }
+        .ml-hist { margin-bottom: 12px; }
+        .ml-hist-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+        .ml-hist-item { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; background: var(--inset-bg); border-radius: 9px; padding: 8px 12px; min-width: 56px; }
+        .ml-hist-date { font-size: 0.62rem; color: var(--text-tertiary); font-weight: 600; }
+        .ml-hist-item b { font-size: 0.86rem; font-weight: 800; color: var(--text-primary); font-family: var(--font-mono); }
+        .ml-hist-item .up { font-size: 0.64rem; font-weight: 800; color: var(--color-success); }
+        .ml-hist-item .dn { font-size: 0.64rem; font-weight: 800; color: var(--color-danger); }
         .ml-reasons { background: var(--inset-bg); border-radius: var(--radius-md); padding: 12px 13px; }
         .ml-reasons-h { font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); margin-bottom: 9px; }
         /* [N7] 소표본 게이트 표기 */
@@ -4576,7 +4661,8 @@ export default function PWADashboard({ latestReport }) {
         .gd-narr { font-size: 0.76rem; color: var(--color-ink-2); background: var(--inset-bg); border-radius: 9px; padding: 8px 11px; margin: 10px 0 0; line-height: 1.5; word-break: keep-all; }
         .gd-wallets { display: flex; align-items: center; gap: 8px; margin: 12px 0 8px; }
         .gd-w { flex: 1; display: flex; flex-direction: column; gap: 3px; align-items: center; background: var(--inset-bg); border-radius: 12px; padding: 12px 6px; text-align: center; }
-        .gd-wl { font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); }
+        .gd-wl { font-size: 1.02rem; font-weight: 800; color: var(--color-ink); }
+        .gd-wl-ed { font-size: 0.66rem; font-weight: 600; color: var(--text-tertiary); margin-left: 3px; }
         .gd-wb { font-size: 1.05rem; font-weight: 900; font-family: var(--font-mono); color: var(--color-ink); }
         .gd-wg { font-size: 0.68rem; font-weight: 800; font-family: var(--font-mono); }
         .gd-wg.up { color: var(--color-success); } .gd-wg.dn { color: var(--color-danger); }
@@ -4595,11 +4681,20 @@ export default function PWADashboard({ latestReport }) {
         .gd-trend-final b.up { color: var(--color-success); } .gd-trend-final b.dn { color: var(--purple, var(--color-danger)); }
         /* [사용자 지시] 그래프 클릭 시 그 시점 판단 차이 설명 */
         .gd-trend-hint { font-size: 0.66rem; color: var(--text-tertiary); text-align: center; margin-top: 4px; }
-        .gd-trend-explain { position: relative; margin-top: 8px; padding: 10px 26px 10px 10px; background: var(--inset-bg); border-radius: 10px; }
-        .gd-trend-x { position: absolute; top: 6px; right: 6px; width: 20px; height: 20px; border: none; background: none; color: var(--text-tertiary); font-size: 11px; cursor: pointer; }
-        .gd-trend-explain-t { font-size: 0.76rem; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; }
-        .gd-trend-explain-b { font-size: 0.74rem; color: var(--text-secondary); line-height: 1.55; word-break: keep-all; }
-        .gd-trend-explain-b .up { color: var(--color-success); } .gd-trend-explain-b .dn { color: var(--purple, var(--color-danger)); }
+        /* [사용자 지시] 그래프 점 클릭 시 팝업 카드(바텀시트)로 상세 설명 */
+        .gd-trend-modal-bg { position: fixed; inset: 0; z-index: 9000; background: rgba(10,15,25,.5); display: flex; align-items: flex-end; justify-content: center; }
+        .gd-trend-modal { position: relative; width: 100%; max-width: 480px; background: var(--color-card); border-radius: 18px 18px 0 0; padding: 22px 20px calc(env(safe-area-inset-bottom, 0px) + 22px); }
+        .gd-trend-modal-x { position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--color-card-soft, var(--color-line)); color: var(--color-ink-2); font-size: 14px; cursor: pointer; }
+        .gd-trend-modal-t { font-size: 1.02rem; font-weight: 800; color: var(--color-ink); margin: 0 40px 4px 0; word-break: keep-all; }
+        .gd-trend-modal-ret { font-size: 0.8rem; font-weight: 700; color: var(--color-ink-3); margin-bottom: 14px; }
+        .gd-trend-modal-rows { display: flex; flex-direction: column; gap: 10px; }
+        .gd-trend-modal-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--color-card-soft, var(--color-bg)); border-radius: 10px; }
+        .gd-trend-modal-who { flex: none; font-size: 0.82rem; font-weight: 800; color: var(--color-ink); }
+        .gd-trend-modal-mid { flex: 1; min-width: 0; font-size: 0.76rem; color: var(--color-ink-2); }
+        .gd-trend-modal-row b { font-size: 0.88rem; font-weight: 800; }
+        .gd-trend-modal-row b.up { color: var(--color-success); } .gd-trend-modal-row b.dn { color: var(--purple, var(--color-danger)); }
+        .gd-trend-modal-diff { margin-top: 14px; font-size: 0.92rem; font-weight: 800; color: var(--color-ink); text-align: center; }
+        .gd-trend-modal-note { margin-top: 10px; font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.55; word-break: keep-all; text-align: center; }
         .gd-pending, .gd-recent { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
         .gd-ph { font-size: 0.7rem; font-weight: 800; color: var(--color-ink-2); margin-bottom: 6px; }
         .gd-prow, .gd-rrow { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 0.74rem; }
@@ -4683,6 +4778,9 @@ export default function PWADashboard({ latestReport }) {
         .chlog-kind { font-size: 0.62rem; font-weight: 800; color: var(--accent-buy); background: color-mix(in srgb, var(--accent-buy) 12%, transparent); padding: 1px 7px; border-radius: 5px; align-self: flex-start; }
         .chlog-text { font-size: 0.76rem; color: var(--text-secondary); line-height: 1.5; word-break: keep-all; }
         .chlog-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 10px; line-height: 1.5; }
+        .chlog-trend { font-size: 0.76rem; color: var(--text-secondary); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); line-height: 1.5; word-break: keep-all; }
+        .chlog-trend.muted { color: var(--text-tertiary); }
+        .chlog-trend b.up { color: var(--color-success); } .chlog-trend b.dn { color: var(--color-danger); }
         /* [A-2] AI 개선노트 3단(틀린 것→고친 것→효과) */
         .imp-list { display: flex; flex-direction: column; gap: 10px; }
         .imp-row { background: var(--inset-bg); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 11px 13px; display: flex; flex-direction: column; gap: 7px; }

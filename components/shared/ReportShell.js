@@ -1,23 +1,34 @@
 // [리포트 PWA화] AI 신뢰도 아카이브 상세 리포트 공용 셸.
 //   [FB-8 3-A] 드릴다운 상세에는 상단 자산탭(TopNav)을 그리지 않는다 — '← AI 신뢰도로' 백링크로만 복귀.
 //   '← AI 신뢰도로' 백링크 + 제목. PWA 톤·디자인 토큰만 사용.
+// [사용자 지시] AI 페이지와 동일한 상위 메뉴(AiTabTitle) 노출 + back·"AI 신뢰도로"가 원래
+//   있던 탭(?from=)으로 정확히 복귀 — 예전엔 항상 기본 탭('vs')으로 갔다.
 import Link from "next/link";
+import { useRouter } from "next/router";
+import AiTabTitle from "../AiTabTitle";
+
+const AI_SECS = ["vs", "verify", "archive"];
 
 export default function ReportShell({ title, sub, children }) {
+  const router = useRouter();
+  const from = AI_SECS.includes(router.query.from) ? router.query.from : "archive";
+  const backHref = `/pwa?tab=report&sec=${from}`;
   return (
     <div className="rp pwa-shell">
-      <Link href="/pwa?tab=report" className="rp-back">← AI 신뢰도로</Link>
+      <div className="rp-aitab"><AiTabTitle current={from} /></div>
+      <Link href={backHref} className="rp-back">← AI 신뢰도로</Link>
       <div className="rp-head">
         <h1 className="rp-title">{title}</h1>
         {sub && <p className="rp-sub">{sub}</p>}
       </div>
       {children}
       <div className="rp-foot">
-        <Link href="/pwa?tab=report" className="rp-foot-link">← AI 신뢰도로 돌아가기</Link>
+        <Link href={backHref} className="rp-foot-link">← AI 신뢰도로 돌아가기</Link>
         <Link href="/pwa?tab=dashboard" className="rp-foot-link">🏠 종합자산</Link>
       </div>
       <style jsx>{`
         .rp { max-width: 480px; margin: 0 auto; padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
+        .rp-aitab { margin-bottom: 12px; }
         .rp-back { display: inline-block; font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); text-decoration: none; margin: 2px 0 10px; }
         .rp-head { margin-bottom: 14px; }
         .rp-title { font-size: 1.15rem; font-weight: 800; letter-spacing: -.3px; margin: 0; }

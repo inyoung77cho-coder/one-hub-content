@@ -10,7 +10,7 @@ import { getLedger as getAssetLedger } from "../../lib/ledger";
 import HoldingsNews from "../../components/HoldingsNews";
 import ReportTeaser from "../../components/ReportTeaser";
 import { getLedger as getDecisionLedger, computeShowdown, matureLedger } from "../../lib/verdictLedger";
-import { computeWallets, getSeed, resetSeed, streakNarrative, wonG, getNickname, setNickname } from "../../lib/gameWallet";
+import { computeWallets, getSeed, resetSeed, streakNarrative, wonG, wonNum, getNickname, setNickname } from "../../lib/gameWallet";
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { initGameSync } from "../../lib/gameSync";
 import { samplePolicy } from "../../lib/sampleSize";
@@ -37,7 +37,6 @@ const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEW
 const pctTxt = (v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(2)}%`;
 const rePct = (v) => (v == null ? "-" : `${v > 0 ? "+" : ""}${Number(v).toFixed(1)}%`);
 // [사용자 지시] 지갑 큰 숫자는 "원" 없이, 그 아래 증감(+xx원)에만 "원"을 남긴다.
-const wonNum = (n) => wonG(n).replace(/원$/, "");
 const mmdd = (ms) => { const d = new Date(ms); return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
 // 백엔드가 positions를 문자열로 주는 경우가 있어 방어적으로 파싱
