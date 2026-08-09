@@ -3,8 +3,11 @@
 //   '← AI 신뢰도로' 백링크 + 제목. PWA 톤·디자인 토큰만 사용.
 // [사용자 지시] AI 페이지와 동일한 상위 메뉴(AiTabTitle) 노출 + back·"AI 신뢰도로"가 원래
 //   있던 탭(?from=)으로 정확히 복귀 — 예전엔 항상 기본 탭('vs')으로 갔다.
+// [사용자 지시] 다른 페이지와 동일하게 맨 위 ONE-HUB 공통 헤더도 추가 — 순서: ONE-HUB 헤더 →
+//   AI 리포트(+분석변경) → 리포트 내용.
 import Link from "next/link";
 import { useRouter } from "next/router";
+import AppHeader from "../AppHeader";
 import AiTabTitle from "../AiTabTitle";
 
 const AI_SECS = ["vs", "verify", "archive"];
@@ -15,6 +18,7 @@ export default function ReportShell({ title, sub, children }) {
   const backHref = `/pwa?tab=report&sec=${from}`;
   return (
     <div className="rp pwa-shell">
+      <AppHeader />
       <div className="rp-aitab"><AiTabTitle current={from} /></div>
       <Link href={backHref} className="rp-back">← AI 신뢰도로</Link>
       <div className="rp-head">
@@ -27,7 +31,7 @@ export default function ReportShell({ title, sub, children }) {
         <Link href="/pwa?tab=dashboard" className="rp-foot-link">🏠 종합자산</Link>
       </div>
       <style jsx>{`
-        .rp { max-width: 480px; margin: 0 auto; padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
+        .rp { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
         .rp-aitab { margin-bottom: 12px; }
         .rp-back { display: inline-block; font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); text-decoration: none; margin: 2px 0 10px; }
         .rp-head { margin-bottom: 14px; }

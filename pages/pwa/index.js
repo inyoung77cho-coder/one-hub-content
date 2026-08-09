@@ -1609,7 +1609,8 @@ export default function PWADashboard({ latestReport }) {
         {/* ── Recommend Tab ── [v9.0] AI 매수 선별 전 기술 스코어링 상위 후보 — 실거래와 분리된 관심종목 전용 화면 */}
         {tab === 'recommend' && (
           <main className="pwa-main">
-            {/* [v10 UI] 추천 관심종목 — 네이비 히어로(타 페이지와 통일). 제목/업데이트 2줄 정렬 */}
+            {/* [사용자 지시] 추천 관심종목 — 종합자산(assets.js)에서 "추천 자세히"로 들어와도 동일한
+                라이트 카드 형태를 유지하도록 통일(보유 탭의 acc-hero와 동일 패턴). 제목/업데이트 2줄 정렬 */}
             <section className="rec-hero">
               <div className="rec-hero-top">
                 <span className="rec-hero-title">🔍 추천 관심종목</span>
@@ -2151,7 +2152,7 @@ export default function PWADashboard({ latestReport }) {
           <main className="pwa-main">
             {!data && !error && <div className="pwa-loading"><div className="pwa-spinner" /><span>Loading...</span></div>}
             {data && (<>
-              {/* [v10 UI 시안] 계좌 현황 — 다크 네이비 계좌 히어로(onehub-stock 보유탭) */}
+              {/* [사용자 지시] 계좌 현황 — 종합자산과 동일한 라이트 카드로 통일(onehub-stock 보유탭) */}
               <section className="acc-hero">
                 <div className="acc-hero-top">
                   <span className="acc-hero-lbl">💳 계좌 현황 · 트레이더 {trader}</span>
@@ -2446,13 +2447,13 @@ export default function PWADashboard({ latestReport }) {
                     <div className="gd-w me">
                       <span className="gd-wl" onClick={editGameNickname} role="button" tabIndex={0} title="닉네임 바꾸기">{gameNick}<span className="gd-wl-ed">✎</span></span>
                       <b className="gd-wb">{wonNum(g.myBalance)}</b>
-                      {g.myGain !== 0 && <span className={`gd-wg ${g.myGain >= 0 ? 'up' : 'dn'}`}>{g.myGain >= 0 ? '+' : ''}{wonG(g.myGain)}</span>}
+                      <span className={`gd-wg ${g.myGain > 0 ? 'up' : g.myGain < 0 ? 'dn' : ''}`}>{g.myGain > 0 ? '+' : ''}{wonG(g.myGain)}</span>
                     </div>
                     <div className="gd-vs">VS</div>
                     <div className="gd-w ai">
                       <span className="gd-wl">AI</span>
                       <b className="gd-wb">{wonNum(g.aiBalance)}</b>
-                      {g.aiGain !== 0 && <span className={`gd-wg ${g.aiGain >= 0 ? 'up' : 'dn'}`}>{g.aiGain >= 0 ? '+' : ''}{wonG(g.aiGain)}</span>}
+                      <span className={`gd-wg ${g.aiGain > 0 ? 'up' : g.aiGain < 0 ? 'dn' : ''}`}>{g.aiGain > 0 ? '+' : ''}{wonG(g.aiGain)}</span>
                     </div>
                   </div>
                   <div className="gd-bar"><div className="gd-bar-me" style={{ width: `${Math.max(6, Math.min(94, pct))}%` }} /></div>
@@ -2474,10 +2475,12 @@ export default function PWADashboard({ latestReport }) {
                       const d = new Date(s.ts);
                       trend.push({ label: `${d.getMonth() + 1}/${d.getDate()}`, [gameNick]: myCum, AI: aiCum, _ev: s });
                     });
-                    // [사용자 지시] 그래프 클릭 시 그 지점에서 나·AI 판단이 갈린 이유를 +-비율/금액으로 설명
-                    const onTrendClick = (e) => {
-                      const ev = e?.activePayload?.[0]?.payload?._ev;
-                      setTrendClick(ev || null);
+                    // [버그 수정] recharts v3부터 onClick 시그니처가 바뀌어 (nextState, reactEvent) 두 인자로
+                    //   호출된다 — v2 방식의 e.activePayload는 더 이상 없다(항상 undefined라 클릭이 무반응
+                    //   이었다). nextState.activeIndex(문자열 인덱스)로 trend 배열에서 직접 찾는다.
+                    const onTrendClick = (nextState) => {
+                      const i = nextState?.activeIndex != null ? Number(nextState.activeIndex) : NaN;
+                      setTrendClick(Number.isFinite(i) ? (trend[i]?._ev || null) : null);
                     };
                     return (
                       <div className="gd-trend">
@@ -4087,29 +4090,31 @@ export default function PWADashboard({ latestReport }) {
         .v10-log-cnt { font-size: 12px; font-weight: 700; color: var(--color-ink-3); flex-shrink: 0; }
 
         /* [v10 UI 시안] 주식 보유/기록 다크 네이비 히어로 (계좌 현황 · AI 분석 흐름) */
-        .acc-hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 18px; box-shadow: var(--shadow-float); }
+        /* [사용자 지시] 종합자산(assets.js)에서 "보유 자세히"로 들어와도 동일한 라이트 카드
+           형태를 유지하도록 통일 */
+        .acc-hero { background: var(--color-card); color: var(--color-ink); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; box-shadow: var(--shadow-card); }
         .acc-hero-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 13px; gap: 8px; }
-        .acc-hero-lbl { font-size: 12.5px; font-weight: 700; color: var(--hero-ink-sub); }
+        .acc-hero-lbl { font-size: 12.5px; font-weight: 700; color: var(--color-ink-2); }
         .acc-badge { font-size: 12.5px; font-weight: 800; padding: 5px 12px; border-radius: 20px; }
-        .acc-badge.down { background: rgba(240,68,82,.2); color: var(--hero-danger); }
-        .acc-badge.up { background: rgba(22,199,132,.2); color: var(--hero-accent); }
-        .acc-hero-total { font-size: 29px; font-weight: 800; letter-spacing: -.5px; line-height: 1; color: var(--hero-ink); }
+        .acc-badge.down { background: var(--color-danger-soft, rgba(240,68,82,.14)); color: var(--color-danger); }
+        .acc-badge.up { background: var(--color-success-soft, rgba(22,199,132,.14)); color: var(--color-success); }
+        .acc-hero-total { font-size: 29px; font-weight: 800; letter-spacing: -.5px; line-height: 1; color: var(--color-ink); }
         .acc-hero-total span { font-size: 17px; font-weight: 700; margin-left: 1px; }
-        .acc-hero-sub { font-size: 12.5px; color: var(--hero-ink-soft); margin-top: 9px; }
-        .acc-hero-sub b { font-weight: 700; color: var(--hero-ink); }
-        .acc-hero-sub .up { color: var(--hero-accent); } .acc-hero-sub .dn { color: var(--hero-danger); }
+        .acc-hero-sub { font-size: 12.5px; color: var(--color-ink-2); margin-top: 9px; }
+        .acc-hero-sub b { font-weight: 700; color: var(--color-ink); }
+        .acc-hero-sub .up { color: var(--color-success); } .acc-hero-sub .dn { color: var(--color-danger); }
         .acc-chips { display: flex; gap: 9px; margin-top: 16px; }
-        .acc-chip { flex: 1; background: var(--hero-fill); border: 1px solid var(--hero-fill-line); border-radius: 13px; padding: 11px 13px; }
-        .acc-chip span { display: block; font-size: 11px; color: var(--hero-ink-sub); font-weight: 600; margin-bottom: 4px; }
-        .acc-chip b { font-size: 14px; font-weight: 800; color: var(--hero-ink); }
+        .acc-chip { flex: 1; background: var(--color-card-soft, var(--color-bg)); border: 1px solid var(--color-line); border-radius: 13px; padding: 11px 13px; }
+        .acc-chip span { display: block; font-size: 11px; color: var(--color-ink-3); font-weight: 600; margin-bottom: 4px; }
+        .acc-chip b { font-size: 14px; font-weight: 800; color: var(--color-ink); }
 
         /* [v10 UI] 추천 관심종목 네이비 히어로 — 제목/업데이트/설명 2~3줄 정렬 */
-        .rec-hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 18px; box-shadow: var(--shadow-float); }
+        .rec-hero { background: var(--color-card); color: var(--color-ink); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; box-shadow: var(--shadow-card); }
         .rec-hero-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-        .rec-hero-title { font-size: 15px; font-weight: 800; color: var(--hero-ink); letter-spacing: -.2px; }
+        .rec-hero-title { font-size: 15px; font-weight: 800; color: var(--color-ink); letter-spacing: -.2px; }
         .rec-hero-live { background: var(--color-success); color: #04351f; font-size: 9px; font-weight: 800; padding: 3px 7px; border-radius: 5px; letter-spacing: .5px; flex-shrink: 0; }
         .rec-hero-upd { margin-top: 7px; }
-        .rec-hero-desc { font-size: 12px; color: var(--hero-ink-soft); line-height: 1.55; margin-top: 10px; }
+        .rec-hero-desc { font-size: 12px; color: var(--color-ink-2); line-height: 1.55; margin-top: 10px; }
 
         /* [v8.6] Hero 카드 — "오늘의 시장" */
         .hero-card { background: var(--hero-bg); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 20px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; gap: 14px; }

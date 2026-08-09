@@ -208,12 +208,17 @@ export default function AssetsMapPage() {
         {/* ── [사용자 지시] 자산 지도 카드를 맨 위로 — "주식" 뷰에서는 계좌현황 요약을 카드 맨 위에 병합 ── */}
         <section className="card">
           <div className="as-h">자산 지도</div>
+          {/* [버그 수정] dash.balance.total_asset은 증권사(KIS) 연동 잔고만 — 직접입력 등 KIS外
+              보유가 빠져 있었다. 단일 원장(bd.stock_uk, 이미 KIS+직접입력 통합)으로 교체 — 아래
+              범례의 "📈 주식" 행과 항상 같은 수를 보게 된다. */}
           {view === 0 && (
             <div className="as-vc-acct">
-              <div className="as-vc-acct-total">{dash?.balance?.total_asset != null ? `${Number(dash.balance.total_asset).toLocaleString()}원` : "-"}</div>
-              <div className="as-vc-acct-sub">
-                평가손익 <b className={(dash?.balance?.unrealized_pnl ?? 0) >= 0 ? "up" : "dn"}>{(dash?.balance?.unrealized_pnl ?? 0) >= 0 ? "+" : ""}{(dash?.balance?.unrealized_pnl ?? 0).toLocaleString()}원</b>
-              </div>
+              <div className="as-vc-acct-total">{bd.stock_uk != null ? `${Math.round(Number(bd.stock_uk) * 1e8).toLocaleString()}원` : "-"}</div>
+              {dash?.balance?.unrealized_pnl != null && (
+                <div className="as-vc-acct-sub">
+                  평가손익(KIS 연동) <b className={dash.balance.unrealized_pnl >= 0 ? "up" : "dn"}>{dash.balance.unrealized_pnl >= 0 ? "+" : ""}{dash.balance.unrealized_pnl.toLocaleString()}원</b>
+                </div>
+              )}
             </div>
           )}
           <div className="as-map">

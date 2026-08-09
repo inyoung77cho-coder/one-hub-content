@@ -1,8 +1,8 @@
 // public/sw.js — ONE-HUB PWA Service Worker
 
 // [V1] 배포마다 갱신 → 구 SW 강제 교체 트리거. 설정 화면에도 표기(사용자가 최신 여부 확인).
-const SW_VERSION = 'v10.1-20260717';
-const CACHE_VERSION = 'onehub-v27';
+const SW_VERSION = 'v10.2-20260809';
+const CACHE_VERSION = 'onehub-v28';
 
 // [N3] 알림 종류별 착지점 — 백엔드는 kind만 실어 보내면 된다.
 //   ★sample_30(정식 통계 열림)이 재방문 루프의 핵심: 오늘 탭 ⑤ 진행바 → 30건 도달 알림 → 열람.

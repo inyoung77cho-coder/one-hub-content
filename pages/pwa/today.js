@@ -241,7 +241,13 @@ export default function TodayPage({ announcements = [] }) {
     : 0;
   const walletStartLabel = wallet && wallet.settled.length ? dLabel(Math.min(...wallet.settled.map((s) => s.ts))) : "";
   // [사용자 지시] 그래프 클릭 → AI 페이지로 안 넘어가고 그 지점 판단 차이를 간단히 설명
-  const onWalletTrendClick = (e) => setTrendClick(e?.activePayload?.[0]?.payload?._ev || null);
+  // [버그 수정] recharts v3부터 onClick이 (nextState, reactEvent) 두 인자로 호출된다 — v2 방식의
+  //   e.activePayload는 더 이상 없어(항상 undefined) 클릭이 계속 무반응이었다. nextState.activeIndex
+  //   (문자열 인덱스)로 walletTrend 배열에서 직접 찾는다.
+  const onWalletTrendClick = (nextState) => {
+    const i = nextState?.activeIndex != null ? Number(nextState.activeIndex) : NaN;
+    setTrendClick(Number.isFinite(i) ? (walletTrend[i]?._ev || null) : null);
+  };
   // [사용자 지시] 그래프 아래 날짜별 차이 금액 옆에 왜 차이 나는지(종목·금액) 간단히 나열 —
   //   클릭하지 않아도 바로 보이도록. 최근 정산분부터 최대 4건.
   const walletDiffLines = wallet ? [...wallet.settled].sort((a, b) => b.ts - a.ts).slice(0, 4).map((s) => ({
