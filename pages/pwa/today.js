@@ -11,10 +11,11 @@ import HoldingsNews from "../../components/HoldingsNews";
 import ReportTeaser from "../../components/ReportTeaser";
 import { getLedger as getDecisionLedger, computeShowdown, matureLedger } from "../../lib/verdictLedger";
 import { computeWallets, getSeed, resetSeed, streakNarrative, wonG, getNickname, setNickname } from "../../lib/gameWallet";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from "recharts";
 import { initGameSync } from "../../lib/gameSync";
 import { samplePolicy } from "../../lib/sampleSize";
-import { getStoryRegionOverride, REGIONS } from "../../lib/storyRegion";
+import { getStoryRegionOverride, REGIONS, getNewRegions, ackNewRegions } from "../../lib/storyRegion";
+import { recordSnapshot as recordRegionSnapshot, getRegionDelta } from "../../lib/storyRegionHistory";
 import { getHoldings as getEtfHoldings } from "../../lib/etfHoldings";
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
@@ -24,6 +25,7 @@ import MarketStatusBadge from "../../components/MarketStatusBadge";
 import RotatingPageTitle from "../../components/RotatingPageTitle";
 import ShareButton from "../../components/ShareButton";
 import FeedbackButton from "../../components/FeedbackButton";
+import { getAnnouncements } from "../../lib/reports";
 
 const DAY = 86400000;
 const MATURE_DAYS = 3; // 판단 → 채점까지(나 vs AI)
@@ -45,7 +47,7 @@ function parsePositions(dash) {
   return Array.isArray(p) ? p : [];
 }
 
-export default function TodayPage() {
+export default function TodayPage({ announcements = [] }) {
   const router = useRouter();
   const [trader] = useTrader();
   const [dash, setDash] = useState(null);
@@ -60,6 +62,8 @@ export default function TodayPage() {
   const [opNotes, setOpNotes] = useState([]); // [알림] OneHub 신고가(spot_price)
   const [reBrief, setReBrief] = useState(null); // [사용자 지시] 내 부동산 vs 지역 대장단지 가격 비교(re/briefing 재사용)
   const [storyComments, setStoryComments] = useState([]); // [사용자 지시] 오늘의 이야기 — 카테고리별(주식/부동산/ETF/기타) 미리보기
+  const [regionDelta, setRegionDelta] = useState(null); // [이야기 탭] 지역별 이야기 건수 증감(참석자 추적 불가 — 건수로 대체, 확인 완료)
+  const [newRegions, setNewRegions] = useState([]); // [이야기 탭] REGIONS에 새로 추가된 동(로컬 "본 목록" 대비)
   const [news, setNews] = useState(null); // [뉴스 통합] 오늘의 뉴스 — 부모가 한 번 fetch 해 카테고리별로 나눠 쓴다
   const [newsOpen, setNewsOpen] = useState(false); // ETF·부동산 타일 뉴스 더보기
   // [2026-08-05] 뉴스 상세는 useState가 아니라 URL(?news=id)에서 파생 — history에 진짜 항목이
@@ -82,7 +86,8 @@ export default function TodayPage() {
     const tr = getTrader();
     initGameSync(tr); // [2026-08-05] 시드/닉네임/원장 서버 하이드레이션 + 이후 변경 서버 미러링
     setStatus((s) => (dash ? "stale" : "loading"));
-    try { const mp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); setMyComplex(mp?.name || ""); } catch (e) {}
+    let myProp = null;
+    try { myProp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); setMyComplex(myProp?.name || ""); } catch (e) {}
     try { setDecisions(getDecisionLedger(tr) || []); } catch (e) { setDecisions([]); }
     // [2026-08-03] 나 vs AI 누적 손익이 매일 시드머니로 리셋된 것처럼 보이던 버그 수정.
     //   matureLedger(스냅샷 축적)가 예전엔 index.js의 ?tab=report 진입 때만 돌아서, "오늘"
@@ -109,18 +114,34 @@ export default function TodayPage() {
       .then((n) => { if (n?.ok && Array.isArray(n.items)) setNotis(dedupBy(n.items, (x) => x.id ?? `${x.title || ""}|${x.body || ""}|${x.sent_at || x.created_at || ""}`)); }).catch(() => {});
     fetch(`/api/today/news`).then((r) => r.json())
       .then((d) => { setNews(Array.isArray(d?.items) ? d.items : []); }).catch(() => setNews([]));
-    fetch(`/api/pwa/re/briefing`).then((r) => r.json())
-      .then((b) => { if (b && !b.error) setReBrief(b); }).catch(() => {});
+    // [사용자 지시] 브리핑이 항상 백엔드 기본 지역(서현동)만 보여주던 문제 — 내 단지의 법정동을
+    //   찾아 region= 으로 넘겨 "보유 주택 지역" 시황이 나오게 한다. 단지가 없거나 동을 못 찾으면
+    //   기존처럼 기본 지역 그대로(에러 아님).
+    const loadBriefing = (region) =>
+      fetch(`/api/pwa/re/briefing${region ? `?region=${encodeURIComponent(region)}` : ""}`).then((r) => r.json())
+        .then((b) => { if (b && !b.error) setReBrief(b); }).catch(() => {});
+    if (myProp?.name) {
+      fetch(`/api/pwa/re/complexAreas?complex=${encodeURIComponent(myProp.name)}`).then((r) => r.json())
+        .then((d) => loadBriefing(d?.법정동 || null))
+        .catch(() => loadBriefing(null));
+    } else {
+      loadBriefing(null);
+    }
     {
       const region = getStoryRegionOverride() || Object.values(REGIONS)[0][0];
       fetch(`/api/comments?date=${encodeURIComponent(region)}`).then((r) => r.json())
         .then((d) => { if (Array.isArray(d?.comments)) setStoryComments(d.comments); }).catch(() => {});
     }
-    try {
-      const mp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null");
-      if (mp?.name) fetch(`/api/input/re-spot?complex_name=${encodeURIComponent(mp.name)}`).then((r) => r.json())
-        .then((s) => { if (s?.ok && Array.isArray(s.items)) setOpNotes(s.items); }).catch(() => {});
-    } catch (e) {}
+    // [이야기 탭] 지역별 이야기 건수 오늘치를 받아 로컬에 하루 1건 적립 → 전날 대비 증감 계산.
+    fetch(`/api/story-region-stats`).then((r) => r.json())
+      .then((d) => {
+        if (!d?.ok || !d.counts) return;
+        recordRegionSnapshot(d.counts);
+        setRegionDelta(getRegionDelta());
+      }).catch(() => {});
+    setNewRegions(getNewRegions());
+    if (myProp?.name) fetch(`/api/input/re-spot?complex_name=${encodeURIComponent(myProp.name)}`).then((r) => r.json())
+      .then((s) => { if (s?.ok && Array.isArray(s.items)) setOpNotes(s.items); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dash]);
 
@@ -141,6 +162,12 @@ export default function TodayPage() {
     const on = () => setNick(getNickname());
     window.addEventListener("onehub-game-change", on);
     return () => window.removeEventListener("onehub-game-change", on);
+  }, []);
+
+  const dismissNewRegions = useCallback((e) => {
+    e.stopPropagation();
+    ackNewRegions();
+    setNewRegions([]);
   }, []);
 
   const editNickname = useCallback((e) => {
@@ -185,21 +212,35 @@ export default function TodayPage() {
   //   AI 페이지 game-dash와 동일). 정산분이 없으면 seed 그대로 잔고만 보여주고 그래프는 숨김.
   const wallet = computeWallets(computeShowdown(mine, 3), getSeed());
   const walletNarr = wallet ? streakNarrative(wallet.settled) : null;
+  // [사용자 지시] x축 한 칸 = 하루. 같은 날 여러 종목이 정산되면 그날 하나의 점으로 묶는다
+  //   (예전엔 정산 건마다 점을 찍어 같은 날짜 라벨이 여러 번 반복됐다).
+  const dLabel = (ts) => { const d = new Date(ts); return `${d.getMonth() + 1}/${d.getDate()}`; };
   const walletTrend = (() => {
     if (!wallet || !wallet.settled.length) return [];
     const chron = [...wallet.settled].sort((a, b) => a.ts - b.ts);
-    let myCum = wallet.seed, aiCum = wallet.seed;
-    const start = new Date(chron[0].ts);
-    // [사용자 지시] x축은 하루 날짜(M/D)로 통일 — 첫 점만 "시작"이 붙어 있던 걸 없애 모든 점이
-    //   동일한 날짜 표기가 되도록.
-    const t = [{ label: `${start.getMonth() + 1}/${start.getDate()}`, [nick]: myCum, AI: aiCum, _ev: null }];
+    const byDay = new Map();
     chron.forEach((s) => {
-      myCum += s.myPnl; aiCum += s.aiPnl;
-      const d = new Date(s.ts);
-      t.push({ label: `${d.getMonth() + 1}/${d.getDate()}`, [nick]: myCum, AI: aiCum, _ev: s });
+      const key = dLabel(s.ts);
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key).push(s);
+    });
+    let myCum = wallet.seed, aiCum = wallet.seed;
+    // 시드(출발) 지점은 첫 정산일과 날짜가 겹치지 않도록 하루 전으로 표기.
+    const startLabel = dLabel(chron[0].ts - DAY);
+    const t = [{ label: startLabel, [nick]: myCum, AI: aiCum, _ev: null }];
+    [...byDay.entries()].forEach(([label, items]) => {
+      const myPnl = items.reduce((s, it) => s + (it.myPnl || 0), 0);
+      const aiPnl = items.reduce((s, it) => s + (it.aiPnl || 0), 0);
+      myCum += myPnl; aiCum += aiPnl;
+      t.push({ label, [nick]: myCum, AI: aiCum, _ev: { date: label, items, myPnl, aiPnl } });
     });
     return t;
   })();
+  // [사용자 지시] 며칠째·언제부터 대결 중인지 그래프 위에 간단히 표기
+  const walletDaysIn = wallet && wallet.settled.length
+    ? Math.max(1, Math.floor((Date.now() - Math.min(...wallet.settled.map((s) => s.ts))) / DAY) + 1)
+    : 0;
+  const walletStartLabel = wallet && wallet.settled.length ? dLabel(Math.min(...wallet.settled.map((s) => s.ts))) : "";
   // [사용자 지시] 그래프 클릭 → AI 페이지로 안 넘어가고 그 지점 판단 차이를 간단히 설명
   const onWalletTrendClick = (e) => setTrendClick(e?.activePayload?.[0]?.payload?._ev || null);
   // [사용자 지시] 그래프 아래 날짜별 차이 금액 옆에 왜 차이 나는지(종목·금액) 간단히 나열 —
@@ -249,10 +290,18 @@ export default function TodayPage() {
   const myEtfNews = myEtfTickers.length > 0
     ? allNews.find((n) => myEtfTickers.some((tk) => `${n.headline || ""} ${n.summary_md || ""}`.includes(tk)))
     : null;
+  // [사용자 지시] global/macro/policy로 분류된 뉴스엔 ETF와 무관한 지정학·시사 기사가 많이 섞여
+  //   있어, 그대로 1순위 대체로 쓰면 "ETF 관련"이라 보기 어려운 헤드라인이 뜬다. 지수·환율·금리 등
+  //   ETF 가격에 실제로 연동되는 키워드가 있는 것만 2순위로 인정하고, 그마저 없으면 평가액(실데이터)
+  //   기반 안내로 대체 — 무관한 뉴스를 "ETF 정보"인 것처럼 보여주지 않는다.
+  const ETF_KW = /코스피|코스닥|나스닥|S&P|다우|지수|금리|환율|달러|연준|Fed|금값|국채|증시/i;
+  const etfRelNews = etfNews.find((n) => ETF_KW.test(`${n.headline || ""} ${n.summary_md || ""}`));
   const etfHeadline = myEtfNews
     ? `📌 보유 ETF 관련 · ${myEtfNews.headline}`
-    : etfNews.length > 0
-    ? `📰 ${etfNews[0].headline}`
+    : etfRelNews
+    ? `📰 ${etfRelNews.headline}`
+    : ukTxt(bd.etf_uk)
+    ? `📊 ETF 평가 ${ukTxt(bd.etf_uk)} · 오늘은 보유 ETF 관련 특이 뉴스가 없어요.`
     : "오늘은 특별한 ETF 관련 이슈가 없어요 — 평소 배분을 유지하세요.";
   const storySorted = [...storyComments].sort((a, b) => (b.ts || 0) - (a.ts || 0));
   // ts는 클라 시각(ms) — KST 자정 이후분만 "오늘"로 센다(todayStr은 위에서 이미 계산).
@@ -392,11 +441,13 @@ export default function TodayPage() {
                 // [사용자 지시] 그래프는 클릭해도 AI 페이지로 이동하지 않고 그 자리에서 설명 — 카드 전체의
                 //   onClick(navigate)이 버블링으로 걸려도 여기서 멈춘다.
                 <div className="hero-trend" onClick={(e) => e.stopPropagation()}>
+                  <div className="hero-trend-top">
+                    <span className="hero-trend-days">{walletDaysIn}일째 · {walletStartLabel} 시작</span>
+                  </div>
                   <ResponsiveContainer width="100%" height={130}>
                     <LineChart data={walletTrend} margin={{ top: 6, right: 8, left: 0, bottom: 0 }} onClick={onWalletTrendClick}>
                       <XAxis dataKey="label" stroke="var(--color-ink-3)" fontSize={10} tickLine={false} />
                       <YAxis hide domain={["dataMin", "dataMax"]} />
-                      <Tooltip formatter={(v) => wonG(v)} contentStyle={{ background: "var(--color-card)", border: "1px solid var(--color-line)", borderRadius: 8, fontSize: 12 }} />
                       <Line type="monotone" dataKey={nick} stroke="var(--color-success)" strokeWidth={2} dot={{ r: 2, cursor: "pointer" }} activeDot={{ r: 5, cursor: "pointer" }} />
                       <Line type="monotone" dataKey="AI" stroke="var(--purple)" strokeWidth={2} dot={{ r: 2, cursor: "pointer" }} activeDot={{ r: 5, cursor: "pointer" }} />
                     </LineChart>
@@ -404,11 +455,18 @@ export default function TodayPage() {
                   {trendClick ? (
                     <div className="hero-trend-explain">
                       <button type="button" className="hero-trend-x" onClick={() => setTrendClick(null)} aria-label="닫기">✕</button>
-                      <div className="hero-trend-explain-t">{trendClick.name} · 나:{trendClick.decision === "take" ? "매수" : "관망"} · AI:매수</div>
-                      <div className="hero-trend-explain-b">
-                        가격 {trendClick.ret >= 0 ? "+" : ""}{trendClick.ret}% · {nick} <b className={trendClick.myPnl >= 0 ? "up" : "dn"}>{wonG(trendClick.myPnl)}</b> vs AI <b className={trendClick.aiPnl >= 0 ? "up" : "dn"}>{wonG(trendClick.aiPnl)}</b>
-                        {" "}(차이 <b className={(trendClick.myPnl - trendClick.aiPnl) >= 0 ? "up" : "dn"}>{(trendClick.myPnl - trendClick.aiPnl) >= 0 ? "+" : ""}{wonG(trendClick.myPnl - trendClick.aiPnl)}</b>)
-                      </div>
+                      <div className="hero-trend-explain-t">{trendClick.date} · {trendClick.items.length}종목 정산</div>
+                      {trendClick.items.map((it, i) => (
+                        <div className="hero-trend-explain-b" key={i}>
+                          {it.name} · 나:{it.decision === "take" ? "매수" : "관망"} · AI:매수 · 가격 {it.ret >= 0 ? "+" : ""}{it.ret}%
+                          {" · "}{nick} <b className={it.myPnl >= 0 ? "up" : "dn"}>{wonG(it.myPnl)}</b> vs AI <b className={it.aiPnl >= 0 ? "up" : "dn"}>{wonG(it.aiPnl)}</b>
+                        </div>
+                      ))}
+                      {trendClick.items.length > 1 && (
+                        <div className="hero-trend-explain-b">
+                          합계 차이 <b className={(trendClick.myPnl - trendClick.aiPnl) >= 0 ? "up" : "dn"}>{(trendClick.myPnl - trendClick.aiPnl) >= 0 ? "+" : ""}{wonG(trendClick.myPnl - trendClick.aiPnl)}</b>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="hero-trend-hint">점을 눌러보세요 — 그날 차이를 바로 설명해 드립니다</div>
@@ -588,7 +646,9 @@ export default function TodayPage() {
               <div className="tile-news">
                 {opNotes.slice(0, 4).map((o, i) => (
                   <button className="tile-news-row" key={o.id || i} onClick={() => router.push("/pwa/realestate")}>
-                    <span className="tile-news-t">{o.complex_name}{o.price_manwon ? ` · ${(o.price_manwon / 10000).toFixed(2)}억` : ""}</span>
+                    <span className="tile-news-t">
+                      {o.complex_name}{o.area_m2 ? ` · ${Math.round(Number(o.area_m2) / 3.3058)}평` : ""}{o.price_manwon ? ` · ${(o.price_manwon / 10000).toFixed(2)}억` : ""}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -616,20 +676,27 @@ export default function TodayPage() {
             <ReportTeaser />
           </section>
 
-          {/* 카드4 — 오늘의 할 일: 관심(저평가) 단지 */}
-          <section className="card tile">
-            <div className="tile-h">✅ 오늘의 할 일 · 부동산</div>
+          {/* 카드4 — 오늘의 할 일: 관심(저평가) 단지. [사용자 지시] 체크박스로 확인 후 취소선 */}
+          <section className="card sc">
+            <div className="sc-h">✅ 오늘의 할 일 · 부동산</div>
             {reBrief?.under?.length > 0 ? (
-              <div className="tile-news">
-                <div className="tile-news-h">확인해볼 저평가 관심 단지</div>
-                {reBrief.under.slice(0, 3).map((u, i) => (
-                  <button className="tile-news-row" key={i} onClick={() => router.push("/pwa/realestate")}>
-                    <span className="tile-news-t">{u.단지명} <b className="up">+{Number(u.gap).toFixed(1)}% 저평가</b></span>
-                  </button>
-                ))}
+              <div className="sc-list">
+                {reBrief.under.slice(0, 3).map((u, i) => {
+                  const key = `re-${u.단지명 || i}`;
+                  const done = checked.has(key);
+                  return (
+                    <div className={`sc-row ${done ? "done" : ""}`} key={key}>
+                      <button type="button" className="sc-check" onClick={() => toggleCheck(key)} aria-label={done ? "완료 취소" : "완료 표시"}>{done ? "✓" : ""}</button>
+                      <button type="button" className="sc-body" onClick={() => router.push("/pwa/realestate")}>
+                        <span className="sc-t">{u.단지명}</span>
+                        <span className="sc-s">+{Number(u.gap).toFixed(1)}% 저평가</span>
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
-              <div className="tile-empty">오늘은 새로 확인할 관심 단지 정보가 없어요.</div>
+              <div className="sc-empty">오늘은 새로 확인할 관심 단지 정보가 없어요.</div>
             )}
           </section>
         </>)}
@@ -669,28 +736,43 @@ export default function TodayPage() {
           </section>
         )}
 
-        {/* 카드2 — [사용자 지시] 오늘의 할 일 · ETF */}
+        {/* 카드2 — [사용자 지시] 오늘의 할 일 · ETF (체크박스로 확인 후 취소선) */}
         {view === 2 && (() => {
           const todo = [myEtfNews, ...etfNews].filter(Boolean).filter((n, i, arr) => arr.findIndex((x) => x.id === n.id) === i).slice(0, 3);
           return (
-            <section className="card tile">
-              <div className="tile-h">✅ 오늘의 할 일 · ETF</div>
+            <section className="card sc">
+              <div className="sc-h">✅ 오늘의 할 일 · ETF</div>
               {todo.length > 0 ? (
-                <div className="tile-news">
-                  <div className="tile-news-h">확인해볼 것</div>
-                  {todo.map((n) => (
-                    <button className="tile-news-row" key={n.id} onClick={() => openNewsDetail(n)}>
-                      <span className="tile-news-t">{n.headline}</span>
-                    </button>
-                  ))}
+                <div className="sc-list">
+                  {todo.map((n) => {
+                    const key = `etf-${n.id}`;
+                    const done = checked.has(key);
+                    return (
+                      <div className={`sc-row ${done ? "done" : ""}`} key={key}>
+                        <button type="button" className="sc-check" onClick={() => toggleCheck(key)} aria-label={done ? "완료 취소" : "완료 표시"}>{done ? "✓" : ""}</button>
+                        <button type="button" className="sc-body" onClick={() => openNewsDetail(n)}>
+                          <span className="sc-t">{n.headline}</span>
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="tile-empty">오늘은 특별히 확인할 ETF 이슈가 없어요.</div>
+                <div className="sc-empty">오늘은 특별히 확인할 ETF 이슈가 없어요.</div>
               )}
               <button className="tile-more" onClick={() => router.push("/pwa/etf")}>ETF 리밸런싱 확인하러 가기 →</button>
             </section>
           );
         })()}
+
+        {/* ══ 새 지역 추가 안내 — [확인 완료] REGIONS(lib/storyRegion.js)에 늘어난 동을 로컬 "본 목록" 대비로 감지 ══ */}
+        {view === 3 && newRegions.length > 0 && (
+          <section className="card tile story-newregion">
+            <div className="tile-h">🆕 새로운 지역이 추가됐어요</div>
+            <p className="tile-headline">{newRegions.join(", ")} 이야기를 이제 이곳에서 볼 수 있어요.</p>
+            <button className="tile-more" onClick={dismissNewRegions}>확인했어요</button>
+          </section>
+        )}
 
         {/* ══ "오늘의 이야기" — [사용자 지시] 주식/부동산/ETF/기타로 나눠 카드 작성 ══ */}
         {view === 3 && (
@@ -721,6 +803,67 @@ export default function TodayPage() {
             </section>
           );
         })}
+
+        {/* ══ 지역별 이야기 건수 증감 — [확인 완료] 참석자(고유 사용자) 추적 장치가 없어
+             동별 이야기 "건수" 증감으로 대체(lib/storyRegionHistory.js, 로컬 일별 스냅샷) ══ */}
+        {view === 3 && (
+          <section className="card tile">
+            <div className="tile-h">📊 지역별 이야기 증감</div>
+            {regionDelta ? (
+              regionDelta.deltas.filter((d) => d.delta !== 0).length > 0 ? (
+                <div className="story-cat-list">
+                  {regionDelta.deltas.filter((d) => d.delta !== 0).slice(0, 5).map((d) => (
+                    <div className="story-cat-row" key={d.region}>
+                      <span className="story-cat-nick">{d.region}</span>
+                      <span className="story-cat-text">{d.count}건</span>
+                      <span className={d.delta > 0 ? "story-delta-up" : "story-delta-down"}>
+                        {d.delta > 0 ? "▲" : "▼"}{Math.abs(d.delta)}
+                      </span>
+                    </div>
+                  ))}
+                  <p className="tile-sub">{regionDelta.prevDate} 대비</p>
+                </div>
+              ) : (
+                <div className="tile-empty">어제와 비교해 변화가 없어요.</div>
+              )
+            ) : (
+              <div className="tile-empty">데이터를 쌓는 중이에요 — 내일부터 전날 대비 증감이 보여요.</div>
+            )}
+          </section>
+        )}
+
+        {/* ══ Youtube/단톡방 업데이트 공지 — [확인 완료] content/announcements/*.md,
+             관리자가 직접 커밋(content/daily와 동일 패턴, 새 백엔드 없음) ══ */}
+        {view === 3 && (
+          <section className="card tile">
+            <div className="tile-h">📢 업데이트 공지</div>
+            {announcements.length > 0 ? (
+              <div className="story-cat-list">
+                {announcements.map((a) => (
+                  a.url ? (
+                    <a className="story-announce-row" key={a.date + a.title} href={a.url} target="_blank" rel="noopener noreferrer">
+                      <span className="mini-ic">{a.icon}</span>
+                      <span className="mini-body">
+                        <span className="mini-t">{a.title}</span>
+                        {a.body && <span className="mini-s">{a.body}</span>}
+                      </span>
+                    </a>
+                  ) : (
+                    <div className="story-announce-row" key={a.date + a.title}>
+                      <span className="mini-ic">{a.icon}</span>
+                      <span className="mini-body">
+                        <span className="mini-t">{a.title}</span>
+                        {a.body && <span className="mini-s">{a.body}</span>}
+                      </span>
+                    </div>
+                  )
+                ))}
+              </div>
+            ) : (
+              <div className="tile-empty">아직 등록된 공지가 없어요.</div>
+            )}
+          </section>
+        )}
 
       </DataState>
 
@@ -790,6 +933,8 @@ export default function TodayPage() {
         .hero-bar-me { height: 100%; background: var(--color-success); border-radius: 4px; transition: width .4s; }
         .hero-lead { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 0.76rem; color: var(--color-ink-2); word-break: keep-all; }
         .hero-trend { margin: 10px -4px 2px; }
+        .hero-trend-top { padding: 0 4px; margin-bottom: 2px; }
+        .hero-trend-days { font-size: 0.66rem; font-weight: 700; color: var(--color-ink-3); }
         .hero-trend-hint { font-size: 0.64rem; color: var(--color-ink-3); text-align: center; margin-top: 2px; }
         .hero-trend-explain { position: relative; margin-top: 6px; padding: 9px 24px 9px 9px; background: var(--color-card-soft); border-radius: 9px; }
         .hero-trend-x { position: absolute; top: 5px; right: 5px; width: 18px; height: 18px; border: none; background: none; color: var(--color-ink-3); font-size: 10px; cursor: pointer; }
@@ -854,6 +999,11 @@ export default function TodayPage() {
         .story-cat-row { display: flex; gap: 7px; align-items: baseline; font-size: 0.78rem; }
         .story-cat-nick { flex: none; font-weight: 800; color: var(--color-ink-2); }
         .story-cat-text { flex: 1; min-width: 0; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .story-delta-up { flex: none; font-size: 0.76rem; font-weight: 800; color: var(--color-success); }
+        .story-delta-down { flex: none; font-size: 0.76rem; font-weight: 800; color: var(--color-danger); }
+        .tile-sub { font-size: 0.68rem; color: var(--color-ink-3); margin: 4px 0 0; }
+        .story-newregion { background: var(--color-primary-soft, var(--color-card-soft)); }
+        .story-announce-row { display: flex; align-items: flex-start; gap: 8px; padding: 8px 2px; text-decoration: none; color: inherit; font-family: var(--font-sans); }
         .mini-ic { flex: none; font-size: 20px; width: 26px; text-align: center; }
         .mini-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
         .mini-t { font-size: 0.8rem; font-weight: 800; color: var(--color-ink); }
@@ -877,5 +1027,10 @@ export default function TodayPage() {
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>
   );
+}
+
+// [이야기 탭 공지] content/announcements/*.md — 관리자가 파일을 커밋하면 노출(가짜 공지 없음).
+export async function getStaticProps() {
+  return { props: { announcements: getAnnouncements(5) }, revalidate: 300 };
 }
 
