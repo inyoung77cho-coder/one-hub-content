@@ -148,8 +148,11 @@ export default function AssetsMapPage() {
   }));
   const total = assets?.total_uk != null ? Number(assets.total_uk) : rows.reduce((s, r) => s + (r.val || 0), 0);
   // [§3.1] 실거주(대표단지) 분리 — realestate_uk = 대표단지 + 추가부동산. 추가부동산(투자용)만 빼면 실거주값.
+  // [사용자 지시] bd.realestate_uk는 이제 lib/ledger.js에서 전세보증금을 뺀 순자산 기준이므로,
+  //   여기서 분리해내는 투자용 부동산 값도 동일하게 순액(평가−보증금)으로 맞춰야 실거주 잔여값이
+  //   맞게 계산된다(양쪽 다 총액이면 상관없지만 한쪽만 순액이면 실거주가 부풀어 보인다).
   const realtyUk = bd.realestate_uk != null ? Number(bd.realestate_uk) : 0;
-  const invRealtyUk = invProps.reduce((s, p) => s + (Number(p.valueUk) || 0), 0);
+  const invRealtyUk = invProps.reduce((s, p) => s + Math.max(0, (Number(p.valueUk) || 0) - (Number(p.deposit) || 0)), 0);
   const residenceUk = Math.max(0, realtyUk - invRealtyUk);   // 실거주(못 파는 자산)
   const hasResidence = residenceUk > 0.005;
   const opTotal = Math.max(0, total - residenceUk);           // 운용 가능 자산
@@ -216,6 +219,9 @@ export default function AssetsMapPage() {
               범례의 "📈 주식" 행과 항상 같은 수를 보게 된다. */}
           {view === 0 && (
             <div className="as-vc-acct">
+              {/* [사용자 지시] 아래 범례(억 단위)와 달리 이 큰 숫자는 원 단위로 정확히 표기 —
+                  자산군 라벨도 함께 표시해 무엇의 금액인지 분명히 한다. */}
+              <div className="as-vc-acct-lbl">📈 주식</div>
               <div className="as-vc-acct-total">{bd.stock_uk != null ? `${Math.round(Number(bd.stock_uk) * 1e8).toLocaleString()}원` : "-"}</div>
               {dash?.balance?.unrealized_pnl != null && (
                 <div className="as-vc-acct-sub">
@@ -456,6 +462,7 @@ export default function AssetsMapPage() {
         .as-vc-cta { width: 100%; min-height: 42px; border: 1px solid var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-primary); border-radius: 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         /* [사용자 지시] "주식" 뷰 — 계좌현황 + 보유/추천 분할 요약 */
         .as-vc-acct { margin-bottom: 12px; }
+        .as-vc-acct-lbl { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-3); margin-bottom: 2px; }
         .as-vc-acct-total { font-size: 1.2rem; font-weight: 900; font-family: ui-monospace, monospace; color: var(--color-ink); }
         .as-vc-acct-sub { font-size: 0.78rem; color: var(--color-ink-2); margin-top: 2px; }
         .as-vc-acct-sub b { font-weight: 800; }
