@@ -394,10 +394,14 @@ export default function EtfDashboard() {
 
   return (
     <div className="etf pwa-shell">
-      <AppHeader />
-      {/* [사용자 지시] "종합자산 자산지도" 탭에서 이 페이지로 direct 연결되므로, 상위 메뉴바가
-          사라진 것처럼 보이지 않도록 동일한 타이틀 바를 여기도 얹는다. */}
-      <AssetMapTitle current="ETF" />
+      {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 — 헤더+타이틀바를 하나의
+          sticky 블록으로 묶는다. */}
+      <div className="sticky-hdr">
+        <AppHeader />
+        {/* [사용자 지시] "종합자산 자산지도" 탭에서 이 페이지로 direct 연결되므로, 상위 메뉴바가
+            사라진 것처럼 보이지 않도록 동일한 타이틀 바를 여기도 얹는다. */}
+        <AssetMapTitle current="ETF" />
+      </div>
 
       {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해. [사용자 지시] 다른 페이지처럼 밝은 카드로 통일 */}
       <section className="hero">
@@ -1052,6 +1056,8 @@ export default function EtfDashboard() {
 
       <style jsx>{`
         .etf { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 84px); font-family: var(--font-sans); color: var(--color-ink); }
+        /* [사용자 지시] 상위 메뉴 고정 — 헤더+타이틀바를 뷰포트 상단에 붙인다 */
+        .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
         /* [D4] 접기 헤더 — 라벨 전체가 44px 타깃 */
         .etf-acc-h { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); text-align: left; }
         .etf-caret { color: var(--color-ink-3); font-size: 0.9rem; flex-shrink: 0; }

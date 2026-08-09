@@ -194,39 +194,45 @@ export default function Settings() {
 
   return (
     <div className="m pwa-shell">
-      {/* [OS-2] 다른 페이지와 동일한 상단 메뉴바 — ONE·HUB 로고 + 검색 + 피드백 */}
-      <header className="hd">
-        <button type="button" className="hd-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">ONE<span className="hd-dot">·</span>HUB</button>
-        <div className="hd-ic">
-          <button type="button" className="hd-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색" title="AI 종목 검색">🔍</button>
-          <FeedbackButton variant="icon" />
-        </div>
-      </header>
-      <h1 className="hd-title">⚙️ 설정</h1>
+      {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 */}
+      <div className="sticky-hdr">
+        {/* [OS-2] 다른 페이지와 동일한 상단 메뉴바 — ONE·HUB 로고 + 검색 + 피드백 */}
+        <header className="hd">
+          <button type="button" className="hd-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">ONE<span className="hd-dot">·</span>HUB</button>
+          <div className="hd-ic">
+            <button type="button" className="hd-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색" title="AI 종목 검색">🔍</button>
+            <FeedbackButton variant="icon" />
+          </div>
+        </header>
+        <h1 className="hd-title">⚙️ 설정</h1>
+
+        {/* 뷰 전환 세그먼트 — 일반 / 운영자 (운영자 탭은 admin 전용) */}
+        {isAdmin && (
+          <div className="seg">
+            <button className={!showOps ? "on" : ""} onClick={() => showOps && toggleOps()}>일반</button>
+            <button className={showOps ? "on" : ""} onClick={() => !showOps && toggleOps()}>운영자</button>
+          </div>
+        )}
+
+        {/* [사용자 지시] 상위 메뉴 고정 범위에 포함되도록 삼항 밖으로 — 다른 페이지의 보유/추천
+            탭과 동일한 위치의 메뉴 요소. */}
+        {!showOps && (
+          <div className="itab">
+            <button className={infoTab === "info" ? "on" : ""} onClick={() => setInfoTab("info")}>나의 정보</button>
+            <button className={infoTab === "settings" ? "on" : ""} onClick={() => setInfoTab("settings")}>내 설정 변경</button>
+          </div>
+        )}
+      </div>
 
       {/* [NI-5-d] 베타 테스터 배지 — 정식 출시 후에도 무료 */}
       {me && !isAdmin && (
-        <div style={{ margin: "0 0 12px", padding: "10px 12px", borderRadius: 10, background: "rgba(99,102,241,0.12)", color: "var(--color-ink, #1e293b)", fontSize: "0.78rem", fontWeight: 700, textAlign: "center" }}>
+        <div style={{ margin: "12px 0 12px", padding: "10px 12px", borderRadius: 10, background: "rgba(99,102,241,0.12)", color: "var(--color-ink, #1e293b)", fontSize: "0.78rem", fontWeight: 700, textAlign: "center" }}>
           🧪 베타 테스터 · 정식 출시 후에도 무료로 이용하실 수 있어요
-        </div>
-      )}
-
-      {/* 뷰 전환 세그먼트 — 일반 / 운영자 (운영자 탭은 admin 전용) */}
-      {isAdmin && (
-        <div className="seg">
-          <button className={!showOps ? "on" : ""} onClick={() => showOps && toggleOps()}>일반</button>
-          <button className={showOps ? "on" : ""} onClick={() => !showOps && toggleOps()}>운영자</button>
         </div>
       )}
 
       {!showOps ? (
         <>
-          {/* [OS-2] 좌 "나의 정보" / 우 "내 설정변경" — 공통 상단 메뉴 패턴 */}
-          <div className="itab">
-            <button className={infoTab === "info" ? "on" : ""} onClick={() => setInfoTab("info")}>나의 정보</button>
-            <button className={infoTab === "settings" ? "on" : ""} onClick={() => setInfoTab("settings")}>내 설정 변경</button>
-          </div>
-
           {infoTab === "info" && (
             <div className="card idcard">
               <div className="idrow">
@@ -535,7 +541,9 @@ export default function Settings() {
 
       <style jsx>{`
         .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--color-bg); padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 84px); font-family: var(--font-sans); color: var(--color-ink); }
-        .hd { position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; background: var(--color-bg); padding: calc(env(safe-area-inset-top, 0px) + 10px) 4px 12px; }
+        /* [사용자 지시] 상위 메뉴 고정 — 헤더뿐 아니라 타이틀·세그먼트·탭까지 하나의 블록으로 */
+        .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px 4px; }
+        .hd { display: flex; align-items: center; justify-content: space-between; background: var(--color-bg); padding: calc(env(safe-area-inset-top, 0px) + 10px) 4px 12px; }
         .hd-logo { font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--color-ink); font-family: var(--font-sans); background: none; border: none; padding: 0; cursor: pointer; }
         .hd-dot { color: var(--color-success); }
         .hd-ic { display: flex; align-items: center; gap: 8px; }

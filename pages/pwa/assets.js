@@ -183,26 +183,29 @@ export default function AssetsMapPage() {
 
   return (
     <div className="as">
-      <header className="as-hd">
-        <button className="as-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">ONE<span className="as-dot">·</span>HUB</button>
-        <div className="as-ic">
-          <TraderBadge />
-          <button className="as-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>
-          <FeedbackButton variant="icon" />
-          <button className="as-search" onClick={() => router.push("/pwa/settings")} aria-label="설정">⚙️</button>
-        </div>
-      </header>
+      {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 */}
+      <div className="sticky-hdr">
+        <header className="as-hd">
+          <button className="as-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">ONE<span className="as-dot">·</span>HUB</button>
+          <div className="as-ic">
+            <TraderBadge />
+            <button className="as-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>
+            <FeedbackButton variant="icon" />
+            <button className="as-search" onClick={() => router.push("/pwa/settings")} aria-label="설정">⚙️</button>
+          </div>
+        </header>
 
-      {/* [사용자 지시] ETF·부동산 페이지로 이동해도 이 타이틀 바가 그대로 이어지도록 공용 컴포넌트로 통일 */}
-      <AssetMapTitle current="주식" onChangeView={(i) => setView(i)} />
+        {/* [사용자 지시] ETF·부동산 페이지로 이동해도 이 타이틀 바가 그대로 이어지도록 공용 컴포넌트로 통일 */}
+        <AssetMapTitle current="주식" onChangeView={(i) => setView(i)} />
 
-      {/* [사용자 지시] 주식 페이지의 보유/추천을 상위 메뉴바 바로 아래 탭으로 — "주식" 뷰에서만 노출 */}
-      {view === 0 && (
-        <div className="as-stocktabs">
-          <button type="button" className={`as-st-btn ${stockTab === "hold" ? "on" : ""}`} onClick={() => setStockTab("hold")}>보유</button>
-          <button type="button" className={`as-st-btn ${stockTab === "recommend" ? "on" : ""}`} onClick={() => setStockTab("recommend")}>추천</button>
-        </div>
-      )}
+        {/* [사용자 지시] 주식 페이지의 보유/추천을 상위 메뉴바 바로 아래 탭으로 — "주식" 뷰에서만 노출 */}
+        {view === 0 && (
+          <div className="as-stocktabs">
+            <button type="button" className={`as-st-btn ${stockTab === "hold" ? "on" : ""}`} onClick={() => setStockTab("hold")}>보유</button>
+            <button type="button" className={`as-st-btn ${stockTab === "recommend" ? "on" : ""}`} onClick={() => setStockTab("recommend")}>추천</button>
+          </div>
+        )}
+      </div>
 
       <DataState status={status} hasData={!!assets} onRetry={load} skeletonLines={5} skeletonBlock>
         {/* ── [사용자 지시] 자산 지도 카드를 맨 위로 — "주식" 뷰에서는 계좌현황 요약을 카드 맨 위에 병합 ── */}
@@ -375,6 +378,8 @@ export default function AssetsMapPage() {
       <style jsx>{`
         /* [N5-3] 하단 여백 = 하단탭(56) + FAB 상단(68+52) 여유. 88px이면 FAB가 마지막 문구를 가렸다. */
         .as { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 140px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
+        /* [사용자 지시] 상위 메뉴 고정 */
+        .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
         .as-row.ex { opacity: 0.72; }
         .as-dotc.ex { background: repeating-linear-gradient(45deg, var(--color-ink-3) 0 2px, transparent 2px 4px); }
         .as-hd { display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top, 0px) + 12px) 2px 10px; }

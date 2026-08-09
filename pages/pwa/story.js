@@ -45,10 +45,13 @@ export default function PwaStory() {
   return (
     <div className="story">
       <Head><title>이야기 | ONE-HUB</title></Head>
-      <AppHeader />
-      <div className="story-title">
-        <span className="story-fixed"><span className="story-region">{region}</span> 이야기 <span className="story-sub-inline">동네 수다{guessed === region ? " · 내 등록 단지 기준" : ""}</span></span>
-        <button type="button" className="story-change" onClick={() => (picking ? setPicking(false) : openPicker())}>지역변경</button>
+      {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 */}
+      <div className="sticky-hdr">
+        <AppHeader />
+        <div className="story-title">
+          <span className="story-fixed"><span className="story-region">{region}</span> 이야기 <span className="story-sub-inline">동네 수다{guessed === region ? " · 내 등록 단지 기준" : ""}</span></span>
+          <button type="button" className="story-change" onClick={() => (picking ? setPicking(false) : openPicker())}>지역변경</button>
+        </div>
       </div>
 
       {picking && (
@@ -80,6 +83,8 @@ export default function PwaStory() {
       <BottomNav active="story" />
       <style jsx>{`
         .story { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 140px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
+        /* [사용자 지시] 상위 메뉴 고정 */
+        .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
         .story-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; }
         .story-fixed { flex-shrink: 0; }
         .story-region { color: var(--color-primary); }

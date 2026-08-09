@@ -265,9 +265,12 @@ export default function RealEstateDashboard() {
 
   return (
     <div className="re pwa-shell">
-      <AppHeader onSearch={() => setReSearchOpen(true)} />
-      {/* [사용자 지시] "종합자산 자산지도"에서 direct 연결되므로 상위 메뉴바를 그대로 이어 붙인다 */}
-      <AssetMapTitle current="부동산" />
+      {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 */}
+      <div className="sticky-hdr">
+        <AppHeader onSearch={() => setReSearchOpen(true)} />
+        {/* [사용자 지시] "종합자산 자산지도"에서 direct 연결되므로 상위 메뉴바를 그대로 이어 붙인다 */}
+        <AssetMapTitle current="부동산" />
+      </div>
 
       {/* [item1] 부동산 찾기 — 단지 검색 + 대장 아파트 + 관심지역(동) */}
       {reSearchOpen && (
@@ -1003,6 +1006,8 @@ export default function RealEstateDashboard() {
 
       <style jsx>{`
         .re { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 84px); font-family: var(--font-sans); color: var(--color-ink); }
+        /* [사용자 지시] 상위 메뉴 고정 */
+        .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
         .partner-cta { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-decoration: none; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 14px 16px; margin: 4px 0 14px; box-shadow: var(--shadow-card); }
         .partner-cta .pc-l { display: flex; align-items: center; gap: 10px; }
         .partner-cta .pc-ic { font-size: 20px; }

@@ -385,24 +385,27 @@ export default function TodayPage({ announcements = [] }) {
 
   return (
     <div className="td">
-      <header className="td-hd">
-        <button className="td-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">ONE<span className="td-dot">·</span>HUB</button>
-        <div className="td-ic">
-          <TraderBadge />
-          <button className="td-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>
-          <FeedbackButton variant="icon" />
-          <button className="td-search" onClick={() => router.push("/pwa/settings")} aria-label="설정">⚙️</button>
-        </div>
-      </header>
+      {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 */}
+      <div className="sticky-hdr">
+        <header className="td-hd">
+          <button className="td-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">ONE<span className="td-dot">·</span>HUB</button>
+          <div className="td-ic">
+            <TraderBadge />
+            <button className="td-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>
+            <FeedbackButton variant="icon" />
+            <button className="td-search" onClick={() => router.push("/pwa/settings")} aria-label="설정">⚙️</button>
+          </div>
+        </header>
 
-      <div className="td-titlewrap">
-        <RotatingPageTitle
-          fixed="오늘"
-          mutedSuffix
-          items={[{ suffix: "의 대결" }, { suffix: "의 부동산" }, { suffix: "의 ETF" }, { suffix: "의 이야기" }]}
-          onChange={(i) => setView(i)}
-          onLabelClick={(item) => { if (item.suffix === "의 이야기") router.push("/pwa/story"); }}
-        />
+        <div className="td-titlewrap">
+          <RotatingPageTitle
+            fixed="오늘"
+            mutedSuffix
+            items={[{ suffix: "의 대결" }, { suffix: "의 부동산" }, { suffix: "의 ETF" }, { suffix: "의 이야기" }]}
+            onChange={(i) => setView(i)}
+            onLabelClick={(item) => { if (item.suffix === "의 이야기") router.push("/pwa/story"); }}
+          />
+        </div>
       </div>
       {/* [사용자 지시] KRX/NXT 장운영 배지는 "오늘의 대결"(주식) 탭에서만 — 부동산/ETF/이야기엔 불필요 */}
       <div className="td-market">{view === 0 && <MarketStatusBadge />}{at && <span className="td-fresh3"><LastUpdated timestamp={at} onRefresh={load} /></span>}</div>
@@ -891,6 +894,8 @@ export default function TodayPage({ announcements = [] }) {
 
       <style jsx>{`
         .td { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 140px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
+        /* [사용자 지시] 상위 메뉴 고정 */
+        .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
         .td-hd { display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top, 0px) + 12px) 2px 10px; }
         .td-logo { font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--color-ink); background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
         .td-dot { color: var(--color-success); }

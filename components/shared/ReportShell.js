@@ -18,8 +18,11 @@ export default function ReportShell({ title, sub, children }) {
   const backHref = `/pwa?tab=report&sec=${from}`;
   return (
     <div className="rp pwa-shell">
-      <AppHeader />
-      <div className="rp-aitab"><AiTabTitle current={from} /></div>
+      {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 */}
+      <div className="sticky-hdr">
+        <AppHeader />
+        <div className="rp-aitab"><AiTabTitle current={from} /></div>
+      </div>
       <Link href={backHref} className="rp-back">← AI 신뢰도로</Link>
       <div className="rp-head">
         <h1 className="rp-title">{title}</h1>
@@ -32,7 +35,8 @@ export default function ReportShell({ title, sub, children }) {
       </div>
       <style jsx>{`
         .rp { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
-        .rp-aitab { margin-bottom: 12px; }
+        .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
+        .rp-aitab { padding-bottom: 12px; }
         .rp-back { display: inline-block; font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); text-decoration: none; margin: 2px 0 10px; }
         .rp-head { margin-bottom: 14px; }
         .rp-title { font-size: 1.15rem; font-weight: 800; letter-spacing: -.3px; margin: 0; }

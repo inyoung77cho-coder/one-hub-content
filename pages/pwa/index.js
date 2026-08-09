@@ -1076,28 +1076,48 @@ export default function PWADashboard({ latestReport }) {
       )}
 
       <div className={`pwa-wrapper pwa-shell theme-${theme}`} style={{ display: splash ? 'none' : undefined }}>
-        {/* [UI 통일] 공통 헤더 — ONE·HUB + 🔍만(＋·⚙️는 하단 BottomNav). */}
-        <AppHeader onSearch={() => setTab('analyze')} />
+        {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 — 탭마다 다른 메뉴바를
+            하나의 sticky 블록으로 묶는다(헤더 + 탭별 서브 메뉴). */}
+        <div className="sticky-hdr">
+          {/* [UI 통일] 공통 헤더 — ONE·HUB + 🔍만(＋·⚙️는 하단 BottomNav). */}
+          <AppHeader onSearch={() => setTab('analyze')} />
 
-        {/* [N2] 상단 5탭 제거 — 하단 4탭(BottomNav)과 공존해 '내비가 둘'인 상태가 원 지적이었다.
-            도달성은 유지된다: 종합자산·AI = 하단탭, 주식·ETF·부동산 = 자산 지도 범례.
-            주식 내부 이동은 아래 서브탭(보유·추천)이 담당한다. */}
-        {/* [사용자 지시] 종합자산 자산지도에서 "보유/추천 자세히"로 들어온 경우에도 상단 메뉴(종합자산
-            자산지도)가 그대로 이어지도록. "주식" 탭 클릭 시 assets.js로 복귀 — stockTab은 그쪽에서
-            localStorage로 기억해 원 위치(보유/추천)로 복귀한다. */}
-        {['recommend','portfolio'].includes(tab) && (
-          <AssetMapTitle current="주식" />
-        )}
-        {/* [S2 IA] 주식 카테고리 서브탭 — 보유 · 추천 (기록은 트러스트 탭으로) */}
-        {['recommend','portfolio'].includes(tab) && (
-          <nav className="pwa-subtabs">
-            {[['portfolio','보유'],['recommend','추천']].map(([t,label]) => (
-              <button key={t} className={`pwa-subtab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
-                {label}
-              </button>
-            ))}
-          </nav>
-        )}
+          {/* [N2] 상단 5탭 제거 — 하단 4탭(BottomNav)과 공존해 '내비가 둘'인 상태가 원 지적이었다.
+              도달성은 유지된다: 종합자산·AI = 하단탭, 주식·ETF·부동산 = 자산 지도 범례.
+              주식 내부 이동은 아래 서브탭(보유·추천)이 담당한다. */}
+          {/* [사용자 지시] 종합자산 자산지도에서 "보유/추천 자세히"로 들어온 경우에도 상단 메뉴(종합자산
+              자산지도)가 그대로 이어지도록. "주식" 탭 클릭 시 assets.js로 복귀 — stockTab은 그쪽에서
+              localStorage로 기억해 원 위치(보유/추천)로 복귀한다. */}
+          {['recommend','portfolio'].includes(tab) && (
+            <AssetMapTitle current="주식" />
+          )}
+          {/* [S2 IA] 주식 카테고리 서브탭 — 보유 · 추천 (기록은 트러스트 탭으로) */}
+          {['recommend','portfolio'].includes(tab) && (
+            <nav className="pwa-subtabs">
+              {[['portfolio','보유'],['recommend','추천']].map(([t,label]) => (
+                <button key={t} className={`pwa-subtab ${tab===t?'active':''}`} onClick={()=>setTab(t)}>
+                  {label}
+                </button>
+              ))}
+            </nav>
+          )}
+          {/* [OS-2] 오늘·자산·이야기와 동일한 패턴 — "AI" 고정 + vs 나 대결/자기 검증/리포트 순환,
+              분석변경 버튼은 항상 행 맨 오른쪽. ?sec= 딥링크로도 진입하므로 controlledIndex로 동기화.
+              [사용자 지시] 상위 메뉴 고정 대상이라 report 탭 <main> 안에서 여기로 끌어올림. */}
+          {tab === 'report' && (
+            <div className="trust-nav">
+              <RotatingPageTitle
+                fixed="AI"
+                mutedSuffix
+                spaced
+                buttonLabel="분석변경"
+                items={[{ suffix: 'vs 나 대결' }, { suffix: '자기검증' }, { suffix: '리포트' }]}
+                controlledIndex={TRUST_TABS.indexOf(trustSec)}
+                onChange={(i) => setTrustSec(TRUST_TABS[i])}
+              />
+            </div>
+          )}
+        </div>
 
         {error && <div className="pwa-error">Error: {error}</div>}
 
@@ -2401,20 +2421,6 @@ export default function PWADashboard({ latestReport }) {
         {/* ── Report Tab = [S2 IA] 트러스트 허브 ── */}
         {tab === 'report' && (
           <main className="pwa-main">
-
-            {/* [OS-2] 오늘·자산·이야기와 동일한 패턴 — "AI" 고정 + vs 나 대결/자기 검증/리포트 순환,
-                분석변경 버튼은 항상 행 맨 오른쪽. ?sec= 딥링크로도 진입하므로 controlledIndex로 동기화. */}
-            <div className="trust-nav">
-              <RotatingPageTitle
-                fixed="AI"
-                mutedSuffix
-                spaced
-                buttonLabel="분석변경"
-                items={[{ suffix: 'vs 나 대결' }, { suffix: '자기검증' }, { suffix: '리포트' }]}
-                controlledIndex={TRUST_TABS.indexOf(trustSec)}
-                onChange={(i) => setTrustSec(TRUST_TABS[i])}
-              />
-            </div>
 
             {/* [나 vs AI 대결] AI 추천 중 내가 산 것 vs AI 단독매매, 3일·7일 수익 승부 */}
             {trustSec === 'vs' && (<>
@@ -3778,6 +3784,8 @@ export default function PWADashboard({ latestReport }) {
            AppHeader를 두는데 index.js만 pwa-wrapper에 그 여백이 없었던 게 원인. 여기로 옮기고
            pwa-main의 중복 14px은 제거(아래 .pwa-main 참고) — 이중 패딩 방지. */
         .pwa-wrapper { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--bg); color: var(--text-primary); font-family: var(--font-body); padding: 0 14px 88px; transition: background 0.2s ease, color 0.2s ease; }
+        /* [사용자 지시] 상위 메뉴 고정 */
+        .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--bg); margin: 0 -14px; padding: 0 14px; }
         button, input { font-family: inherit; }
         button:focus-visible, input:focus-visible { outline: 2px solid var(--accent-info); outline-offset: 2px; }
         :global(.pwa-wrapper a:focus-visible) { outline: 2px solid var(--accent-info); outline-offset: 2px; }
