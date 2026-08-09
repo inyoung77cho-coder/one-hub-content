@@ -320,7 +320,7 @@ export default function TodayPage({ reports }) {
               </div>
               <div className="hero-bar"><div className="hero-bar-me" style={{ width: `${Math.max(6, Math.min(94, wallet.myBalance + wallet.aiBalance > 0 ? (wallet.myBalance / (wallet.myBalance + wallet.aiBalance)) * 100 : 50))}%` }} /></div>
               <div className="hero-lead">
-                {wallet.leader === "me" ? <b className="up">🏆 내가 {wonG(Math.abs(wallet.diff))} 앞섬</b> : wallet.leader === "ai" ? <b className="dn">🤖 AI가 {wonG(Math.abs(wallet.diff))} 앞섬</b> : <b>⚖️ 접전</b>} · 판당 베팅 {wonG(wallet.bet)}(가상)
+                {wallet.leader === "me" ? <b className="up">🏆 내가 {wonG(Math.abs(wallet.diff))} 앞섬</b> : wallet.leader === "ai" ? <b className="dn">🤖 AI가 {wonG(Math.abs(wallet.diff))} 앞섬</b> : <b>⚖️ 접전</b>} · 매판 잔고의 {Math.round((wallet.betPct ?? 0.1) * 100)}%(복리, 가상)
                 <ShareButton compact title="ONE-HUB 나 vs AI 대결"
                   text={wallet.leader === "me" ? `내가 AI보다 ${wonG(Math.abs(wallet.diff))} 앞서고 있어요! 나도 AI랑 대결해볼래?` : wallet.leader === "ai" ? `AI한테 ${wonG(Math.abs(wallet.diff))} 지고 있어요 — 나도 AI랑 대결해볼래?` : "AI와 팽팽한 접전 중! 나도 대결해볼래?"}
                   url="https://one-hub-content.vercel.app/pwa/today" />

@@ -265,6 +265,7 @@ export default function PWADashboard({ latestReport }) {
   const [decTick, setDecTick] = useState(0); // [나 vs AI] 추천 카드 판단 버튼 상태 리렌더 트리거
   const [gameSeed, setGameSeed] = useState(null); // [G-시리즈] 가상 게임 시드머니(있으면 게임 시작됨)
   const [gameNick, setGameNick] = useState('나'); // [닉네임] 나 vs AI에서 "나" 대신 표시
+  const [trendClick, setTrendClick] = useState(null); // [사용자 지시] 추이 그래프 클릭 시 그 시점 판단 차이 설명
   useEffect(() => {
     const load = () => { setGameSeed(getSeed()); setGameNick(getNickname()); };
     load();
@@ -2425,7 +2426,7 @@ export default function PWADashboard({ latestReport }) {
                     <div className="gd-w ai"><span className="gd-wl">AI 지갑 🤖</span><b className="gd-wb">{wonG(g.aiBalance)}</b>{g.aiGain !== 0 && <span className={`gd-wg ${g.aiGain >= 0 ? 'up' : 'dn'}`}>{g.aiGain >= 0 ? '+' : ''}{wonG(g.aiGain)}</span>}</div>
                   </div>
                   <div className="gd-bar"><div className="gd-bar-me" style={{ width: `${Math.max(6, Math.min(94, pct))}%` }} /></div>
-                  <div className="gd-lead">{g.leader === 'me' ? <b className="up">🏆 내가 {wonG(Math.abs(g.diff))} 앞섬</b> : g.leader === 'ai' ? <b className="dn">🤖 AI가 {wonG(Math.abs(g.diff))} 앞섬</b> : <b>⚖️ 접전</b>} · 판당 베팅 {wonG(g.bet)}(가상)
+                  <div className="gd-lead">{g.leader === 'me' ? <b className="up">🏆 내가 {wonG(Math.abs(g.diff))} 앞섬</b> : g.leader === 'ai' ? <b className="dn">🤖 AI가 {wonG(Math.abs(g.diff))} 앞섬</b> : <b>⚖️ 접전</b>} · 매판 잔고의 {Math.round((g.betPct ?? 0.1) * 100)}%(복리, 가상)
                     <ShareButton compact title="ONE-HUB 나 vs AI 대결"
                       text={g.leader === 'me' ? `내가 AI보다 ${wonG(Math.abs(g.diff))} 앞서고 있어요! 나도 AI랑 대결해볼래?` : g.leader === 'ai' ? `AI한테 ${wonG(Math.abs(g.diff))} 지고 있어요 — 나도 AI랑 대결해볼래?` : "AI와 팽팽한 접전 중! 나도 대결해볼래?"}
                       url="https://one-hub-content.vercel.app/pwa/today" />
@@ -2437,12 +2438,17 @@ export default function PWADashboard({ latestReport }) {
                     const chron = [...g.settled].sort((a, b) => a.ts - b.ts);
                     let myCum = g.seed, aiCum = g.seed;
                     const start = new Date(chron.length ? chron[0].ts : Date.now());
-                    const trend = [{ label: `${start.getMonth() + 1}/${start.getDate()} 시작`, [gameNick]: myCum, AI: aiCum }];
+                    const trend = [{ label: `${start.getMonth() + 1}/${start.getDate()} 시작`, [gameNick]: myCum, AI: aiCum, _ev: null }];
                     chron.forEach((s) => {
                       myCum += s.myPnl; aiCum += s.aiPnl;
                       const d = new Date(s.ts);
-                      trend.push({ label: `${d.getMonth() + 1}/${d.getDate()}`, [gameNick]: myCum, AI: aiCum });
+                      trend.push({ label: `${d.getMonth() + 1}/${d.getDate()}`, [gameNick]: myCum, AI: aiCum, _ev: s });
                     });
+                    // [사용자 지시] 그래프 클릭 시 그 지점에서 나·AI 판단이 갈린 이유를 +-비율/금액으로 설명
+                    const onTrendClick = (e) => {
+                      const ev = e?.activePayload?.[0]?.payload?._ev;
+                      setTrendClick(ev || null);
+                    };
                     return (
                       <div className="gd-trend">
                         <div className="gd-trend-top">
@@ -2454,18 +2460,36 @@ export default function PWADashboard({ latestReport }) {
                           </span>
                         </div>
                         {trend.length > 1 && (
-                          <ResponsiveContainer width="100%" height={140}>
-                            <LineChart data={trend} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
-                              <XAxis dataKey="label" stroke="var(--color-ink-3)" fontSize={10} tickLine={false} />
-                              <YAxis hide domain={['dataMin', 'dataMax']} />
-                              <Tooltip
-                                formatter={(v) => wonG(v)}
-                                contentStyle={{ background: 'var(--color-card)', border: '1px solid var(--color-line)', borderRadius: 8, fontSize: 12 }}
-                              />
-                              <Line type="monotone" dataKey={gameNick} stroke="var(--color-success)" strokeWidth={2} dot={false} />
-                              <Line type="monotone" dataKey="AI" stroke="var(--purple)" strokeWidth={2} dot={false} />
-                            </LineChart>
-                          </ResponsiveContainer>
+                          <>
+                            <ResponsiveContainer width="100%" height={140}>
+                              <LineChart data={trend} margin={{ top: 6, right: 8, left: 0, bottom: 0 }} onClick={onTrendClick}>
+                                <XAxis dataKey="label" stroke="var(--color-ink-3)" fontSize={10} tickLine={false} />
+                                <YAxis hide domain={['dataMin', 'dataMax']} />
+                                <Tooltip
+                                  formatter={(v) => wonG(v)}
+                                  contentStyle={{ background: 'var(--color-card)', border: '1px solid var(--color-line)', borderRadius: 8, fontSize: 12 }}
+                                />
+                                <Line type="monotone" dataKey={gameNick} stroke="var(--color-success)" strokeWidth={2} dot={{ r: 2, cursor: 'pointer' }} activeDot={{ r: 5, cursor: 'pointer' }} />
+                                <Line type="monotone" dataKey="AI" stroke="var(--purple)" strokeWidth={2} dot={{ r: 2, cursor: 'pointer' }} activeDot={{ r: 5, cursor: 'pointer' }} />
+                              </LineChart>
+                            </ResponsiveContainer>
+                            <div className="gd-trend-hint">{trendClick ? null : '그래프의 점을 눌러보세요 — 그날 판단 차이를 설명해 드립니다'}</div>
+                            {trendClick && (() => {
+                              const diffWon = (trendClick.myPnl || 0) - (trendClick.aiPnl || 0);
+                              return (
+                                <div className="gd-trend-explain">
+                                  <button type="button" className="gd-trend-x" onClick={() => setTrendClick(null)} aria-label="닫기">✕</button>
+                                  <div className="gd-trend-explain-t">{trendClick.name} · {trendClick.decision === 'take' ? '나: 매수' : '나: 관망'} · AI: {trendClick.aiBought !== false ? '매수' : '관망'}</div>
+                                  <div className="gd-trend-explain-b">
+                                    가격 {trendClick.ret >= 0 ? '+' : ''}{trendClick.ret}% 움직였고, 베팅 기준(그 시점 잔고)이 서로 달라 손익도 갈렸습니다 —
+                                    {' '}{gameNick} <b className={trendClick.myPnl >= 0 ? 'up' : 'dn'}>{wonG(trendClick.myPnl)}</b>
+                                    {' vs '}AI <b className={trendClick.aiPnl >= 0 ? 'up' : 'dn'}>{wonG(trendClick.aiPnl)}</b>
+                                    {' '}(차이 <b className={diffWon >= 0 ? 'up' : 'dn'}>{diffWon >= 0 ? '+' : ''}{wonG(diffWon)}</b>)
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </>
                         )}
                       </div>
                     );
@@ -2491,6 +2515,37 @@ export default function PWADashboard({ latestReport }) {
                 </section>
               );
             })()}
+
+            {/* [사용자 지시] 향후 전개 — 정산 대기 중인 판단들이 확정되면 판도가 어떻게 바뀔 수 있는지 나열 */}
+            {gameSeed && (() => {
+              const pending = ledger.filter((e) => Date.now() - e.ts < 3 * 86400000);
+              if (!pending.length) return null;
+              const g2 = computeWallets(computeShowdown(ledger, 3), gameSeed);
+              if (!g2) return null;
+              const myStake = Math.max(10000, Math.round(g2.myBalance * (g2.betPct ?? 0.1)));
+              const aiStake = Math.max(10000, Math.round(g2.aiBalance * (g2.betPct ?? 0.1)));
+              return (
+                <section className="pwa-card upcoming-card">
+                  <span className="pwa-card-label">🔮 앞으로의 대결 구도</span>
+                  <p className="upcoming-desc">아래 {pending.length}건이 정산되면 잔고가 바뀌고, 다음 베팅액도 그 결과를 따라갑니다(복리) — 지금 기준 예상 영향:</p>
+                  <div className="upcoming-list">
+                    {pending.map((e, i) => {
+                      const dday = Math.max(0, 3 - Math.floor((Date.now() - e.ts) / 86400000));
+                      const myIn = e.decision === 'take';
+                      return (
+                        <div className="upcoming-row" key={i}>
+                          <span className="upcoming-name">{e.name}</span>
+                          <span className="upcoming-j">나:{myIn ? '매수' : '관망'} · AI:매수</span>
+                          <span className="upcoming-impact">{myIn ? `나 ±${wonG(myStake)}` : `AI만 ±${wonG(aiStake)}`}</span>
+                          <span className="upcoming-dday">D-{dday}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              );
+            })()}
+
             {(() => {
               const w3 = computeShowdown(ledger, 3);
               const w7 = computeShowdown(ledger, 7);
@@ -4537,6 +4592,13 @@ export default function PWADashboard({ latestReport }) {
         .gd-trend-days { font-size: 0.7rem; font-weight: 700; color: var(--text-tertiary); }
         .gd-trend-final { font-size: 0.72rem; color: var(--text-secondary); text-align: right; }
         .gd-trend-final b.up { color: var(--color-success); } .gd-trend-final b.dn { color: var(--purple, var(--color-danger)); }
+        /* [사용자 지시] 그래프 클릭 시 그 시점 판단 차이 설명 */
+        .gd-trend-hint { font-size: 0.66rem; color: var(--text-tertiary); text-align: center; margin-top: 4px; }
+        .gd-trend-explain { position: relative; margin-top: 8px; padding: 10px 26px 10px 10px; background: var(--inset-bg); border-radius: 10px; }
+        .gd-trend-x { position: absolute; top: 6px; right: 6px; width: 20px; height: 20px; border: none; background: none; color: var(--text-tertiary); font-size: 11px; cursor: pointer; }
+        .gd-trend-explain-t { font-size: 0.76rem; font-weight: 800; color: var(--text-primary); margin-bottom: 4px; }
+        .gd-trend-explain-b { font-size: 0.74rem; color: var(--text-secondary); line-height: 1.55; word-break: keep-all; }
+        .gd-trend-explain-b .up { color: var(--color-success); } .gd-trend-explain-b .dn { color: var(--purple, var(--color-danger)); }
         .gd-pending, .gd-recent { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
         .gd-ph { font-size: 0.7rem; font-weight: 800; color: var(--color-ink-2); margin-bottom: 6px; }
         .gd-prow, .gd-rrow { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 0.74rem; }
@@ -4548,6 +4610,14 @@ export default function PWADashboard({ latestReport }) {
         .gd-rwin { font-size: 0.64rem; font-weight: 700; color: var(--text-secondary); }
         .gd-foot { font-size: 0.64rem; color: var(--text-tertiary); margin-top: 12px; line-height: 1.6; word-break: keep-all; }
         .gd-reset { border: none; background: none; color: var(--color-primary); font-weight: 700; cursor: pointer; font-size: 0.64rem; text-decoration: underline; font-family: var(--font-sans); padding: 0; }
+        /* [사용자 지시] 향후 대결 구도 카드 */
+        .upcoming-desc { font-size: 0.76rem; color: var(--text-secondary); line-height: 1.55; word-break: keep-all; margin: 6px 0 10px; }
+        .upcoming-list { display: flex; flex-direction: column; gap: 6px; }
+        .upcoming-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--inset-bg); border-radius: 9px; font-size: 0.74rem; }
+        .upcoming-name { flex: 1; min-width: 0; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .upcoming-j { flex: none; font-size: 0.64rem; color: var(--text-tertiary); }
+        .upcoming-impact { flex: none; font-size: 0.68rem; font-weight: 800; color: var(--color-primary); font-family: var(--font-mono); }
+        .upcoming-dday { flex: none; font-size: 0.64rem; font-weight: 800; color: var(--color-warning-ink, var(--color-warning)); }
         .vs-score { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 12px 0 4px; padding: 10px 0; background: var(--inset-bg); border-radius: 12px; }
         .vs-score-side { display: flex; align-items: center; gap: 8px; }
         .vs-score-who { font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); }
