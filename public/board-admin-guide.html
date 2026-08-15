@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>ONE-HUB 운영자 가이드 — 봇 & 콘텐츠 관리</title>
+<style>
+  :root {
+    --ink: #12213B; --ink-soft: #64748B; --ink-faint: #94A3B8;
+    --line: #E1E9F5; --card: #ffffff; --bg: #F4F7FC;
+    --primary: #2F6BFF; --primary-soft: #EAF0FF;
+    --green: #15803D; --green-soft: #DCFCE7;
+    --amber: #B45309; --amber-soft: #FEF3C7;
+    --red: #DC2626; --red-soft: #FEF2F2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #E8EDF7; --ink-soft: #A7B4C8; --ink-faint: #7C8AA0;
+      --line: #26324A; --card: #141B2C; --bg: #0B1120;
+      --primary: #5C8CFF; --primary-soft: #182645;
+      --green: #4ADE80; --green-soft: #123321;
+      --amber: #FBBF24; --amber-soft: #3A2A08;
+      --red: #F87171; --red-soft: #3A1414;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ink: #E8EDF7; --ink-soft: #A7B4C8; --ink-faint: #7C8AA0;
+    --line: #26324A; --card: #141B2C; --bg: #0B1120;
+    --primary: #5C8CFF; --primary-soft: #182645;
+    --green: #4ADE80; --green-soft: #123321;
+    --amber: #FBBF24; --amber-soft: #3A2A08;
+    --red: #F87171; --red-soft: #3A1414;
+  }
+  :root[data-theme="light"] {
+    --ink: #12213B; --ink-soft: #64748B; --ink-faint: #94A3B8;
+    --line: #E1E9F5; --card: #ffffff; --bg: #F4F7FC;
+    --primary: #2F6BFF; --primary-soft: #EAF0FF;
+    --green: #15803D; --green-soft: #DCFCE7;
+    --amber: #B45309; --amber-soft: #FEF3C7;
+    --red: #DC2626; --red-soft: #FEF2F2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: 'Pretendard', -apple-system, 'Malgun Gothic', sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 28px 18px 90px; }
+  header.top { margin-bottom: 28px; }
+  .eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .06em; color: var(--primary); text-transform: uppercase; margin: 0 0 8px; }
+  h1 { font-size: 1.5rem; font-weight: 800; margin: 0 0 8px; letter-spacing: -.4px; }
+  .lede { color: var(--ink-soft); font-size: 0.92rem; margin: 0; max-width: 56ch; }
+
+  nav.jump { display: flex; gap: 6px; overflow-x: auto; margin: 20px 0 32px; padding: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+  nav.jump a { flex: 1 0 auto; text-align: center; white-space: nowrap; padding: 9px 12px; border-radius: 8px; text-decoration: none; color: var(--ink-soft); font-size: 12.5px; font-weight: 700; }
+  nav.jump a:hover { background: var(--primary-soft); color: var(--primary); }
+
+  section { margin-bottom: 40px; scroll-margin-top: 16px; }
+  .sec-head { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .sec-num { font-size: 12px; font-weight: 800; color: var(--primary); background: var(--primary-soft); border-radius: 999px; width: 26px; height: 26px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  h2 { font-size: 1.12rem; font-weight: 800; margin: 0; letter-spacing: -.2px; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; box-shadow: 0 4px 16px rgba(18,33,59,.05); margin-bottom: 12px; }
+  .card h3 { font-size: 0.95rem; font-weight: 800; margin: 0 0 8px; }
+  .card p { margin: 0 0 8px; font-size: 0.88rem; color: var(--ink-soft); }
+  .card p:last-child { margin-bottom: 0; }
+  .card ul { margin: 6px 0; padding-left: 20px; font-size: 0.88rem; color: var(--ink-soft); }
+  .card li { margin-bottom: 4px; }
+
+  table.cmd { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin: 4px 0; }
+  table.cmd th { text-align: left; font-size: 11px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-faint); font-weight: 700; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  table.cmd td { padding: 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.cmd tr:last-child td { border-bottom: none; }
+  table.cmd code { background: var(--primary-soft); color: var(--primary); padding: 1px 6px; border-radius: 5px; font-family: ui-monospace, 'SF Mono', 'D2Coding', monospace; font-size: 0.82rem; white-space: nowrap; }
+  .wide { overflow-x: auto; }
+
+  .flow { display: flex; flex-direction: column; gap: 0; margin: 16px 0; }
+  .flow-step { display: flex; gap: 12px; align-items: flex-start; }
+  .flow-dot { width: 24px; height: 24px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .flow-line { width: 1.5px; background: var(--line); margin-left: 11.25px; height: 22px; }
+  .flow-body { padding-bottom: 2px; }
+  .flow-body b { font-size: 0.9rem; }
+  .flow-body p { margin: 2px 0 0; font-size: 0.83rem; color: var(--ink-soft); }
+
+  .badge { display: inline-block; font-size: 11px; font-weight: 800; padding: 2px 9px; border-radius: 999px; margin-right: 4px; }
+  .badge.auto { background: var(--green-soft); color: var(--green); }
+  .badge.manual { background: var(--amber-soft); color: var(--amber); }
+
+  .callout { border-left: 3px solid var(--primary); background: var(--primary-soft); border-radius: 0 10px 10px 0; padding: 12px 16px; font-size: 0.86rem; color: var(--ink); margin: 14px 0; }
+  .callout.warn { border-left-color: var(--red); background: var(--red-soft); }
+  .callout b { color: var(--primary); }
+  .callout.warn b { color: var(--red); }
+
+  .tabgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 480px) { .tabgrid { grid-template-columns: 1fr; } }
+
+  footer.end { margin-top: 48px; padding-top: 18px; border-top: 1px dashed var(--line); color: var(--ink-faint); font-size: 12.5px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <p class="eyebrow">ONE-HUB · 운영자 전용 가이드</p>
+    <h1>텔레그램 봇 & 콘텐츠 관리 화면 사용법</h1>
+    <p class="lede">부동산·뉴스 콘텐츠가 텔레그램 봇에서 board-admin 화면까지 어떻게 이어지는지, 각 명령어와 버튼이 무엇을 하는지 정리했습니다.</p>
+  </header>
+
+  <nav class="jump">
+    <a href="#flow">전체 흐름</a>
+    <a href="#re-bot">부동산 봇</a>
+    <a href="#news-bot">뉴스 봇</a>
+    <a href="#admin">관리 화면</a>
+    <a href="#faq">주의사항</a>
+  </nav>
+
+  <section id="flow">
+    <div class="sec-head"><span class="sec-num">1</span><h2>전체 흐름</h2></div>
+    <div class="card">
+      <p>봇 2개(부동산·뉴스)가 콘텐츠를 만들고, <b>board-admin</b> 한 화면에서 두 봇의 결과물과 회원까지 관리합니다.</p>
+      <div class="flow">
+        <div class="flow-step">
+          <div class="flow-dot">1</div>
+          <div class="flow-body"><b>텔레그램 봇에 텍스트·이미지 전송</b><p>카톡방 시세 캡처, 뉴스 기사 사진 등을 봇에게 그대로 전달</p></div>
+        </div>
+        <div class="flow-line"></div>
+        <div class="flow-step">
+          <div class="flow-dot">2</div>
+          <div class="flow-body"><b>AI가 자동으로 정리</b><p>단지·평형·호가·요약(부동산) 또는 헤드라인·요약·분류(뉴스)로 구조화</p></div>
+        </div>
+        <div class="flow-line"></div>
+        <div class="flow-step">
+          <div class="flow-dot">3</div>
+          <div class="flow-body"><b>게시 <span class="badge manual">부동산=수동 확인 후 게시</span><span class="badge auto">뉴스=자동 게시</span></b><p>부동산은 봇 카드에서 "게시" 버튼을 눌러야 화면에 노출되고, 뉴스는 정리되는 즉시 '오늘' 피드에 올라갑니다</p></div>
+        </div>
+        <div class="flow-line"></div>
+        <div class="flow-step">
+          <div class="flow-dot">4</div>
+          <div class="flow-body"><b>board-admin에서 확인·수정</b><p>내용이 틀렸거나 지워야 하면 여기서 최종 손질</p></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="re-bot">
+    <div class="sec-head"><span class="sec-num">2</span><h2>🏢 부동산 봇</h2></div>
+    <div class="card">
+      <h3>① 정보 입력</h3>
+      <ul>
+        <li>카톡방 시세·시황 텍스트를 붙여넣거나 시세표 이미지를 보내면 AI가 <b>단지·평형·호가·요약</b>으로 정리해 카드로 보여줍니다.</li>
+        <li>명확한 가격도 없고 의미 있는 시황(시세소식·개발호재)도 아니면 카드 없이 자동 폐기됩니다 — 필요하면 <code>/view</code>로 확인 후 게시 가능.</li>
+      </ul>
+      <h3>② 카드 버튼</h3>
+      <ul>
+        <li><b>✅ 게시</b> — board에 <span class="badge manual" style="background:var(--amber-soft);color:var(--amber)">🟡 미검증</span> 표시로 공개</li>
+        <li><b>✏️ 수정</b> — 필드(단지/평형/호가/유형/요약)를 골라 새 값으로 답장</li>
+        <li><b>🗑 버림</b> — 폐기(이미 게시된 것도 다시 누르면 보드에서 내려감)</li>
+      </ul>
+      <h3>③ 명령어</h3>
+      <div class="wide">
+        <table class="cmd">
+          <tr><th>명령어</th><th>내용</th></tr>
+          <tr><td><code>/list</code></td><td>최근 15건</td></tr>
+          <tr><td><code>/list 대기|게시|폐기</code></td><td>상태로 필터</td></tr>
+          <tr><td><code>/list 오늘|어제|2026-08-01</code></td><td>날짜로 필터</td></tr>
+          <tr><td><code>/list 이번주|지난주</code></td><td>주간(월~일) 필터</td></tr>
+          <tr><td><code>/list 전체</code></td><td>최근 100건까지</td></tr>
+          <tr><td><code>/view &lt;번호&gt;</code></td><td>그 항목 카드 다시 보기(버튼으로 게시/수정/버림)</td></tr>
+          <tr><td><code>/del &lt;번호&gt;</code></td><td>바로 폐기(게시된 것도 즉시 내려감)</td></tr>
+          <tr><td><code>/report [일수]</code></td><td>최근 수집분 종합 리포트 초안(기본 7일)</td></tr>
+          <tr><td><code>/menu</code> · <code>/help</code></td><td>메뉴 · 이 도움말</td></tr>
+        </table>
+      </div>
+      <p style="margin-top:10px">상태+기간 조합도 가능합니다 (예: <code>/list 게시 이번주</code>). 면적은 평 기준, 개인정보·전화번호는 게시 시 자동 제거됩니다.</p>
+    </div>
+  </section>
+
+  <section id="news-bot">
+    <div class="sec-head"><span class="sec-num">3</span><h2>📰 뉴스 봇</h2></div>
+    <div class="card">
+      <div class="callout">
+        <b>부동산 봇과 가장 다른 점</b> — 뉴스는 확인 버튼 없이 <b>AI가 요약하는 즉시 '오늘' 피드에 자동 게시</b>됩니다. 틀린 내용은 올라간 뒤에 <code>/edit</code>나 board-admin에서 고치는 방식입니다.
+      </div>
+      <h3>① 뉴스 올리기</h3>
+      <ul>
+        <li>뉴스 기사나 이미지를 보내면 AI가 요약해 자동 게시됩니다.</li>
+        <li>해시태그로 분류 가능: <code>#글로벌 #거시 #증시 #부동산 #정책 #시사</code> (예: "미 증시 사상 최고 #증시")</li>
+      </ul>
+      <h3>② 명령어</h3>
+      <div class="wide">
+        <table class="cmd">
+          <tr><th>명령어</th><th>내용</th></tr>
+          <tr><td><code>/list</code></td><td>오늘 올라온 뉴스</td></tr>
+          <tr><td><code>/list 어제</code> · <code>/list 2026-08-01</code></td><td>날짜로 필터</td></tr>
+          <tr><td><code>/pin [번호]</code></td><td>상단 고정</td></tr>
+          <tr><td><code>/pub [번호]</code></td><td>게시</td></tr>
+          <tr><td><code>/draft [번호]</code></td><td>비공개(초안)로 전환</td></tr>
+          <tr><td><code>/del [번호]</code></td><td>숨김</td></tr>
+          <tr><td><code>/importance &lt;번호&gt; &lt;1~5&gt;</code></td><td>중요도 지정</td></tr>
+          <tr><td><code>/edit &lt;번호&gt; &lt;새 요약&gt;</code></td><td>요약 수정</td></tr>
+          <tr><td><code>/help</code> · <code>/menu</code></td><td>이 도움말</td></tr>
+        </table>
+      </div>
+      <p style="margin-top:10px">번호는 <code>/list</code>로 확인합니다. 개인정보·저작권(무단전재) 콘텐츠는 자동 필터링됩니다.</p>
+    </div>
+  </section>
+
+  <section id="admin">
+    <div class="sec-head"><span class="sec-num">4</span><h2>⚙️ 관리 화면 (board-admin)</h2></div>
+    <p class="lede" style="margin-bottom:14px">봇이 만든 콘텐츠와 회원을 최종적으로 확인·수정하는 곳입니다. 여기서 바꾸면 공개 화면에 곧바로 반영됩니다. <b>운영자 계정으로 로그인해야</b> 접근할 수 있습니다.</p>
+    <div class="tabgrid">
+      <div class="card">
+        <h3>부동산 신규 정보</h3>
+        <p>봇으로 게시된 매물·시세소식 카드를 목록으로 보고, 단지/평형/호가/유형/요약을 직접 수정하거나 "보드에서 내리기"로 소프트 삭제할 수 있습니다.</p>
+      </div>
+      <div class="card">
+        <h3>리포트</h3>
+        <p><code>/report</code>로 만든 종합 리포트의 제목·헤드라인·기간 표기·종합 요약을 수정합니다.</p>
+      </div>
+      <div class="card">
+        <h3>뉴스</h3>
+        <p>섹션·중요도·게시 상태(초안/게시됨/내림)·헤드라인·본문을 수정합니다. 뉴스봇이 이미 자동 게시한 내용을 사후 검수하는 주 창구입니다.</p>
+      </div>
+      <div class="card">
+        <h3>회원</h3>
+        <p>가입 회원의 닉네임·카카오 연동·티어·가입일·최근 로그인을 확인하고, <b>활성화 / 정지 / 탈퇴 처리</b>할 수 있습니다. 운영자 본인 계정은 자기잠금 방지를 위해 상태 변경 버튼이 보이지 않습니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq">
+    <div class="sec-head"><span class="sec-num">5</span><h2>알아두면 좋은 점</h2></div>
+    <div class="callout">
+      <b>삭제는 대부분 되돌릴 수 있습니다.</b> "보드에서 내리기" · "화면에서 내리기"는 소프트 삭제(hidden 처리)라 완전히 지워지는 게 아니라 화면에서만 감춰집니다. 회원 "탈퇴 처리"도 다시 활성화로 되돌릴 수 있습니다.
+    </div>
+    <div class="callout warn">
+      <b>봇 명령어는 운영자 텔레그램 계정에서만 동작합니다.</b> 다른 계정이 봇에게 명령을 보내도 응답하지 않습니다.
+    </div>
+  </section>
+
+  <footer class="end">ONE-HUB 내부 운영 문서 · 검색엔진에 노출되지 않습니다</footer>
+
+</div>
+</body>
+</html>

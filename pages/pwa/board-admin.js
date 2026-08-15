@@ -147,7 +147,10 @@ export default function BoardAdmin() {
   return (
     <div className="ba">
       <header className="ba-head">
-        <Link href="/pwa/settings" className="ba-back">← 설정</Link>
+        <div className="ba-headrow">
+          <Link href="/pwa/settings" className="ba-back">← 설정</Link>
+          <a href="/board-admin-guide.html" target="_blank" rel="noopener" className="ba-guide">📖 사용법 보기</a>
+        </div>
         <h1>운영자 · 콘텐츠 관리</h1>
         <p className="ba-sub">텔레그램 봇으로 올린 부동산 정보·리포트·뉴스를 확인·수정하고, 회원 목록·상태도 관리합니다. 콘텐츠 변경은 공개 화면에 곧바로 반영됩니다.</p>
       </header>
@@ -220,7 +223,9 @@ export default function BoardAdmin() {
 
       <style jsx>{`
         .ba { max-width: 720px; margin: 0 auto; padding: 20px 16px 80px; font-family: 'Pretendard', sans-serif; color: #12213B; }
+        .ba-headrow { display: flex; align-items: center; justify-content: space-between; }
         .ba-back { font-size: 13px; font-weight: 700; color: #2F6BFF; }
+        .ba-guide { font-size: 12.5px; font-weight: 700; color: #64748B; text-decoration: none; background: #F1F5FB; padding: 6px 12px; border-radius: 999px; }
         .ba-head h1 { font-size: 1.35rem; font-weight: 800; margin: 10px 0 6px; letter-spacing: -.4px; }
         .ba-sub { font-size: 0.86rem; color: #64748B; margin: 0; line-height: 1.6; }
         .ba-tabs { display: flex; gap: 8px; margin: 20px 0 16px; }
