@@ -31,8 +31,11 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === "GET") {
+      // [2026-08-16] 50건 고정이라 게시량이 많아지면 탭 숫자가 그 지점에서 멈춘 것처럼 보였음
+      //   (실제로는 최신순으로 계속 갱신되고 있었음 — 오래된 항목이 창 밖으로 밀려날 뿐).
+      //   백엔드 한도(200)에 여유를 두고 150으로 상향.
       const status = (req.query.status || "").toString();
-      const qs = status ? `?status=${encodeURIComponent(status)}&limit=50` : "?limit=50";
+      const qs = status ? `?status=${encodeURIComponent(status)}&limit=150` : "?limit=150";
       const r = await fetch(`${NEWS_API}/admin/news${qs}`, { headers: hdr, signal: AbortSignal.timeout(8000) });
       const body = await r.json().catch(() => null);
       if (!r.ok) return res.status(200).json({ ok: false, error: `뉴스엔진 ${r.status}: ${body?.detail || "알 수 없는 오류"}` });

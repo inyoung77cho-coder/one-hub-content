@@ -163,7 +163,7 @@ export default function BoardAdmin() {
           리포트 {reports ? `(${reports.length})` : ""}
         </button>
         <button className={tab === "news" ? "on" : ""} onClick={() => setTab("news")}>
-          뉴스 {news ? `(${news.length})` : ""}
+          뉴스 {news ? `(최근 ${news.length})` : ""}
         </button>
         <button className={tab === "users" ? "on" : ""} onClick={() => setTab("users")}>
           회원 {users ? `(${users.length})` : ""}
