@@ -56,7 +56,7 @@ export default function My() {
         <div className="al-note">알림은 텔레그램으로 발송됩니다.</div>
       </div>
 
-      <Link href="/pwa/portfolio" className="card link"><span>💼 자산 최적화</span><span className="sub">주식+ETF+부동산 통합 자산</span><span className="ar">→</span></Link>
+      <Link href="/pwa/assets" className="card link"><span>💼 자산 최적화</span><span className="sub">주식+ETF+부동산 통합 자산</span><span className="ar">→</span></Link>
       <Link href="/pwa/realestate" className="card link"><span>📊 ONE Score 랭킹</span><span className="sub">서현동 단지 종합점수</span><span className="ar">→</span></Link>
 
       <nav className="tabbar">

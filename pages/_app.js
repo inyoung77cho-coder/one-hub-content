@@ -5,6 +5,7 @@ import SplashScreen from "../components/SplashScreen";
 import Head from "next/head";
 import { useEffect } from "react";
 import { useRouter } from "next/router";
+import { Analytics } from "@vercel/analytics/react";
 import { initSync } from "../lib/syncManager";
 import { getTrader } from "../lib/trader";
 import { enforceUserBoundary } from "../lib/session";
@@ -90,6 +91,7 @@ export default function App({ Component, pageProps }) {
           한 화면만 정직하면 의미가 없다. 정상이면 아무것도 그리지 않는다. */}
       {isPWARoute && <EngineVersionBanner />}
       <Component {...pageProps} />
+      <Analytics />
     </>
   );
 }

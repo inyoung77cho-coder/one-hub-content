@@ -442,6 +442,16 @@ export default function Settings() {
             <Link href="/pwa/board-admin" className="detail">보드 관리 열기 →</Link>
           </div>
 
+          {/* [2026-08-10] 신고가·속보 입력(InputSheet 운영자 모드) — 화면 어디서도 연결이 안 돼
+              있던 걸 발견해 여기 운영자 섹션에 연결. 확정 실거래와 분리 저장, 엔진 미반영(참고 전용). */}
+          <div className="card">
+            <div className="k">신고가 · 속보 입력</div>
+            <p style={{ fontSize: "0.8rem", color: "#64748B", margin: "6px 0 10px", lineHeight: 1.6 }}>
+              정보원 반영이 늦는 부동산 신고가·매물호가를 수시로 입력합니다. 확정 실거래와 분리 저장되며 엔진에는 반영되지 않습니다.
+            </p>
+            <Link href="/pwa/input" className="detail">입력 화면 열기 →</Link>
+          </div>
+
           {/* [v11 #18 / §3-9] 트레이더 A/B 관리 — engine-status + /api/ops/traders(있으면) 병합 */}
           <div className="card">
             <div className="k">트레이더 관리 · A / B</div>

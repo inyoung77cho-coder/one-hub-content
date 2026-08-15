@@ -9,21 +9,45 @@ import { computeSummary, toManwon } from "../../lib/aiAssets";
 import { getTrader } from "../../lib/trader";
 import { getLedger } from "../../lib/ledger";
 import { acctRule } from "../../lib/taxRules";
+import { getStockHoldings } from "../../lib/stockHoldings";
+import { getHoldings as getEtfHoldings } from "../../lib/etfHoldings";
 
 const UK = 1e8; // 억 → 원
 
-// §6: 실제 메타 연결 전 데모(지역/섹터). 목업 값과 동일.
-const DEMO_EQUITY_META = {
-  demo: true,
-  region: { domestic: 100, overseas: 0 },
-  sectors: [
-    { theme: "반도체", pct: 37 },
-    { theme: "방산", pct: 22 },
-    { theme: "시장대표", pct: 21 },
-    { theme: "2차전지", pct: 18 },
-    { theme: "IT", pct: 2 },
-  ],
-};
+// [2026-08-10] §6 데모 해제(지역만) — 백엔드 종목 검색 API(/api/stocks/search)의 theme 필드를
+//   실제 확인해보니 삼성전자조차 검색이 안 되고 다른 종목도 theme:"" 로 비어 있어(스크리너가
+//   훑는 소수 종목만 분류됨, 임의 보유종목 커버리지 없음) 섹터는 데모 유지 — 잘못된 빈 데이터로
+//   "실데이터"라고 보여주는 게 데모 배지보다 나쁘다고 판단. 지역(국내/해외)은 보유 종목의
+//   market/ccy 필드로 완전히 로컬 계산 가능해(백엔드 의존 없음) 실데이터로 교체.
+const DEMO_SECTORS = [
+  { theme: "반도체", pct: 37 },
+  { theme: "방산", pct: 22 },
+  { theme: "시장대표", pct: 21 },
+  { theme: "2차전지", pct: 18 },
+  { theme: "IT", pct: 2 },
+];
+
+// 보유 주식·ETF의 market/ccy 필드로 국내/해외 실비중 계산(평단×수량 기준, 라이브시세 아님 —
+//   stockHoldingsValueKrw()와 동일한 간이 환산 규칙). 환율 없으면 해외분 제외(과소평가 대신 누락).
+function realRegion(stocks, etfs, fxRate) {
+  let dom = 0, ovs = 0;
+  for (const h of stocks || []) {
+    const isUsd = h.ccy === "USD";
+    if (isUsd && !fxRate) continue;
+    const v = (Number(h.avgPrice) || 0) * (Number(h.shares) || 0) * (isUsd ? fxRate : 1);
+    if (isUsd || h.market === "us") ovs += v; else dom += v;
+  }
+  for (const h of etfs || []) {
+    const isUsd = h.avgCcy === "USD";
+    if (isUsd && !fxRate) continue;
+    const v = (Number(h.avgPrice) || 0) * (Number(h.shares) || 0) * (isUsd ? fxRate : 1);
+    if (isUsd || h.market === "us") ovs += v; else dom += v;
+  }
+  const total = dom + ovs;
+  if (total <= 0) return null;
+  return { domestic: Math.round((dom / total) * 1000) / 10, overseas: Math.round((ovs / total) * 1000) / 10 };
+}
+
 const SECTOR_COLOR = {
   반도체: "var(--color-primary)", 방산: "var(--ob)", 시장대표: "var(--color-ink-3)",
   "2차전지": "var(--color-etf)", IT: "var(--color-success)", 배당: "var(--color-success)", 채권: "var(--color-ink-3)",
@@ -62,10 +86,14 @@ export default function AIAdvisor() {
       Promise.all([
         getLedger(tr).catch(() => null),
         fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => null),
-      ]).then(([a, dash]) => {
+        fetch(`/api/fx/usdkrw`).then((r) => r.json()).catch(() => null),
+      ]).then(([a, dash, fxj]) => {
         setRealtyState(a?.realty_state || null);
         const assets = buildAssets(a, dash);
-        setS(computeSummary({ as_of: new Date().toISOString(), assets, tendencyOrStyle: goal, equityMeta: DEMO_EQUITY_META }));
+        const fxRate = fxj?.ok ? fxj.rate : null;
+        const region = realRegion(getStockHoldings(tr), getEtfHoldings(tr), fxRate);
+        const equityMeta = { demo: false, region, sectors: DEMO_SECTORS };
+        setS(computeSummary({ as_of: new Date().toISOString(), assets, tendencyOrStyle: goal, equityMeta }));
       }).catch(() => setErr(true));
     };
     load();
@@ -293,7 +321,7 @@ export default function AIAdvisor() {
       {/* 주식형 자산 균형 — §4 (데모) */}
       {s && eq && (
         <div className="card">
-          <div className="sec-title">🧭 주식형 자산 균형 {eq.demo && <span className="demo">데모 데이터</span>}</div>
+          <div className="sec-title">🧭 주식형 자산 균형</div>
           <div className="eq-head"><div className="l">주식 + ETF 합산 (주식형)</div><div className="v num">{toManwon(s.equity_won)}</div></div>
           <div className="eq-note">ETF도 주식형이라 개별주식과 합쳐 하나의 주식 노출로 봅니다. 축소가 아니라 <b>국내/해외·섹터 균형</b>이 목표.</div>
 
@@ -310,7 +338,7 @@ export default function AIAdvisor() {
 
           {eq.sectors?.length > 0 && (
             <>
-              <div className="mini-h">🎯 섹터 (합산){p && <span className="goal">온보딩 · 단일테마 ≤{p.theme_cap}%</span>}</div>
+              <div className="mini-h">🎯 섹터 (합산)<span className="demo">데모 데이터</span>{p && <span className="goal">온보딩 · 단일테마 ≤{p.theme_cap}%</span>}</div>
               <div className="seg">{eq.sectors.map((x) => <span key={x.theme} style={{ width: `${x.pct}%`, background: sColor(x.theme) }} />)}</div>
               <div className="legend">{eq.sectors.filter((x) => x.pct >= 5).map((x) => <span className="it" key={x.theme}><i style={{ background: sColor(x.theme) }} />{x.theme} <b>{x.pct}%</b></span>)}</div>
               {maxTheme && p && maxTheme.pct > p.theme_cap && (
@@ -399,7 +427,7 @@ export default function AIAdvisor() {
       )}
 
       <div className="cta-row">
-        <Link href="/pwa/portfolio" className="cta">💼 통합 포트폴리오</Link>
+        <Link href="/pwa/assets" className="cta">💼 통합 포트폴리오</Link>
         <Link href="/pwa/etf" className="cta">📊 ETF 상세</Link>
       </div>
 
