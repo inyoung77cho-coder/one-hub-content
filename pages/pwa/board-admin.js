@@ -354,7 +354,7 @@ function NewsCard({ item, onSave, onHide }) {
           placeholder={"[기사요약]\n- \n[영향도]\n- 영향도: 85"} />
       </Field>
       <label className="pin"><input type="checkbox" checked={f.pinned} onChange={setBool("pinned")} /> 상단 고정</label>
-      <div className="meta">{item.status === "draft" ? "🕓 초안" : item.status === "hidden" ? "🚫 내려짐" : "✅ 게시됨"} · {String(item.created_at || "").slice(0, 16).replace("T", " ")} · id {item.id}</div>
+      <div className="meta">{item.status === "draft" ? "🕓 초안" : item.status === "hidden" ? "🚫 내려짐" : "✅ 게시됨"} · {String(item.created_at || "").slice(0, 16).replace("T", " ")} · {item.daily_no || `id ${item.id}`}</div>
       <div className="acts">
         <button className="del" onClick={onHide}>화면에서 내리기</button>
         <button className="save" disabled={!dirty}
