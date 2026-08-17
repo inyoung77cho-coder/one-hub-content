@@ -346,12 +346,13 @@ export default function Home({ reports, stats, cases }) {
           <section style={{ paddingTop: 0 }}>
             <div className="container">
               <div className="sec-head">
-                <p className="eyebrow">DAILY REPORTS · 매일 15:30 업데이트</p>
+                <p className="eyebrow">DAILY REPORTS · 매일 16:30 업데이트</p>
                 <h2>운영일지</h2>
                 <p>매일의 시장 판단을 기록으로 남깁니다. ONE-HUB의 콘텐츠이자 신뢰의 근거입니다.</p>
               </div>
               <div className="logs">
-                {reports.slice(0, 4).map((r) => (
+                {/* index 0(최신)은 위 TODAY'S JUDGMENT에 이미 표시되므로 그 다음 건부터 */}
+                {reports.slice(1, 5).map((r) => (
                   <a className="log" key={r.date} href={`/daily/${r.date}`}>
                     <div className="log-top">
                       <span className="log-date">{r.date}</span>
@@ -857,9 +858,11 @@ export async function getStaticProps() {
 
   // [실전 사례] 후기 대신 — 실제 운영일지에서 뽑은 3가지 실제 사례(날조 없음, 전부 content/daily 실데이터).
   //   ① 가장 많이 걸러낸 날(방어) ② 실제 매매가 있었던 날(실행) ③ 하락장에서 버틴 날(관망).
-  const byBlock = [...reports].filter((r) => (r.block_count || 0) > 0).sort((a, b) => (b.block_count || 0) - (a.block_count || 0));
-  const byTrade = reports.filter((r) => (r.trade_count || 0) > 0);
-  const byBear = reports.filter((r) => r.regime === 'BEAR' && (r.trade_count || 0) === 0);
+  // latest(오늘의 판단 카드에 이미 표시됨)는 후보에서 제외 — 안 그러면 실행 사례가 매번 오늘과 겹침.
+  const caseCandidates = reports.slice(1);
+  const byBlock = [...caseCandidates].filter((r) => (r.block_count || 0) > 0).sort((a, b) => (b.block_count || 0) - (a.block_count || 0));
+  const byTrade = [...caseCandidates].filter((r) => (r.trade_count || 0) > 0).sort((a, b) => (b.trade_count || 0) - (a.trade_count || 0));
+  const byBear = caseCandidates.filter((r) => r.regime === 'BEAR' && (r.trade_count || 0) === 0);
   const cases = [];
   if (byBlock[0]) cases.push({ key: 'block', ic: '🛡️', tag: '방어', date: byBlock[0].date, headline: `${byBlock[0].block_count}건을 걸러낸 날`, quote: byBlock[0].insight });
   if (byTrade[0]) cases.push({ key: 'trade', ic: '⚡', tag: '실행', date: byTrade[0].date, headline: `${byTrade[0].trade_count}건을 실행한 날`, quote: byTrade[0].insight });
