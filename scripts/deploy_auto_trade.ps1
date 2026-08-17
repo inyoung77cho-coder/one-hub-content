@@ -93,7 +93,7 @@ git add -A ; git commit -q -m 'deploy $fn $D'
 sudo systemctl restart onehub onehub-b onehub-api
 sleep 6
 for S in onehub onehub-b onehub-api; do
-  systemctl is-active --quiet \$S || { echo "[실패] \$S inactive — 롤백"; cp -p $fn.bak_$D $fn; sudo systemctl restart onehub onehub-b onehub-api; exit 1; }
+  systemctl is-active --quiet `$S || { echo "[실패] `$S inactive — 롤백"; cp -p $fn.bak_$D $fn; sudo systemctl restart onehub onehub-b onehub-api; exit 1; }
 done
 echo '  서비스 3종 active'
 curl -s http://localhost:5001/api/version | head -c 120

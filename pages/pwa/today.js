@@ -36,6 +36,30 @@ const STORY_CATS = [["주식", "📈"], ["부동산", "🏠"], ["ETF", "📊"], 
 const regimeKo = (r) => ({ BULL: "상승", BEAR: "하락", SIDE: "횡보", SIDEWAYS: "횡보", NEUTRAL: "중립" }[String(r || "").toUpperCase()] || null);
 const pctTxt = (v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(2)}%`;
 const rePct = (v) => (v == null ? "-" : `${v > 0 ? "+" : ""}${Number(v).toFixed(1)}%`);
+// [시황 브리핑] 텔레그램 "Today News"/"보유종목 관련 뉴스" 원문 텍스트를 카드용으로 최소 파싱.
+//   구조화를 새로 만들지 않고 news_collector.py가 이미 만든 포맷 그대로 줄 단위로 나눈다.
+function parseThemedNews(msg) {
+  if (!msg) return [];
+  const sections = [];
+  let cur = null;
+  for (const raw of String(msg).split("\n")) {
+    const line = raw.trim();
+    if (!line || line === "Today News") continue;
+    if (line.startsWith("[") && line.endsWith("]")) {
+      cur = { theme: line.slice(1, -1), items: [] };
+      sections.push(cur);
+    } else if (line.startsWith("-") && cur) {
+      cur.items.push(line.replace(/^-+\s*/, ""));
+    }
+  }
+  return sections;
+}
+function parsePortfolioNews(msg) {
+  if (!msg) return [];
+  return String(msg).split("\n").map((l) => l.trim())
+    .filter((l) => l && l !== "[보유종목 관련 뉴스]")
+    .map((l) => l.replace(/^-+\s*/, ""));
+}
 // [사용자 지시] 지갑 큰 숫자는 "원" 없이, 그 아래 증감(+xx원)에만 "원"을 남긴다.
 const mmdd = (ms) => { const d = new Date(ms); return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
@@ -66,6 +90,7 @@ export default function TodayPage({ announcements = [] }) {
   const [news, setNews] = useState(null); // [뉴스 통합] 오늘의 뉴스 — 부모가 한 번 fetch 해 카테고리별로 나눠 쓴다
   const [brief, setBrief] = useState(null); // [시황 브리핑] 텔레그램 "ONE-HUB Market Brief"와 같은 스냅샷 — 대결 탭 카드용
   const [briefOpen, setBriefOpen] = useState(false); // [시황 브리핑] 전체 지표 더보기 토글
+  const [newsBrief, setNewsBrief] = useState(null); // [시황 브리핑] 텔레그램 "Today News"/"보유종목 관련 뉴스" 원문 스냅샷
   const [newsOpen, setNewsOpen] = useState(false); // ETF·부동산 타일 뉴스 더보기
   // [2026-08-05] 뉴스 상세는 useState가 아니라 URL(?news=id)에서 파생 — history에 진짜 항목이
   //   쌓이므로 뒤로가기를 누르면 페이지를 벗어나지 않고 팝업만 닫히고 스크롤 위치가 그대로 남는다.
@@ -117,6 +142,8 @@ export default function TodayPage({ announcements = [] }) {
       .then((d) => { setNews(Array.isArray(d?.items) ? d.items : []); }).catch(() => setNews([]));
     fetch(`/api/pwa-market-brief`).then((r) => r.json())
       .then((d) => { if (d?.ok && d.brief) setBrief(d.brief); }).catch(() => {});
+    fetch(`/api/pwa-today-news-brief`).then((r) => r.json())
+      .then((d) => { if (d?.ok && d.brief) setNewsBrief(d.brief); }).catch(() => {});
     // [사용자 지시] 브리핑이 항상 백엔드 기본 지역(서현동)만 보여주던 문제 — 내 단지의 법정동을
     //   찾아 region= 으로 넘겨 "보유 주택 지역" 시황이 나오게 한다. 단지가 없거나 동을 못 찾으면
     //   기존처럼 기본 지역 그대로(에러 아님).
@@ -630,6 +657,30 @@ export default function TodayPage({ announcements = [] }) {
           </section>
         )}
 
+        {/* 카드1.6 — 텔레그램 "Today News"/"보유종목 관련 뉴스" 원문 스냅샷.
+            아래 카드2(주식 뉴스)와는 다른 소스(onehub-news 서비스)라 헷갈리지 않도록 별도 카드로 분리. */}
+        {newsBrief && (parseThemedNews(newsBrief.news_msg).length > 0 || parsePortfolioNews(newsBrief.portfolio_news_msg).length > 0) && (
+          <section className="card mb">
+            <div className="sn-h">🗞 봇이 오늘 보낸 뉴스{newsBrief.date ? ` · ${newsBrief.date}` : ""}</div>
+            {parsePortfolioNews(newsBrief.portfolio_news_msg).length > 0 && (
+              <div className="mb-news-block">
+                <div className="sn-sub-h">보유 종목 관련</div>
+                {parsePortfolioNews(newsBrief.portfolio_news_msg).map((line, i) => (
+                  <div key={i} className="mb-news-row">{line}</div>
+                ))}
+              </div>
+            )}
+            {parseThemedNews(newsBrief.news_msg).map((sec) => (
+              <div key={sec.theme} className="mb-news-block">
+                <div className="sn-sub-h">{sec.theme}</div>
+                {sec.items.map((line, i) => (
+                  <div key={i} className="mb-news-row">{line}</div>
+                ))}
+              </div>
+            ))}
+          </section>
+        )}
+
         {/* 카드2 — 주식 뉴스(보유 종목 관련 + 주요 뉴스 통합) */}
         <section className="card sn">
           <div className="sn-h">주식 뉴스</div>
@@ -1043,6 +1094,9 @@ export default function TodayPage({ announcements = [] }) {
         .mb-heat-cool { background: var(--color-primary-soft, var(--color-card-soft)); color: var(--color-primary); }
         .mb-heat-cold { background: var(--color-card-soft); color: var(--color-ink-3); }
         .mb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 0.76rem; color: var(--color-ink-2); margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+        .mb-news-block { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-line); }
+        .mb-news-block:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+        .mb-news-row { font-size: 0.78rem; color: var(--color-ink); line-height: 1.55; word-break: keep-all; padding: 3px 0; }
 
         /* ══ 카드2: 주식 뉴스 ══ */
         .sn-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
