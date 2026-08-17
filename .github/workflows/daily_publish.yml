@@ -90,9 +90,11 @@ jobs:
           REPORT_DATE="${{ steps.date.outputs.report_date }}"
           git config user.name "ONE-HUB Bot"
           git config user.email "bot@one-hub.io"
-          git stash
+          git stash push -u -m "daily-report-wip" || true
           git pull --rebase origin main
-          git stash pop
+          if git stash list | grep -q "daily-report-wip"; then
+            git stash pop
+          fi
           git add "content/daily/${REPORT_DATE}.md"
           if git diff --staged --quiet; then
             echo "No changes"
