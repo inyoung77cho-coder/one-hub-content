@@ -293,9 +293,11 @@ function ReportCard({ item, onSave, onDelete }) {
   const [f, setF] = useState({
     title: item.title || "", headline: item.headline || "",
     period_label: item.period_label || "", overall: item.overall || "",
+    status: item.status || "published",
   });
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
-  const dirty = ["title", "headline", "period_label", "overall"].some((k) => (f[k] || "") !== (item[k] || ""));
+  const keys = ["title", "headline", "period_label", "overall", "status"];
+  const dirty = keys.some((k) => (f[k] || "") !== (item[k] || (k === "status" ? "published" : "")));
 
   return (
     <div className="card">
@@ -303,11 +305,17 @@ function ReportCard({ item, onSave, onDelete }) {
       <Field label="헤드라인"><textarea rows={2} value={f.headline} onChange={set("headline")} /></Field>
       <Field label="기간 표기"><input value={f.period_label} onChange={set("period_label")} /></Field>
       <Field label="종합 요약(overall)"><textarea rows={4} value={f.overall} onChange={set("overall")} /></Field>
-      <div className="meta">게시 {item.published_at || item.created_at} · {item.source_count}건 종합 · id {item.id}</div>
+      <Field label="게시 상태">
+        <select value={f.status} onChange={set("status")}>
+          <option value="draft">초안(비공개)</option>
+          <option value="published">게시됨</option>
+        </select>
+      </Field>
+      <div className="meta">{item.status === "draft" ? "🕓 초안" : "✅ 게시됨"} · 게시 {item.published_at || item.created_at} · {item.source_count}건 종합 · id {item.id}</div>
       <div className="acts">
         <button className="del" onClick={onDelete}>보드에서 내리기</button>
         <button className="save" disabled={!dirty}
-          onClick={() => onSave({ title: f.title, headline: f.headline, period_label: f.period_label, overall: f.overall })}>
+          onClick={() => onSave({ title: f.title, headline: f.headline, period_label: f.period_label, overall: f.overall, status: f.status })}>
           {dirty ? "저장" : "변경 없음"}
         </button>
       </div>
