@@ -9,8 +9,9 @@ import BottomNav from "../../components/BottomNav";
 const TABS = [
   ["news", "📰", "뉴스"],
   ["video", "▶️", "영상"],
+  ["idiom", "💬", "이디엄"],
 ];
-const TRACK_KO = { economy: "경제", display: "디스플레이" };
+const TRACK_KO = { economy: "경제", display: "디스플레이", general: "생활영어" };
 const SPEEDS = [0.75, 1, 1.25];
 
 function fmtDate(iso) {
@@ -40,6 +41,7 @@ function LessonCard({ lesson }) {
 
   const exprs = lesson.expressions || [];
   const words = lesson.words || [];
+  const isIdiom = lesson.medium === "idiom";
 
   return (
     <article className="lc">
@@ -75,32 +77,38 @@ function LessonCard({ lesson }) {
 
       {!revealed ? (
         <button type="button" className="lc-reveal" onClick={() => setRevealed(true)}>
-          📖 2단계 · 지문 보기
+          📖 2단계 · {isIdiom ? "대화 보기" : "지문 보기"}
         </button>
       ) : (
         <>
           <section className="lc-sec">
-            <h3>지문 (READ)</h3>
-            <p className="lc-passage">{lesson.passage_en}</p>
+            <h3>{isIdiom ? "대화 (LISTEN & READ)" : "지문 (READ)"}</h3>
+            {/* 이디엄 레슨은 "Mike: …" 형태의 대화라 줄바꿈을 살려야 읽힌다. */}
+            <p className={isIdiom ? "lc-passage lc-dialogue" : "lc-passage"}>{lesson.passage_en}</p>
           </section>
 
           {lesson.summary_ko && (
             <section className="lc-sec">
-              <h3>한국어 요약</h3>
+              <h3>{isIdiom ? "상황" : "한국어 요약"}</h3>
               <p className="lc-ko">{lesson.summary_ko}</p>
             </section>
           )}
 
           {exprs.length > 0 && (
             <section className="lc-sec">
-              <h3>오늘의 표현</h3>
+              <h3>{isIdiom ? "오늘의 이디엄" : "오늘의 표현"}</h3>
               <ol className="lc-exprs">
                 {exprs.map((e, i) => (
                   <li key={i}>
                     <b>{e.expr}</b>
                     <span className="lc-mean"> — {e.meaning_ko}</span>
+                    {/* 아래 2개는 이디엄에서만 온다. 직역을 같이 보여주면
+                        글자만 보고 왜 오해하는지가 드러난다. */}
+                    {e.literal_ko && <div className="lc-lit">직역: {e.literal_ko}</div>}
+                    {e.nuance_ko && <div className="lc-nu">쓸 때: {e.nuance_ko}</div>}
                     {e.example_en && <div className="lc-ex">{e.example_en}</div>}
                     {e.example_ko && <div className="lc-exko">{e.example_ko}</div>}
+                    {e.example2_en && <div className="lc-ex">{e.example2_en}</div>}
                   </li>
                 ))}
               </ol>
@@ -109,7 +117,7 @@ function LessonCard({ lesson }) {
 
           {words.length > 0 && (
             <section className="lc-sec">
-              <h3>단어</h3>
+              <h3>{isIdiom ? "함께 볼 단어" : "단어"}</h3>
               <ul className="lc-words">
                 {words.map((w, i) => (
                   <li key={i}>
@@ -135,7 +143,10 @@ function LessonCard({ lesson }) {
         {lesson.medium === "video" && !lesson.has_transcript && (
           <span className="lc-warn">자막을 못 받아와 제목·설명 기반으로 만들었어요</span>
         )}
-        {lesson.source_url && (
+        {isIdiom && (
+          <span className="lc-warn">예문·대화는 실제 작품 대사 인용이 아니라 학습용으로 새로 쓴 것입니다</span>
+        )}
+        {!isIdiom && lesson.source_url && (
           <a href={lesson.source_url} target="_blank" rel="noreferrer noopener">
             🔗 {lesson.medium === "video" ? "영상 보기" : "원문 보기"}
           </a>
@@ -161,6 +172,7 @@ function LessonCard({ lesson }) {
         .lc-sec { margin-top: 16px; }
         .lc-sec h3 { font-size: .74rem; font-weight: 800; color: var(--color-ink-3); letter-spacing: .3px; margin: 0 0 7px; text-transform: uppercase; }
         .lc-passage { font-size: .92rem; line-height: 1.85; color: var(--color-ink); margin: 0; }
+        .lc-dialogue { white-space: pre-line; }
         .lc-ko { font-size: .82rem; line-height: 1.7; color: var(--color-ink-2); margin: 0; white-space: pre-line; word-break: keep-all; }
         .lc-exprs, .lc-words { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 10px; }
         .lc-words { list-style: none; padding-left: 0; }
@@ -169,6 +181,8 @@ function LessonCard({ lesson }) {
         .lc-mean { color: var(--color-ink-2); }
         .lc-ex { font-size: .8rem; color: var(--color-ink-2); margin-top: 3px; padding-left: 8px; border-left: 2px solid var(--color-line); }
         .lc-exko { font-size: .74rem; color: var(--color-ink-3); padding-left: 10px; }
+        .lc-lit { font-size: .76rem; color: var(--color-ink-3); margin-top: 3px; }
+        .lc-nu { font-size: .78rem; color: var(--color-ink-2); margin-top: 2px; }
         .lc-foot { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); display: flex; flex-direction: column; gap: 6px; }
         .lc-foot a { font-size: .78rem; font-weight: 700; color: var(--color-primary); text-decoration: none; }
         .lc-warn { font-size: .72rem; color: var(--color-ink-3); }
@@ -216,7 +230,7 @@ export default function EnglishPage() {
       <AppHeader />
       <div className="en-hd">
         <h1>🇬🇧 매일 영어</h1>
-        <span className="en-sub">경제 · 디스플레이 · 하루 각 1건</span>
+        <span className="en-sub">경제 · 디스플레이 뉴스/영상 + 오늘의 이디엄</span>
       </div>
 
       <div className="en-tabs" role="tablist">
@@ -275,7 +289,8 @@ export default function EnglishPage() {
       )}
 
       <p className="en-foot">
-        지문은 원문을 그대로 옮긴 것이 아니라, 사실만 추려 학습용으로 다시 쓴 글입니다. 원문은 각 카드의 링크에서 볼 수 있어요.
+        뉴스·영상 지문은 원문을 그대로 옮긴 것이 아니라 사실만 추려 학습용으로 다시 쓴 글이고(원문은 각 카드의 링크),
+        이디엄 예문·대화도 실제 작품 대사 인용이 아니라 새로 쓴 것입니다.
       </p>
 
       <BottomNav active="english" />
