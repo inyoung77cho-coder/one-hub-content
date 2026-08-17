@@ -9,11 +9,19 @@ const REGIME_EMOJI = { BULL: '📈', BEAR: '📉', SIDEWAYS: '➖' };
 const REGIME_LABEL = { BULL: '상승장', BEAR: '하락장', SIDEWAYS: '횡보장' };
 const REGIME_TAG = { BULL: 'p-bull', BEAR: 'p-bear', SIDEWAYS: 'p-flat' };
 
-export default function Home({ reports, stats, cases }) {
+export default function Home({ reports, stats, cases, daysAgo }) {
   const latest = reports[0] || null;
   const emoji = (r) => REGIME_EMOJI[r] || '➖';
   const label = (r) => REGIME_LABEL[r] || '횡보장';
   const analyzed = latest ? (latest.block_count || 0) + (latest.trade_count || 0) : 0;
+  // 정직한 신선도 표시 — 리포트가 밀려도 숨기지 않고 그대로 알린다.
+  const freshnessLabel = (d) => {
+    if (d === null || d === undefined) return '';
+    if (d <= 0) return '오늘 16:30 갱신';
+    if (d === 1) return '어제 갱신';
+    if (d <= 6) return `${d}일 전 갱신`;
+    return `${d}일 전 갱신 · 확인 중`;
+  };
 
   // 조부장 오늘 경제일기 — 오늘 운영일지(latest)로 매일 갱신되는 1인칭 일기
   const diary = latest ? {
@@ -179,9 +187,21 @@ export default function Home({ reports, stats, cases }) {
             </div>
           </div>
 
-          {/* 조부장 오늘 경제일기 (상단 프로미넌트) */}
+          {/* FREE SCORE PREVIEW — 신규유입 훅. 기존에 배포된 /welcome 무료채점 위젯을 홈에서 처음 노출 */}
+          <section style={{ paddingTop: 0 }}>
+            <div className="container">
+              <div className="free-score">
+                <span className="fs-badge">🎯 로그인 없이 3초</span>
+                <h2 className="fs-h">내 아파트, 지금 저평가일까?</h2>
+                <p className="fs-p">가입 없이 단지 하나만 골라 국토부 실거래 기반 ONE Score를 바로 확인하세요.</p>
+                <a className="btn btn-primary btn-lg" href="/welcome">🎯 무료로 채점해보기 →</a>
+              </div>
+            </div>
+          </section>
+
+          {/* TODAY'S JUDGMENT — 조부장 일기 + 오늘의 판단 카드 통합(중복 노출 제거) */}
           {latest && diary && (
-            <section style={{ paddingTop: 44, paddingBottom: 0 }}>
+            <section style={{ paddingTop: 0, paddingBottom: 0 }}>
               <div className="container">
                 <div className="diary">
                   <div className="diary-side">
@@ -190,15 +210,23 @@ export default function Home({ reports, stats, cases }) {
                   </div>
                   <div className="diary-main">
                     <div className="diary-top">
-                      <span className="diary-eyebrow">📔 조부장의 오늘 경제일기</span>
-                      <span className="diary-date">{latest.date} · {emoji(latest.regime)} {label(latest.regime)}</span>
+                      <span className="diary-eyebrow">📔 오늘의 판단</span>
+                      <span className="diary-date">
+                        {latest.date} · {emoji(latest.regime)} {label(latest.regime)}
+                        <span className="diary-fresh">{freshnessLabel(daysAgo)}</span>
+                      </span>
                     </div>
                     <p className="diary-p">{diary.open}</p>
+                    <div className="diary-metrics">
+                      <div className="dm"><div className="k">분석</div><div className="v">{analyzed}</div></div>
+                      <div className="dm"><div className="k">차단</div><div className="v">{latest.block_count || 0}</div></div>
+                      <div className="dm"><div className="k">실행</div><div className="v">{latest.trade_count || 0}</div></div>
+                    </div>
                     <p className="diary-quote">&ldquo;{latest.insight}&rdquo;</p>
                     <p className="diary-p">{diary.act} {diary.close}</p>
                     <div className="diary-links">
                       <a href="/story">조 부장 이야기 처음부터 →</a>
-                      <a href={`/daily/${latest.date}`}>오늘 판단 근거 보기 →</a>
+                      <a href={`/daily/${latest.date}`}>그날 판단 근거 전체 보기 →</a>
                     </div>
                   </div>
                 </div>
@@ -262,9 +290,6 @@ export default function Home({ reports, stats, cases }) {
                   <p>실거래가 기반 <b>ONE Score</b>로 보유·추가·관망을 자산 <b>전체 배분</b> 안에서 판단합니다.</p>
                 </div>
               </div>
-              <div style={{ textAlign: 'center', marginTop: 26 }}>
-                <a className="btn btn-primary btn-lg" href="/pwa">🚀 앱에서 내 자산으로 시작하기</a>
-              </div>
             </div>
           </section>
 
@@ -286,38 +311,6 @@ export default function Home({ reports, stats, cases }) {
               </div>
             </div>
           </section>
-
-          {/* TODAY */}
-          {latest && (
-            <section style={{ paddingTop: 0 }}>
-              <div className="container">
-                <div className="sec-head">
-                  <p className="eyebrow">TODAY&apos;S JUDGMENT</p>
-                  <h2>오늘 AI는 무엇을 했는가?</h2>
-                </div>
-                <a className="today-wrap" href={`/daily/${latest.date}`} aria-label={`${latest.date} 오늘의 판단 전체 보기`}>
-                  <div className="today-l">
-                    <p className="d">{latest.date} · 오늘의 판단</p>
-                    <p className="phase">
-                      {emoji(latest.regime)} {label(latest.regime)} ·{' '}
-                      {latest.trade_count > 0 ? `실행 ${latest.trade_count}건` : '진입 자제'}
-                    </p>
-                    <div className="today-metrics">
-                      <div className="tm"><div className="k">분석</div><div className="v">{analyzed}</div></div>
-                      <div className="tm"><div className="k">차단</div><div className="v">{latest.block_count || 0}</div></div>
-                      <div className="tm"><div className="k">실행</div><div className="v">{latest.trade_count || 0}</div></div>
-                    </div>
-                  </div>
-                  <div className="today-r">
-                    <div className="quote-mark" aria-hidden="true">&ldquo;</div>
-                    <p className="quote">{latest.insight}</p>
-                    <p className="quote-meta">ONE-HUB Insight · AI 분석 15:30 KST</p>
-                    <span className="link-arrow">전체 분석 보기 →</span>
-                  </div>
-                </a>
-              </div>
-            </section>
-          )}
 
           {/* REAL CASES — 후기 대신 실제 운영일지 사례(날조 없음) */}
           {cases && cases.length > 0 && (
@@ -384,7 +377,7 @@ export default function Home({ reports, stats, cases }) {
                 <div className="stat"><div className="num">{stats.totalTrades}</div><div className="lbl">최종 실행</div></div>
                 <div className="stat"><div className="num">{stats.totalDays}</div><div className="lbl">운영 일수{stats.watchDays > 0 ? <><br /><span style={{ fontSize: '0.68rem', fontWeight: 600, opacity: 0.7 }}>매매 {stats.tradeDays} · 관망 {stats.watchDays}</span></> : null}</div></div>
               </div>
-              <p className="trust-note">※ 모든 수치는 운영일지 데이터(매일 15:30 KST 갱신)에서 자동 집계됩니다.{stats.watchDays > 0 ? ' ‘관망’은 엔진이 가동됐으나 선별 결과 매매하지 않은 날입니다(중단 아님).' : ''}</p>
+              <p className="trust-note">※ 모든 수치는 운영일지 데이터(매일 16:30 KST 갱신)에서 자동 집계됩니다.{stats.watchDays > 0 ? ' ‘관망’은 엔진이 가동됐으나 선별 결과 매매하지 않은 날입니다(중단 아님).' : ''}</p>
               {/* [HI-4] 트랙레코드 ↔ 게임 연결 — 참여자 집계(사람 승률)는 다중사용자 인프라 후. 지금은 도전 프레임만. */}
               <div className="tr-game">
                 <div className="tr-game-t">⚔️ AI는 완벽하지 않습니다 — 그래서 당신이 이길 수 있습니다</div>
@@ -394,13 +387,15 @@ export default function Home({ reports, stats, cases }) {
             </div>
           </section>
 
-          {/* THE BOARD — 성과 랭킹 + 부동산 신규정보 (경쟁·재미) */}
+          {/* THE BOARD + CHANNELS — 성과보드·부동산 소식 + 구독 채널 통합.
+              PWA FUNNEL(콘솔 밴드)은 최종 CTA와 메시지가 겹쳐 제거, 텔레그램은 재방문 채널로 승격,
+              실체 없는 YouTube "준비중" 카드는 착수 전까지 노출하지 않음. */}
           <section style={{ paddingTop: 0 }}>
             <div className="container">
               <div className="sec-head">
-                <p className="eyebrow">THE BOARD · 함께, 재미있게</p>
-                <h2>이번 주, 누가 잘하고 있나</h2>
-                <p>혼자가 아니라 함께 — 참여자들의 성과 보드와 새 부동산 소식을 홈에서 먼저 봅니다.</p>
+                <p className="eyebrow">THE BOARD &amp; CHANNELS</p>
+                <h2>혼자 보지 말고, 매일 받아보세요</h2>
+                <p>성과 랭킹과 새 부동산 소식은 여기서 먼저 보고, 다음 리포트는 텔레그램으로 받아보세요.</p>
               </div>
               <div className="board-grid">
                 <a className="board-card" href="/leaderboard">
@@ -420,56 +415,20 @@ export default function Home({ reports, stats, cases }) {
                   <span className="board-arrow">보드 열기 →</span>
                 </a>
               </div>
-            </div>
-          </section>
-
-          {/* PWA FUNNEL (콘솔 중복 제거 · 단일 퍼널) */}
-          <section>
-            <div className="container">
-              <div className="funnel">
-                <p className="eyebrow">THE CONSOLE</p>
-                <h2 className="funnel-h">운영은 앱에서 — 주식·ETF·부동산을 한 콘솔에서</h2>
-                <p className="funnel-p">
-                  분석·배분·리밸런싱·의사결정은 ONE-HUB PWA 콘솔이 담당합니다. 홈페이지는 기록과 이야기를, 앱은 실제 운영을.
-                </p>
-                <div className="funnel-tags">
-                  <span>🤖 AI 자산운영</span><span>💼 통합 자산</span><span>📊 ETF</span><span>🏢 부동산</span><span>🛡️ 시스템 상태</span>
+              <a className="channel-tele" href="https://t.me/onehub_jiy_bot" target="_blank" rel="noopener">
+                <div className="ct-ic">✈️</div>
+                <div className="ct-body">
+                  <div className="ct-t">텔레그램으로 매일 16:30 리포트 받기</div>
+                  <div className="ct-d">브라우저를 안 열어도, 오늘 AI가 뭘 했는지 텔레그램으로 먼저 도착합니다.</div>
                 </div>
-                <a href="/pwa" className="btn btn-primary btn-lg" style={{ marginTop: 20 }}>🚀 ONE-HUB 앱 시작하기</a>
-                <p className="funnel-sub">
-                  설치 없이 웹에서 바로 · 홈 화면에 추가하면 실시간 알림까지 ·{' '}
-                  <Link href="/pwa-guide" style={{ color: 'var(--blue)', fontWeight: 700 }}>설치 가이드</Link>
-                </p>
-              </div>
-            </div>
-          </section>
-
-          {/* ACQUISITION CHANNELS (유입 강화) */}
-          <section style={{ paddingTop: 0 }}>
-            <div className="container">
-              <div className="sec-head">
-                <p className="eyebrow">FOLLOW ONE-HUB</p>
-                <h2>매일의 판단을, 원하는 채널에서</h2>
-                <p>새 글·리포트·영상은 아래 채널로 먼저 도착합니다. 팔로우하고 ONE-HUB의 성장 과정을 함께 보세요.</p>
-              </div>
-              <div className="channels">
-                <div className="channel channel-soon">
-                  <div className="ch-ic">▶️</div>
-                  <div className="ch-t">YouTube <span className="ch-soon">준비중</span></div>
-                  <div className="ch-d">AI 운영 브이로그·시장 브리핑 영상</div>
-                  <span className="ch-cta-soon">곧 공개</span>
-                </div>
+                <span className="ct-cta">채널 참여하기 →</span>
+              </a>
+              <div className="channels channels-sm">
                 <a className="channel" href="/blog">
                   <div className="ch-ic">✍️</div>
                   <div className="ch-t">블로그</div>
                   <div className="ch-d">AI 판단 근거·투자 방법론 아티클</div>
                   <span className="ch-cta">읽으러 가기 →</span>
-                </a>
-                <a className="channel" href="https://t.me/onehub_jiy_bot" target="_blank" rel="noopener">
-                  <div className="ch-ic">✈️</div>
-                  <div className="ch-t">텔레그램</div>
-                  <div className="ch-d">매일 15:30 리포트를 실시간으로</div>
-                  <span className="ch-cta">채널 참여 →</span>
                 </a>
                 <a className="channel" href="/community">
                   <div className="ch-ic">💬</div>
@@ -553,7 +512,7 @@ export default function Home({ reports, stats, cases }) {
               </nav>
             </div>
             <p className="foot-disclaimer">
-              © 2026 ONE-HUB · running on AWS Lightsail · 매일 15:30 KST 자동 업데이트
+              © 2026 ONE-HUB · running on AWS Lightsail · 매일 16:30 KST 자동 업데이트
               <br />
               ONE-HUB가 제공하는 정보는 투자 판단의 참고 자료이며 투자 자문·일임이 아닙니다. 모든 투자의 최종 결정과 책임은 이용자 본인에게 있습니다.
             </p>
@@ -588,15 +547,6 @@ export default function Home({ reports, stats, cases }) {
         .story-cta{display:inline-block;margin-top:12px;font-size:15px;font-weight:700;color:#7FE9C0}
         @media(max-width:640px){.story-wrap{padding:32px 24px}.story-title{font-size:22px}.story-body{font-size:15px}}
 
-        /* PWA 퍼널 밴드 */
-        .funnel{background:#fff;border:1px solid var(--line);border-radius:24px;padding:52px 40px;box-shadow:var(--shadow);text-align:center}
-        .funnel-h{font-size:26px;font-weight:800;letter-spacing:-.5px;margin:10px 0 12px;color:var(--ink)}
-        .funnel-p{font-size:15px;color:var(--ink2);max-width:640px;margin:0 auto 20px;line-height:1.65}
-        .funnel-tags{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
-        .funnel-tags span{background:var(--blue-soft);color:var(--blue);font-size:13px;font-weight:700;padding:7px 13px;border-radius:11px}
-        .funnel-sub{font-size:13px;color:var(--ink3);margin-top:16px}
-        @media(max-width:640px){.funnel{padding:36px 22px}.funnel-h{font-size:21px}}
-
         /* 유입 채널 */
         .channels{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
         .channel{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:5px;transition:transform .15s ease,box-shadow .15s ease}
@@ -605,10 +555,6 @@ export default function Home({ reports, stats, cases }) {
         .ch-t{font-size:16px;font-weight:800;color:var(--ink)}
         .ch-d{font-size:13px;color:var(--ink2);line-height:1.5;flex:1}
         .ch-cta{font-size:13px;font-weight:700;color:var(--blue);margin-top:10px}
-        .ch-cta-soon{font-size:13px;font-weight:700;color:var(--ink3);margin-top:10px}
-        .channel-soon{opacity:.72;cursor:default}
-        .channel-soon:hover{transform:none;box-shadow:var(--shadow)}
-        .ch-soon{font-size:10px;font-weight:800;color:#64748B;background:#F1F5F9;padding:2px 7px;border-radius:6px;margin-left:6px;vertical-align:middle}
 
         /* 3자산 활용 사례 */
         .usecases{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
@@ -653,13 +599,36 @@ export default function Home({ reports, stats, cases }) {
         .diary-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px}
         .diary-eyebrow{font-size:15px;font-weight:800;color:var(--blue);letter-spacing:-.2px}
         .diary-date{font-size:12.5px;color:var(--ink3);font-family:'Space Mono',monospace}
+        .diary-fresh{margin-left:10px;font-size:11px;font-weight:700;color:var(--ink2);background:#EEF2FB;border-radius:999px;padding:3px 9px}
         .diary-p{font-size:15px;line-height:1.8;color:var(--ink);margin-bottom:8px;word-break:keep-all}
+        .diary-metrics{display:flex;gap:10px;margin:14px 0}
+        .dm{flex:1;background:#F3F6FC;border:1px solid #E1E8F5;border-radius:11px;padding:10px;text-align:center}
+        .dm .k{font-size:11px;color:var(--ink3);font-weight:600}
+        .dm .v{font-size:18px;font-weight:800;color:var(--ink);margin-top:2px}
         .diary-quote{font-size:16px;line-height:1.65;color:var(--ink);font-weight:700;border-left:3px solid var(--blue);padding:2px 0 2px 14px;margin:12px 0}
         .diary-links{display:flex;gap:20px;flex-wrap:wrap;margin-top:16px}
         .diary-links :global(a){font-size:13.5px;font-weight:700;color:var(--blue)}
         @media(max-width:640px){.diary{flex-direction:column;gap:16px;padding:24px 22px}.diary-side{width:auto;display:flex;align-items:center;gap:12px;text-align:left}.diary-who{align-items:flex-start}.diary-avatar{font-size:40px}}
         @media(max-width:860px){.channels{grid-template-columns:1fr 1fr}}
         @media(max-width:520px){.channels{grid-template-columns:1fr}}
+
+        /* 무료 채점 프리뷰 */
+        .free-score{background:#fff;border:1px solid var(--line);border-radius:22px;padding:34px 30px;text-align:center;box-shadow:var(--shadow)}
+        .fs-badge{display:inline-block;font-size:12px;font-weight:800;color:#B45309;background:#FFF6E5;border-radius:999px;padding:5px 12px;margin-bottom:14px}
+        .fs-h{font-size:22px;font-weight:800;letter-spacing:-.4px;margin-bottom:10px}
+        .fs-p{font-size:14px;color:var(--ink2);max-width:480px;margin:0 auto 20px;line-height:1.6}
+        @media(max-width:640px){.free-score{padding:26px 22px}.fs-h{font-size:19px}}
+
+        /* 텔레그램 승격 카드 */
+        .channel-tele{display:flex;align-items:center;gap:16px;background:linear-gradient(135deg,#17263F,#1B2F52);border-radius:18px;padding:22px 24px;margin-top:16px;color:#fff;transition:transform .15s ease}
+        .channel-tele:hover{transform:translateY(-2px)}
+        .ct-ic{font-size:30px;flex-shrink:0}
+        .ct-body{flex:1}
+        .ct-t{font-size:16px;font-weight:800}
+        .ct-d{font-size:13px;color:#B9CBEA;margin-top:4px;line-height:1.5}
+        .ct-cta{font-size:13px;font-weight:700;color:#7FE9C0;flex-shrink:0}
+        .channels-sm{grid-template-columns:1fr 1fr;margin-top:16px}
+        @media(max-width:640px){.channel-tele{flex-direction:column;align-items:flex-start;text-align:left}.channels-sm{grid-template-columns:1fr}}
 
         /* 최종 CTA 밴드 */
         .cta-band{background:linear-gradient(150deg,var(--blue),var(--hero1));color:#fff;border-radius:24px;padding:56px 40px;text-align:center}
@@ -737,21 +706,6 @@ export default function Home({ reports, stats, cases }) {
         .pillar h3{font-size:18px;font-weight:800;letter-spacing:-.3px}
         .pillar p{font-size:14px;color:var(--ink2);margin-top:9px;line-height:1.6}
         @media(max-width:760px){.pillars{grid-template-columns:1fr}}
-
-        .today-wrap{background:var(--card);border-radius:24px;box-shadow:var(--shadow);overflow:hidden;display:grid;grid-template-columns:1fr 1fr}
-        .today-l{background:linear-gradient(150deg,var(--hero1),var(--hero2));color:#fff;padding:36px 32px}
-        .today-l .d{font-size:13px;color:#9DB6E6;font-weight:600}
-        .today-l .phase{font-size:26px;font-weight:800;margin:8px 0 20px}
-        .today-metrics{display:flex;gap:10px}
-        .tm{flex:1;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:13px;padding:13px;text-align:center}
-        .tm .k{font-size:11px;color:#9DB6E6;font-weight:600}
-        .tm .v{font-size:19px;font-weight:800;margin-top:4px}
-        .today-r{padding:36px 32px;display:flex;flex-direction:column;justify-content:center}
-        .quote-mark{font-size:34px;color:var(--blue);font-weight:800;line-height:.6}
-        .quote{font-size:17px;font-weight:600;line-height:1.6;letter-spacing:-.2px;margin:12px 0 18px}
-        .quote-meta{font-size:12.5px;color:var(--ink3);font-weight:600;margin-bottom:20px}
-        .link-arrow{font-size:13px;font-weight:700;color:var(--blue)}
-        @media(max-width:760px){.today-wrap{grid-template-columns:1fr}}
 
         .logs{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
         .log{background:var(--card);border-radius:18px;padding:20px 22px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px;transition:transform .15s ease,box-shadow .15s ease}
@@ -868,5 +822,14 @@ export async function getStaticProps() {
   if (byTrade[0]) cases.push({ key: 'trade', ic: '⚡', tag: '실행', date: byTrade[0].date, headline: `${byTrade[0].trade_count}건을 실행한 날`, quote: byTrade[0].insight });
   if (byBear[0]) cases.push({ key: 'watch', ic: '🧊', tag: '관망', date: byBear[0].date, headline: '하락장에서 아무것도 사지 않은 날', quote: byBear[0].insight });
 
-  return { props: { reports, stats, cases } };
+  // 신선도 배지용 경과일수 — 빌드 시점(=매 리포트 배포마다 재빌드)에 한 번만 계산해 prop으로 내려준다.
+  // 컴포넌트 안에서 직접 new Date()를 부르면 빌드 시각과 클라이언트 하이드레이션 시각이 달라 불일치가 난다.
+  let daysAgo = null;
+  if (reports[0]) {
+    const buildDate = new Date();
+    const latestDate = new Date(`${reports[0].date}T00:00:00+09:00`);
+    daysAgo = Math.floor((buildDate - latestDate) / 86400000);
+  }
+
+  return { props: { reports, stats, cases, daysAgo } };
 }
