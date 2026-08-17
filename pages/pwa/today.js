@@ -38,6 +38,17 @@ const pctTxt = (v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(2)}%`;
 const rePct = (v) => (v == null ? "-" : `${v > 0 ? "+" : ""}${Number(v).toFixed(1)}%`);
 // [시황 브리핑] 텔레그램 "Today News"/"보유종목 관련 뉴스" 원문 텍스트를 카드용으로 최소 파싱.
 //   구조화를 새로 만들지 않고 news_collector.py가 이미 만든 포맷 그대로 줄 단위로 나눈다.
+//   원문 뉴스 제목이 스크래핑 단계에서 HTML 엔티티(&quot; 등)로 인코딩된 채 넘어오는 경우가 있어
+//   같이 디코딩한다 — React는 일반 텍스트 렌더링에서 엔티티를 자동으로 풀어주지 않는다.
+function decodeHtmlEntities(str) {
+  if (!str) return str;
+  return str
+    .replace(/&quot;/g, "\"")
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
 function parseThemedNews(msg) {
   if (!msg) return [];
   const sections = [];
@@ -49,7 +60,7 @@ function parseThemedNews(msg) {
       cur = { theme: line.slice(1, -1), items: [] };
       sections.push(cur);
     } else if (line.startsWith("-") && cur) {
-      cur.items.push(line.replace(/^-+\s*/, ""));
+      cur.items.push(decodeHtmlEntities(line.replace(/^-+\s*/, "")));
     }
   }
   return sections;
@@ -58,7 +69,7 @@ function parsePortfolioNews(msg) {
   if (!msg) return [];
   return String(msg).split("\n").map((l) => l.trim())
     .filter((l) => l && l !== "[보유종목 관련 뉴스]")
-    .map((l) => l.replace(/^-+\s*/, ""));
+    .map((l) => decodeHtmlEntities(l.replace(/^-+\s*/, "")));
 }
 // [사용자 지시] 지갑 큰 숫자는 "원" 없이, 그 아래 증감(+xx원)에만 "원"을 남긴다.
 const mmdd = (ms) => { const d = new Date(ms); return `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
