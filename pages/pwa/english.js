@@ -1,0 +1,302 @@
+// [ENG] 매일 영어 — 경제/디스플레이 뉴스 지문 + 유튜브 영상, 하루 각 1건.
+//   백엔드 = onehub-english.service(:5005), 프록시 = /api/english/[fn].
+//   학습 흐름은 ①먼저 듣기(대본 가림) → ②지문·표현 읽기 → ③다시 듣기 3단계.
+//   지문은 원문 복사가 아니라 사실만 추려 다시 쓴 학습용 텍스트(원문은 링크로).
+import { useCallback, useEffect, useRef, useState } from "react";
+import AppHeader from "../../components/AppHeader";
+import BottomNav from "../../components/BottomNav";
+
+const TABS = [
+  ["news", "📰", "뉴스"],
+  ["video", "▶️", "영상"],
+];
+const TRACK_KO = { economy: "경제", display: "디스플레이" };
+const SPEEDS = [0.75, 1, 1.25];
+
+function fmtDate(iso) {
+  if (!iso) return "";
+  const d = new Date(`${iso}T00:00:00`);
+  const wd = ["일", "월", "화", "수", "목", "금", "토"][d.getDay()];
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${wd})`;
+}
+
+function LessonCard({ lesson }) {
+  const [revealed, setRevealed] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const audioRef = useRef(null);
+
+  // playbackRate 는 src 가 바뀌거나 새로 마운트되면 1로 돌아간다 — 매번 다시 건다.
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.playbackRate = speed;
+  }, [speed, lesson.id]);
+
+  const replay = useCallback(() => {
+    const el = audioRef.current;
+    if (!el) return;
+    el.currentTime = 0;
+    el.playbackRate = speed;
+    el.play().catch(() => {});
+  }, [speed]);
+
+  const exprs = lesson.expressions || [];
+  const words = lesson.words || [];
+
+  return (
+    <article className="lc">
+      <div className="lc-top">
+        <span className="lc-track">{TRACK_KO[lesson.track] || lesson.track}</span>
+        <span className="lc-src">{lesson.source_name}</span>
+      </div>
+
+      <h2 className="lc-title">{lesson.title_en}</h2>
+      {lesson.title_ko && <p className="lc-titleko">{lesson.title_ko}</p>}
+
+      {lesson.has_audio ? (
+        <div className="lc-audio">
+          <div className="lc-step">🎧 1단계 · 대본 없이 먼저 들어보세요</div>
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <audio ref={audioRef} src={`/api/english/audio/${lesson.id}`} controls preload="none" />
+          <div className="lc-speed">
+            {SPEEDS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={speed === s ? "on" : ""}
+                onClick={() => setSpeed(s)}
+              >
+                {s}x
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="lc-noaudio">음성이 아직 없습니다 (텍스트로 학습하세요)</div>
+      )}
+
+      {!revealed ? (
+        <button type="button" className="lc-reveal" onClick={() => setRevealed(true)}>
+          📖 2단계 · 지문 보기
+        </button>
+      ) : (
+        <>
+          <section className="lc-sec">
+            <h3>지문 (READ)</h3>
+            <p className="lc-passage">{lesson.passage_en}</p>
+          </section>
+
+          {lesson.summary_ko && (
+            <section className="lc-sec">
+              <h3>한국어 요약</h3>
+              <p className="lc-ko">{lesson.summary_ko}</p>
+            </section>
+          )}
+
+          {exprs.length > 0 && (
+            <section className="lc-sec">
+              <h3>오늘의 표현</h3>
+              <ol className="lc-exprs">
+                {exprs.map((e, i) => (
+                  <li key={i}>
+                    <b>{e.expr}</b>
+                    <span className="lc-mean"> — {e.meaning_ko}</span>
+                    {e.example_en && <div className="lc-ex">{e.example_en}</div>}
+                    {e.example_ko && <div className="lc-exko">{e.example_ko}</div>}
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+
+          {words.length > 0 && (
+            <section className="lc-sec">
+              <h3>단어</h3>
+              <ul className="lc-words">
+                {words.map((w, i) => (
+                  <li key={i}>
+                    <b>{w.word}</b>
+                    {w.pos && <i className="lc-pos"> {w.pos}</i>}
+                    <span className="lc-mean"> {w.meaning_ko}</span>
+                    {w.example_en && <div className="lc-ex">{w.example_en}</div>}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {lesson.has_audio && (
+            <button type="button" className="lc-again" onClick={replay}>
+              🎧 3단계 · 다시 듣기
+            </button>
+          )}
+        </>
+      )}
+
+      <div className="lc-foot">
+        {lesson.medium === "video" && !lesson.has_transcript && (
+          <span className="lc-warn">자막을 못 받아와 제목·설명 기반으로 만들었어요</span>
+        )}
+        {lesson.source_url && (
+          <a href={lesson.source_url} target="_blank" rel="noreferrer noopener">
+            🔗 {lesson.medium === "video" ? "영상 보기" : "원문 보기"}
+          </a>
+        )}
+      </div>
+
+      <style jsx>{`
+        .lc { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 16px; box-shadow: var(--shadow-card); }
+        .lc-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .lc-track { font-size: 11px; font-weight: 800; color: #fff; background: var(--color-primary); border-radius: 999px; padding: 3px 9px; }
+        .lc-src { font-size: 11.5px; font-weight: 600; color: var(--color-ink-3); }
+        .lc-title { font-size: 1rem; font-weight: 800; line-height: 1.4; margin: 0 0 4px; color: var(--color-ink); }
+        .lc-titleko { font-size: .8rem; color: var(--color-ink-2); margin: 0 0 12px; word-break: keep-all; }
+        .lc-audio { margin: 12px 0; }
+        .lc-step { font-size: .74rem; font-weight: 700; color: var(--color-ink-3); margin-bottom: 6px; }
+        .lc-audio audio { width: 100%; height: 36px; }
+        .lc-speed { display: flex; gap: 6px; margin-top: 8px; }
+        .lc-speed button { flex: 0 0 auto; font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--color-line); background: var(--color-bg); color: var(--color-ink-2); cursor: pointer; font-family: var(--font-sans); }
+        .lc-speed button.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .lc-noaudio { font-size: .75rem; color: var(--color-ink-3); margin: 10px 0; }
+        .lc-reveal, .lc-again { width: 100%; margin-top: 12px; padding: 12px; border-radius: 10px; border: none; background: var(--color-primary); color: #fff; font-size: .86rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .lc-again { background: var(--color-bg); color: var(--color-primary); border: 1px solid var(--color-primary); }
+        .lc-sec { margin-top: 16px; }
+        .lc-sec h3 { font-size: .74rem; font-weight: 800; color: var(--color-ink-3); letter-spacing: .3px; margin: 0 0 7px; text-transform: uppercase; }
+        .lc-passage { font-size: .92rem; line-height: 1.85; color: var(--color-ink); margin: 0; }
+        .lc-ko { font-size: .82rem; line-height: 1.7; color: var(--color-ink-2); margin: 0; white-space: pre-line; word-break: keep-all; }
+        .lc-exprs, .lc-words { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 10px; }
+        .lc-words { list-style: none; padding-left: 0; }
+        .lc-exprs li, .lc-words li { font-size: .84rem; color: var(--color-ink); line-height: 1.5; }
+        .lc-pos { font-size: .72rem; color: var(--color-ink-3); font-style: normal; }
+        .lc-mean { color: var(--color-ink-2); }
+        .lc-ex { font-size: .8rem; color: var(--color-ink-2); margin-top: 3px; padding-left: 8px; border-left: 2px solid var(--color-line); }
+        .lc-exko { font-size: .74rem; color: var(--color-ink-3); padding-left: 10px; }
+        .lc-foot { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); display: flex; flex-direction: column; gap: 6px; }
+        .lc-foot a { font-size: .78rem; font-weight: 700; color: var(--color-primary); text-decoration: none; }
+        .lc-warn { font-size: .72rem; color: var(--color-ink-3); }
+      `}</style>
+    </article>
+  );
+}
+
+export default function EnglishPage() {
+  const [tab, setTab] = useState("news");
+  const [feed, setFeed] = useState({ loading: true, date: null, items: [], error: null });
+  const [past, setPast] = useState({ open: false, loading: false, items: [] });
+
+  useEffect(() => {
+    let alive = true;
+    setFeed({ loading: true, date: null, items: [], error: null });
+    setPast({ open: false, loading: false, items: [] });
+    fetch(`/api/english/today?medium=${tab}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive) return;
+        setFeed({ loading: false, date: d.date, items: d.items || [], error: d.error || null });
+      })
+      .catch(() => alive && setFeed({ loading: false, date: null, items: [], error: "연결 실패" }));
+    return () => {
+      alive = false;
+    };
+  }, [tab]);
+
+  const loadPast = () => {
+    if (past.open) return setPast((p) => ({ ...p, open: false }));
+    setPast({ open: true, loading: true, items: [] });
+    fetch(`/api/english/lessons?medium=${tab}&limit=12`)
+      .then((r) => r.json())
+      .then((d) => {
+        // 오늘 것은 위에 이미 있으니 뺀다.
+        const todayIds = new Set(feed.items.map((i) => i.id));
+        setPast({ open: true, loading: false, items: (d.items || []).filter((i) => !todayIds.has(i.id)) });
+      })
+      .catch(() => setPast({ open: true, loading: false, items: [] }));
+  };
+
+  return (
+    <div className="en pwa-shell">
+      <AppHeader />
+      <div className="en-hd">
+        <h1>🇬🇧 매일 영어</h1>
+        <span className="en-sub">경제 · 디스플레이 · 하루 각 1건</span>
+      </div>
+
+      <div className="en-tabs" role="tablist">
+        {TABS.map(([key, ic, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className={tab === key ? "on" : ""}
+            onClick={() => setTab(key)}
+          >
+            <span aria-hidden="true">{ic}</span> {label}
+          </button>
+        ))}
+      </div>
+
+      {feed.loading ? (
+        <div className="en-state">불러오는 중…</div>
+      ) : feed.items.length === 0 ? (
+        <div className="en-state">
+          아직 준비된 학습이 없어요.
+          <br />
+          매일 아침 7시에 새 레슨이 올라옵니다.
+          {feed.error && <div className="en-err">({feed.error})</div>}
+        </div>
+      ) : (
+        <>
+          <div className="en-date">{fmtDate(feed.date)}</div>
+          <div className="en-list">
+            {feed.items.map((l) => (
+              <LessonCard key={l.id} lesson={l} />
+            ))}
+          </div>
+        </>
+      )}
+
+      <button type="button" className="en-past" onClick={loadPast}>
+        {past.open ? "지난 학습 접기" : "지난 학습 보기"}
+      </button>
+      {past.open && (
+        <div className="en-list">
+          {past.loading ? (
+            <div className="en-state">불러오는 중…</div>
+          ) : past.items.length === 0 ? (
+            <div className="en-state">지난 학습이 없습니다.</div>
+          ) : (
+            past.items.map((l) => (
+              <div key={l.id}>
+                <div className="en-pastdate">{fmtDate(l.lesson_date)}</div>
+                <LessonCard lesson={l} />
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
+      <p className="en-foot">
+        지문은 원문을 그대로 옮긴 것이 아니라, 사실만 추려 학습용으로 다시 쓴 글입니다. 원문은 각 카드의 링크에서 볼 수 있어요.
+      </p>
+
+      <BottomNav active="english" />
+
+      <style jsx>{`
+        .en { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 96px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
+        .en-hd { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 6px 2px 14px; }
+        .en-hd h1 { font-size: 22px; font-weight: 800; letter-spacing: -.5px; margin: 0; }
+        .en-sub { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
+        .en-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+        .en-tabs button { flex: 1 1 0; padding: 10px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .85rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .en-tabs button.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .en-date { font-size: .78rem; font-weight: 700; color: var(--color-ink-3); margin: 0 2px 10px; }
+        .en-pastdate { font-size: .74rem; font-weight: 700; color: var(--color-ink-3); margin: 0 2px 6px; }
+        .en-list { display: flex; flex-direction: column; gap: 14px; }
+        .en-state { font-size: .85rem; color: var(--color-ink-2); text-align: center; padding: 32px 8px; line-height: 1.7; }
+        .en-err { font-size: .72rem; color: var(--color-ink-3); margin-top: 6px; }
+        .en-past { width: 100%; margin-top: 16px; padding: 11px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .82rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .en-foot { font-size: .72rem; color: var(--color-ink-3); text-align: center; margin-top: 18px; line-height: 1.6; word-break: keep-all; }
+      `}</style>
+      <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
+    </div>
+  );
+}
