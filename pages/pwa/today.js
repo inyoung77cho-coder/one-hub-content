@@ -64,6 +64,8 @@ export default function TodayPage({ announcements = [] }) {
   const [regionDelta, setRegionDelta] = useState(null); // [이야기 탭] 지역별 이야기 건수 증감(참석자 추적 불가 — 건수로 대체, 확인 완료)
   const [newRegions, setNewRegions] = useState([]); // [이야기 탭] REGIONS에 새로 추가된 동(로컬 "본 목록" 대비)
   const [news, setNews] = useState(null); // [뉴스 통합] 오늘의 뉴스 — 부모가 한 번 fetch 해 카테고리별로 나눠 쓴다
+  const [brief, setBrief] = useState(null); // [시황 브리핑] 텔레그램 "ONE-HUB Market Brief"와 같은 스냅샷 — 대결 탭 카드용
+  const [briefOpen, setBriefOpen] = useState(false); // [시황 브리핑] 전체 지표 더보기 토글
   const [newsOpen, setNewsOpen] = useState(false); // ETF·부동산 타일 뉴스 더보기
   // [2026-08-05] 뉴스 상세는 useState가 아니라 URL(?news=id)에서 파생 — history에 진짜 항목이
   //   쌓이므로 뒤로가기를 누르면 페이지를 벗어나지 않고 팝업만 닫히고 스크롤 위치가 그대로 남는다.
@@ -113,6 +115,8 @@ export default function TodayPage({ announcements = [] }) {
       .then((n) => { if (n?.ok && Array.isArray(n.items)) setNotis(dedupBy(n.items, (x) => x.id ?? `${x.title || ""}|${x.body || ""}|${x.sent_at || x.created_at || ""}`)); }).catch(() => {});
     fetch(`/api/today/news`).then((r) => r.json())
       .then((d) => { setNews(Array.isArray(d?.items) ? d.items : []); }).catch(() => setNews([]));
+    fetch(`/api/pwa-market-brief`).then((r) => r.json())
+      .then((d) => { if (d?.ok && d.brief) setBrief(d.brief); }).catch(() => {});
     // [사용자 지시] 브리핑이 항상 백엔드 기본 지역(서현동)만 보여주던 문제 — 내 단지의 법정동을
     //   찾아 region= 으로 넘겨 "보유 주택 지역" 시황이 나오게 한다. 단지가 없거나 동을 못 찾으면
     //   기존처럼 기본 지역 그대로(에러 아님).
@@ -572,6 +576,60 @@ export default function TodayPage({ announcements = [] }) {
           {!wallet && <div className="hero-foot">누적 판단 {pol.count}건{pol.remaining > 0 ? ` · ${pol.remaining}건 남으면 채점 통계 공개` : ""}</div>}
         </section>
 
+        {/* 카드1.5 — 시황 브리핑. 텔레그램 "ONE-HUB Market Brief"와 같은 스냅샷을
+            /api/pwa-market-brief로 받아 압축 요약. 데이터가 아직 없으면(신규 배포 직후 등)
+            그냥 안 보여준다 — 빈 카드보다 정직한 생략이 낫다. */}
+        {brief && (
+          <section className="card mb">
+            <div className="sn-h">📡 오늘 시황 브리핑{brief.date ? ` · ${brief.date}` : ""}</div>
+            <div className="mb-badges">
+              {brief.heat_grade && (
+                <span className={`mb-badge mb-heat-${String(brief.heat_grade).toLowerCase()}`}>
+                  Heat {brief.heat_score != null ? Math.round(brief.heat_score) : "-"} · {brief.heat_grade}
+                </span>
+              )}
+              {brief.fg_rating && <span className="mb-badge">Fear&amp;Greed {brief.fg_score != null ? Math.round(brief.fg_score) : "-"} · {brief.fg_rating}</span>}
+            </div>
+            <div className="tile-2col">
+              <div className="mini-stat">
+                <div className="mini-body">
+                  <div className="mini-t">Nasdaq</div>
+                  <div className={`mini-s ${(brief.nasdaq_chg ?? 0) > 0 ? "up" : (brief.nasdaq_chg ?? 0) < 0 ? "dn" : ""}`}>
+                    {brief.nasdaq_price ?? "-"} ({pctTxt(brief.nasdaq_chg ?? 0)})
+                  </div>
+                </div>
+              </div>
+              <div className="mini-stat">
+                <div className="mini-body">
+                  <div className="mini-t">SOX</div>
+                  <div className={`mini-s ${(brief.sox_chg ?? 0) > 0 ? "up" : (brief.sox_chg ?? 0) < 0 ? "dn" : ""}`}>
+                    {brief.sox_price ?? "-"} ({pctTxt(brief.sox_chg ?? 0)})
+                  </div>
+                </div>
+              </div>
+            </div>
+            {briefOpen && (
+              <div className="sn-sub">
+                <div className="sn-sub-h">전체 지표</div>
+                <div className="mb-grid">
+                  <div>S&amp;P500 {brief.sp500_price ?? "-"} ({pctTxt(brief.sp500_chg ?? 0)})</div>
+                  <div>VIX {brief.vix ?? "-"}</div>
+                  <div>DXY {brief.dxy_price ?? "-"} ({pctTxt(brief.dxy_chg ?? 0)})</div>
+                  <div>WTI ${brief.wti ?? "-"}</div>
+                  <div>Gold ${brief.gold ?? "-"}</div>
+                  <div>Copper ${brief.copper_price ?? "-"} ({pctTxt(brief.copper_chg ?? 0)})</div>
+                  <div>USD/KRW {brief.usdkrw ?? "-"}</div>
+                  <div>US10Y {brief.us10y ?? "-"}%</div>
+                  <div>YieldCurve {brief.yc_spread ?? "-"}%{brief.yc_inverted ? " (INVERTED)" : ""}</div>
+                </div>
+              </div>
+            )}
+            <button type="button" className="tile-more" onClick={() => setBriefOpen((v) => !v)}>
+              {briefOpen ? "접기 ▲" : "전체 지표 더보기 →"}
+            </button>
+          </section>
+        )}
+
         {/* 카드2 — 주식 뉴스(보유 종목 관련 + 주요 뉴스 통합) */}
         <section className="card sn">
           <div className="sn-h">주식 뉴스</div>
@@ -976,6 +1034,15 @@ export default function TodayPage({ announcements = [] }) {
         .hero-foot { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--color-line); }
         .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--color-success); display: inline-block; animation: td-pulse 1.6s ease-in-out infinite; }
         @keyframes td-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+        /* ══ 카드1.5: 시황 브리핑 ══ */
+        .mb-badges { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+        .mb-badge { font-size: 0.68rem; font-weight: 800; padding: 4px 9px; border-radius: 999px; background: var(--color-card-soft); color: var(--color-ink-2); white-space: nowrap; }
+        .mb-heat-hot { background: var(--color-danger-soft, #FDECEE); color: var(--color-danger); }
+        .mb-heat-warm { background: var(--color-warning-soft); color: var(--color-warning-ink, var(--color-warning)); }
+        .mb-heat-cool { background: var(--color-primary-soft, var(--color-card-soft)); color: var(--color-primary); }
+        .mb-heat-cold { background: var(--color-card-soft); color: var(--color-ink-3); }
+        .mb-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 0.76rem; color: var(--color-ink-2); margin-bottom: 6px; font-variant-numeric: tabular-nums; }
 
         /* ══ 카드2: 주식 뉴스 ══ */
         .sn-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
