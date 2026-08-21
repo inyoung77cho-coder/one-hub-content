@@ -11,6 +11,13 @@ const TABS = [
   ["video", "▶️", "영상"],
   ["idiom", "💬", "이디엄"],
 ];
+// [2026-08-21] 중국어는 뉴스 트랙만 있다(경제/영상/이디엄은 아직 없음) — 언어 전환 시
+// TABS 를 이걸로 좁힌다.
+const TABS_ZH = [["news", "📰", "뉴스"]];
+const LANGS = [
+  ["en", "🇬🇧", "영어"],
+  ["zh", "🇨🇳", "중국어"],
+];
 const TRACK_KO = { economy: "경제", display: "디스플레이", general: "생활영어" };
 const SPEEDS = [0.75, 1, 1.25];
 
@@ -101,6 +108,7 @@ function LessonCard({ lesson }) {
                 {exprs.map((e, i) => (
                   <li key={i}>
                     <b>{e.expr}</b>
+                    {e.pinyin && <span className="lc-pinyin"> [{e.pinyin}]</span>}
                     <span className="lc-mean"> — {e.meaning_ko}</span>
                     {/* 아래 2개는 이디엄에서만 온다. 직역을 같이 보여주면
                         글자만 보고 왜 오해하는지가 드러난다. */}
@@ -122,6 +130,7 @@ function LessonCard({ lesson }) {
                 {words.map((w, i) => (
                   <li key={i}>
                     <b>{w.word}</b>
+                    {w.pinyin && <span className="lc-pinyin"> [{w.pinyin}]</span>}
                     {w.pos && <i className="lc-pos"> {w.pos}</i>}
                     <span className="lc-mean"> {w.meaning_ko}</span>
                     {w.example_en && <div className="lc-ex">{w.example_en}</div>}
@@ -178,6 +187,7 @@ function LessonCard({ lesson }) {
         .lc-words { list-style: none; padding-left: 0; }
         .lc-exprs li, .lc-words li { font-size: .84rem; color: var(--color-ink); line-height: 1.5; }
         .lc-pos { font-size: .72rem; color: var(--color-ink-3); font-style: normal; }
+        .lc-pinyin { font-size: .78rem; color: var(--color-primary); font-weight: 600; }
         .lc-mean { color: var(--color-ink-2); }
         .lc-ex { font-size: .8rem; color: var(--color-ink-2); margin-top: 3px; padding-left: 8px; border-left: 2px solid var(--color-line); }
         .lc-exko { font-size: .74rem; color: var(--color-ink-3); padding-left: 10px; }
@@ -192,15 +202,24 @@ function LessonCard({ lesson }) {
 }
 
 export default function EnglishPage() {
+  const [lang, setLang] = useState("en");
   const [tab, setTab] = useState("news");
   const [feed, setFeed] = useState({ loading: true, date: null, items: [], error: null });
   const [past, setPast] = useState({ open: false, loading: false, items: [] });
+
+  const tabs = lang === "zh" ? TABS_ZH : TABS;
+
+  // 언어를 바꿨는데 그 언어엔 없는 탭(영상/이디엄)에 있었다면 뉴스로 되돌린다.
+  const switchLang = (next) => {
+    setLang(next);
+    if (next === "zh" && tab !== "news") setTab("news");
+  };
 
   useEffect(() => {
     let alive = true;
     setFeed({ loading: true, date: null, items: [], error: null });
     setPast({ open: false, loading: false, items: [] });
-    fetch(`/api/english/today?medium=${tab}`)
+    fetch(`/api/english/today?medium=${tab}&language=${lang}`)
       .then((r) => r.json())
       .then((d) => {
         if (!alive) return;
@@ -210,12 +229,12 @@ export default function EnglishPage() {
     return () => {
       alive = false;
     };
-  }, [tab]);
+  }, [tab, lang]);
 
   const loadPast = () => {
     if (past.open) return setPast((p) => ({ ...p, open: false }));
     setPast({ open: true, loading: true, items: [] });
-    fetch(`/api/english/lessons?medium=${tab}&limit=12`)
+    fetch(`/api/english/lessons?medium=${tab}&language=${lang}&limit=12`)
       .then((r) => r.json())
       .then((d) => {
         // 오늘 것은 위에 이미 있으니 뺀다.
@@ -229,12 +248,30 @@ export default function EnglishPage() {
     <div className="en pwa-shell">
       <AppHeader />
       <div className="en-hd">
-        <h1>🇬🇧 매일 영어</h1>
-        <span className="en-sub">경제 · 디스플레이 뉴스/영상 + 오늘의 이디엄</span>
+        <h1>{lang === "zh" ? "🇨🇳 매일 중국어" : "🇬🇧 매일 영어"}</h1>
+        <span className="en-sub">
+          {lang === "zh" ? "경제 뉴스로 배우는 중국어(HSK4-5)" : "경제 · 디스플레이 뉴스/영상 + 오늘의 이디엄"}
+        </span>
       </div>
 
+      <div className="en-langs" role="tablist">
+        {LANGS.map(([key, ic, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={lang === key}
+            className={lang === key ? "on" : ""}
+            onClick={() => switchLang(key)}
+          >
+            <span aria-hidden="true">{ic}</span> {label}
+          </button>
+        ))}
+      </div>
+      {lang === "zh" && <p className="en-zhnote">중국어는 경제 뉴스 1건부터 시작합니다. 영상·이디엄은 준비 중이에요.</p>}
+
       <div className="en-tabs" role="tablist">
-        {TABS.map(([key, ic, label]) => (
+        {tabs.map(([key, ic, label]) => (
           <button
             key={key}
             type="button"
@@ -254,7 +291,7 @@ export default function EnglishPage() {
         <div className="en-state">
           아직 준비된 학습이 없어요.
           <br />
-          매일 아침 7시에 새 레슨이 올라옵니다.
+          매일 아침 6시에 새 레슨이 올라옵니다.
           {feed.error && <div className="en-err">({feed.error})</div>}
         </div>
       ) : (
@@ -300,6 +337,10 @@ export default function EnglishPage() {
         .en-hd { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 6px 2px 14px; }
         .en-hd h1 { font-size: 22px; font-weight: 800; letter-spacing: -.5px; margin: 0; }
         .en-sub { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
+        .en-langs { display: flex; gap: 8px; margin-bottom: 10px; }
+        .en-langs button { flex: 1 1 0; padding: 8px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .en-langs button.on { background: var(--color-ink); border-color: var(--color-ink); color: #fff; }
+        .en-zhnote { font-size: .74rem; color: var(--color-ink-3); margin: 0 2px 12px; line-height: 1.6; word-break: keep-all; }
         .en-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
         .en-tabs button { flex: 1 1 0; padding: 10px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .85rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .en-tabs button.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }

@@ -6,8 +6,8 @@ const ENGLISH_API = process.env.ENGLISH_API_URL || "http://54.180.54.132:5005";
 
 // 화이트리스트. 임의 경로 전달을 막는다(SSRF 방지).
 const ENDPOINTS = {
-  today: (q) => `/english/today${qs(q, ["medium", "track"])}`,
-  lessons: (q) => `/english/lessons${qs(q, ["medium", "track", "limit", "before"])}`,
+  today: (q) => `/english/today${qs(q, ["medium", "track", "language"])}`,
+  lessons: (q) => `/english/lessons${qs(q, ["medium", "track", "language", "limit", "before"])}`,
   lesson: (q) => `/english/lesson/${encodeURIComponent(q.id || "")}`,
 };
 
