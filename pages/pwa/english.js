@@ -11,6 +11,9 @@ const TABS = [
   ["video", "▶️", "영상"],
   ["idiom", "💬", "이디엄"],
 ];
+// 중국어 모드에서 탭 글자를 중국어로 — "생활중국어"(4글자)처럼 길어지면 그 버튼만
+// box 가 커져 나머지 탭과 크기가 안 맞는다. 전부 한자 2글자로 맞춰 폭을 통일한다.
+const TABS_ZH_LABEL = { news: "新闻", video: "视频", idiom: "口语" };
 const LANGS = [
   ["en", "🇬🇧", "영어"],
   ["zh", "🇨🇳", "중국어"],
@@ -273,7 +276,7 @@ export default function EnglishPage() {
             className={tab === key ? "on" : ""}
             onClick={() => setTab(key)}
           >
-            <span aria-hidden="true">{ic}</span> {lang === "zh" && key === "idiom" ? "생활중국어" : label}
+            <span aria-hidden="true">{ic}</span> {lang === "zh" ? TABS_ZH_LABEL[key] : label}
           </button>
         ))}
       </div>
