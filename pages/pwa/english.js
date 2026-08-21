@@ -11,14 +11,12 @@ const TABS = [
   ["video", "▶️", "영상"],
   ["idiom", "💬", "이디엄"],
 ];
-// [2026-08-21] 중국어는 뉴스 트랙만 있다(경제/영상/이디엄은 아직 없음) — 언어 전환 시
-// TABS 를 이걸로 좁힌다.
-const TABS_ZH = [["news", "📰", "뉴스"]];
 const LANGS = [
   ["en", "🇬🇧", "영어"],
   ["zh", "🇨🇳", "중국어"],
 ];
 const TRACK_KO = { economy: "경제", display: "디스플레이", general: "생활영어" };
+const TRACK_KO_ZH = { economy: "경제", display: "디스플레이", general: "생활중국어" };
 const SPEEDS = [0.75, 1, 1.25];
 
 function fmtDate(iso) {
@@ -28,7 +26,7 @@ function fmtDate(iso) {
   return `${d.getMonth() + 1}월 ${d.getDate()}일 (${wd})`;
 }
 
-function LessonCard({ lesson }) {
+function LessonCard({ lesson, lang }) {
   const [revealed, setRevealed] = useState(false);
   const [speed, setSpeed] = useState(1);
   const audioRef = useRef(null);
@@ -53,7 +51,7 @@ function LessonCard({ lesson }) {
   return (
     <article className="lc">
       <div className="lc-top">
-        <span className="lc-track">{TRACK_KO[lesson.track] || lesson.track}</span>
+        <span className="lc-track">{(lang === "zh" ? TRACK_KO_ZH : TRACK_KO)[lesson.track] || lesson.track}</span>
         <span className="lc-src">{lesson.source_name}</span>
       </div>
 
@@ -207,13 +205,7 @@ export default function EnglishPage() {
   const [feed, setFeed] = useState({ loading: true, date: null, items: [], error: null });
   const [past, setPast] = useState({ open: false, loading: false, items: [] });
 
-  const tabs = lang === "zh" ? TABS_ZH : TABS;
-
-  // 언어를 바꿨는데 그 언어엔 없는 탭(영상/이디엄)에 있었다면 뉴스로 되돌린다.
-  const switchLang = (next) => {
-    setLang(next);
-    if (next === "zh" && tab !== "news") setTab("news");
-  };
+  const switchLang = (next) => setLang(next);
 
   useEffect(() => {
     let alive = true;
@@ -250,7 +242,9 @@ export default function EnglishPage() {
       <div className="en-hd">
         <h1>{lang === "zh" ? "🇨🇳 매일 중국어" : "🇬🇧 매일 영어"}</h1>
         <span className="en-sub">
-          {lang === "zh" ? "경제 뉴스로 배우는 중국어(HSK4-5)" : "경제 · 디스플레이 뉴스/영상 + 오늘의 이디엄"}
+          {lang === "zh"
+            ? "경제 · 디스플레이 뉴스/영상 + 오늘의 생활중국어(HSK4-5)"
+            : "경제 · 디스플레이 뉴스/영상 + 오늘의 이디엄"}
         </span>
       </div>
 
@@ -268,10 +262,9 @@ export default function EnglishPage() {
           </button>
         ))}
       </div>
-      {lang === "zh" && <p className="en-zhnote">중국어는 경제 뉴스 1건부터 시작합니다. 영상·이디엄은 준비 중이에요.</p>}
 
       <div className="en-tabs" role="tablist">
-        {tabs.map(([key, ic, label]) => (
+        {TABS.map(([key, ic, label]) => (
           <button
             key={key}
             type="button"
@@ -280,7 +273,7 @@ export default function EnglishPage() {
             className={tab === key ? "on" : ""}
             onClick={() => setTab(key)}
           >
-            <span aria-hidden="true">{ic}</span> {label}
+            <span aria-hidden="true">{ic}</span> {lang === "zh" && key === "idiom" ? "생활중국어" : label}
           </button>
         ))}
       </div>
@@ -299,7 +292,7 @@ export default function EnglishPage() {
           <div className="en-date">{fmtDate(feed.date)}</div>
           <div className="en-list">
             {feed.items.map((l) => (
-              <LessonCard key={l.id} lesson={l} />
+              <LessonCard key={l.id} lesson={l} lang={lang} />
             ))}
           </div>
         </>
@@ -318,7 +311,7 @@ export default function EnglishPage() {
             past.items.map((l) => (
               <div key={l.id}>
                 <div className="en-pastdate">{fmtDate(l.lesson_date)}</div>
-                <LessonCard lesson={l} />
+                <LessonCard lesson={l} lang={lang} />
               </div>
             ))
           )}
@@ -340,7 +333,6 @@ export default function EnglishPage() {
         .en-langs { display: flex; gap: 8px; margin-bottom: 10px; }
         .en-langs button { flex: 1 1 0; padding: 8px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .en-langs button.on { background: var(--color-ink); border-color: var(--color-ink); color: #fff; }
-        .en-zhnote { font-size: .74rem; color: var(--color-ink-3); margin: 0 2px 12px; line-height: 1.6; word-break: keep-all; }
         .en-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
         .en-tabs button { flex: 1 1 0; padding: 10px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .85rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .en-tabs button.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
