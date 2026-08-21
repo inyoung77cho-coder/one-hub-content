@@ -17,6 +17,7 @@ import { samplePolicy } from "../../lib/sampleSize";
 import { getStoryRegionOverride, REGIONS, getNewRegions, ackNewRegions } from "../../lib/storyRegion";
 import { recordSnapshot as recordRegionSnapshot, getRegionDelta } from "../../lib/storyRegionHistory";
 import { getHoldings as getEtfHoldings } from "../../lib/etfHoldings";
+import { fetchStockQuote } from "../../lib/stockLive";
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
@@ -130,12 +131,13 @@ export default function TodayPage({ announcements = [] }) {
     //   matureLedger(스냅샷 축적)가 예전엔 index.js의 ?tab=report 진입 때만 돌아서, "오늘"
     //   페이지만 보는 사용자는 판단이 영영 성숙(3거래일 채점)되지 않아 늘 seed 그대로였다.
     //   "오늘"이 기본 랜딩이 된 지금은 여기서도 직접 성숙시켜야 한다.
+    // [2026-08-21 WI-03/04] 가격 하나 얻으려고 매번 전체 AI 분석(/api/analyze-stock →
+    //   ai_analyzer.analyze())을 호출하고 있었음 — 관망 종목 ~30개가 20시간 경과로 한꺼번에
+    //   갱신되는 순간마다 opus 콜이 30건씩 나가서 ai_analyzer 주간 비용의 대다수를 차지했다.
+    //   시세 전용(무료 소스, Yahoo/Stooq 기반) 엔드포인트로 교체 — AI 판단은 필요 없는 용도였다.
     const fetchPrice = async (code) => {
-      try {
-        const r = await fetch(`/api/analyze-stock?code=${code}`);
-        const d = await r.json();
-        return Number(d?.current_price ?? d?.price) || null;
-      } catch { return null; }
+      const q = await fetchStockQuote(code);
+      return q?.price || null;
     };
     matureLedger(tr, fetchPrice).then((list) => setDecisions(list || [])).catch(() => {});
     Promise.all([

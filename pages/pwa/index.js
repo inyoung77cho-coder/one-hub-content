@@ -20,7 +20,7 @@ import AppHeader from '../../components/AppHeader';
 import TraderBadge from '../../components/shared/TraderBadge';
 import BottomNav from '../../components/BottomNav';
 import { getStockHoldings, removeStock, buyStock } from '../../lib/stockHoldings';
-import { fetchStockQuotes } from '../../lib/stockLive';
+import { fetchStockQuotes, fetchStockQuote } from '../../lib/stockLive';
 import { getKrxSession } from '../../lib/marketHours';
 import ShareButton from '../../components/ShareButton';
 import RotatingPageTitle from '../../components/RotatingPageTitle';
@@ -739,10 +739,10 @@ export default function PWADashboard({ latestReport }) {
     setDecFeedback({ name, decision, date: `${_rd.getMonth() + 1}/${_rd.getDate()}` });
     clearTimeout(logDecision._t); logDecision._t = setTimeout(() => setDecFeedback(null), 5000);
     if (!Number(priceHint)) {
+      // [2026-08-21 WI-03/04] 가격만 필요한데 전체 AI 분석을 호출하던 지점 — 시세 전용으로 교체.
       try {
-        const r = await fetch(`/api/analyze-stock?code=${code}`);
-        const d = await r.json();
-        const entry = Number(d?.current_price ?? d?.price) || null;
+        const q = await fetchStockQuote(code);
+        const entry = q?.price || null;
         if (entry) { recordDecision({ code, name, entry, decision, trader }); setDecTick((t) => t + 1); }
       } catch {}
     }
@@ -807,12 +807,12 @@ export default function PWADashboard({ latestReport }) {
   useEffect(() => {
     if (tab !== 'report') return;
     let alive = true;
+    // [2026-08-21 WI-03/04] 가격 하나 얻으려고 매번 전체 AI 분석(/api/analyze-stock →
+    //   ai_analyzer.analyze())을 호출하고 있었음 — ai_analyzer 주간 비용의 대다수가 여기서 발생.
+    //   시세 전용(무료 소스) 엔드포인트로 교체.
     const fetchPrice = async (code) => {
-      try {
-        const r = await fetch(`/api/analyze-stock?code=${code}`);
-        const d = await r.json();
-        return Number(d?.current_price ?? d?.price) || null;
-      } catch { return null; }
+      const q = await fetchStockQuote(code);
+      return q?.price || null;
     };
     matureLedger(trader, fetchPrice).then((list) => { if (alive) setLedger(list); });
     return () => { alive = false; };
@@ -923,10 +923,10 @@ export default function PWADashboard({ latestReport }) {
     if (!(shares > 0)) { setSharesPrompt(null); return; }
     setSharesPrompt((p) => (p ? { ...p, saving: true, err: '' } : p));
     let px = 0;
+    // [2026-08-21 WI-03/04] 가격만 필요한데 전체 AI 분석을 호출하던 지점 — 시세 전용으로 교체.
     try {
-      const r = await fetch(`/api/analyze-stock?code=${code}`);
-      const d = await r.json();
-      px = Number(d?.current_price ?? d?.price) || 0;
+      const q = await fetchStockQuote(code);
+      px = q?.price || 0;
     } catch {}
     if (!px) {
       setSharesPrompt((p) => (p ? { ...p, saving: false, err: '현재가를 불러오지 못했습니다 — 자산 탭에서 직접 추가해 주세요.' } : p));
