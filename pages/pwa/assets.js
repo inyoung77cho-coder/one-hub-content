@@ -222,7 +222,7 @@ export default function AssetsMapPage() {
               {/* [사용자 지시] 아래 범례(억 단위)와 달리 이 큰 숫자는 원 단위로 정확히 표기 —
                   자산군 라벨도 함께 표시해 무엇의 금액인지 분명히 한다. */}
               <div className="as-vc-acct-lbl">📈 주식</div>
-              <div className="as-vc-acct-total">{bd.stock_uk != null ? `${Math.round(Number(bd.stock_uk) * 1e8).toLocaleString()}원` : "-"}</div>
+              <div className="as-vc-acct-total">{bd.stock_uk != null ? `${(bd.stock_won ?? Math.round(Number(bd.stock_uk) * 1e8)).toLocaleString()}원` : "-"}</div>
               {dash?.balance?.unrealized_pnl != null && (
                 <div className="as-vc-acct-sub">
                   평가손익(KIS 연동) <b className={dash.balance.unrealized_pnl >= 0 ? "up" : "dn"}>{dash.balance.unrealized_pnl >= 0 ? "+" : ""}{dash.balance.unrealized_pnl.toLocaleString()}원</b>

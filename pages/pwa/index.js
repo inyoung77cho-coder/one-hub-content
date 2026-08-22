@@ -880,6 +880,13 @@ export default function PWADashboard({ latestReport }) {
   // [S1.4] 보유 종목도 종목코드 기준 공용 dedup(이중 방어)
   positions = dedupBy(positions, (p) => p.code || p.stock || p.name);
 
+  // [PWA 피드백] 이미 보유 중인 종목이 "추천"에도 뜰 때 "샀어요"를 누르면 매수 기록 흐름이
+  // 다시 열려 중복 보유 등록으로 이어질 수 있었다 — KIS 연동 + 직접입력 보유를 합쳐 이미
+  // 갖고 있는 종목코드인지 먼저 확인한다.
+  const heldCodeSet = new Set(positions.map((p) => String(p.code || '').toUpperCase()).filter(Boolean));
+  try { getStockHoldings(trader).forEach((h) => { if (h.code) heldCodeSet.add(String(h.code).toUpperCase()); }); } catch (e) {}
+  const isHeld = (code) => code != null && heldCodeSet.has(String(code).toUpperCase());
+
   // [v8.7] 포트폴리오 요약 — 보유종목 평가수익률 + 오늘 변동
   const portCostBasis = positions.reduce((sum, p) => sum + (Number(p.avg_price||0) * Number(p.qty||0)), 0);
   const portEvalTotal = positions.reduce((sum, p) => sum + Number(p.eval_amount||0), 0);
@@ -1819,9 +1826,11 @@ export default function PWADashboard({ latestReport }) {
                             {/* [N8] 이 버튼은 주문을 넣지 않는다(실주문 연동 없음) — 라벨이 하는 일과 같아야 한다.
                                 '매수하기'는 앱이 지킬 수 없는 약속이라 '주문 방법'으로 낮춘다. */}
                             <button className="buy-now-btn" onClick={(e) => { e.stopPropagation(); setBuyNotice({ name: s.name, code: s.code }); }}>주문 방법 →</button>
-                            {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (<>
+                            {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); const held = isHeld(s.code); return (<>
                               <div className="dec-mini" onClick={(e) => e.stopPropagation()}>
-                                <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logTake(s.code, s.name)}>샀어요</button>
+                                {held
+                                  ? <span className="dec-b held">✅ 보유중</span>
+                                  : <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logTake(s.code, s.name)}>샀어요</button>}
                                 <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망</button>
                               </div>
                               {dec && <div className="dec-dday">🏁 승부 진행 중 · D-3</div>}
@@ -1850,9 +1859,11 @@ export default function PWADashboard({ latestReport }) {
                                   </button>
                                   <div className="rec-reason">{isBlockedCode(s.code) ? <>관심도 상위이나 <b>AI 최종 매수 차단(매도신호)</b> — 보유 화면과 동일 판단입니다.</> : m.reason}</div>
                                   {/* [나 vs AI] 내 판단 기록 */}
-                                  {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); return (
+                                  {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); const held = isHeld(s.code); return (
                                     <div className="dec-mini">
-                                      <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logTake(s.code, s.name)}>샀어요</button>
+                                      {held
+                                        ? <span className="dec-b held">✅ 보유중</span>
+                                        : <button className={`dec-b take ${dec === 'take' ? 'on' : ''}`} onClick={() => logTake(s.code, s.name)}>샀어요</button>}
                                       <button className={`dec-b pass ${dec === 'pass' ? 'on' : ''}`} onClick={() => logDecision(s.code, s.name, 'pass')}>관망</button>
                                     </div>
                                   ); })()}
@@ -3826,7 +3837,10 @@ export default function PWADashboard({ latestReport }) {
         /* [사용자 지시] 종합자산(assets.js)의 보유/추천 탭과 완전히 동일한 형태 유지 —
            사각형 박스(카드) 안에 알약형 버튼, 선택 시 파란색(--color-primary). 이전엔 박스 없이
            낱개 초록 알약(--accent-buy)이라 페이지 이동 시 모양·색이 달라 보였다. */
-        .pwa-subtabs { display: flex; gap: 6px; margin: 0 16px 12px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 4px; box-shadow: var(--card-shadow); }
+        /* [header_position_consistency] assets.js .as-stocktabs 와 동일한 margin(0 2px)으로 —
+           16px였을 때 종합자산에서 "보유 자세히"로 들어오면 이 탭 줄만 더 안쪽으로 들어가
+           보여 상단 메뉴 폭이 바뀌는 것처럼 보였다. */
+        .pwa-subtabs { display: flex; gap: 6px; margin: 0 2px 12px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 4px; box-shadow: var(--card-shadow); }
         .pwa-subtab { flex: 1; min-height: 36px; padding: 0; background: none; border: none; border-radius: 9px; cursor: pointer; color: var(--text-secondary); font-family: var(--font-sans); font-size: 0.8rem; font-weight: 700; }
         .pwa-subtab.active { background: var(--color-primary); color: #fff; }
 
@@ -4203,6 +4217,7 @@ export default function PWADashboard({ latestReport }) {
         .dec-mini.lg .dec-b { font-size: 0.8rem; padding: 9px 6px; border-radius: 9px; }
         .dec-b.take.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
         .dec-b.pass.on { background: var(--color-ink-2, var(--text-secondary)); color: #fff; border-color: var(--color-ink-2, var(--text-secondary)); }
+        .dec-b.held { display: inline-flex; align-items: center; justify-content: center; cursor: default; color: var(--color-success, #0E9E6A); border-color: var(--color-success, #0E9E6A); background: color-mix(in srgb, var(--color-success, #0E9E6A) 10%, var(--card-bg)); }
         .dec-b:active { transform: scale(0.97); }
         .rec-def { font-size: 0.72rem; color: var(--text-secondary); background: var(--inset-bg); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; margin-bottom: 12px; line-height: 1.5; }
         /* [S7.2] 추천 정렬 칩 · 샀어요 마이크로카피 · 5신호 점등 */
