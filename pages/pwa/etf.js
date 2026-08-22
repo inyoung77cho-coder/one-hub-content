@@ -377,6 +377,9 @@ export default function EtfDashboard() {
     etfTodos.push({ acct: "일반", icon: "🧾", title: `손실 종목 손익통산(${tax.losses.map((l) => l.ticker).join("·")})`, detail: "일반계좌는 같은 해 이익·손실을 합산 과세합니다. 손실 종목을 함께 매도(손실수확)하면 과세표준이 줄어 양도세를 아낄 수 있습니다.", tone: "info" });
   if (tax?.dividend_usd > 0)
     etfTodos.push({ acct: "일반", icon: "💵", title: `해외 배당 연 $${tax.dividend_usd} 관리`, detail: "해외상장 ETF 배당은 15% 원천징수 후 지급됩니다. 연 금융소득 2,000만원 초과 시 종합과세 대상이니 규모를 확인하세요.", tone: "info" });
+  // [2026-08-22] 미국 ETF 매매 시 거래시간·환율 참고 — 보유 중일 때만, 목표 배분과 무관한 사실이라 안 잠금.
+  if (holdings.some(isOverseasHolding))
+    etfTodos.push({ acct: "일반", icon: "🕐", title: "미국 ETF 매매 시간·환율 참고", detail: "미국 정규장은 한국시간 기준 밤 22:30~05:00(서머타임) 또는 23:30~06:00(그 외)에 열립니다. 원화→달러 환전이 필요해 환율 변동분도 실질 매수단가에 영향을 줍니다.", tone: "info" });
   const hasPension = holdings.some((h) => isPensionAcct(h.account || "일반"));
   if (hasPension) {
     // 세액공제 한도는 개인연금+IRP 합산(연 900만) — 두 계좌 취득액을 함께 본다
@@ -492,6 +495,15 @@ export default function EtfDashboard() {
             <div className="todo-locked">
               🔒 <b>리밸런싱 제안은 목표 배분을 정한 뒤 표시됩니다.</b>
               <span>목표가 있어야 “무엇을 얼마나 조정할지”를 만들 수 있습니다. 아래 세제 알림은 목표와 무관해 그대로 표시됩니다.</span>
+              {/* [2026-08-22] 핵심 리스크는 보이는데 다음 행동이 안 보인다는 피드백 —
+                  아래 "🎯 목표 배분" 카드와 동일한 프리셋 버튼을 여기 바로 둬서, 스크롤 없이
+                  한 번의 탭으로 잠금을 풀 수 있게 한다(가짜 기본값을 만들지는 않는다 — 이전에
+                  사용자가 고른 적 없는 상한을 지시해 신뢰가 깎인 사고가 있어 그 원칙은 유지). */}
+              <div className="acct-filter" role="group" aria-label="목표 배분 프리셋" style={{ marginTop: 10 }}>
+                {Object.keys(REBAL_PRESETS.presets).map((k) => (
+                  <button key={k} className="acct-chip" onClick={() => applyPreset(k)}>{k}</button>
+                ))}
+              </div>
             </div>
           )}
           {todosForAcct.length > 0 ? (
