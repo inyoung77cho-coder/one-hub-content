@@ -20,6 +20,7 @@ export default function RealEstateDashboard() {
   const [brief, setBrief] = useState(null);
   const [rank, setRank] = useState(null);
   const [macro, setMacro] = useState(null);
+  const [weekly, setWeekly] = useState(null); // [2026-08-22] 주간 전파·예측 리포트(다음주 시나리오 + 단지별 예측)
   const [feed, setFeed] = useState(null); // [v11 #16] 최근 실거래 피드
   const [err, setErr] = useState(null);
   const [myC, setMyC] = useState("");   // [S5] 내 단지
@@ -75,10 +76,11 @@ export default function RealEstateDashboard() {
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/re/${fn}`).then((r) => r.json());
-    Promise.all([g("briefing"), g("ranking"), g("macro"), g("feed")])
-      .then(([b, r, m, f]) => {
+    Promise.all([g("briefing"), g("ranking"), g("macro"), g("feed"), g("weekly")])
+      .then(([b, r, m, f, w]) => {
         if (b.error) setErr(b.error);
         setBrief(b); setRank(r); setMacro(m); setFeed(f);
+        if (w && w.ok) setWeekly(w); // pending/error 응답이면 조용히 무시(섹션 자체를 안 그림)
       })
       .catch((e) => setErr(e.message));
     // [S5+] 단지→법정동 매핑(같은 동 필터). 미배포 시 조용히 폴백.
@@ -250,6 +252,9 @@ export default function RealEstateDashboard() {
   //   주식·ETF와 동일하게 '평가금액' 기준으로 통일. 대표 평형 시세가 잠금이면(희소평형) 매수가로 보수적 대체.
   const repEvalUk = (() => { const p = myPyeongPrice(); return p.uk != null ? p.uk : (Number(myProp?.buyUk) || 0); })();
   const reTotalEvalUk = Math.round((repEvalUk + reProps.reduce((s, p) => s + (Number(p.valueUk) || 0), 0)) * 100) / 100;
+  // [2026-08-22] 보유/관심 부동산 예측 — weekly_report.py의 전파(대장-후행) 예측을 단지명으로 조회.
+  //   ★대장(시범삼성) 인근 13개 단지에서만 검증된 모델이라, 해당 안 되면 조용히 null(추측성 예측 금지).
+  const findForecast = (name) => (weekly?.ai_all || []).find((a) => a.단지명 === name) || null;
   useEffect(() => {
     try {
       const onb = JSON.parse(localStorage.getItem("onehub_onboard_assets") || "{}") || {};
@@ -520,11 +525,19 @@ export default function RealEstateDashboard() {
             <span className="rp-name">⭐ {myProp.name} <span className="rp-tag">대표</span></span>
             <span className="rp-val">{uk(repEvalUk)}<em>{myPyeongPrice().uk != null ? "평가" : "매수가"}</em></span>
           </div>
+          {(() => {
+            const fc = findForecast(myProp.name);
+            return fc && (
+              <div className="rp-forecast">🔮 전파 예측 {fc.현재가}억 → {fc.예측가}억 ({fc.괴리율 > 0 ? "+" : ""}{fc.괴리율}%, {fc.괴리율 > 5 ? "저평가" : fc.괴리율 < -5 ? "고평가" : "적정"}) · 대장 시범삼성 기준 · 투자자문 아님</div>
+            );
+          })()}
           {reProps.map((p) => {
             const dep = Number(p.deposit) || 0, mon = Number(p.monthly) || 0;
             const netUk = Math.round(((Number(p.valueUk) || 0) - dep) * 100) / 100;
+            const fc = findForecast(p.name);
             return (
-              <div className="rp-row" key={p.id}>
+              <div key={p.id}>
+              <div className="rp-row">
                 <span className="rp-name">🏠 {p.name}{p.memo ? <span className="rp-memo"> · {p.memo}</span> : null}
                   {(dep > 0 || mon > 0) && (
                     <span className="rp-invest">순수투자금 {uk(netUk)}{dep > 0 ? ` (보증금 ${uk(dep)} 차감)` : ""}{mon > 0 ? ` · 월 ${mon.toLocaleString()}만원` : ""}</span>
@@ -532,6 +545,10 @@ export default function RealEstateDashboard() {
                 </span>
                 <span className="rp-val">{uk(p.valueUk)}<em>평가</em></span>
                 <button className="rp-del" onClick={() => delReProp(p.id)} aria-label="삭제">✕</button>
+              </div>
+              {fc && (
+                <div className="rp-forecast">🔮 전파 예측 {fc.현재가}억 → {fc.예측가}억 ({fc.괴리율 > 0 ? "+" : ""}{fc.괴리율}%, {fc.괴리율 > 5 ? "저평가" : fc.괴리율 < -5 ? "고평가" : "적정"}) · 대장 시범삼성 기준 · 투자자문 아님</div>
+              )}
               </div>
             );
           })}
@@ -983,6 +1000,21 @@ export default function RealEstateDashboard() {
         </section>
       )}
 
+      {/* [2026-08-22] 다음 주 AI 시나리오 — weekly_report.py(주간 전파·예측 리포트)에서.
+          시장 전체 방향성 3가지 확률 시나리오(단지 특정 예측 아님) — 내 단지 예측은 아래 별도 카드. */}
+      {weekly?.scenarios?.length > 0 && (
+        <section className="card">
+          <div className="label">🔮 다음 주 시장 예상 <span className="sub">{weekly.week}</span></div>
+          {weekly.scenarios.map((s, i) => (
+            <div key={i} className="mr-row">
+              <span className="mr-k">{s.prob}</span>
+              <span className="mr-v"><b>{s.type}</b> — {s.desc}</span>
+            </div>
+          ))}
+          <div className="mr-disc">※ 시장 전체 흐름에 대한 규칙 기반 시나리오이며 투자자문이 아닙니다.</div>
+        </section>
+      )}
+
       {/* [S5] 내 단지 등록 위저드 — 자동완성·평형·동층·매수가·시점 */}
       {wizOpen && (
         <div className="wiz-scrim" onClick={() => setWizOpen(false)}>
@@ -1164,6 +1196,7 @@ export default function RealEstateDashboard() {
         .rp-note { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 9px; line-height: 1.55; word-break: keep-all; }
         /* [피드백] 순수투자금·월수익 표기 */
         .rp-invest { display: block; font-size: 0.66rem; font-weight: 700; color: var(--color-primary); margin-top: 3px; word-break: keep-all; }
+        .rp-forecast { font-size: 0.68rem; font-weight: 600; color: var(--color-ink-3); padding: 2px 0 6px; word-break: keep-all; }
         .rp-invest-total { display: flex; align-items: center; justify-content: space-between; margin-top: 7px; }
         .rp-invest-total span { font-size: 0.74rem; font-weight: 700; color: var(--color-ink-2); }
         .rp-invest-total em { font-style: normal; font-size: 0.56rem; font-weight: 800; color: var(--color-primary); background: var(--color-primary-soft); padding: 1px 6px; border-radius: 4px; margin-left: 5px; }
