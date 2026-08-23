@@ -111,14 +111,16 @@ export default function PortfolioDuelCard() {
     reload();
   };
 
-  // [버그 보정] 실보유로 시작했는데 기준 예수금이 0인 경우(과거 배포분의 KIS 조회 일시 오류로
-  //   보이는 사례가 실사용자에게서 확인됨) — 결정 기록은 유지한 채 최신 예수금으로 바로잡는다.
-  const onFixCash = async () => {
+  // [버그 보정] 실보유 시작 시 캐시된 KIS 예수금이 틀리게 잡힌 경우(과거 배포분 KIS 조회
+  //   오류·백엔드 필드 오류 등) — 결정 기록은 유지한 채 기준 현금만 최신값으로 바로잡는다.
+  //   base.cash===0일 때만 노출하던 배너와 달리, 아래 pd-foot의 버튼은 항상 눌러 재동기화
+  //   가능하게 해 "0은 아니지만 틀린 값"으로 시작된 경우도(실사용자 사례 확인) 다시 고칠 수 있다.
+  const onResyncCash = async () => {
     setBusy(true); setErr("");
     try {
       const fresh = await fetch(`/api/pwa-dashboard?trader=${trader}`).then((r) => r.json()).catch(() => null);
       const kisCash = fresh?.balance?.cash != null ? Number(fresh.balance.cash) : 0;
-      if (kisCash <= 0) { setErr("예수금을 다시 조회했지만 여전히 0원입니다 — 잠시 후 다시 시도해 주세요."); return; }
+      if (kisCash <= 0) { setErr("예수금을 다시 조회했지만 0원입니다 — 잠시 후 다시 시도해 주세요."); return; }
       correctBaseCash(trader, kisCash);
       reload();
     } finally {
@@ -193,7 +195,7 @@ export default function PortfolioDuelCard() {
       {duel.base.seedType === "kis" && duel.base.cash === 0 && (
         <div className="pd-warn">
           ⚠ 기준 예수금이 0원으로 기록돼 있습니다 — KIS 조회 일시 오류로 보입니다.
-          <button type="button" className="pd-warn-btn" onClick={onFixCash} disabled={busy}>지금 예수금 다시 조회해 보정</button>
+          <button type="button" className="pd-warn-btn" onClick={onResyncCash} disabled={busy}>지금 예수금 다시 조회해 보정</button>
         </div>
       )}
 
@@ -299,7 +301,13 @@ export default function PortfolioDuelCard() {
 
       <div className="pd-foot">
         <span>매수 추천은 100만원 규모, 매도 추천은 AI 보유분 평단 대비 {"-5%"}(손절)/{"+10%"}(익절) 기준입니다. 투자자문이 아닙니다.</span>
-        <button type="button" className="pd-reset" onClick={onReset}>초기화</button>
+        <div className="pd-foot-btns">
+          {duel.base.seedType === "kis" && (
+            <button type="button" className="pd-reset" onClick={onResyncCash} disabled={busy}>기준 예수금 다시 조회</button>
+          )}
+          <button type="button" className="pd-reset" onClick={onReset}>초기화</button>
+        </div>
+        {err && <span className="pd-err">{err}</span>}
       </div>
 
       <style jsx>{`
@@ -351,6 +359,7 @@ export default function PortfolioDuelCard() {
         .pd-hist-news { align-self: flex-start; max-width: 100%; text-align: left; font-size: 0.7rem; color: var(--color-ink-2); background: var(--color-card-soft); border: none; border-radius: 7px; padding: 5px 8px; cursor: pointer; font-family: var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .pd-foot { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--color-line); display: flex; flex-direction: column; gap: 8px; }
         .pd-foot span { font-size: 0.68rem; color: var(--color-ink-3); line-height: 1.6; word-break: keep-all; }
+        .pd-foot-btns { display: flex; gap: 14px; }
         .pd-reset { align-self: flex-start; font-size: 0.7rem; color: var(--color-ink-3); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; font-family: var(--font-sans); }
       `}</style>
     </section>
