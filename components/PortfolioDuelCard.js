@@ -28,6 +28,10 @@ export default function PortfolioDuelCard() {
   const [err, setErr] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [news, setNews] = useState([]); // [2단계] 종목별 뉴스 추적 — 전용 백엔드 없이 기존 종합뉴스에서 이름 매칭
+  // [진단용] 반복된 "보정해도 안 바뀐다" 리포트의 원인을 원격으로 특정하기 어려워, 마지막 조회
+  //   시각·응답을 화면에 그대로 남긴다 — 다음 스크린샷에서 fetch 자체가 새 값을 받았는지,
+  //   받았는데 저장/표시 단계에서 되돌아간 건지 바로 구분하기 위함(임시, 원인 확정 후 제거 예정).
+  const [debug, setDebug] = useState(null);
 
   const trader = typeof window !== "undefined" ? getTrader() : "A";
 
@@ -130,10 +134,12 @@ export default function PortfolioDuelCard() {
     try {
       const fresh = await fetch(`/api/pwa-dashboard?trader=${trader}`).then((r) => r.json()).catch(() => null);
       const kisCash = fresh?.balance?.cash != null ? Number(fresh.balance.cash) : 0;
+      setDebug({ ts: new Date().toLocaleTimeString("ko-KR"), trader, fetchedCash: kisCash, fetchedTotal: fresh?.balance?.total_asset ?? null, ok: fresh?.ok });
       if (kisCash <= 0) { setErr("예수금을 다시 조회했지만 0원입니다 — 잠시 후 다시 시도해 주세요."); return; }
       correctBaseCash(trader, kisCash);
       notifySync();
       reload();
+      setDebug((d) => ({ ...d, savedCash: getPortfolios(trader)?.base?.cash }));
     } finally {
       setBusy(false);
     }
@@ -320,6 +326,11 @@ export default function PortfolioDuelCard() {
           <button type="button" className="pd-reset" onClick={onReset}>초기화</button>
         </div>
         {err && <span className="pd-err">{err}</span>}
+        {debug && (
+          <span className="pd-debug">
+            🔧 {debug.ts} · trader={debug.trader} · ok={String(debug.ok)} · 조회된 현금={wonFmt(debug.fetchedCash)} · 조회된 총자산={debug.fetchedTotal != null ? wonFmt(debug.fetchedTotal) : "-"} · 저장 후 기준현금={debug.savedCash != null ? wonFmt(debug.savedCash) : "저장 전"}
+          </span>
+        )}
       </div>
 
       <style jsx>{`
@@ -330,6 +341,7 @@ export default function PortfolioDuelCard() {
         .pd-intro.sub { font-size: 0.76rem; color: var(--color-ink-3); }
         .pd-start { width: 100%; margin-top: 14px; padding: 13px; border-radius: 10px; border: none; background: var(--color-primary); color: #fff; font-size: 0.9rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .pd-err { margin-top: 8px; font-size: 0.78rem; color: var(--color-danger); }
+        .pd-debug { font-size: 0.6rem; color: var(--color-ink-3); font-family: ui-monospace, monospace; word-break: break-all; background: var(--color-card-soft); border-radius: 6px; padding: 5px 7px; }
         .pd-warn { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--color-warning-soft, #FEF3C7); color: var(--color-warning-ink, #B45309); font-size: 0.76rem; line-height: 1.6; display: flex; flex-direction: column; gap: 6px; word-break: keep-all; }
         .pd-warn-btn { align-self: flex-start; padding: 6px 12px; border-radius: 7px; border: none; background: var(--color-warning-ink, #B45309); color: #fff; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .pd-vs { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
