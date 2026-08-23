@@ -10,7 +10,7 @@ import { fetchStockQuotes } from "../lib/stockLive";
 import {
   isDuelStarted, startDuel, resetDuel, getPortfolios, getSnapshots,
   recordSnapshot, recordDuelDecision, hasDecisionToday, detectSellCandidates, portfolioValue,
-  getDecisionAnalysis, DEFAULT_CASH,
+  getDecisionAnalysis, correctBaseCash, DEFAULT_CASH,
 } from "../lib/portfolioDuel";
 
 // [사용자 지시] 억 단위 반올림은 소액 계좌에서 나/AI 차이가 0.00억으로 뭉개져 보였다 —
@@ -78,13 +78,24 @@ export default function PortfolioDuelCard() {
   const onStart = async () => {
     setBusy(true); setErr("");
     try {
+      // [버그 수정] 마운트 시 캐시된 dash를 그대로 쓰면, 백엔드 cache_balance가 1분 주기
+      // 갱신이라 그 사이 KIS 조회 실패로 예수금이 일시적으로 0으로 남아있던 순간을 그대로
+      // 기준에 박아넣을 수 있다(실사용자 리포트: 예수금 0으로 시작됨). 시작 직전 새로 조회.
+      const fresh = await fetch(`/api/pwa-dashboard?trader=${trader}`).then((r) => r.json()).catch(() => null);
       let positions = [];
       try {
-        let p = dash?.balance?.positions;
+        let p = fresh?.balance?.positions;
         if (typeof p === "string") p = JSON.parse(p);
         if (Array.isArray(p)) positions = p;
       } catch (e) {}
-      const kisCash = dash?.balance?.cash != null ? Number(dash.balance.cash) : 0;
+      const kisCash = fresh?.balance?.cash != null ? Number(fresh.balance.cash) : 0;
+      // 보유 종목은 있는데 예수금이 정확히 0 — 흔치 않은 조합이라 KIS 조회 일시 오류로 의심하고
+      // 재시도를 유도한다(잘못된 기준은 나중에 되돌릴 수 없으므로 여기서 막는 게 안전).
+      if (positions.length > 0 && kisCash === 0) {
+        setErr("예수금이 0원으로 조회됐습니다 — KIS 연동이 잠시 불안정할 수 있어요. 잠시 후 다시 시도해 주세요.");
+        setBusy(false);
+        return;
+      }
       const res = startDuel({ trader, kisPositions: positions, kisCash });
       if (!res.ok) { setErr(res.error || "시작 실패"); setBusy(false); return; }
       reload();
@@ -98,6 +109,21 @@ export default function PortfolioDuelCard() {
     if (!window.confirm("포트폴리오 대결을 초기화할까요?\n지금까지의 기준·결정 기록이 모두 사라지고 처음부터 다시 시작됩니다.")) return;
     resetDuel(trader);
     reload();
+  };
+
+  // [버그 보정] 실보유로 시작했는데 기준 예수금이 0인 경우(과거 배포분의 KIS 조회 일시 오류로
+  //   보이는 사례가 실사용자에게서 확인됨) — 결정 기록은 유지한 채 최신 예수금으로 바로잡는다.
+  const onFixCash = async () => {
+    setBusy(true); setErr("");
+    try {
+      const fresh = await fetch(`/api/pwa-dashboard?trader=${trader}`).then((r) => r.json()).catch(() => null);
+      const kisCash = fresh?.balance?.cash != null ? Number(fresh.balance.cash) : 0;
+      if (kisCash <= 0) { setErr("예수금을 다시 조회했지만 여전히 0원입니다 — 잠시 후 다시 시도해 주세요."); return; }
+      correctBaseCash(trader, kisCash);
+      reload();
+    } finally {
+      setBusy(false);
+    }
   };
 
   const decide = async (item, action, accepted) => {
@@ -163,6 +189,13 @@ export default function PortfolioDuelCard() {
   return (
     <section className="pd-card">
       <div className="pd-title">🥊 포트폴리오 대결 <span className="pd-sub">{duel.base.startDate}부터 · {duel.base.seedType === "kis" ? "실보유 기준" : "가상현금 기준"}</span></div>
+
+      {duel.base.seedType === "kis" && duel.base.cash === 0 && (
+        <div className="pd-warn">
+          ⚠ 기준 예수금이 0원으로 기록돼 있습니다 — KIS 조회 일시 오류로 보입니다.
+          <button type="button" className="pd-warn-btn" onClick={onFixCash} disabled={busy}>지금 예수금 다시 조회해 보정</button>
+        </div>
+      )}
 
       <div className="pd-vs">
         <div className="pd-vs-row">
@@ -277,6 +310,8 @@ export default function PortfolioDuelCard() {
         .pd-intro.sub { font-size: 0.76rem; color: var(--color-ink-3); }
         .pd-start { width: 100%; margin-top: 14px; padding: 13px; border-radius: 10px; border: none; background: var(--color-primary); color: #fff; font-size: 0.9rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .pd-err { margin-top: 8px; font-size: 0.78rem; color: var(--color-danger); }
+        .pd-warn { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--color-warning-soft, #FEF3C7); color: var(--color-warning-ink, #B45309); font-size: 0.76rem; line-height: 1.6; display: flex; flex-direction: column; gap: 6px; word-break: keep-all; }
+        .pd-warn-btn { align-self: flex-start; padding: 6px 12px; border-radius: 7px; border: none; background: var(--color-warning-ink, #B45309); color: #fff; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .pd-vs { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
         .pd-vs-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
         .pd-vs-side { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
