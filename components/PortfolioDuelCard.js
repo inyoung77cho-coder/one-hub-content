@@ -235,6 +235,20 @@ export default function PortfolioDuelCard() {
         </div>
       </div>
 
+      {duel.base.seedType === "kis" && (
+        // [사용자 지시] 이전엔 하단 회색 텍스트링크 스타일이라 "버튼이 안 보인다"는 리포트를
+        //   받음 — 총액 바로 아래, 눈에 띄는 버튼으로 승격해 실보유 기준 대결의 핵심 조치를 배치.
+        <button type="button" className="pd-resync" onClick={onResyncCash} disabled={busy}>
+          {busy ? "조회 중…" : "🔄 기준 예수금 다시 조회"}
+        </button>
+      )}
+      {debug && (
+        <span className="pd-debug">
+          🔧 {debug.ts} · trader={debug.trader} · ok={String(debug.ok)} · 조회된 현금={wonFmt(debug.fetchedCash)} · 조회된 총자산={debug.fetchedTotal != null ? wonFmt(debug.fetchedTotal) : "-"} · 저장 후 기준현금={debug.savedCash != null ? wonFmt(debug.savedCash) : "저장 전"}
+        </span>
+      )}
+      {err && <div className="pd-err">{err}</div>}
+
       {chartData.length > 1 && (
         <ResponsiveContainer width="100%" height={140}>
           <LineChart data={chartData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
@@ -320,17 +334,8 @@ export default function PortfolioDuelCard() {
       <div className="pd-foot">
         <span>매수 추천은 100만원 규모, 매도 추천은 AI 보유분 평단 대비 {"-5%"}(손절)/{"+10%"}(익절) 기준입니다. 투자자문이 아닙니다.</span>
         <div className="pd-foot-btns">
-          {duel.base.seedType === "kis" && (
-            <button type="button" className="pd-reset" onClick={onResyncCash} disabled={busy}>기준 예수금 다시 조회</button>
-          )}
           <button type="button" className="pd-reset" onClick={onReset}>초기화</button>
         </div>
-        {err && <span className="pd-err">{err}</span>}
-        {debug && (
-          <span className="pd-debug">
-            🔧 {debug.ts} · trader={debug.trader} · ok={String(debug.ok)} · 조회된 현금={wonFmt(debug.fetchedCash)} · 조회된 총자산={debug.fetchedTotal != null ? wonFmt(debug.fetchedTotal) : "-"} · 저장 후 기준현금={debug.savedCash != null ? wonFmt(debug.savedCash) : "저장 전"}
-          </span>
-        )}
       </div>
 
       <style jsx>{`
@@ -344,6 +349,8 @@ export default function PortfolioDuelCard() {
         .pd-debug { font-size: 0.6rem; color: var(--color-ink-3); font-family: ui-monospace, monospace; word-break: break-all; background: var(--color-card-soft); border-radius: 6px; padding: 5px 7px; }
         .pd-warn { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: var(--color-warning-soft, #FEF3C7); color: var(--color-warning-ink, #B45309); font-size: 0.76rem; line-height: 1.6; display: flex; flex-direction: column; gap: 6px; word-break: keep-all; }
         .pd-warn-btn { align-self: flex-start; padding: 6px 12px; border-radius: 7px; border: none; background: var(--color-warning-ink, #B45309); color: #fff; font-size: 0.72rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .pd-resync { width: 100%; margin-top: 4px; padding: 11px; border-radius: 10px; border: 1.5px solid var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); font-size: 0.82rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .pd-resync:disabled { opacity: 0.6; cursor: default; }
         .pd-vs { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
         .pd-vs-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
         .pd-vs-side { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
