@@ -6,9 +6,10 @@ import { getLatestDailyReport } from '../../lib/reports';
 import LastUpdated from '../../components/LastUpdated';
 import MarketSession from '../../components/MarketSession';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
-import { recordDecision, matureLedger, computeShowdown, getTodayDecision, reconcileAutoWatch, getLedger } from '../../lib/verdictLedger';
-import { getSeed, setSeed, resetSeed, SEED_OPTIONS, computeWallets, streakNarrative, wonG, wonNum, getNickname, setNickname } from '../../lib/gameWallet';
+import { recordDecision, getTodayDecision, reconcileAutoWatch, getLedger } from '../../lib/verdictLedger';
+import { getSeed, wonG } from '../../lib/gameWallet';
 import { initGameSync } from '../../lib/gameSync';
+import PortfolioDuelCard from '../../components/PortfolioDuelCard';
 // [N1] 자산 원장. lib/verdictLedger 의 getLedger(판단 기록)와 이름이 겹쳐 별칭으로 구분한다.
 import { getLedger as getAssetLedger } from '../../lib/ledger';
 import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta } from '../../lib/assetHistory';
@@ -26,7 +27,6 @@ import ShareButton from '../../components/ShareButton';
 import RotatingPageTitle from '../../components/RotatingPageTitle';
 import AssetMapTitle from '../../components/AssetMapTitle';
 import { recordAccuracySnapshot, getAccuracyHistory } from '../../lib/aiAccuracyHistory';
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
 import { StockForm } from '../../components/shared/AssetForms';
@@ -263,22 +263,14 @@ export default function PWADashboard({ latestReport }) {
   const [actingCode, setActingCode] = useState(null); // 승인/거절 처리 중인 종목코드
   const [perf, setPerf] = useState(null); // [v8.7] 기록화면 성과 요약 (이번달 수익률/MDD/승률)
   const [accuracy, setAccuracy] = useState(null); // [기록] AI 자기검증(차단 적중률) 누적 — ML 학습 현황 카드
-  const [ledger, setLedger] = useState([]); // [나 vs AI] 내 판단(매매/관망) 원장 + 3·7일 성과
   const [decTick, setDecTick] = useState(0); // [나 vs AI] 추천 카드 판단 버튼 상태 리렌더 트리거
-  const [gameSeed, setGameSeed] = useState(null); // [G-시리즈] 가상 게임 시드머니(있으면 게임 시작됨)
-  const [gameNick, setGameNick] = useState('나'); // [닉네임] 나 vs AI에서 "나" 대신 표시
-  const [trendClick, setTrendClick] = useState(null); // [사용자 지시] 추이 그래프 클릭 시 그 시점 판단 차이 설명
+  const [gameSeed, setGameSeed] = useState(null); // [decFeedback 배너] 판단 기록 시 "가상 X원 걸림" 표기에 씀
   useEffect(() => {
-    const load = () => { setGameSeed(getSeed()); setGameNick(getNickname()); };
+    const load = () => { setGameSeed(getSeed()); };
     load();
     initGameSync(getTrader()); // [2026-08-05] 서버 하이드레이션 + 변경 미러링(today.js와 동일 진입점)
     window.addEventListener('onehub-game-change', load);
     return () => window.removeEventListener('onehub-game-change', load);
-  }, []);
-  const editGameNickname = useCallback(() => {
-    const cur = getNickname();
-    const next = typeof window !== 'undefined' ? window.prompt('나 vs AI에서 쓸 닉네임 (8자 이내)', cur === '나' ? '' : cur) : null;
-    if (next != null) setNickname(next);
   }, []);
   // [S3/G2] AI 트러스트 3섹션 서브내비(vs/verify/archive)를 URL(?sec=)로 유지 — 뒤로가기·딥링크(F4) 지원
   // [FB-4 §4.2] 정직성 브랜드 강화 — AI 페이지는 '자기검증'을 앞세운다(기본 진입 섹션).
@@ -802,21 +794,6 @@ export default function PWADashboard({ latestReport }) {
       .catch(() => { if (alive) merge({ ok: false }); });
     return () => { alive = false; };
   }, [bottomSheet?.code]);
-
-  // [나 vs AI] 기록 탭 진입 시 원장 성숙(현재가 스냅샷 축적) 후 승부 계산
-  useEffect(() => {
-    if (tab !== 'report') return;
-    let alive = true;
-    // [2026-08-21 WI-03/04] 가격 하나 얻으려고 매번 전체 AI 분석(/api/analyze-stock →
-    //   ai_analyzer.analyze())을 호출하고 있었음 — ai_analyzer 주간 비용의 대다수가 여기서 발생.
-    //   시세 전용(무료 소스) 엔드포인트로 교체.
-    const fetchPrice = async (code) => {
-      const q = await fetchStockQuote(code);
-      return q?.price || null;
-    };
-    matureLedger(trader, fetchPrice).then((list) => { if (alive) setLedger(list); });
-    return () => { alive = false; };
-  }, [tab, trader]);
 
   const regimeClass = (r) => r === 'BULL' ? 'bull' : r === 'BEAR' ? 'bear' : 'side';
   const regimeIcon = (r) => r === 'BULL' ? '☀️' : r === 'BEAR' ? '🌧️' : '☁️';
@@ -2433,353 +2410,8 @@ export default function PWADashboard({ latestReport }) {
         {tab === 'report' && (
           <main className="pwa-main">
 
-            {/* [나 vs AI 대결] AI 추천 중 내가 산 것 vs AI 단독매매, 3일·7일 수익 승부 */}
-            {trustSec === 'vs' && (<>
-            {/* [G-시리즈] 가상 시드머니 대결 — 시드 미설정=온보딩(GI-2) / 설정=게임 대시보드(GI-6) */}
-            {!gameSeed ? (
-              <section className="pwa-card game-onb">
-                <span className="pwa-card-label">⚔ AI와 가상 대결 시작</span>
-                <div className="gonb-sub">같은 <b>가상 시드머니</b>로 출발해, 내 판단 지갑과 AI 지갑의 <b>잔고 차이</b>로 승부합니다. <b>실제 돈이 아닌 판단 연습용 가상 대결</b>입니다.</div>
-                <div className="gonb-opts">
-                  {SEED_OPTIONS.map((o) => (
-                    <button key={o.v} className="gonb-opt" onClick={() => setSeed(o.v)}>{o.label}<span>가상</span></button>
-                  ))}
-                </div>
-                <div className="gonb-foot">🎮 가상·모의 게임입니다 · 판단은 본인 책임이며 투자자문이 아닙니다.</div>
-              </section>
-            ) : (() => {
-              const sd3 = computeShowdown(ledger, 3);
-              const g = computeWallets(sd3, gameSeed); // [모바일 수정] 알고 있는 시드를 넘겨 재조회 null 로 대시보드가 비지 않게
-              if (!g) return null;
-              const pending = ledger.filter((e) => Date.now() - e.ts < 3 * 86400000);
-              const narr = streakNarrative(g.settled);
-              const pct = g.myBalance + g.aiBalance > 0 ? (g.myBalance / (g.myBalance + g.aiBalance)) * 100 : 50;
-              return (
-                <section className="pwa-card game-dash">
-                  <div className="gd-top"><span className="pwa-card-label" style={{ margin: 0 }}>⚔ 나 vs AI · 가상 지갑 대결</span><span className="gd-virtual">가상·모의</span></div>
-                  {narr && <div className="gd-narr">📖 {narr}</div>}
-                  {/* [사용자 지시] "원" 삭제(잔고는 숫자만, 증감액만 wonG로 원 표기) + 좌우 대칭(둘 다
-                      "이름/AI" 한 단어 + 잔고 + 증감) + "나"/"AI" 글자를 크게 */}
-                  <div className="gd-wallets">
-                    <div className="gd-w me">
-                      <span className="gd-wl" onClick={editGameNickname} role="button" tabIndex={0} title="닉네임 바꾸기">{gameNick}<span className="gd-wl-ed">✎</span></span>
-                      <b className="gd-wb">{wonNum(g.myBalance)}</b>
-                      <span className={`gd-wg ${g.myGain > 0 ? 'up' : g.myGain < 0 ? 'dn' : ''}`}>{g.myGain > 0 ? '+' : ''}{wonG(g.myGain)}</span>
-                    </div>
-                    <div className="gd-vs">VS</div>
-                    <div className="gd-w ai">
-                      <span className="gd-wl">AI</span>
-                      <b className="gd-wb">{wonNum(g.aiBalance)}</b>
-                      <span className={`gd-wg ${g.aiGain > 0 ? 'up' : g.aiGain < 0 ? 'dn' : ''}`}>{g.aiGain > 0 ? '+' : ''}{wonG(g.aiGain)}</span>
-                    </div>
-                  </div>
-                  <div className="gd-bar"><div className="gd-bar-me" style={{ width: `${Math.max(6, Math.min(94, pct))}%` }} /></div>
-                  <div className="gd-lead">{g.leader === 'me' ? <b className="up">🏆 내가 {wonG(Math.abs(g.diff))} 앞섬</b> : g.leader === 'ai' ? <b className="dn">🤖 AI가 {wonG(Math.abs(g.diff))} 앞섬</b> : <b>⚖️ 접전</b>} · 매판 잔고의 {Math.round((g.betPct ?? 0.1) * 100)}%(복리, 가상)
-                    <ShareButton compact title="ONE-HUB 나 vs AI 대결"
-                      text={g.leader === 'me' ? `내가 AI보다 ${wonG(Math.abs(g.diff))} 앞서고 있어요! 나도 AI랑 대결해볼래?` : g.leader === 'ai' ? `AI한테 ${wonG(Math.abs(g.diff))} 지고 있어요 — 나도 AI랑 대결해볼래?` : "AI와 팽팽한 접전 중! 나도 대결해볼래?"}
-                      url="https://one-hub-content.vercel.app/pwa/today" />
-                  </div>
-                  {(() => {
-                    // [2026-08-03] 며칠차·몇종목 대결 + 일자별 누적 금액 추이 그래프.
-                    //   x축=정산된 날짜, 시드(출발점)부터 판이 정산될 때마다 잔고가 누적된다.
-                    const daysIn = g.settled.length ? Math.max(1, Math.floor((Date.now() - Math.min(...g.settled.map((s) => s.ts))) / 86400000) + 1) : 0;
-                    const chron = [...g.settled].sort((a, b) => a.ts - b.ts);
-                    let myCum = g.seed, aiCum = g.seed;
-                    const start = new Date(chron.length ? chron[0].ts : Date.now());
-                    const trend = [{ label: `${start.getMonth() + 1}/${start.getDate()} 시작`, [gameNick]: myCum, AI: aiCum, _ev: null }];
-                    chron.forEach((s) => {
-                      myCum += s.myPnl; aiCum += s.aiPnl;
-                      const d = new Date(s.ts);
-                      trend.push({ label: `${d.getMonth() + 1}/${d.getDate()}`, [gameNick]: myCum, AI: aiCum, _ev: s });
-                    });
-                    // [버그 수정] recharts v3부터 onClick 시그니처가 바뀌어 (nextState, reactEvent) 두 인자로
-                    //   호출된다 — v2 방식의 e.activePayload는 더 이상 없다(항상 undefined라 클릭이 무반응
-                    //   이었다). nextState.activeIndex(문자열 인덱스)로 trend 배열에서 직접 찾는다.
-                    const onTrendClick = (nextState) => {
-                      const i = nextState?.activeIndex != null ? Number(nextState.activeIndex) : NaN;
-                      setTrendClick(Number.isFinite(i) ? (trend[i]?._ev || null) : null);
-                    };
-                    return (
-                      <div className="gd-trend">
-                        <div className="gd-trend-top">
-                          <span className="gd-trend-days">{daysIn}일째 · {g.settled.length}종목 대결</span>
-                          <span className="gd-trend-final">
-                            최종 <b className={g.myGain >= 0 ? 'up' : 'dn'}>{gameNick} {wonG(g.myBalance)}</b>
-                            {' · '}
-                            <b className={g.aiGain >= 0 ? 'up' : 'dn'}>AI {wonG(g.aiBalance)}</b>
-                          </span>
-                        </div>
-                        {trend.length > 1 && (
-                          <>
-                            <ResponsiveContainer width="100%" height={140}>
-                              <LineChart data={trend} margin={{ top: 6, right: 8, left: 0, bottom: 0 }} onClick={onTrendClick}>
-                                <XAxis dataKey="label" stroke="var(--color-ink-3)" fontSize={10} tickLine={false} />
-                                <YAxis hide domain={['dataMin', 'dataMax']} />
-                                <Line type="monotone" dataKey={gameNick} stroke="var(--color-success)" strokeWidth={2} dot={{ r: 2, cursor: 'pointer' }} activeDot={{ r: 5, cursor: 'pointer' }} />
-                                <Line type="monotone" dataKey="AI" stroke="var(--purple)" strokeWidth={2} dot={{ r: 2, cursor: 'pointer' }} activeDot={{ r: 5, cursor: 'pointer' }} />
-                              </LineChart>
-                            </ResponsiveContainer>
-                            <div className="gd-trend-hint">그래프의 점을 눌러보세요 — 그날 대결을 자세히 설명해 드립니다</div>
-                          </>
-                        )}
-                        {/* [사용자 지시] 점 클릭 시 팝업 카드로 더 상세히 설명(베팅액·승자 포함) */}
-                        {trendClick && (() => {
-                          const diffWon = (trendClick.myPnl || 0) - (trendClick.aiPnl || 0);
-                          return (
-                            <div className="gd-trend-modal-bg" onClick={() => setTrendClick(null)}>
-                              <div className="gd-trend-modal" onClick={(e) => e.stopPropagation()}>
-                                <button type="button" className="gd-trend-modal-x" onClick={() => setTrendClick(null)} aria-label="닫기">✕</button>
-                                <div className="gd-trend-modal-t">{trendClick.name}</div>
-                                <div className="gd-trend-modal-ret">가격 {trendClick.ret >= 0 ? '+' : ''}{trendClick.ret}%</div>
-                                <div className="gd-trend-modal-rows">
-                                  <div className="gd-trend-modal-row">
-                                    <span className="gd-trend-modal-who">🙋 {gameNick}</span>
-                                    <span className="gd-trend-modal-mid">{trendClick.decision === 'take' ? '매수' : '관망'} · 베팅 {wonG(trendClick.myBetAmt)}</span>
-                                    <b className={trendClick.myPnl >= 0 ? 'up' : 'dn'}>{trendClick.myPnl >= 0 ? '+' : ''}{wonG(trendClick.myPnl)}</b>
-                                  </div>
-                                  <div className="gd-trend-modal-row">
-                                    <span className="gd-trend-modal-who">🤖 AI</span>
-                                    <span className="gd-trend-modal-mid">{trendClick.aiBought !== false ? '매수' : '관망'} · 베팅 {wonG(trendClick.aiBetAmt)}</span>
-                                    <b className={trendClick.aiPnl >= 0 ? 'up' : 'dn'}>{trendClick.aiPnl >= 0 ? '+' : ''}{wonG(trendClick.aiPnl)}</b>
-                                  </div>
-                                </div>
-                                <div className="gd-trend-modal-diff">
-                                  {trendClick.winner === 'me' ? '🏆 내가' : trendClick.winner === 'ai' ? '🤖 AI가' : '⚖️ 무승부 ·'} {trendClick.winner !== 'tie' && <>{wonG(Math.abs(diffWon))} 앞섬</>}
-                                </div>
-                                <div className="gd-trend-modal-note">베팅 기준(그 시점 각자 잔고)이 서로 달라 같은 가격 변동에도 손익 금액이 달라집니다.</div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    );
-                  })()}
-                  {pending.length > 0 && (
-                    <div className="gd-pending">
-                      <div className="gd-ph">⏳ 진행 중 대결 {pending.length}건 (3일 후 정산)</div>
-                      {pending.slice(0, 4).map((e, i) => {
-                        const dday = Math.max(0, 3 - Math.floor((Date.now() - e.ts) / 86400000));
-                        return <div className="gd-prow" key={i}><span className="gd-pn">{e.name}</span><span className="gd-pj">나:{e.decision === 'take' ? '매수' : '관망'} · AI:{e.decision === 'take' ? '동일 베팅' : '매수'}</span><span className="gd-dday">D-{dday}</span></div>;
-                      })}
-                    </div>
-                  )}
-                  {g.settled.length > 0 && (
-                    <div className="gd-recent">
-                      <div className="gd-ph">🏁 최근 결과</div>
-                      {g.settled.slice(0, 4).map((s, i) => (
-                        <div className="gd-rrow" key={i}><span className="gd-rw">{s.winner === 'me' ? '🏆' : s.winner === 'ai' ? '💀' : '⚖️'}</span><span className="gd-pn">{s.name}</span><span className={`gd-rret ${s.ret >= 0 ? 'up' : 'dn'}`}>{s.ret >= 0 ? '+' : ''}{s.ret}%</span><span className="gd-rwin">{s.winner === 'me' ? '나 승' : s.winner === 'ai' ? 'AI 승' : '무'}</span></div>
-                      ))}
-                    </div>
-                  )}
-                  <div className="gd-foot">🎮 가상·모의 게임 · 실제 자산 아님 · 판단은 본인 책임(투자자문 아님) · <button className="gd-reset" onClick={() => { if (typeof window === 'undefined' || window.confirm('게임을 초기화할까요? (가상 지갑만 리셋, 판단 기록은 유지)')) resetSeed(); }}>시드 변경</button></div>
-                </section>
-              );
-            })()}
-
-            {/* [사용자 지시] 향후 전개 — 정산 대기 중인 판단들이 확정되면 판도가 어떻게 바뀔 수 있는지 나열 */}
-            {gameSeed && (() => {
-              const pending = ledger.filter((e) => Date.now() - e.ts < 3 * 86400000);
-              if (!pending.length) return null;
-              const g2 = computeWallets(computeShowdown(ledger, 3), gameSeed);
-              if (!g2) return null;
-              const myStake = Math.max(10000, Math.round(g2.myBalance * (g2.betPct ?? 0.1)));
-              const aiStake = Math.max(10000, Math.round(g2.aiBalance * (g2.betPct ?? 0.1)));
-              return (
-                <section className="pwa-card upcoming-card">
-                  <span className="pwa-card-label">🔮 앞으로의 대결 구도</span>
-                  <p className="upcoming-desc">아래 {pending.length}건이 정산되면 잔고가 바뀌고, 다음 베팅액도 그 결과를 따라갑니다(복리) — 지금 기준 예상 영향:</p>
-                  <div className="upcoming-list">
-                    {pending.map((e, i) => {
-                      const dday = Math.max(0, 3 - Math.floor((Date.now() - e.ts) / 86400000));
-                      const myIn = e.decision === 'take';
-                      return (
-                        <div className="upcoming-row" key={i}>
-                          <span className="upcoming-name">{e.name}</span>
-                          <span className="upcoming-j">나:{myIn ? '매수' : '관망'} · AI:매수</span>
-                          <span className="upcoming-impact">{myIn ? `나 ±${wonG(myStake)}` : `AI만 ±${wonG(aiStake)}`}</span>
-                          <span className="upcoming-dday">D-{dday}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              );
-            })()}
-
-            {(() => {
-              const w3 = computeShowdown(ledger, 3);
-              const w7 = computeShowdown(ledger, 7);
-              const anyReady = w3.ready || w7.ready;
-              const recorded = ledger.length;
-              const winLabel = (w) => w.winner === 'me' ? '내 판단 승' : w.winner === 'ai' ? 'AI 승' : '무승부';
-              const winColor = (w) => w.winner === 'me' ? 'var(--color-success)' : w.winner === 'ai' ? 'var(--purple)' : 'var(--color-ink-3)';
-              // 종합 승부(3·7일 합산)
-              const tally = [w3, w7].filter(w => w.ready);
-              const meWins = tally.filter(w => w.winner === 'me').length;
-              const aiWins = tally.filter(w => w.winner === 'ai').length;
-              const overall = !tally.length ? null : meWins > aiWins ? 'me' : aiWins > meWins ? 'ai' : 'tie';
-              const Row = ({ label, w }) => (
-                <div className="vs-row">
-                  <div className="vs-row-h"><span className="vs-win">{label}</span>{w.ready
-                    ? <span className="vs-badge" style={{ color: winColor(w), borderColor: winColor(w) }}>{winLabel(w)}</span>
-                    : <span className="vs-pending">집계 중</span>}</div>
-                  {w.ready ? (
-                    <div className="vs-bars">
-                      <div className="vs-side">
-                        <span className="vs-name">🙋 내 판단</span>
-                        <span className="vs-ret" style={{ color: w.myRet >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>{w.myRet >= 0 ? '+' : ''}{w.myRet}%</span>
-                      </div>
-                      <span className="vs-mid">vs</span>
-                      <div className="vs-side">
-                        <span className="vs-name">🤖 AI 단독 <span className="vs-virtual">가상</span></span>
-                        <span className="vs-ret" style={{ color: w.aiRet >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>{w.aiRet >= 0 ? '+' : ''}{w.aiRet}%</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="vs-pending-txt">판단 후 {label.replace('일','')}일이 지나면 실제 수익으로 채점됩니다.</div>
-                  )}
-                </div>
-              );
-              return (
-                <section className="pwa-card vs-card">
-                  <div className="vs-top">
-                    <span className="pwa-card-label" style={{ margin: 0 }}>🥊 나 vs AI 대결 · 누구 판단이 옳았나</span>
-                    {/* [A-1] 소표본에선 승자 선언 대신 '학습 중'. 30건 이상일 때만 우세 배지. */}
-                    {overall && samplePolicy(recorded).declareWinner && <span className="vs-overall" style={{ background: overall === 'me' ? 'var(--color-success-soft)' : overall === 'ai' ? 'var(--purple-soft, var(--color-primary-soft))' : 'var(--color-card-soft)', color: overall === 'me' ? 'var(--color-success-ink, var(--color-success))' : overall === 'ai' ? 'var(--purple)' : 'var(--color-ink-2)' }}>{overall === 'me' ? '🏆 내 판단 우세' : overall === 'ai' ? '🏆 AI 우세' : '⚖️ 접전'}</span>}
-                    {overall && !samplePolicy(recorded).declareWinner && <span className="vs-overall" style={{ background: 'var(--color-warning-soft)', color: 'var(--color-warning-ink, var(--color-warning))' }}>🌱 학습 중</span>}
-                  </div>
-                  {/* [A-1] 스코어보드 — 첫 참여 전에도 '나 0 : 0 AI'로 게임 프레이밍. */}
-                  <div className="vs-score">
-                    <div className="vs-score-side"><span className="vs-score-who">🙋 나</span><span className="vs-score-num">{meWins}</span></div>
-                    <span className="vs-score-colon">:</span>
-                    <div className="vs-score-side"><span className="vs-score-num">{aiWins}</span><span className="vs-score-who">AI 🤖</span></div>
-                  </div>
-                  {/* [AI-7] 채점 완료/대기 명시 — 미채점을 승패로 세지 않음. 기록 N건 중 채점 완료 vs 대기. */}
-                  <div className="vs-score-sub">채점 완료 <b>{w3.n || 0}</b>건 · 대기 <b>{Math.max(0, recorded - (w3.n || 0))}</b>건{recorded > 0 && !tally.length ? ' — 3일 경과 후 승부가 채점됩니다(미채점은 패로 세지 않습니다)' : ''}</div>
-                  {/* [CI-1] 기록 성실도 — 게임의 기준은 수익률이 아니라 '판단 기록'. 침묵(자동관망)도 데이터. */}
-                  {(() => { const manual = ledger.filter((e) => e.source !== 'auto_watch').length; return (
-                    <div className="vs-integrity">📋 기록 <b>{recorded}건</b>{recorded > 0 ? <> · 직접 판단 <b>{manual}건</b>({Math.round(manual / recorded * 100)}%)</> : ''} · <span className="vs-integrity-note">순위는 수익률이 아니라 <b>판단 기록·성실도</b>로 매깁니다</span></div>
-                  ); })()}
-                  <div className="vs-def"><b>내가 산 것</b> vs <b>AI가 전부 매매했다고 가정한 가상 수익</b>을 3·7일로 비교합니다(AI는 가상 체결).</div>
-                  {anyReady ? (
-                    <>
-                      <Row label="3일" w={w3} />
-                      <Row label="7일" w={w7} />
-                      {(w7.ready ? w7 : w3).details?.length > 0 && (() => {
-                        const w = w7.ready ? w7 : w3;
-                        return (
-                          <div className="vs-detail">
-                            <div className="vs-detail-h">종목별 판단 결과 ({w7.ready ? '7일' : '3일'})</div>
-                            {w.details.slice(0, 6).map((d, i) => (
-                              <div className="vs-drow" key={i}>
-                                <span className="vs-dname">{d.name}</span>
-                                <span className={`vs-dtag ${d.decision === 'take' ? 'take' : 'pass'}`}>{d.decision === 'take' ? '내가 삼' : '지나침'}</span>
-                                <span className="vs-dret mono" style={{ color: d.ret >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>{d.ret >= 0 ? '+' : ''}{d.ret}%</span>
-                                <span className="vs-dok">{d.correct ? '✓' : '✗'}</span>
-                              </div>
-                            ))}
-                            <p className="vs-foot">✓ = 판단 적중(산 게 오르거나 · 지나친 게 내림) · ✗ = 틀림. AI 단독은 추천 전부를 매매했다고 가정합니다.</p>
-                          </div>
-                        );
-                      })()}
-                    </>
-                  ) : (
-                    <div className="vs-empty">
-                      <div className="vs-empty-ic">⚔</div>
-                      <div className="vs-empty-t">{recorded > 0 ? `판단 ${recorded}건 기록됨 · 성과 집계 중` : 'AI와의 첫 승부를 기다리고 있어요'}</div>
-                      <div className="vs-empty-s">추천 탭에서 AI 매매 제안을 <b>승인(매매)</b> 또는 <b>거절(관망)</b>하면 판단이 기록되고, <b>3일·7일 뒤</b> 실제 수익으로 나 vs AI 승부가 자동 채점됩니다.</div>
-                      <button className="vs-empty-btn" onClick={() => setTab('recommend')}>⚔ AI와 첫 승부 시작하기</button>
-                    </div>
-                  )}
-                </section>
-              );
-            })()}
-
-            {/* [FB-4 §4.1] 나 vs AI 일자별 — 판단을 남긴 날짜별로 누적 현황을 한눈에. ledger.ts 기준(KST). */}
-            {ledger.length > 0 && (() => {
-              const byDay = {};
-              ledger.forEach((e) => {
-                const key = new Date((e.ts || 0) + 9 * 3600000).toISOString().slice(0, 10);
-                byDay[key] = byDay[key] || { take: 0, pass: 0 };
-                if (e.decision === 'take') byDay[key].take++; else byDay[key].pass++;
-              });
-              const days = Object.entries(byDay).sort((a, b) => b[0].localeCompare(a[0])).slice(0, 7);
-              return (
-                <section className="pwa-card vsday-card">
-                  <span className="pwa-card-label">📅 나 vs AI · 일자별 판단</span>
-                  <div className="vsday-list">
-                    {days.map(([d, v]) => (
-                      <div className="vsday-row" key={d}>
-                        <span className="vsday-d">{d.slice(5)}</span>
-                        <span className="vsday-cnt">판단 {v.take + v.pass}건</span>
-                        <span className="vsday-tp">샀어요 {v.take} · 관망 {v.pass}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <p className="vsday-foot">판단을 남긴 날짜별 기록입니다 · 각 판단은 3·7일 뒤 실제 수익으로 채점됩니다.</p>
-                </section>
-              );
-            })()}
-
-            {/* [A-6] AI vs 나 손익 비교 — 승률·총이익·총손실·순손익·손익비. AI는 가상 포지션(가정 명시). */}
-            {(() => {
-              const w7 = computeShowdown(ledger, 7);
-              const w = w7.ready ? w7 : computeShowdown(ledger, 3);
-              if (!w.ready || !(w.details?.length)) return null;
-              const winDays = w7.ready ? 7 : 3;   // [항목1] 정산 창(거래일)
-              const won = 10000; // 1건 100만원 → ret(%) × 10000 = 손익(원)
-              const dts = w.details;
-              // [항목1] 대결 기준일 — 오늘(정산일) + 판단일 범위. 언제 기준인지 명시.
-              const _kstNow = new Date(Date.now() + 9*3600*1000);
-              const _todayStr = _kstNow.toISOString().slice(0, 10);
-              const _fmtMd = (ts) => { const d = new Date(ts + 9*3600*1000); return `${d.getUTCMonth()+1}/${d.getUTCDate()}`; };
-              const _dsTs = dts.map(d => d.ts).filter(Boolean);
-              const _dateRange = _dsTs.length
-                ? (_fmtMd(Math.min(..._dsTs)) === _fmtMd(Math.max(..._dsTs))
-                    ? _fmtMd(Math.max(..._dsTs))
-                    : `${_fmtMd(Math.min(..._dsTs))}~${_fmtMd(Math.max(..._dsTs))}`)
-                : null;
-              const sum = (arr, f) => arr.reduce((a, x) => a + f(x), 0);
-              const aiProfit = sum(dts.filter(d => d.ret > 0), d => d.ret * won); // AI=추천 전부 매수(항상 투자)
-              const aiLoss = sum(dts.filter(d => d.ret < 0), d => -d.ret * won);
-              const aiWins = dts.filter(d => d.ret > 0).length;
-              const takes = dts.filter(d => d.decision === 'take');
-              const myProfit = sum(takes.filter(d => d.ret > 0), d => d.ret * won);
-              const myLoss = sum(takes.filter(d => d.ret < 0), d => -d.ret * won);
-              const myWins = takes.filter(d => d.ret > 0).length;
-              const passes = dts.filter(d => d.decision === 'pass');
-              const avoidedLoss = sum(passes.filter(d => d.ret < 0), d => -d.ret * won);
-              const missedGain = sum(passes.filter(d => d.ret > 0), d => d.ret * won);
-              const plr = (p, l) => l > 0 ? (p / l).toFixed(2) : (p > 0 ? '∞' : '-');
-              const won0 = (n) => `${n >= 0 ? '' : '-'}${Math.abs(Math.round(n)).toLocaleString()}원`;
-              const pol = samplePolicy(dts.length);
-              const aiNet = aiProfit - aiLoss, myNet = myProfit - myLoss;
-              const col = (n) => n >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
-              return (
-                <section className="pwa-card">
-                  <span className="pwa-card-label">💰 AI vs 나 · 손익 비교</span>
-                  <div className="pl-asof">🗓 {_todayStr} 정산 · {winDays}거래일 전 판단{_dateRange ? ` (${_dateRange})` : ''} 기준 · 대결 {dts.length}건</div>
-                  <div style={{ margin: '2px 0 4px' }}><SampleSizeBadge count={dts.length} label={pol.tier === 'learning' ? '학습 중' : undefined} /></div>
-                  <div className="pl-grid">
-                    <div className="pl-cell"><span className="pl-k">🙋 내 순손익 (실제 보유)</span><span className="pl-v" style={{ color: col(myNet) }}>{won0(myNet)}</span></div>
-                    <div className="pl-cell"><span className="pl-k">🤖 AI 순손익 (가상)</span><span className="pl-v" style={{ color: col(aiNet) }}>{won0(aiNet)}</span></div>
-                    <div className="pl-cell"><span className="pl-k">내 승률 · 손익비</span><span className="pl-v">{takes.length ? `${Math.round(myWins/takes.length*100)}%` : '-'} · {plr(myProfit, myLoss)}</span></div>
-                    <div className="pl-cell"><span className="pl-k">AI 승률 · 손익비</span><span className="pl-v">{Math.round(aiWins/dts.length*100)}% · {plr(aiProfit, aiLoss)}</span></div>
-                    <div className="pl-cell"><span className="pl-k">관망으로 피한 손실</span><span className="pl-v" style={{ color: 'var(--color-success)' }}>{won0(avoidedLoss)}</span></div>
-                    <div className="pl-cell"><span className="pl-k">관망으로 놓친 이익</span><span className="pl-v" style={{ color: 'var(--color-danger)' }}>{won0(missedGain)}</span></div>
-                    {/* [A-5] 오류 4분류 — 거짓 매수율(샀는데 내림) vs 기회 상실률(관망했는데 오름)을 분리. */}
-                    <div className="pl-cell"><span className="pl-k">거짓 매수율 <span style={{color:'var(--text-tertiary)'}}>(사서 손실)</span></span><span className="pl-v">{takes.length ? `${Math.round(takes.filter(d=>d.ret<0).length/takes.length*100)}%` : '-'}<span style={{fontSize:'0.6rem',color:'var(--text-tertiary)',fontWeight:600}}> {takes.filter(d=>d.ret<0).length}/{takes.length}</span></span></div>
-                    <div className="pl-cell"><span className="pl-k">기회 상실률 <span style={{color:'var(--text-tertiary)'}}>(관망 중 상승)</span></span><span className="pl-v">{passes.length ? `${Math.round(passes.filter(d=>d.ret>0).length/passes.length*100)}%` : '-'}<span style={{fontSize:'0.6rem',color:'var(--text-tertiary)',fontWeight:600}}> {passes.filter(d=>d.ret>0).length}/{passes.length}</span></span></div>
-                    {pol.declareWinner && (
-                      <div className="pl-cell wide"><span className="pl-k">종합</span><span className="pl-v" style={{ color: myNet > aiNet ? 'var(--color-success)' : myNet < aiNet ? 'var(--purple)' : 'var(--color-ink-2)' }}>{myNet > aiNet ? '🏆 내 판단이 더 벌었습니다' : myNet < aiNet ? '🤖 AI 가상이 더 벌었습니다' : '⚖️ 접전'}</span></div>
-                    )}
-                  </div>
-                  <p className="pl-foot">가정: 1건당 100만원 매수 · AI는 항상 투자, 나는 산 것만 — 실제 체결 아닌 가상.{!pol.declareWinner && <> 표본 {dts.length}건 — 30건부터 승자 선언.</>}</p>
-                </section>
-              );
-            })()}
-
-            </>)}
+            {/* [나 vs AI 대결] — 2026-08-23 완전 재설계. today.js와 동일한 components/PortfolioDuelCard.js 로 통합. */}
+            {trustSec === 'vs' && <PortfolioDuelCard />}
 
             {/* [S2.2 G2] AI 자기검증 — 판단 흐름 · 학습 현황 · 개선노트 */}
             {trustSec === 'verify' && (<>
@@ -4672,132 +4304,6 @@ export default function PWADashboard({ latestReport }) {
         .aid-tag.act { color: #2F6BFF; background: #EAF1FF; }
         .aid-tag.sc { color: #B45309; background: #FEF3C7; }
         .aid-tag.gone { color: #94A3B8; background: #F1F5F9; }
-        .vs-card { border: 1px solid var(--color-line); }
-        .vs-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-        .vs-overall { font-size: 0.7rem; font-weight: 800; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
-        /* [A-1] 나 vs AI 스코어보드 */
-        /* [G-시리즈] 가상 지갑 대결 게임 */
-        .game-onb { border: 1px solid var(--color-primary); }
-        .gonb-sub { font-size: 0.78rem; color: var(--text-secondary); line-height: 1.6; margin: 6px 0 12px; word-break: keep-all; }
-        .gonb-opts { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
-        .gonb-opt { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 14px 4px; border: 1px solid var(--border); border-radius: 12px; background: var(--inset-bg); color: var(--color-ink); font-size: 0.84rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
-        .gonb-opt span { font-size: 0.56rem; font-weight: 800; color: var(--purple, var(--color-primary)); background: var(--purple-soft, var(--color-primary-soft)); padding: 1px 6px; border-radius: 4px; }
-        .gonb-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 12px; line-height: 1.5; word-break: keep-all; }
-        /* [사용자 지시] 삭제된 "AI 신뢰도" 소개카드 대신, 이 페이지에서 가장 중요한 실제 결과인
-           나 vs AI 대결 카드를 짙은 곤색(hero) 카드로 강조 — 자식 요소들은 대부분 CSS 변수(--color-ink 등)를
-           참조하므로 여기서 그 변수들만 hero 톤으로 재정의하면 하위 전부가 함께 톤이 바뀐다. */
-        .gd-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-        .gd-virtual { font-size: 0.6rem; font-weight: 800; color: var(--purple, var(--color-primary)); background: var(--purple-soft, var(--color-primary-soft)); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
-        .gd-narr { font-size: 0.76rem; color: var(--color-ink-2); background: var(--inset-bg); border-radius: 9px; padding: 8px 11px; margin: 10px 0 0; line-height: 1.5; word-break: keep-all; }
-        .gd-wallets { display: flex; align-items: center; gap: 8px; margin: 12px 0 8px; }
-        .gd-w { flex: 1; display: flex; flex-direction: column; gap: 3px; align-items: center; background: var(--inset-bg); border-radius: 12px; padding: 12px 6px; text-align: center; }
-        .gd-wl { font-size: 1.02rem; font-weight: 800; color: var(--color-ink); }
-        .gd-wl-ed { font-size: 0.66rem; font-weight: 600; color: var(--text-tertiary); margin-left: 3px; }
-        .gd-wb { font-size: 1.05rem; font-weight: 900; font-family: var(--font-mono); color: var(--color-ink); }
-        .gd-wg { font-size: 0.68rem; font-weight: 800; font-family: var(--font-mono); }
-        .gd-wg.up { color: var(--color-success); } .gd-wg.dn { color: var(--color-danger); }
-        .gd-vs { font-size: 0.72rem; font-weight: 900; color: var(--text-tertiary); flex-shrink: 0; }
-        .gd-bar { height: 8px; border-radius: 4px; background: var(--purple-soft, var(--color-primary-soft)); overflow: hidden; margin-bottom: 8px; }
-        .gd-bar-me { height: 100%; background: var(--color-success); border-radius: 4px; transition: width .4s; }
-        .gd-lead { text-align: center; font-size: 0.74rem; color: var(--text-secondary); line-height: 1.5; word-break: keep-all; }
-        .gd-lead b.up { color: var(--color-success); } .gd-lead b.dn { color: var(--purple, var(--color-danger)); }
-        .gd-trend { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
-        .gd-trend :global(.recharts-wrapper),
-        .gd-trend :global(.recharts-surface),
-        .gd-trend :global(.recharts-wrapper *) { outline: none !important; }
-        .gd-trend-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 4px; flex-wrap: wrap; }
-        .gd-trend-days { font-size: 0.7rem; font-weight: 700; color: var(--text-tertiary); }
-        .gd-trend-final { font-size: 0.72rem; color: var(--text-secondary); text-align: right; }
-        .gd-trend-final b.up { color: var(--color-success); } .gd-trend-final b.dn { color: var(--purple, var(--color-danger)); }
-        /* [사용자 지시] 그래프 클릭 시 그 시점 판단 차이 설명 */
-        .gd-trend-hint { font-size: 0.66rem; color: var(--text-tertiary); text-align: center; margin-top: 4px; }
-        /* [사용자 지시] 그래프 점 클릭 시 팝업 카드(바텀시트)로 상세 설명 */
-        .gd-trend-modal-bg { position: fixed; inset: 0; z-index: 9000; background: rgba(10,15,25,.5); display: flex; align-items: flex-end; justify-content: center; }
-        .gd-trend-modal { position: relative; width: 100%; max-width: 480px; background: var(--color-card); border-radius: 18px 18px 0 0; padding: 22px 20px calc(env(safe-area-inset-bottom, 0px) + 22px); }
-        .gd-trend-modal-x { position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--color-card-soft, var(--color-line)); color: var(--color-ink-2); font-size: 14px; cursor: pointer; }
-        .gd-trend-modal-t { font-size: 1.02rem; font-weight: 800; color: var(--color-ink); margin: 0 40px 4px 0; word-break: keep-all; }
-        .gd-trend-modal-ret { font-size: 0.8rem; font-weight: 700; color: var(--color-ink-3); margin-bottom: 14px; }
-        .gd-trend-modal-rows { display: flex; flex-direction: column; gap: 10px; }
-        .gd-trend-modal-row { display: flex; align-items: center; gap: 8px; padding: 10px 12px; background: var(--color-card-soft, var(--color-bg)); border-radius: 10px; }
-        .gd-trend-modal-who { flex: none; font-size: 0.82rem; font-weight: 800; color: var(--color-ink); }
-        .gd-trend-modal-mid { flex: 1; min-width: 0; font-size: 0.76rem; color: var(--color-ink-2); }
-        .gd-trend-modal-row b { font-size: 0.88rem; font-weight: 800; }
-        .gd-trend-modal-row b.up { color: var(--color-success); } .gd-trend-modal-row b.dn { color: var(--purple, var(--color-danger)); }
-        .gd-trend-modal-diff { margin-top: 14px; font-size: 0.92rem; font-weight: 800; color: var(--color-ink); text-align: center; }
-        .gd-trend-modal-note { margin-top: 10px; font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.55; word-break: keep-all; text-align: center; }
-        .gd-pending, .gd-recent { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
-        .gd-ph { font-size: 0.7rem; font-weight: 800; color: var(--color-ink-2); margin-bottom: 6px; }
-        .gd-prow, .gd-rrow { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 0.74rem; }
-        .gd-pn { flex: 1; font-weight: 700; color: var(--color-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .gd-pj { font-size: 0.66rem; color: var(--text-tertiary); }
-        .gd-dday { font-size: 0.66rem; font-weight: 800; color: var(--color-warning-ink, var(--color-warning)); }
-        .gd-rw { flex-shrink: 0; }
-        .gd-rret { font-family: var(--font-mono); font-weight: 800; } .gd-rret.up { color: var(--color-success); } .gd-rret.dn { color: var(--color-danger); }
-        .gd-rwin { font-size: 0.64rem; font-weight: 700; color: var(--text-secondary); }
-        .gd-foot { font-size: 0.64rem; color: var(--text-tertiary); margin-top: 12px; line-height: 1.6; word-break: keep-all; }
-        .gd-reset { border: none; background: none; color: var(--color-primary); font-weight: 700; cursor: pointer; font-size: 0.64rem; text-decoration: underline; font-family: var(--font-sans); padding: 0; }
-        /* [사용자 지시] 향후 대결 구도 카드 */
-        .upcoming-desc { font-size: 0.76rem; color: var(--text-secondary); line-height: 1.55; word-break: keep-all; margin: 6px 0 10px; }
-        .upcoming-list { display: flex; flex-direction: column; gap: 6px; }
-        .upcoming-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--inset-bg); border-radius: 9px; font-size: 0.74rem; }
-        .upcoming-name { flex: 1; min-width: 0; font-weight: 700; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .upcoming-j { flex: none; font-size: 0.64rem; color: var(--text-tertiary); }
-        .upcoming-impact { flex: none; font-size: 0.68rem; font-weight: 800; color: var(--color-primary); font-family: var(--font-mono); }
-        .upcoming-dday { flex: none; font-size: 0.64rem; font-weight: 800; color: var(--color-warning-ink, var(--color-warning)); }
-        .vs-score { display: flex; align-items: center; justify-content: center; gap: 18px; margin: 12px 0 4px; padding: 10px 0; background: var(--inset-bg); border-radius: 12px; }
-        .vs-score-side { display: flex; align-items: center; gap: 8px; }
-        .vs-score-who { font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); }
-        .vs-score-num { font-size: 1.7rem; font-weight: 900; font-family: var(--font-mono); color: var(--color-ink); min-width: 22px; text-align: center; }
-        .vs-score-colon { font-size: 1.3rem; font-weight: 900; color: var(--text-tertiary); }
-        .vs-score-sub { text-align: center; font-size: 0.68rem; color: var(--text-secondary); margin: 6px 0 2px; line-height: 1.5; word-break: keep-all; }
-        .vs-integrity { text-align: center; font-size: 0.68rem; color: var(--text-secondary); margin: 4px 0 2px; line-height: 1.5; word-break: keep-all; background: var(--inset-bg); border-radius: 8px; padding: 7px 10px; }
-        .vs-integrity-note { color: var(--text-tertiary); }
-        .vs-virtual { font-size: 0.56rem; font-weight: 800; color: var(--purple, var(--color-primary)); background: var(--purple-soft, var(--color-primary-soft)); padding: 1px 5px; border-radius: 4px; vertical-align: middle; }
-        /* [A-6] AI vs 나 손익 비교 */
-        .pl-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
-        .pl-cell { background: var(--inset-bg); border-radius: 10px; padding: 9px 11px; display: flex; flex-direction: column; gap: 3px; }
-        .pl-cell.wide { grid-column: 1 / -1; }
-        .pl-k { font-size: 0.64rem; color: var(--text-tertiary); font-weight: 700; }
-        .pl-v { font-size: 0.9rem; font-weight: 800; font-family: var(--font-mono); }
-        .pl-asof { font-size: 0.66rem; font-weight: 700; color: var(--color-ink-3); margin: 2px 0 4px; }
-        .pl-foot { font-size: 0.64rem; color: var(--text-tertiary); line-height: 1.5; margin-top: 8px; word-break: keep-all; }
-        .vs-def { font-size: 0.74rem; color: var(--text-secondary); line-height: 1.55; margin: 10px 0 4px; word-break: keep-all; }
-        /* [FB-4 §4.1] 나 vs AI 일자별 */
-        .vsday-list { display: flex; flex-direction: column; margin-top: 8px; }
-        .vsday-row { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--color-line); }
-        .vsday-row:last-child { border-bottom: none; }
-        .vsday-d { flex: none; width: 44px; font-size: 0.78rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; }
-        .vsday-cnt { flex: none; font-size: 0.74rem; font-weight: 700; color: var(--color-primary); }
-        .vsday-tp { flex: 1; text-align: right; font-size: 0.74rem; font-weight: 600; color: var(--text-secondary); }
-        .vsday-foot { font-size: 0.66rem; color: var(--text-tertiary); margin-top: 9px; line-height: 1.5; word-break: keep-all; }
-        .vs-def b { color: var(--text-primary); font-weight: 700; }
-        .vs-row { margin-top: 12px; padding: 12px; background: var(--color-card-soft); border-radius: 14px; }
-        .vs-row-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-        .vs-win { font-size: 0.86rem; font-weight: 800; color: var(--text-primary); }
-        .vs-badge { font-size: 0.72rem; font-weight: 800; border: 1px solid; border-radius: 8px; padding: 2px 9px; }
-        .vs-pending { font-size: 0.68rem; font-weight: 700; color: var(--text-tertiary); }
-        .vs-bars { display: flex; align-items: center; gap: 8px; }
-        .vs-side { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; background: var(--card-bg); border-radius: 10px; padding: 10px 6px; }
-        .vs-name { font-size: 0.72rem; font-weight: 700; color: var(--text-secondary); white-space: nowrap; }
-        .vs-ret { font-size: 1.15rem; font-weight: 800; font-family: var(--font-mono); }
-        .vs-mid { font-size: 0.7rem; font-weight: 800; color: var(--text-tertiary); flex-shrink: 0; }
-        .vs-pending-txt { font-size: 0.72rem; color: var(--text-tertiary); line-height: 1.5; }
-        .vs-detail { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--color-line); }
-        .vs-detail-h { font-size: 0.72rem; font-weight: 800; color: var(--text-secondary); margin-bottom: 6px; }
-        .vs-drow { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--border); }
-        .vs-dname { flex: 1; font-size: 0.8rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .vs-dtag { font-size: 0.64rem; font-weight: 800; padding: 2px 7px; border-radius: 6px; flex-shrink: 0; }
-        .vs-dtag.take { background: var(--color-primary-soft); color: var(--color-primary); }
-        .vs-dtag.pass { background: var(--color-card-soft); color: var(--text-tertiary); }
-        .vs-dret { font-size: 0.8rem; font-weight: 800; flex-shrink: 0; min-width: 52px; text-align: right; }
-        .vs-dok { font-size: 0.82rem; flex-shrink: 0; width: 16px; text-align: center; }
-        .vs-foot { font-size: 0.64rem; color: var(--text-tertiary); margin-top: 8px; line-height: 1.5; word-break: keep-all; }
-        .vs-empty { text-align: center; padding: 16px 8px 6px; }
-        .vs-empty-ic { font-size: 1.7rem; margin-bottom: 6px; }
-        .vs-empty-t { font-size: 0.86rem; font-weight: 700; color: var(--text-primary); }
-        .vs-empty-s { font-size: 0.74rem; color: var(--text-secondary); margin-top: 6px; line-height: 1.55; word-break: keep-all; }
-        .vs-empty-s b { color: var(--text-primary); font-weight: 700; }
-        .vs-empty-btn { margin-top: 12px; background: var(--color-primary); color: #fff; border: none; border-radius: 10px; padding: 9px 18px; font-size: 0.8rem; font-weight: 700; cursor: pointer; }
         /* [§3-5] AI 개선노트(changelog) */
         .chlog-intro { font-size: 0.8rem; color: var(--text-secondary); line-height: 1.55; margin: 10px 0 12px; }
         .chlog-intro b { color: var(--text-primary); font-weight: 700; }
