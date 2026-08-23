@@ -13,7 +13,9 @@ import {
   getDecisionAnalysis, DEFAULT_CASH,
 } from "../lib/portfolioDuel";
 
-const eok = (n) => (n == null ? "-" : `${(n / 1e8).toFixed(2)}억`);
+// [사용자 지시] 억 단위 반올림은 소액 계좌에서 나/AI 차이가 0.00억으로 뭉개져 보였다 —
+//   원 단위 그대로(백원 단위까지) 표기해 실제 차이가 보이게 한다.
+const wonFmt = (n) => (n == null ? "-" : `${Math.round(n).toLocaleString()}원`);
 const BUY_AMOUNT_WON = 1000000; // [단순화] 매수 추천 크기 = 100만원어치(최소 1주) 고정 — 사이즈 커스터마이즈는 범위 밖
 
 export default function PortfolioDuelCard() {
@@ -126,7 +128,7 @@ export default function PortfolioDuelCard() {
         <p className="pd-intro">
           {posCount > 0
             ? <>지금 보유 중인 KIS 종목 <b>{posCount}개</b>를 그대로 복제해서, "나"와 "AI" 두 포트폴리오를 <b>지금 이 순간부터</b> 시작합니다.</>
-            : <>KIS 실보유가 확인되지 않아 <b>{eok(DEFAULT_CASH)}원 가상현금</b>으로 "나"와 "AI" 두 포트폴리오를 시작합니다.</>}
+            : <>KIS 실보유가 확인되지 않아 <b>{wonFmt(DEFAULT_CASH)} 가상현금</b>으로 "나"와 "AI" 두 포트폴리오를 시작합니다.</>}
         </p>
         <p className="pd-intro sub">매일 나오는 매수·매도 추천을 AI는 항상 수용하고, 나는 내가 고른 대로만 반영합니다. 그 차이가 곧 대결 결과입니다.</p>
         <button type="button" className="pd-start" onClick={onStart} disabled={busy}>{busy ? "시작하는 중…" : "대결 시작하기"}</button>
@@ -163,18 +165,20 @@ export default function PortfolioDuelCard() {
       <div className="pd-title">🥊 포트폴리오 대결 <span className="pd-sub">{duel.base.startDate}부터 · {duel.base.seedType === "kis" ? "실보유 기준" : "가상현금 기준"}</span></div>
 
       <div className="pd-vs">
-        <div className="pd-vs-side">
-          <span className="pd-vs-lbl">나</span>
-          <span className="pd-vs-val">{eok(myVal)}원</span>
-          <span className="pd-vs-break">현금 {eok(duel.me.cash)} + 주식 {eok(stockVal(duel.me))}</span>
+        <div className="pd-vs-row">
+          <div className="pd-vs-side">
+            <span className="pd-vs-lbl">나 총액</span>
+            <span className="pd-vs-val">{wonFmt(myVal)}</span>
+            <span className="pd-vs-break">현금 {wonFmt(duel.me.cash)} + 주식 {wonFmt(stockVal(duel.me))}</span>
+          </div>
+          <div className="pd-vs-side r">
+            <span className="pd-vs-lbl">AI 총액</span>
+            <span className="pd-vs-val">{wonFmt(aiVal)}</span>
+            <span className="pd-vs-break">현금 {wonFmt(duel.ai.cash)} + 주식 {wonFmt(stockVal(duel.ai))}</span>
+          </div>
         </div>
         <div className={`pd-vs-diff ${diff > 0 ? "pos" : diff < 0 ? "neg" : ""}`}>
-          {diff > 0 ? "+" : ""}{eok(diff)} ({diffPct > 0 ? "+" : ""}{diffPct.toFixed(2)}%)
-        </div>
-        <div className="pd-vs-side">
-          <span className="pd-vs-lbl">AI</span>
-          <span className="pd-vs-val">{eok(aiVal)}원</span>
-          <span className="pd-vs-break">현금 {eok(duel.ai.cash)} + 주식 {eok(stockVal(duel.ai))}</span>
+          총액 차이 {diff > 0 ? "+" : ""}{wonFmt(diff)} ({diffPct > 0 ? "+" : ""}{diffPct.toFixed(2)}%)
         </div>
       </div>
 
@@ -197,7 +201,7 @@ export default function PortfolioDuelCard() {
             <div className="pd-item" key={`b-${c.code}`}>
               <span className="pd-item-tag buy">매수 추천</span>
               <span className="pd-item-name">{c.name}</span>
-              <span className="pd-item-amt">{eok(BUY_AMOUNT_WON)}원 규모</span>
+              <span className="pd-item-amt">{wonFmt(BUY_AMOUNT_WON)} 규모</span>
               <div className="pd-item-btns">
                 <button type="button" className="pd-b accept" onClick={() => decide(c, "buy", true)}>수용</button>
                 <button type="button" className="pd-b reject" onClick={() => decide(c, "buy", false)}>거부</button>
@@ -273,12 +277,14 @@ export default function PortfolioDuelCard() {
         .pd-intro.sub { font-size: 0.76rem; color: var(--color-ink-3); }
         .pd-start { width: 100%; margin-top: 14px; padding: 13px; border-radius: 10px; border: none; background: var(--color-primary); color: #fff; font-size: 0.9rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .pd-err { margin-top: 8px; font-size: 0.78rem; color: var(--color-danger); }
-        .pd-vs { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 0; }
-        .pd-vs-side { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+        .pd-vs { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+        .pd-vs-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+        .pd-vs-side { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+        .pd-vs-side.r { align-items: flex-end; text-align: right; }
         .pd-vs-lbl { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-3); }
-        .pd-vs-val { font-size: 1.15rem; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; }
-        .pd-vs-break { font-size: 0.62rem; color: var(--color-ink-3); font-family: ui-monospace, monospace; white-space: nowrap; }
-        .pd-vs-diff { font-size: 0.9rem; font-weight: 800; }
+        .pd-vs-val { font-size: 1.05rem; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; word-break: break-word; }
+        .pd-vs-break { font-size: 0.62rem; color: var(--color-ink-3); font-family: ui-monospace, monospace; white-space: normal; word-break: break-word; max-width: 100%; }
+        .pd-vs-diff { font-size: 0.86rem; font-weight: 800; text-align: center; word-break: break-word; }
         .pd-vs-diff.pos { color: var(--color-success); } .pd-vs-diff.neg { color: var(--color-danger); }
         .pd-chart-empty { font-size: 0.76rem; color: var(--color-ink-3); text-align: center; padding: 20px 8px; }
         .pd-todo { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
