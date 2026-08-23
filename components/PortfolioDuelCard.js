@@ -10,10 +10,9 @@ import { fetchStockQuotes } from "../lib/stockLive";
 import {
   isDuelStarted, startDuel, resetDuel, getPortfolios, getSnapshots,
   recordSnapshot, recordDuelDecision, hasDecisionToday, detectSellCandidates, portfolioValue,
-  DEFAULT_CASH,
+  getDecisionAnalysis, DEFAULT_CASH,
 } from "../lib/portfolioDuel";
 
-const won = (n) => (n == null ? "-" : Math.round(n).toLocaleString());
 const eok = (n) => (n == null ? "-" : `${(n / 1e8).toFixed(2)}억`);
 const BUY_AMOUNT_WON = 1000000; // [단순화] 매수 추천 크기 = 100만원어치(최소 1주) 고정 — 사이즈 커스터마이즈는 범위 밖
 
@@ -26,6 +25,7 @@ export default function PortfolioDuelCard() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  const [news, setNews] = useState([]); // [2단계] 종목별 뉴스 추적 — 전용 백엔드 없이 기존 종합뉴스에서 이름 매칭
 
   const trader = typeof window !== "undefined" ? getTrader() : "A";
 
@@ -44,11 +44,22 @@ export default function PortfolioDuelCard() {
     return () => { alive = false; };
   }, [trader]);
 
-  // 시작된 대결의 모든 보유 종목(AI+나 합집합) 실시간 시세 조회 → 스냅샷 1일 1회 기록.
+  // [2단계] 종목별 뉴스 추적 — 티커 전용 백엔드가 없어, 기존 종합뉴스 피드(오늘 탭과 동일 소스)를
+  //   받아 판단 기록 렌더 시 종목명 텍스트 매칭으로 연결한다(today.js의 myEtfNews 패턴과 동일).
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/today/news`).then((r) => r.json()).then((d) => { if (alive) setNews(Array.isArray(d?.items) ? d.items : []); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  // 시작된 대결의 모든 보유 종목(AI+나 합집합) + [2단계] 최근 30일 내 결정 종목(매도로 이미
+  //   손 뗀 종목도 판단 분석용 가격이 계속 쌓이도록) 실시간 시세 조회 → 스냅샷 1일 1회 기록.
   useEffect(() => {
     if (!started || !duel) return;
     let alive = true;
     const codes = new Set([...duel.ai.positions, ...duel.me.positions].map((p) => p.code));
+    const cutoff = Date.now() - 30 * 86400000;
+    duel.decisions.forEach((d) => { if (new Date(d.date).getTime() >= cutoff) codes.add(d.code); });
     if (!codes.size) return;
     const holdings = [...codes].map((c) => ({ id: c, code: c, market: "kr" }));
     fetchStockQuotes(holdings).then(({ quotes: qs }) => {
@@ -71,7 +82,8 @@ export default function PortfolioDuelCard() {
         if (typeof p === "string") p = JSON.parse(p);
         if (Array.isArray(p)) positions = p;
       } catch (e) {}
-      const res = startDuel({ trader, kisPositions: positions });
+      const kisCash = dash?.balance?.cash != null ? Number(dash.balance.cash) : 0;
+      const res = startDuel({ trader, kisPositions: positions, kisCash });
       if (!res.ok) { setErr(res.error || "시작 실패"); setBusy(false); return; }
       reload();
       try { window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {}
@@ -129,6 +141,9 @@ export default function PortfolioDuelCard() {
   const diff = myVal - aiVal;
   const diffPct = aiVal > 0 ? (diff / aiVal) * 100 : 0;
   const chartData = snapshots.map((s) => ({ label: s.date.slice(5), 나: s.myValue, AI: s.aiValue }));
+  // [사용자 지시] 현금 보유액도 포함한 "통합 총액" 기준 비교임을 화면에서 바로 확인 가능하도록,
+  //   현금+주식평가액 분해를 총액 아래 함께 표기(총액=cash+positions는 portfolioValue()가 이미 통합 계산).
+  const stockVal = (side) => side.positions.reduce((s, p) => s + (quotes[p.code] != null ? quotes[p.code] : p.avgPrice) * p.qty, 0);
 
   // 오늘의 매수 후보(dash.recommend_stocks 중 매수 신호(score>=70)이고 오늘 아직 결정 안 한 것)
   const buyCands = (dash?.recommend_stocks || [])
@@ -137,6 +152,10 @@ export default function PortfolioDuelCard() {
   // 오늘의 매도 후보(AI 보유 중 손절/익절 구간)
   const sellCands = detectSellCandidates(trader, quotes).filter((c) => !hasDecisionToday(trader, c.code, "sell"));
 
+  // [2단계] 판단별 단기(1일)/중기(1주)/장기(1개월) 분석 + 종목명으로 매칭된 관련 뉴스 1건.
+  const analysisById = {};
+  getDecisionAnalysis(trader).forEach((a) => { analysisById[a.id] = a; });
+  const newsFor = (name) => name ? news.find((n) => `${n.headline || ""} ${n.summary_md || ""}`.includes(name)) : null;
   const recentDecisions = [...duel.decisions].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 8);
 
   return (
@@ -147,6 +166,7 @@ export default function PortfolioDuelCard() {
         <div className="pd-vs-side">
           <span className="pd-vs-lbl">나</span>
           <span className="pd-vs-val">{eok(myVal)}원</span>
+          <span className="pd-vs-break">현금 {eok(duel.me.cash)} + 주식 {eok(stockVal(duel.me))}</span>
         </div>
         <div className={`pd-vs-diff ${diff > 0 ? "pos" : diff < 0 ? "neg" : ""}`}>
           {diff > 0 ? "+" : ""}{eok(diff)} ({diffPct > 0 ? "+" : ""}{diffPct.toFixed(2)}%)
@@ -154,6 +174,7 @@ export default function PortfolioDuelCard() {
         <div className="pd-vs-side">
           <span className="pd-vs-lbl">AI</span>
           <span className="pd-vs-val">{eok(aiVal)}원</span>
+          <span className="pd-vs-break">현금 {eok(duel.ai.cash)} + 주식 {eok(stockVal(duel.ai))}</span>
         </div>
       </div>
 
@@ -207,14 +228,32 @@ export default function PortfolioDuelCard() {
         <div className="pd-history">
           {recentDecisions.length === 0 && <div className="pd-todo-empty">아직 판단 기록이 없습니다.</div>}
           {recentDecisions.map((d) => {
-            const now = quotes[d.code];
-            const chgPct = now != null && d.price > 0 ? (now / d.price - 1) * 100 * (d.action === "sell" ? -1 : 1) : null;
+            const a = analysisById[d.id];
+            const relNews = newsFor(d.name);
             return (
               <div className="pd-hist-row" key={d.id}>
-                <span className="pd-hist-date">{d.date}</span>
-                <span className="pd-hist-name">{d.name}</span>
-                <span className={`pd-hist-tag ${d.accepted ? "on" : "off"}`}>{d.action === "buy" ? "매수" : "매도"} {d.accepted ? "수용" : "거부"}</span>
-                {chgPct != null && <span className={`pd-hist-chg ${chgPct > 0 ? "pos" : chgPct < 0 ? "neg" : ""}`}>그 결정 이후 {chgPct > 0 ? "+" : ""}{chgPct.toFixed(1)}%</span>}
+                <div className="pd-hist-top">
+                  <span className="pd-hist-date">{d.date}</span>
+                  <span className="pd-hist-name">{d.name}</span>
+                  <span className={`pd-hist-tag ${d.accepted ? "on" : "off"}`}>{d.action === "buy" ? "매수" : "매도"} {d.accepted ? "수용" : "거부"}</span>
+                </div>
+                {a && (
+                  <div className="pd-hist-windows">
+                    {["short", "mid", "long"].map((k) => {
+                      const w = a.windows[k];
+                      return (
+                        <span className="pd-hist-w" key={k}>
+                          {w.label} {w.ready ? <b className={w.pct > 0 ? "pos" : w.pct < 0 ? "neg" : ""}>{w.pct > 0 ? "+" : ""}{w.pct.toFixed(1)}%</b> : <i>집계 전</i>}
+                        </span>
+                      );
+                    })}
+                  </div>
+                )}
+                {relNews && (
+                  <button type="button" className="pd-hist-news" onClick={() => { window.location.href = `/pwa/today?news=${relNews.id}`; }}>
+                    📰 {relNews.headline}
+                  </button>
+                )}
               </div>
             );
           })}
@@ -238,6 +277,7 @@ export default function PortfolioDuelCard() {
         .pd-vs-side { display: flex; flex-direction: column; align-items: center; gap: 2px; }
         .pd-vs-lbl { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-3); }
         .pd-vs-val { font-size: 1.15rem; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; }
+        .pd-vs-break { font-size: 0.62rem; color: var(--color-ink-3); font-family: ui-monospace, monospace; white-space: nowrap; }
         .pd-vs-diff { font-size: 0.9rem; font-weight: 800; }
         .pd-vs-diff.pos { color: var(--color-success); } .pd-vs-diff.neg { color: var(--color-danger); }
         .pd-chart-empty { font-size: 0.76rem; color: var(--color-ink-3); text-align: center; padding: 20px 8px; }
@@ -254,15 +294,20 @@ export default function PortfolioDuelCard() {
         .pd-b { flex: 1; padding: 7px; border-radius: 7px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: 0.76rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .pd-b.accept { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
         .pd-history-toggle { width: 100%; margin-top: 12px; padding: 9px; border-radius: 9px; border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink-2); font-size: 0.76rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
-        .pd-history { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
-        .pd-hist-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--color-line); flex-wrap: wrap; }
+        .pd-history { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+        .pd-hist-row { padding: 8px 0; border-bottom: 1px solid var(--color-line); display: flex; flex-direction: column; gap: 5px; }
+        .pd-hist-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
         .pd-hist-date { font-size: 0.66rem; color: var(--color-ink-3); font-family: ui-monospace, monospace; }
         .pd-hist-name { font-size: 0.78rem; font-weight: 700; color: var(--color-ink); }
         .pd-hist-tag { font-size: 0.62rem; font-weight: 700; padding: 1px 6px; border-radius: 999px; }
         .pd-hist-tag.on { background: var(--color-primary-soft); color: var(--color-primary); }
         .pd-hist-tag.off { background: var(--color-card-soft); color: var(--color-ink-3); }
-        .pd-hist-chg { font-size: 0.72rem; font-weight: 700; margin-left: auto; }
-        .pd-hist-chg.pos { color: var(--color-success); } .pd-hist-chg.neg { color: var(--color-danger); }
+        .pd-hist-windows { display: flex; gap: 10px; flex-wrap: wrap; }
+        .pd-hist-w { font-size: 0.68rem; color: var(--color-ink-3); display: flex; align-items: center; gap: 3px; }
+        .pd-hist-w b { font-family: ui-monospace, monospace; }
+        .pd-hist-w b.pos { color: var(--color-success); } .pd-hist-w b.neg { color: var(--color-danger); }
+        .pd-hist-w i { font-style: normal; color: var(--color-ink-3); }
+        .pd-hist-news { align-self: flex-start; max-width: 100%; text-align: left; font-size: 0.7rem; color: var(--color-ink-2); background: var(--color-card-soft); border: none; border-radius: 7px; padding: 5px 8px; cursor: pointer; font-family: var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .pd-foot { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--color-line); display: flex; flex-direction: column; gap: 8px; }
         .pd-foot span { font-size: 0.68rem; color: var(--color-ink-3); line-height: 1.6; word-break: keep-all; }
         .pd-reset { align-self: flex-start; font-size: 0.7rem; color: var(--color-ink-3); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0; font-family: var(--font-sans); }
