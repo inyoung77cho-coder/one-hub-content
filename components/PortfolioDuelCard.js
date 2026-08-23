@@ -105,9 +105,19 @@ export default function PortfolioDuelCard() {
     }
   };
 
+  // [버그 수정] lib/portfolioDuel.js의 저장 함수들은 localStorage에 직접 쓸 뿐, 이 이벤트를
+  //   스스로 발생시키지 않는다. lib/syncManager.js는 오직 이 이벤트로만 "변경분 있음"을 감지해
+  //   서버로 push하므로, onStart()에서만 이 이벤트를 쐈던 것이 실사용자 버그의 원인이었다 —
+  //   결정 기록·초기화·현금 보정이 로컬엔 반영돼도 서버엔 안 올라가, 다음 pull(페이지 재방문)
+  //   때 초기화 시점의 옛 서버 스냅샷이 로컬을 덮어써 "고쳤는데 다시 원래대로" 로 보였다.
+  //   다른 lib(etfHoldings 등)도 전부 "호출부에서 직접 dispatch"가 이 코드베이스의 관례라
+  //   여기서도 mutating 함수 호출부마다 dispatch한다(lib 내부에서 일괄 처리하지 않음).
+  const notifySync = () => { try { window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {} };
+
   const onReset = () => {
     if (!window.confirm("포트폴리오 대결을 초기화할까요?\n지금까지의 기준·결정 기록이 모두 사라지고 처음부터 다시 시작됩니다.")) return;
     resetDuel(trader);
+    notifySync();
     reload();
   };
 
@@ -122,6 +132,7 @@ export default function PortfolioDuelCard() {
       const kisCash = fresh?.balance?.cash != null ? Number(fresh.balance.cash) : 0;
       if (kisCash <= 0) { setErr("예수금을 다시 조회했지만 0원입니다 — 잠시 후 다시 시도해 주세요."); return; }
       correctBaseCash(trader, kisCash);
+      notifySync();
       reload();
     } finally {
       setBusy(false);
@@ -139,6 +150,7 @@ export default function PortfolioDuelCard() {
     if (price == null) price = item.price || 0;
     const qty = action === "buy" ? Math.max(1, Math.floor(BUY_AMOUNT_WON / (price || 1))) : item.qty;
     recordDuelDecision({ trader, code: item.code, name: item.name, action, qty, price, accepted });
+    notifySync();
     reload();
   };
 
