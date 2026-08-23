@@ -441,6 +441,9 @@ export default function EtfDashboard() {
   const heroCost = s?.krw_cost ?? 0;
   const heroPnl = heroVal - heroCost;
   const heroPnlPct = heroCost > 0 ? (heroVal / heroCost - 1) * 100 : (s?.total_pnl_pct ?? 0);
+  // [2026-08-23] 기타 금융자산(펀드·디폴트옵션)은 위 P&L(수익률) 계산에 안 섞는다 —
+  // 원가 이력이 없어 넣으면 수익률이 왜곡된다. 대신 별도 줄로 합계만 보여준다.
+  const otherAssetsSum = otherAssets.reduce((acc, o) => acc + (Number(o.valueKrw) || 0), 0);
 
   // [N1] onboard(etf_uk) 미러링 제거 — ETF 평가액은 lib/ledger가 lib/etfLive로 직접 계산한다.
   //   과거엔 이 미러가 onboard를 오염시켜 폴백 병합에서 ETF가 두 번 더해졌다(5.15+5.19=10.34억).
@@ -564,6 +567,11 @@ export default function EtfDashboard() {
           <>
             <div className="big">{won(heroVal)}<span>원</span>{heroLive && <span className="big-live">⚡실시간</span>}</div>
             <div className="hsub">취득 {won(heroCost)} → 평가손익 <b>{won(heroPnl)}원</b> · <b>{pct(heroPnlPct)}</b>{heroLive && <span className="hsub-note"> · 수량×실측종가({liveCloseDate ? liveCloseDate.slice(5) : "최근"})</span>}</div>
+            {/* [2026-08-23] 위 큰 숫자·수익률은 티커 보유(ETF/주식)만의 것 — 펀드·디폴트옵션은
+                원가 이력이 없어 수익률 계산에 못 섞는다. 그래서 합계만 별도로 밝힌다. */}
+            {otherAssetsSum > 0 && (
+              <div className="hsub hsub-other">+ 기타 금융자산(펀드·디폴트옵션 등) {won(otherAssetsSum)}원 별도 <span className="hsub-note">· 위 수익률에는 미포함</span></div>
+            )}
             {/* [E-1] Tier 3 — 수익 분해 접힘(헤더에 요약값 노출) */}
             <button className="decomp-head" onClick={toggleDecomp} aria-expanded={decompOpen}>
               <span>📊 수익 분해</span>
@@ -599,7 +607,11 @@ export default function EtfDashboard() {
       {/* [S4] 계좌 유형 필터 — 세제가 근본부터 다르므로 계좌별로 보유·세제를 분리해 본다 */}
       <div className="acct-filter" role="tablist" aria-label="계좌 유형 필터">
         {ACCT_FILTERS.map((f) => {
-          const cnt = f === "전체" ? holdings.length : holdings.filter((h) => (h.account || "일반") === f).length;
+          // [2026-08-23] 기타 금융자산(펀드 등)도 계좌 보유 개수에 포함 — 종목수는 다르지만
+          // "이 계좌에 뭔가 있다"는 게 안 보이던 문제라 카운트에는 반드시 넣는다.
+          const cnt = f === "전체"
+            ? holdings.length + otherAssets.length
+            : holdings.filter((h) => (h.account || "일반") === f).length + otherAssets.filter((o) => (o.account || "일반") === f).length;
           return (
             <button key={f} role="tab" aria-selected={acctFilter === f}
               className={`acct-chip ${acctFilter === f ? "on" : ""} ${isPensionAcct(f) ? "pension" : f === "ISA" ? "isa" : ""}`}
@@ -1310,6 +1322,7 @@ export default function EtfDashboard() {
         .fx-note.stale .fx-dot { background: var(--color-warning); }
         .fx-note.stale b { color: var(--color-warning); }
         .hero .hsub { font-size: 12.5px; color: var(--color-ink-2); margin-top: 9px; }
+        .hero .hsub-other { margin-top: 4px; opacity: 0.85; }
         .hero .hsub b { color: var(--color-success); font-weight: 700; }
         .decomp-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-top: 16px; padding: 11px 13px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 12px; color: var(--color-ink); font-family: var(--font-sans); font-size: 13px; font-weight: 700; cursor: pointer; }
         .decomp-sum { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
