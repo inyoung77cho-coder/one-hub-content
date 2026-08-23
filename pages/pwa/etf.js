@@ -7,7 +7,7 @@ import BottomNav from "../../components/BottomNav";
 import AppHeader from "../../components/AppHeader";
 import AssetMapTitle from "../../components/AssetMapTitle";
 import { getTrader } from "../../lib/trader";
-import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS } from "../../lib/etfHoldings";
+import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS, getOtherAssets, addOtherAsset, removeOtherAsset } from "../../lib/etfHoldings";
 import { classifyEtf } from "../../lib/etfClassify";
 import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress, pensionCreditLimitCombined } from "../../lib/taxRules";
 import Term from "../../components/Term";
@@ -46,6 +46,7 @@ export default function EtfDashboard() {
   const [liveFx, setLiveFx] = useState(null); // 당일 USD/KRW 실시간 환율(매일 자동 갱신)
   // [내 ETF] 사용자 직접 입력 보유 + 자동 시세
   const [holdings, setHoldings] = useState([]);
+  const [otherAssets, setOtherAssets] = useState([]); // [2026-08-23] 티커 없는 펀드·디폴트옵션 등
   const [quotes, setQuotes] = useState({}); // { TICKER: {price, currency, date} }
   const [form, setForm] = useState({ side: "buy", ticker: "", shares: "", price: "", ccy: "USD", account: "일반", market: "auto" });
   const [formMsg, setFormMsg] = useState("");
@@ -159,7 +160,7 @@ export default function EtfDashboard() {
 
   // [내 ETF] 로컬 보유 + 등록ETF 수량 로드(60초 폴링) — 시세는 아래 통합 시세 효과가 담당
   useEffect(() => {
-    const load = () => { const tr = getTrader(); setHoldings(getHoldings(tr)); setPosQtyState(getPosQtyMap(tr)); };
+    const load = () => { const tr = getTrader(); setHoldings(getHoldings(tr)); setPosQtyState(getPosQtyMap(tr)); setOtherAssets(getOtherAssets(tr)); };
     load();
     const poll = setInterval(load, 60000);
     window.addEventListener("onehub-trader-change", load);
@@ -337,6 +338,11 @@ export default function EtfDashboard() {
             ccy: "KRW", market: isKrName ? "kr" : "us",
             // 펀드·현금성자산 등 수량이 없거나 현금인 항목은 이 앱의 티커 모델과 안 맞아 기본 제외
             skip: !hasQty || isCashLike,
+            // [2026-08-23] 수량 없는 항목(현금 제외) = 펀드/디폴트옵션 추정 — 티커 대신
+            // "펀드/기타자산으로 등록" 옵션을 보여준다. evalAmt·buyAmt는 그 등록에 쓴다.
+            isFundCandidate: !hasQty && !isCashLike,
+            evalAmt: num(r.evalAmt), buyAmt,
+            registered: false,
           });
         });
       } catch (e) {
@@ -347,6 +353,25 @@ export default function EtfDashboard() {
     if (anyTruncated) setBulkMsg((m) => `${m}${m ? " · " : ""}"더 보기"로 안 펼친 파일이 있어 일부 종목이 빠졌을 수 있습니다 — 웹에서 더 보기를 눌러 다시 받아주세요.`);
   };
   const updateBulkRow = (id, patch) => setBulkRows((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  // [2026-08-23] 티커 없는 펀드/디폴트옵션 행 — 이름+평가금액만으로 기타자산 등록.
+  const registerBulkRowAsFund = (row) => {
+    const tr = getTrader();
+    const res = addOtherAsset({ name: row.name, account: row.account, valueKrw: row.evalAmt, costKrw: row.buyAmt, trader: tr });
+    if (res.ok) {
+      updateBulkRow(row.id, { registered: true });
+      setOtherAssets(getOtherAssets(tr));
+      try { window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {}
+    } else {
+      setBulkMsg((m) => `${m}${m ? " · " : ""}${row.name}: ${res.error || "등록 실패"}`);
+    }
+  };
+  const delOtherAsset = (o) => {
+    if (!window.confirm(`${o.name} (${o.account}) 기록을 삭제할까요?\n되돌릴 수 없습니다.`)) return;
+    const tr = getTrader();
+    removeOtherAsset({ id: o.id, trader: tr });
+    setOtherAssets(getOtherAssets(tr));
+    try { window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {}
+  };
   const submitBulkRows = () => {
     const tr = getTrader();
     let ok = 0, skipped = 0, failed = 0;
@@ -1108,35 +1133,52 @@ export default function EtfDashboard() {
         </button>
         {bulkOpen && (
           <div className="bulk-panel">
-            <div className="bulk-help">증권사 "계좌별잔고" 내보내기 파일(.xls, 여러 개 선택 가능)을 올리면 종목명·수량·매입금액을 읽어옵니다. <b>티커는 자동으로 못 채우니 아래에서 직접 입력</b>한 뒤 등록하세요. 수량이 없는 펀드·현금성자산은 이 앱 구조상 자동 제외됩니다. 국내/해외 구분은 이름으로 추측한 값이라, 국문 표기된 해외 개별주(예: "팔란티어 테크")는 직접 "해외상장"으로 바꿔주세요.</div>
+            <div className="bulk-help">증권사 "계좌별잔고" 내보내기 파일(.xls, 여러 개 선택 가능)을 올리면 종목명·수량·매입금액을 읽어옵니다. <b>티커는 자동으로 못 채우니 아래에서 직접 입력</b>한 뒤 등록하세요. 수량이 없는 항목은 펀드/디폴트옵션으로 보고 이름+평가금액만으로 따로 등록할 수 있습니다(현금성자산은 자동 제외). 국내/해외 구분은 이름으로 추측한 값이라, 국문 표기된 해외 개별주(예: "팔란티어 테크")는 직접 "해외상장"으로 바꿔주세요.</div>
             <input type="file" accept=".xls,.html,.htm" multiple onChange={(e) => onBulkFiles(e.target.files)} />
             {bulkRows.length > 0 && (
               <>
                 <div className="bulk-rows">
                   {bulkRows.map((r) => (
-                    <div key={r.id} className={`bulk-row ${r.skip ? "skip" : ""}`}>
-                      <label className="bulk-skip">
-                        <input type="checkbox" checked={!r.skip} onChange={(e) => updateBulkRow(r.id, { skip: !e.target.checked })} />
-                        <span className="bulk-name" title={r.name}>{r.name}</span>
-                      </label>
-                      {!r.skip && (
-                        <div className="bulk-fields">
-                          <input className="bulk-in bulk-tk" placeholder="티커(SCHD/069500)" value={r.ticker}
-                            onChange={(e) => updateBulkRow(r.id, { ticker: e.target.value })} />
-                          <input className="bulk-in" type="number" placeholder="수량" value={r.shares}
-                            onChange={(e) => updateBulkRow(r.id, { shares: e.target.value })} />
-                          <input className="bulk-in" type="number" placeholder="평균매입가" value={r.avgPrice}
-                            onChange={(e) => updateBulkRow(r.id, { avgPrice: e.target.value })} />
-                          <select className="bulk-in" value={r.ccy} onChange={(e) => updateBulkRow(r.id, { ccy: e.target.value })}>
-                            <option value="KRW">KRW</option><option value="USD">USD</option>
-                          </select>
-                          <select className="bulk-in" value={r.market} onChange={(e) => updateBulkRow(r.id, { market: e.target.value })}>
-                            <option value="kr">국내상장</option><option value="us">해외상장</option>
-                          </select>
-                          <select className="bulk-in" value={r.account} onChange={(e) => updateBulkRow(r.id, { account: e.target.value })}>
+                    <div key={r.id} className={`bulk-row ${r.skip && !r.isFundCandidate ? "skip" : ""}`}>
+                      {r.isFundCandidate ? (
+                        <div className="bulk-fund">
+                          <span className="bulk-name" title={r.name}>{r.name}</span>
+                          <span className="bulk-fund-val">평가금액 {r.evalAmt.toLocaleString()}원</span>
+                          <select className="bulk-in" value={r.account} onChange={(e) => updateBulkRow(r.id, { account: e.target.value })} disabled={r.registered}>
                             {ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}
                           </select>
+                          {r.registered ? (
+                            <span className="bulk-fund-done">✓ 기타자산으로 등록됨</span>
+                          ) : (
+                            <button type="button" className="bulk-fund-btn" onClick={() => registerBulkRowAsFund(r)}>펀드/기타자산으로 등록</button>
+                          )}
                         </div>
+                      ) : (
+                        <>
+                          <label className="bulk-skip">
+                            <input type="checkbox" checked={!r.skip} onChange={(e) => updateBulkRow(r.id, { skip: !e.target.checked })} />
+                            <span className="bulk-name" title={r.name}>{r.name}</span>
+                          </label>
+                          {!r.skip && (
+                            <div className="bulk-fields">
+                              <input className="bulk-in bulk-tk" placeholder="티커(SCHD/069500)" value={r.ticker}
+                                onChange={(e) => updateBulkRow(r.id, { ticker: e.target.value })} />
+                              <input className="bulk-in" type="number" placeholder="수량" value={r.shares}
+                                onChange={(e) => updateBulkRow(r.id, { shares: e.target.value })} />
+                              <input className="bulk-in" type="number" placeholder="평균매입가" value={r.avgPrice}
+                                onChange={(e) => updateBulkRow(r.id, { avgPrice: e.target.value })} />
+                              <select className="bulk-in" value={r.ccy} onChange={(e) => updateBulkRow(r.id, { ccy: e.target.value })}>
+                                <option value="KRW">KRW</option><option value="USD">USD</option>
+                              </select>
+                              <select className="bulk-in" value={r.market} onChange={(e) => updateBulkRow(r.id, { market: e.target.value })}>
+                                <option value="kr">국내상장</option><option value="us">해외상장</option>
+                              </select>
+                              <select className="bulk-in" value={r.account} onChange={(e) => updateBulkRow(r.id, { account: e.target.value })}>
+                                {ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}
+                              </select>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   ))}
@@ -1145,6 +1187,21 @@ export default function EtfDashboard() {
               </>
             )}
             {bulkMsg && <div className="bulk-msg">{bulkMsg}</div>}
+          </div>
+        )}
+
+        {/* [2026-08-23] 기타 금융자산(펀드·디폴트옵션 등 티커 없는 보유) — 항상 노출 */}
+        {otherAssets.length > 0 && (
+          <div className="other-assets">
+            <div className="other-h">💼 기타 금융자산 <span className="other-sub">티커 없는 펀드·디폴트옵션 등</span></div>
+            {otherAssets.map((o) => (
+              <div className="other-row" key={o.id}>
+                <span className="other-name">{o.name}<span className="other-acct">{o.account}</span></span>
+                <span className="other-val">{Number(o.valueKrw).toLocaleString()}원</span>
+                <button className="other-del" onClick={() => delOtherAsset(o)} aria-label="삭제">✕</button>
+              </div>
+            ))}
+            <div className="other-note">시세 자동 갱신이 안 됩니다(펀드라 애초에 실시간 공개 시세가 없어요) — 평가금액이 바뀌면 삭제 후 다시 등록해주세요.</div>
           </div>
         )}
 
@@ -1456,6 +1513,20 @@ export default function EtfDashboard() {
         .bulk-tk { font-weight: 700; }
         .bulk-submit { width: 100%; margin-top: 12px; padding: 11px; border-radius: 10px; border: none; background: var(--color-primary); color: #fff; font-size: 0.84rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .bulk-msg { margin-top: 9px; font-size: 0.74rem; color: var(--color-ink-2); line-height: 1.6; word-break: keep-all; }
+        .bulk-fund { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+        .bulk-fund-val { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-2); font-family: ui-monospace, monospace; }
+        .bulk-fund-btn { font-size: 0.7rem; font-weight: 800; padding: 5px 10px; border-radius: 7px; border: none; background: var(--color-primary); color: #fff; cursor: pointer; font-family: var(--font-sans); }
+        .bulk-fund-done { font-size: 0.72rem; font-weight: 700; color: var(--color-success, #0E9E6A); }
+        /* [2026-08-23] 기타 금융자산 목록 */
+        .other-assets { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); }
+        .other-h { font-size: 0.78rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
+        .other-sub { font-size: 0.66rem; font-weight: 600; color: var(--color-ink-3); margin-left: 6px; }
+        .other-row { display: flex; align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--color-line); }
+        .other-name { flex: 1 1 0; font-size: 0.76rem; font-weight: 700; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .other-acct { margin-left: 6px; font-size: 0.62rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 999px; padding: 1px 7px; }
+        .other-val { font-size: 0.78rem; font-weight: 700; color: var(--color-ink); font-family: ui-monospace, monospace; white-space: nowrap; }
+        .other-del { border: none; background: none; color: var(--color-ink-3); font-size: 0.8rem; cursor: pointer; padding: 2px 4px; }
+        .other-note { font-size: 0.68rem; color: var(--color-ink-3); margin-top: 8px; line-height: 1.6; word-break: keep-all; }
         /* [S18 D-1] 매수·매도 기록 폼 */
         .me-form { border-top: 1px solid var(--color-line); margin-top: 12px; padding-top: 12px; }
         .mf-tabs { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
