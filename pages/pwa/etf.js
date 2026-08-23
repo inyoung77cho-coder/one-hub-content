@@ -36,6 +36,52 @@ const ACCT_FILTERS = [...ACCOUNTS];
 //   market 이 없는 옛 기록은 티커로 추론한다(inferMarket: 숫자=kr, 그 외=us).
 const isOverseasHolding = (h) => (h?.market === "us") || (h?.market !== "kr" && inferMarket(h?.ticker) === "us");
 
+// [2026-08-23] 이름으로 티커 검색 — "TIGER 미국S&P500"·"삼성전자" 같은 이름을 몰라도
+// 티커를 몰라도 입력할 수 있게 한다. 기존에 있었지만 아무 화면에도 안 붙어있던
+// /api/input/etf-search(국내상장 ETF·펀드, etf_master)와 /api/input/master-search
+// (국내 개별주, stock_master)를 그대로 재사용 — 새 백엔드 없이 프론트만 붙인다.
+function TickerSearchBox({ value, placeholder, onChange, onSelect }) {
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const q = String(value || "").trim();
+    if (q.length < 1) { setResults([]); return; }
+    let alive = true;
+    const t = setTimeout(() => {
+      Promise.all([
+        fetch(`/api/input/etf-search?q=${encodeURIComponent(q)}`).then((r) => r.json()).catch(() => null),
+        fetch(`/api/input/master-search?q=${encodeURIComponent(q)}`).then((r) => r.json()).catch(() => null),
+      ]).then(([etfRes, stockRes]) => {
+        if (!alive) return;
+        const etfItems = (etfRes?.results || []).map((r) => ({ ticker: r.ticker, name: r.name, market: r.market === "KR" ? "kr" : "us", kind: "ETF" }));
+        const stockItems = (stockRes?.results || []).map((r) => ({ ticker: r.ticker, name: r.name, market: "kr", kind: "주식" }));
+        setResults([...etfItems, ...stockItems].slice(0, 10));
+      }).catch(() => {});
+    }, 250);
+    return () => { alive = false; clearTimeout(t); };
+  }, [value]);
+  return (
+    <div className="tk-search">
+      <input className="bulk-in bulk-tk" placeholder={placeholder} value={value}
+        onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)} />
+      {open && results.length > 0 && (
+        <div className="tk-dropdown">
+          {results.map((r, i) => (
+            <button type="button" key={`${r.kind}-${r.ticker}-${i}`} className="tk-opt"
+              onMouseDown={() => { onSelect(r); setOpen(false); }}>
+              <span className="tk-opt-tk">{r.ticker}</span>
+              <span className="tk-opt-nm" title={r.name}>{r.name}</span>
+              <span className="tk-opt-kind">{r.kind}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EtfDashboard() {
   const router = useRouter();
   const [report, setReport] = useState(null);
@@ -1219,8 +1265,9 @@ export default function EtfDashboard() {
                           </label>
                           {!r.skip && (
                             <div className="bulk-fields">
-                              <input className="bulk-in bulk-tk" placeholder="티커(SCHD/069500)" value={r.ticker}
-                                onChange={(e) => updateBulkRow(r.id, { ticker: e.target.value })} />
+                              <TickerSearchBox value={r.ticker} placeholder="티커/이름 검색(SCHD, 삼성전자)"
+                                onChange={(v) => updateBulkRow(r.id, { ticker: v })}
+                                onSelect={(sel) => updateBulkRow(r.id, { ticker: sel.ticker, market: sel.market })} />
                               <input className="bulk-in" type="number" placeholder="수량" value={r.shares}
                                 onChange={(e) => updateBulkRow(r.id, { shares: e.target.value })} />
                               <input className="bulk-in" type="number" placeholder="평균매입가" value={r.avgPrice}
@@ -1277,9 +1324,10 @@ export default function EtfDashboard() {
           </div>
           <div className="mf-grid">
             <label className="mf-f mf-tk">
-              <span>티커</span>
-              <input value={form.ticker} placeholder="SCHD / 069500"
-                onChange={(e) => setForm((f) => ({ ...f, ticker: e.target.value }))} />
+              <span>티커 또는 이름 검색</span>
+              <TickerSearchBox value={form.ticker} placeholder="SCHD / 069500 / 삼성전자"
+                onChange={(v) => setForm((f) => ({ ...f, ticker: v }))}
+                onSelect={(r) => setForm((f) => ({ ...f, ticker: r.ticker, market: r.market }))} />
             </label>
             <label className="mf-f">
               <span>수량</span>
@@ -1570,6 +1618,16 @@ export default function EtfDashboard() {
         .bulk-fields { display: grid; grid-template-columns: 1.4fr 1fr 1fr 0.8fr 1fr 1fr; gap: 5px; margin-top: 7px; }
         .bulk-in { font-size: 0.72rem; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--color-line); background: var(--color-bg); color: var(--color-ink); font-family: var(--font-sans); min-width: 0; }
         .bulk-tk { font-weight: 700; }
+        /* [2026-08-23] 이름으로 티커 검색 */
+        .tk-search { position: relative; min-width: 0; }
+        .tk-search .bulk-in { width: 100%; }
+        .tk-dropdown { position: absolute; z-index: 20; top: calc(100% + 2px); left: 0; right: 0; max-height: 240px; overflow-y: auto; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 8px; box-shadow: var(--shadow-card); }
+        .tk-opt { display: flex; align-items: center; gap: 7px; width: 100%; padding: 7px 9px; border: none; background: none; cursor: pointer; text-align: left; font-family: var(--font-sans); border-bottom: 1px solid var(--color-line); }
+        .tk-opt:last-child { border-bottom: none; }
+        .tk-opt:hover { background: var(--color-card-soft); }
+        .tk-opt-tk { font-size: 0.7rem; font-weight: 800; color: var(--color-primary); font-family: ui-monospace, monospace; flex-shrink: 0; }
+        .tk-opt-nm { flex: 1 1 0; font-size: 0.72rem; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tk-opt-kind { font-size: 0.6rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 999px; padding: 1px 6px; flex-shrink: 0; }
         .bulk-submit { width: 100%; margin-top: 12px; padding: 11px; border-radius: 10px; border: none; background: var(--color-primary); color: #fff; font-size: 0.84rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .bulk-msg { margin-top: 9px; font-size: 0.74rem; color: var(--color-ink-2); line-height: 1.6; word-break: keep-all; }
         .bulk-fund { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
