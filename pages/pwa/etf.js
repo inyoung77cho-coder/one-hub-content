@@ -330,17 +330,19 @@ export default function EtfDashboard() {
           const buyAmt = num(r.buyAmt);
           const hasQty = /\d/.test(String(r.qty)) && qty > 0;
           const isKrName = !/^[A-Z0-9 &.'\-]+$/.test(r.name.replace(/\s/g, " "));
-          // [2026-08-23] 현금성 잔고(원화·달러 등)는 종목이 아니라 티커가 없다 — 자동 제외.
+          // [2026-08-23] 현금성 잔고(원화·달러 등)는 티커가 없어 매수기록 모델엔 안 맞지만,
+          // "방치된 현금" 진단(연금 운영 제안)에 필요해서 기타자산으로는 등록할 수 있게 한다.
           const isCashLike = /^(미국달러|원화|현금성자산|외화현금|.*현금성자산.*)$/.test(r.name.trim());
           rows.push({
             id: nextId++, name: r.name, ticker: "", account,
             shares: hasQty ? String(qty) : "", avgPrice: hasQty && qty > 0 ? String(Math.round(buyAmt / qty)) : "",
             ccy: "KRW", market: isKrName ? "kr" : "us",
-            // 펀드·현금성자산 등 수량이 없거나 현금인 항목은 이 앱의 티커 모델과 안 맞아 기본 제외
+            // 티커 매수기록 대상에서는 항상 제외(현금·펀드 모두) — 아래 기타자산 경로로만 등록.
             skip: !hasQty || isCashLike,
-            // [2026-08-23] 수량 없는 항목(현금 제외) = 펀드/디폴트옵션 추정 — 티커 대신
-            // "펀드/기타자산으로 등록" 옵션을 보여준다. evalAmt·buyAmt는 그 등록에 쓴다.
-            isFundCandidate: !hasQty && !isCashLike,
+            // [2026-08-23] 수량 없는 항목 = 펀드/디폴트옵션 또는 현금 — 티커 대신
+            // "펀드/기타자산으로 등록"(또는 "현금으로 등록") 옵션을 보여준다.
+            isFundCandidate: !hasQty,
+            isCash: isCashLike,
             evalAmt: num(r.evalAmt), buyAmt,
             registered: false,
           });
@@ -356,7 +358,7 @@ export default function EtfDashboard() {
   // [2026-08-23] 티커 없는 펀드/디폴트옵션 행 — 이름+평가금액만으로 기타자산 등록.
   const registerBulkRowAsFund = (row) => {
     const tr = getTrader();
-    const res = addOtherAsset({ name: row.name, account: row.account, valueKrw: row.evalAmt, costKrw: row.buyAmt, trader: tr });
+    const res = addOtherAsset({ name: row.name, account: row.account, valueKrw: row.evalAmt, costKrw: row.buyAmt, isCash: row.isCash, trader: tr });
     if (res.ok) {
       updateBulkRow(row.id, { registered: true });
       setOtherAssets(getOtherAssets(tr));
@@ -511,7 +513,7 @@ export default function EtfDashboard() {
   // [2026-08-22] 미국 ETF 매매 시 거래시간·환율 참고 — 보유 중일 때만, 목표 배분과 무관한 사실이라 안 잠금.
   if (holdings.some(isOverseasHolding))
     etfTodos.push({ acct: "일반", icon: "🕐", title: "미국 ETF 매매 시간·환율 참고", detail: "미국 정규장은 한국시간 기준 밤 22:30~05:00(서머타임) 또는 23:30~06:00(그 외)에 열립니다. 원화→달러 환전이 필요해 환율 변동분도 실질 매수단가에 영향을 줍니다.", tone: "info" });
-  const hasPension = holdings.some((h) => isPensionAcct(h.account || "일반"));
+  const hasPension = holdings.some((h) => isPensionAcct(h.account || "일반")) || otherAssets.some((o) => isPensionAcct(o.account || "일반"));
   if (hasPension) {
     // 세액공제 한도는 개인연금+IRP 합산(연 900만) — 두 계좌 취득액을 함께 본다
     const limit = pensionCreditLimitCombined();
@@ -523,6 +525,50 @@ export default function EtfDashboard() {
       etfTodos.push({ acct: "연금", icon: "🎁", title: `연금 추가납입 여유 ${won(room)}원`, detail: `개인연금+IRP 합산 세액공제 한도(${won(limit)}원)까지 ${won(room)}원 남았습니다. 추가 납입하면 13.2~16.5% 세액공제를 더 받습니다(연금저축 단독 한도 600만).`, tone: "good" });
     else
       etfTodos.push({ acct: "연금", icon: "✅", title: "연금 세액공제 한도 충족", detail: "개인연금+IRP 합산 세액공제 한도를 채웠습니다. 초과 납입분은 내년 이월공제 또는 ISA·일반 활용을 검토하세요.", tone: "good" });
+
+    // [2026-08-23] 연금 운영 제안 — 디폴트옵션 방치·같은 지수 중복 보유·현금 방치를
+    // 실제 보유(티커+기타자산) 데이터에서 감지한다. 세 가지 다 '사실 감지'라 목표
+    // 배분과 무관하게(잠금 없이) 보여준다 — 위 손익통산·해외배당과 같은 원칙.
+    const pensionItems = [
+      ...holdings.filter((h) => isPensionAcct(h.account || "일반"))
+        .map((h) => ({ name: h.ticker, account: h.account, valueKrw: holdingMetrics(h).valueKrw || 0, isCash: false })),
+      ...otherAssets.filter((o) => isPensionAcct(o.account || "일반"))
+        .map((o) => ({ name: o.name, account: o.account, valueKrw: Number(o.valueKrw) || 0, isCash: !!o.isCash })),
+    ];
+
+    // 1) 디폴트옵션 방치 — DC 미지정 가입자용 자동 상품에 큰 금액이 남아있는 경우.
+    const defaultOptItems = pensionItems.filter((x) => /디폴트\s*옵션|default\s*option/i.test(x.name));
+    const defaultOptSum = defaultOptItems.reduce((a, x) => a + x.valueKrw, 0);
+    if (defaultOptSum > 0)
+      etfTodos.push({ acct: "연금", icon: "⚙️", title: `디폴트옵션 방치 ${won(defaultOptSum)}원`, detail: `${[...new Set(defaultOptItems.map((x) => x.account))].join("·")} 계좌에 자동배정(디폴트옵션) 상태로 ${won(defaultOptSum)}원이 있습니다. 가입자가 직접 운용을 지시하지 않았을 때 자동 배정되는 보수적 상품이라, 직접 투자상품을 선택하면 본인 성향에 맞게 조정할 수 있습니다.`, tone: "warn" });
+
+    // 2) 같은 지수를 여러 상품으로 중복 보유 — 계좌별로 그룹핑, 같은 지수 2개 이상이면 표시.
+    const INDEX_KEYWORDS = [
+      { key: "나스닥100", re: /나스닥\s*100|nasdaq\s*100/i },
+      { key: "S&P500", re: /S&P\s*500|에스앤피\s*500/i },
+      { key: "코스피200", re: /코스피\s*200|kospi\s*200/i },
+    ];
+    const detectIndex = (name) => { for (const k of INDEX_KEYWORDS) if (k.re.test(name)) return k.key; return null; };
+    const byIndex = {};
+    pensionItems.filter((x) => !x.isCash).forEach((x) => {
+      const idx = detectIndex(x.name);
+      if (!idx) return;
+      const gkey = `${x.account}::${idx}`;
+      (byIndex[gkey] = byIndex[gkey] || []).push(x);
+    });
+    Object.entries(byIndex).forEach(([gkey, items]) => {
+      if (items.length < 2) return;
+      const [account, idx] = gkey.split("::");
+      const sum = items.reduce((a, x) => a + x.valueKrw, 0);
+      etfTodos.push({ acct: "연금", icon: "🔁", title: `${account} ${idx} 중복 보유 ${items.length}개`, detail: `${items.map((x) => x.name).join(" · ")} — 같은 지수를 여러 상품으로 나눠 보유 중입니다(합계 ${won(sum)}원). 하나로 통합하면 보수(수수료) 중복을 줄일 수 있습니다.`, tone: "warn" });
+    });
+
+    // 3) 계좌 안 현금 방치 — 투자상품으로 옮기지 않으면 사실상 수익이 안 난다.
+    const cashByAcct = {};
+    pensionItems.filter((x) => x.isCash && x.valueKrw > 0).forEach((x) => { cashByAcct[x.account] = (cashByAcct[x.account] || 0) + x.valueKrw; });
+    Object.entries(cashByAcct).forEach(([account, sum]) => {
+      etfTodos.push({ acct: "연금", icon: "💰", title: `${account} 현금 방치 ${won(sum)}원`, detail: `${account} 계좌에 투자되지 않은 현금이 ${won(sum)}원 있습니다. 계좌 안에서는 투자상품으로 옮기지 않으면 수익이 나지 않습니다.`, tone: "warn" });
+    });
   }
   const todosForAcct = etfTodos.filter((t) => acctFilter === "전체" || t.acct === "전체" || t.acct === acctFilter || (t.acct === "연금" && isPensionAcct(acctFilter)));
 
@@ -1145,7 +1191,7 @@ export default function EtfDashboard() {
         </button>
         {bulkOpen && (
           <div className="bulk-panel">
-            <div className="bulk-help">증권사 "계좌별잔고" 내보내기 파일(.xls, 여러 개 선택 가능)을 올리면 종목명·수량·매입금액을 읽어옵니다. <b>티커는 자동으로 못 채우니 아래에서 직접 입력</b>한 뒤 등록하세요. 수량이 없는 항목은 펀드/디폴트옵션으로 보고 이름+평가금액만으로 따로 등록할 수 있습니다(현금성자산은 자동 제외). 국내/해외 구분은 이름으로 추측한 값이라, 국문 표기된 해외 개별주(예: "팔란티어 테크")는 직접 "해외상장"으로 바꿔주세요.</div>
+            <div className="bulk-help">증권사 "계좌별잔고" 내보내기 파일(.xls, 여러 개 선택 가능)을 올리면 종목명·수량·매입금액을 읽어옵니다. <b>티커는 자동으로 못 채우니 아래에서 직접 입력</b>한 뒤 등록하세요. 수량이 없는 항목은 펀드/디폴트옵션 또는 현금으로 보고 이름+평가금액만으로 따로 등록할 수 있습니다. 국내/해외 구분은 이름으로 추측한 값이라, 국문 표기된 해외 개별주(예: "팔란티어 테크")는 직접 "해외상장"으로 바꿔주세요.</div>
             <input type="file" accept=".xls,.html,.htm" multiple onChange={(e) => onBulkFiles(e.target.files)} />
             {bulkRows.length > 0 && (
               <>
@@ -1154,15 +1200,15 @@ export default function EtfDashboard() {
                     <div key={r.id} className={`bulk-row ${r.skip && !r.isFundCandidate ? "skip" : ""}`}>
                       {r.isFundCandidate ? (
                         <div className="bulk-fund">
-                          <span className="bulk-name" title={r.name}>{r.name}</span>
+                          <span className="bulk-name" title={r.name}>{r.isCash ? "💰 " : ""}{r.name}</span>
                           <span className="bulk-fund-val">평가금액 {r.evalAmt.toLocaleString()}원</span>
                           <select className="bulk-in" value={r.account} onChange={(e) => updateBulkRow(r.id, { account: e.target.value })} disabled={r.registered}>
                             {ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}
                           </select>
                           {r.registered ? (
-                            <span className="bulk-fund-done">✓ 기타자산으로 등록됨</span>
+                            <span className="bulk-fund-done">✓ {r.isCash ? "현금으로" : "기타자산으로"} 등록됨</span>
                           ) : (
-                            <button type="button" className="bulk-fund-btn" onClick={() => registerBulkRowAsFund(r)}>펀드/기타자산으로 등록</button>
+                            <button type="button" className="bulk-fund-btn" onClick={() => registerBulkRowAsFund(r)}>{r.isCash ? "현금으로 등록" : "펀드/기타자산으로 등록"}</button>
                           )}
                         </div>
                       ) : (
@@ -1205,10 +1251,10 @@ export default function EtfDashboard() {
         {/* [2026-08-23] 기타 금융자산(펀드·디폴트옵션 등 티커 없는 보유) — 항상 노출 */}
         {otherAssets.length > 0 && (
           <div className="other-assets">
-            <div className="other-h">💼 기타 금융자산 <span className="other-sub">티커 없는 펀드·디폴트옵션 등</span></div>
+            <div className="other-h">💼 기타 금융자산 <span className="other-sub">티커 없는 펀드·디폴트옵션·현금 등</span></div>
             {otherAssets.map((o) => (
               <div className="other-row" key={o.id}>
-                <span className="other-name">{o.name}<span className="other-acct">{o.account}</span></span>
+                <span className="other-name">{o.isCash ? "💰 " : ""}{o.name}<span className="other-acct">{o.account}</span></span>
                 <span className="other-val">{Number(o.valueKrw).toLocaleString()}원</span>
                 <button className="other-del" onClick={() => delOtherAsset(o)} aria-label="삭제">✕</button>
               </div>
