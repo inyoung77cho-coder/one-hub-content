@@ -9,7 +9,7 @@ import AssetMapTitle from "../../components/AssetMapTitle";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS, getOtherAssets, addOtherAsset, removeOtherAsset } from "../../lib/etfHoldings";
 import { classifyEtf } from "../../lib/etfClassify";
-import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress, pensionCreditLimitCombined } from "../../lib/taxRules";
+import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress, pensionCreditLimitCombined, acctRule } from "../../lib/taxRules";
 import Term from "../../components/Term";
 import REBAL_PRESETS from "../../data/rebalance_presets.json";
 
@@ -36,6 +36,42 @@ const ACCT_FILTERS = [...ACCOUNTS];
 //   market 이 없는 옛 기록은 티커로 추론한다(inferMarket: 숫자=kr, 그 외=us).
 const isOverseasHolding = (h) => (h?.market === "us") || (h?.market !== "kr" && inferMarket(h?.ticker) === "us");
 
+// [2026-08-23] 다음 매수 계좌 추천 — etf_master의 tax_type(실측 3종: KR_DOMESTIC/
+// KR_LISTED_OVERSEAS/US_CAPGAIN) 으로 어느 계좌가 유리한지 순위+이유를 낸다.
+// 숫자는 전부 data/tax_rules.json에서 읽는다(하드코딩 금지 — 이 파일 기존 원칙과 동일).
+// ★해외 현지상장 ETF(US_CAPGAIN)는 연금계좌에 법적으로 담을 수 없다 — 추천에서 제외.
+// 소수점 세율이 반올림으로 뭉개지지 않게(9.9%→"10%" 오류 방지) 정수면 그대로, 아니면 1자리.
+const pctFmt = (frac) => { const v = frac * 100; return Number.isInteger(v) ? String(v) : v.toFixed(1); };
+function recommendAccounts(taxType, market) {
+  const gen = acctRule("일반"), isa = acctRule("ISA"), pen = acctRule("연금");
+  const genOverseasPct = pctFmt(gen.overseas_capital_gains_rate);
+  const genDividendPct = pctFmt(gen.domestic_etf_dividend_rate);
+  const isaExcessPct = pctFmt(isa.excess_separate_rate);
+  const isaLimit = won(isa.tax_free_limit_won);
+
+  if (taxType === "US_CAPGAIN" || (market === "us" && !taxType)) {
+    return [
+      { account: "ISA", tone: "good", reason: `해외 현지상장 ETF는 연금계좌엔 법적으로 담을 수 없습니다. ISA(중개형)라면 순이익 ${isaLimit}원까지 비과세 + 초과분 ${isaExcessPct}% 분리과세로, 일반계좌 양도세 ${genOverseasPct}%보다 유리합니다.` },
+      { account: "일반", tone: "info", reason: `ISA 한도를 넘거나 중개형이 아니라면 일반계좌뿐입니다 — 양도세 ${genOverseasPct}%(기본공제 ${won(gen.overseas_basic_deduction_won)}원), 배당은 15% 원천징수 후 종합과세 대상입니다.` },
+    ];
+  }
+  if (taxType === "KR_LISTED_OVERSEAS") {
+    return [
+      { account: "개인연금", tone: "good", reason: `매매차익·분배금 모두 배당소득세 ${genDividendPct}% 대상인 상품입니다. 연금계좌 안에서는 매도해도 과세이연되고, 인출 시에만 저율(${(pen.pension_income_rate_min * 100).toFixed(1)}~${(pen.pension_income_rate_max * 100).toFixed(1)}%)로 과세됩니다.` },
+      { account: "퇴직연금", tone: "good", reason: "개인연금과 같은 원리로 유리합니다 — 세액공제 한도는 개인연금과 합산(연 900만원)됩니다." },
+      { account: "ISA", tone: "good", reason: `순이익 ${isaLimit}원까지 비과세 + 초과분 ${isaExcessPct}% — 일반계좌 ${genDividendPct}%보다 유리합니다.` },
+      { account: "일반", tone: "info", reason: `세제계좌 한도를 다 썼다면 일반계좌도 가능하지만, 매년 배당소득세 ${genDividendPct}%가 발생합니다.` },
+    ];
+  }
+  if (taxType === "KR_DOMESTIC") {
+    return [
+      { account: "일반", tone: "info", reason: "국내주식형 ETF는 일반계좌에서도 매매차익이 비과세입니다. 분배금(배당)만 배당소득세가 붙으므로, 세제계좌로 옮겨도 차이가 크지 않습니다." },
+      { account: "ISA", tone: "info", reason: `그래도 분배금까지 아끼고 싶다면 ISA(초과분 ${isaExcessPct}% 저율) 또는 연금(과세이연)도 검토할 수 있습니다.` },
+    ];
+  }
+  return [{ account: "일반", tone: "info", reason: `이 종목의 세제 분류 정보가 없어 구체적 추천이 어렵습니다 — 일반적으로 해외 개별주는 양도세 ${genOverseasPct}%(기본공제 ${won(gen.overseas_basic_deduction_won)}원) 대상입니다.` }];
+}
+
 // [2026-08-23] 이름으로 티커 검색 — "TIGER 미국S&P500"·"삼성전자" 같은 이름을 몰라도
 // 티커를 몰라도 입력할 수 있게 한다. 기존에 있었지만 아무 화면에도 안 붙어있던
 // /api/input/etf-search(국내상장 ETF·펀드, etf_master)와 /api/input/master-search
@@ -53,8 +89,10 @@ function TickerSearchBox({ value, placeholder, onChange, onSelect }) {
         fetch(`/api/input/master-search?q=${encodeURIComponent(q)}`).then((r) => r.json()).catch(() => null),
       ]).then(([etfRes, stockRes]) => {
         if (!alive) return;
-        const etfItems = (etfRes?.results || []).map((r) => ({ ticker: r.ticker, name: r.name, market: r.market === "KR" ? "kr" : "us", kind: "ETF" }));
-        const stockItems = (stockRes?.results || []).map((r) => ({ ticker: r.ticker, name: r.name, market: "kr", kind: "주식" }));
+        // [2026-08-23] tax_type(etf_master 분류: KR_DOMESTIC/KR_LISTED_OVERSEAS/US_CAPGAIN)도
+        // 같이 들고 나온다 — 아래 "다음 매수 계좌 추천"이 이 값으로 세제를 판단한다.
+        const etfItems = (etfRes?.results || []).map((r) => ({ ticker: r.ticker, name: r.name, market: r.market === "KR" ? "kr" : "us", kind: "ETF", taxType: r.tax_type || null }));
+        const stockItems = (stockRes?.results || []).map((r) => ({ ticker: r.ticker, name: r.name, market: "kr", kind: "주식", taxType: null }));
         setResults([...etfItems, ...stockItems].slice(0, 10));
       }).catch(() => {});
     }, 250);
@@ -93,6 +131,8 @@ export default function EtfDashboard() {
   // [내 ETF] 사용자 직접 입력 보유 + 자동 시세
   const [holdings, setHoldings] = useState([]);
   const [otherAssets, setOtherAssets] = useState([]); // [2026-08-23] 티커 없는 펀드·디폴트옵션 등
+  const [nbTicker, setNbTicker] = useState(""); // [2026-08-23] 다음 매수 계좌 추천 — 검색 입력값
+  const [nbSel, setNbSel] = useState(null); // 검색에서 고른 종목(ticker/name/market/taxType)
   const [quotes, setQuotes] = useState({}); // { TICKER: {price, currency, date} }
   const [form, setForm] = useState({ side: "buy", ticker: "", shares: "", price: "", ccy: "USD", account: "일반", market: "auto" });
   const [formMsg, setFormMsg] = useState("");
@@ -846,6 +886,37 @@ export default function EtfDashboard() {
         );
       })()}
 
+      {/* [2026-08-23] 다음 매수 계좌 추천 — 종목을 검색하면 세제 분류(etf_master.tax_type)
+          기반으로 어느 계좌가 유리한지 순위+이유를 보여준다. "이미 산 것"이 아니라
+          "앞으로 살 것"을 위한 도구라 위 계좌 배치 최적화와 다르다. */}
+      <section className="card">
+        <div className="label">💡 다음 매수, 어느 계좌가 유리할까 <span className="sub">종목 검색</span></div>
+        <TickerSearchBox value={nbTicker} placeholder="티커/이름 검색(SCHD, TIGER 미국S&P500)"
+          onChange={(v) => { setNbTicker(v); setNbSel(null); }}
+          onSelect={(r) => { setNbTicker(`${r.name} (${r.ticker})`); setNbSel(r); }} />
+        {nbSel && (() => {
+          const recs = recommendAccounts(nbSel.taxType, nbSel.market);
+          // 연금 추천이 있으면 세액공제 여유도 같이 보여준다(있는 데이터만, 추측 없음).
+          const limit = pensionCreditLimitCombined();
+          const penRows = holdings.filter((h) => isPensionAcct(h.account || "일반"));
+          const acquired = penRows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
+          const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
+          const room = Math.max(0, limit - contrib);
+          return (
+            <div className="nb-recs">
+              {recs.map((rec, i) => (
+                <div className={`nb-rec ${rec.tone}`} key={i}>
+                  <span className="nb-rec-rank">{i + 1}순위</span>
+                  <span className="nb-rec-acct">{ACCT_EMOJI[rec.account] || ""} {rec.account}</span>
+                  <span className="nb-rec-why">{rec.reason}{isPensionAcct(rec.account) && i === 0 ? ` (현재 세액공제 여유 ${won(room)}원)` : ""}</span>
+                </div>
+              ))}
+              <div className="rb-tax sub" style={{ marginTop: 8 }}>⚠ 투자자문·세무자문이 아닙니다. 실제 유불리는 개인 소득·보유기간·거래 규모에 따라 다르며, 최종 계좌 선택은 본인이 판단하세요.</div>
+            </div>
+          );
+        })()}
+      </section>
+
       {/* [§3-2 원칙1] 포트폴리오 합계는 홈·AI자산 2곳에만. ETF 페이지는 ETF 슬라이스만 표시(피드백14) */}
       {err && <div className="err">데이터 로드 오류: {err}</div>}
 
@@ -1526,6 +1597,14 @@ export default function EtfDashboard() {
         .rb-why-row { display: flex; gap: 9px; align-items: flex-start; padding: 4px 0; }
         .rb-why-n { flex-shrink: 0; width: 18px; height: 18px; border-radius: 6px; background: var(--color-primary-soft); color: var(--color-primary); font-size: 0.68rem; font-weight: 800; display: grid; place-items: center; margin-top: 1px; }
         .rb-why-t { font-size: 0.78rem; color: var(--color-ink); line-height: 1.5; word-break: keep-all; }
+        /* [2026-08-23] 다음 매수 계좌 추천 */
+        .nb-recs { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .nb-rec { border-left: 3px solid var(--color-line); border-radius: 8px; padding: 8px 10px; background: var(--color-card-soft); display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 8px; }
+        .nb-rec.good { border-left-color: var(--color-success); background: var(--color-success-soft); }
+        .nb-rec.info { border-left-color: var(--color-primary); }
+        .nb-rec-rank { font-size: 0.66rem; font-weight: 800; color: var(--color-ink-3); }
+        .nb-rec-acct { font-size: 0.8rem; font-weight: 800; color: var(--color-ink); }
+        .nb-rec-why { flex-basis: 100%; font-size: 0.76rem; color: var(--color-ink-2); line-height: 1.55; word-break: keep-all; }
         /* [§3-6] ForecastChart 참고용 */
         .forecast-tag { color: var(--color-warning-ink) !important; background: var(--color-warning-soft); padding: 2px 8px; border-radius: 6px; font-size: 10px; font-weight: 800; }
         /* [S7.4] 예측 접기 헤더 */
