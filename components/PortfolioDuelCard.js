@@ -10,7 +10,7 @@ import { fetchStockQuotes } from "../lib/stockLive";
 import {
   isDuelStarted, startDuel, resetDuel, getPortfolios, getSnapshots,
   recordSnapshot, recordDuelDecision, hasDecisionToday, detectSellCandidates, portfolioValue,
-  getDecisionAnalysis, correctBaseCash, DEFAULT_CASH,
+  getDecisionAnalysis, correctBaseCash, computeAiFromLive, DEFAULT_CASH,
 } from "../lib/portfolioDuel";
 
 // [사용자 지시] 억 단위 반올림은 소액 계좌에서 나/AI 차이가 0.00억으로 뭉개져 보였다 —
@@ -25,13 +25,18 @@ function computeMyLive(dash) {
   try {
     let p = dash.balance.positions;
     if (typeof p === "string") p = JSON.parse(p);
-    const positions = Array.isArray(p) ? p : [];
-    const stockVal = positions.reduce((s, pos) => {
+    const raw = Array.isArray(p) ? p : [];
+    const positions = raw.map((pos) => {
       const qty = Number(pos.qty ?? pos.hldg_qty) || 0;
       const evalAmt = pos.eval_amount != null ? Number(pos.eval_amount) : Number(pos.current_price ?? pos.avg_price ?? 0) * qty;
-      return s + evalAmt;
-    }, 0);
-    return { cash: Number(dash.balance.cash) || 0, stockVal };
+      return {
+        code: String(pos.code ?? pos.pdno ?? "").trim(),
+        name: pos.name ?? pos.prdt_name ?? pos.code,
+        qty, avgPrice: Number(pos.avg_price ?? pos.pchs_avg_pric) || 0, evalAmt,
+      };
+    }).filter((pos) => pos.code && pos.qty > 0);
+    const stockVal = positions.reduce((s, pos) => s + pos.evalAmt, 0);
+    return { cash: Number(dash.balance.cash) || 0, stockVal, positions };
   } catch (e) { return null; }
 }
 
@@ -76,7 +81,10 @@ export default function PortfolioDuelCard() {
   useEffect(() => {
     if (!started || !duel) return;
     let alive = true;
-    const codes = new Set([...duel.ai.positions, ...duel.me.positions].map((p) => p.code));
+    const live = duel.base.seedType === "kis" ? computeMyLive(dash) : null;
+    const aiSim = live ? computeAiFromLive(live, duel.decisions) : duel.ai;
+    const mePositions = live ? live.positions : duel.me.positions;
+    const codes = new Set([...aiSim.positions, ...mePositions].map((p) => p.code));
     const cutoff = Date.now() - 30 * 86400000;
     duel.decisions.forEach((d) => { if (new Date(d.date).getTime() >= cutoff) codes.add(d.code); });
     if (!codes.size) return;
@@ -86,8 +94,7 @@ export default function PortfolioDuelCard() {
       const m = {};
       Object.entries(qs).forEach(([code, q]) => { if (q?.krw != null) m[code] = q.krw; });
       setQuotes(m);
-      const live = duel.base.seedType === "kis" ? computeMyLive(dash) : null;
-      recordSnapshot(trader, m, live ? live.cash + live.stockVal : null);
+      recordSnapshot(trader, m, live ? live.cash + live.stockVal : null, live ? portfolioValue(aiSim, m) : null);
       setSnapshots(getSnapshots(trader));
     });
     return () => { alive = false; };
@@ -198,25 +205,28 @@ export default function PortfolioDuelCard() {
   // ── 화면: 진행 중 ──────────────────────────────────────────────────
   // [버그 수정] "나"를 base+결정로그 재계산으로 표시하면, 이 게임의 수용/거부 버튼을 거치지
   //   않고 KIS에서 직접 산 종목(실사용자 사례: 삼성전자 직접 매수)이 절대 반영되지 않는다.
-  //   "나"는 애초에 실제 내 계좌이므로 대시보드가 주는 실시간 KIS 잔고를 그대로 쓰고,
-  //   "AI"만 기준+추천전부수용 가정의 가상 시뮬레이션으로 base+decisions 재계산을 유지한다
-  //   (실보유로 시작한 경우에 한함 — 가상현금 시작은 원래도 KIS와 무관하므로 그대로 재계산).
+  //   "나"는 실제 내 계좌이므로 대시보드가 주는 실시간 KIS 잔고를 그대로 쓴다.
+  // [사용자 지시: 공평한 대결] "AI"도 base 재계산이 아니라 "나"의 실시간 포트폴리오에서 시작해
+  //   내가 "거부"한 추천만 반대로 뒤집어 재구성 — AI 추천을 거치지 않은 내 개별 매매(직접
+  //   매수 등)는 결정 로그에 없으니 자동으로 양쪽에 동일 반영(미러링)된다. 둘 다 실보유로
+  //   시작한 경우에 한함 — 가상현금 시작은 원래도 KIS와 무관하므로 base+decisions 그대로 유지.
   const myLive = duel.base.seedType === "kis" ? computeMyLive(dash) : null;
-  const aiVal = portfolioValue(duel.ai, quotes);
+  const aiPortfolio = myLive ? computeAiFromLive(myLive, duel.decisions) : duel.ai;
+  const aiVal = portfolioValue(aiPortfolio, quotes);
   const myVal = myLive ? myLive.cash + myLive.stockVal : portfolioValue(duel.me, quotes);
   const diff = myVal - aiVal;
   const diffPct = aiVal > 0 ? (diff / aiVal) * 100 : 0;
   const chartData = snapshots.map((s) => ({ label: s.date.slice(5), 나: s.myValue, AI: s.aiValue }));
   // [사용자 지시] 현금 보유액도 포함한 "통합 총액" 기준 비교임을 화면에서 바로 확인 가능하도록,
   //   현금+주식평가액 분해를 총액 아래 함께 표기(총액=cash+positions는 portfolioValue()가 이미 통합 계산).
-  const aiStockVal = (side) => side.positions.reduce((s, p) => s + (quotes[p.code] != null ? quotes[p.code] : p.avgPrice) * p.qty, 0);
+  const sideStockVal = (side) => side.positions.reduce((s, p) => s + (quotes[p.code] != null ? quotes[p.code] : p.avgPrice) * p.qty, 0);
 
   // 오늘의 매수 후보(dash.recommend_stocks 중 매수 신호(score>=70)이고 오늘 아직 결정 안 한 것)
   const buyCands = (dash?.recommend_stocks || [])
     .filter((c) => c.code && (c.score ?? 0) >= 70 && !hasDecisionToday(trader, c.code, "buy"))
     .slice(0, 3);
   // 오늘의 매도 후보(AI 보유 중 손절/익절 구간)
-  const sellCands = detectSellCandidates(trader, quotes).filter((c) => !hasDecisionToday(trader, c.code, "sell"));
+  const sellCands = detectSellCandidates(aiPortfolio.positions, quotes).filter((c) => !hasDecisionToday(trader, c.code, "sell"));
 
   // [2단계] 판단별 단기(1일)/중기(1주)/장기(1개월) 분석 + 종목명으로 매칭된 관련 뉴스 1건.
   const analysisById = {};
@@ -243,13 +253,13 @@ export default function PortfolioDuelCard() {
             <span className="pd-vs-break">
               {myLive
                 ? <>현금 {wonFmt(myLive.cash)} + 주식 {wonFmt(myLive.stockVal)}</>
-                : <>현금 {wonFmt(duel.me.cash)} + 주식 {wonFmt(aiStockVal(duel.me))}</>}
+                : <>현금 {wonFmt(duel.me.cash)} + 주식 {wonFmt(sideStockVal(duel.me))}</>}
             </span>
           </div>
           <div className="pd-vs-side r">
             <span className="pd-vs-lbl">AI 총액</span>
             <span className="pd-vs-val">{wonFmt(aiVal)}</span>
-            <span className="pd-vs-break">현금 {wonFmt(duel.ai.cash)} + 주식 {wonFmt(aiStockVal(duel.ai))}</span>
+            <span className="pd-vs-break">현금 {wonFmt(aiPortfolio.cash)} + 주식 {wonFmt(sideStockVal(aiPortfolio))}</span>
           </div>
         </div>
         <div className={`pd-vs-diff ${diff > 0 ? "pos" : diff < 0 ? "neg" : ""}`}>
