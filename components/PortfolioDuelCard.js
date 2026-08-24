@@ -17,6 +17,23 @@ import {
 //   원 단위 그대로(백원 단위까지) 표기해 실제 차이가 보이게 한다.
 const wonFmt = (n) => (n == null ? "-" : `${Math.round(n).toLocaleString()}원`);
 const BUY_AMOUNT_WON = 1000000; // [단순화] 매수 추천 크기 = 100만원어치(최소 1주) 고정 — 사이즈 커스터마이즈는 범위 밖
+// [버그 수정] "나"는 실보유 시작이면 base+결정로그 재계산이 아니라 실시간 KIS 잔고를 써야
+//   결정 버튼을 거치지 않고 KIS에서 직접 산/판 종목도 반영된다(실사용자 사례: 직접 매수한
+//   삼성전자가 안 잡히던 문제). 렌더와 스냅샷 적립 두 곳에서 같은 계산이 필요해 모듈 함수로 분리.
+function computeMyLive(dash) {
+  if (!dash?.balance) return null;
+  try {
+    let p = dash.balance.positions;
+    if (typeof p === "string") p = JSON.parse(p);
+    const positions = Array.isArray(p) ? p : [];
+    const stockVal = positions.reduce((s, pos) => {
+      const qty = Number(pos.qty ?? pos.hldg_qty) || 0;
+      const evalAmt = pos.eval_amount != null ? Number(pos.eval_amount) : Number(pos.current_price ?? pos.avg_price ?? 0) * qty;
+      return s + evalAmt;
+    }, 0);
+    return { cash: Number(dash.balance.cash) || 0, stockVal };
+  } catch (e) { return null; }
+}
 
 export default function PortfolioDuelCard() {
   const [started, setStarted] = useState(false);
@@ -69,11 +86,12 @@ export default function PortfolioDuelCard() {
       const m = {};
       Object.entries(qs).forEach(([code, q]) => { if (q?.krw != null) m[code] = q.krw; });
       setQuotes(m);
-      recordSnapshot(trader, m);
+      const live = duel.base.seedType === "kis" ? computeMyLive(dash) : null;
+      recordSnapshot(trader, m, live ? live.cash + live.stockVal : null);
       setSnapshots(getSnapshots(trader));
     });
     return () => { alive = false; };
-  }, [started, duel, trader]);
+  }, [started, duel, trader, dash]);
 
   const onStart = async () => {
     setBusy(true); setErr("");
@@ -178,14 +196,20 @@ export default function PortfolioDuelCard() {
   }
 
   // ── 화면: 진행 중 ──────────────────────────────────────────────────
-  const myVal = portfolioValue(duel.me, quotes);
+  // [버그 수정] "나"를 base+결정로그 재계산으로 표시하면, 이 게임의 수용/거부 버튼을 거치지
+  //   않고 KIS에서 직접 산 종목(실사용자 사례: 삼성전자 직접 매수)이 절대 반영되지 않는다.
+  //   "나"는 애초에 실제 내 계좌이므로 대시보드가 주는 실시간 KIS 잔고를 그대로 쓰고,
+  //   "AI"만 기준+추천전부수용 가정의 가상 시뮬레이션으로 base+decisions 재계산을 유지한다
+  //   (실보유로 시작한 경우에 한함 — 가상현금 시작은 원래도 KIS와 무관하므로 그대로 재계산).
+  const myLive = duel.base.seedType === "kis" ? computeMyLive(dash) : null;
   const aiVal = portfolioValue(duel.ai, quotes);
+  const myVal = myLive ? myLive.cash + myLive.stockVal : portfolioValue(duel.me, quotes);
   const diff = myVal - aiVal;
   const diffPct = aiVal > 0 ? (diff / aiVal) * 100 : 0;
   const chartData = snapshots.map((s) => ({ label: s.date.slice(5), 나: s.myValue, AI: s.aiValue }));
   // [사용자 지시] 현금 보유액도 포함한 "통합 총액" 기준 비교임을 화면에서 바로 확인 가능하도록,
   //   현금+주식평가액 분해를 총액 아래 함께 표기(총액=cash+positions는 portfolioValue()가 이미 통합 계산).
-  const stockVal = (side) => side.positions.reduce((s, p) => s + (quotes[p.code] != null ? quotes[p.code] : p.avgPrice) * p.qty, 0);
+  const aiStockVal = (side) => side.positions.reduce((s, p) => s + (quotes[p.code] != null ? quotes[p.code] : p.avgPrice) * p.qty, 0);
 
   // 오늘의 매수 후보(dash.recommend_stocks 중 매수 신호(score>=70)이고 오늘 아직 결정 안 한 것)
   const buyCands = (dash?.recommend_stocks || [])
@@ -214,14 +238,18 @@ export default function PortfolioDuelCard() {
       <div className="pd-vs">
         <div className="pd-vs-row">
           <div className="pd-vs-side">
-            <span className="pd-vs-lbl">나 총액</span>
+            <span className="pd-vs-lbl">나 총액{myLive && <span className="pd-vs-live"> · 실시간 KIS</span>}</span>
             <span className="pd-vs-val">{wonFmt(myVal)}</span>
-            <span className="pd-vs-break">현금 {wonFmt(duel.me.cash)} + 주식 {wonFmt(stockVal(duel.me))}</span>
+            <span className="pd-vs-break">
+              {myLive
+                ? <>현금 {wonFmt(myLive.cash)} + 주식 {wonFmt(myLive.stockVal)}</>
+                : <>현금 {wonFmt(duel.me.cash)} + 주식 {wonFmt(aiStockVal(duel.me))}</>}
+            </span>
           </div>
           <div className="pd-vs-side r">
             <span className="pd-vs-lbl">AI 총액</span>
             <span className="pd-vs-val">{wonFmt(aiVal)}</span>
-            <span className="pd-vs-break">현금 {wonFmt(duel.ai.cash)} + 주식 {wonFmt(stockVal(duel.ai))}</span>
+            <span className="pd-vs-break">현금 {wonFmt(duel.ai.cash)} + 주식 {wonFmt(aiStockVal(duel.ai))}</span>
           </div>
         </div>
         <div className={`pd-vs-diff ${diff > 0 ? "pos" : diff < 0 ? "neg" : ""}`}>
@@ -344,6 +372,7 @@ export default function PortfolioDuelCard() {
         .pd-vs-side { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
         .pd-vs-side.r { align-items: flex-end; text-align: right; }
         .pd-vs-lbl { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-3); }
+        .pd-vs-live { font-weight: 600; color: var(--color-success); }
         .pd-vs-val { font-size: 1.05rem; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; word-break: break-word; }
         .pd-vs-break { font-size: 0.62rem; color: var(--color-ink-3); font-family: ui-monospace, monospace; white-space: normal; word-break: break-word; max-width: 100%; }
         .pd-vs-diff { font-size: 0.86rem; font-weight: 800; text-align: center; word-break: break-word; }
