@@ -823,7 +823,7 @@ export default function EnginePage() {
                     { label: "분석 종목",   val: `${(dashboard?.screening_candidates?.length ?? 0) + (dashboard?.blocked_stocks?.length ?? 0) + 120}개` },
                     { label: "스크리닝 통과", val: `${dashboard?.screening_candidates?.length ?? '-'}종목` },
                     { label: "AI 차단",     val: `${dashboard?.blocked_stocks?.length ?? '-'}건` },
-                    { label: "실제 매수",   val: `${(dashboard?.recommend_stocks ?? []).filter(s => (s.score ?? 0) >= 70).length}건` },
+                    { label: "실제 매수",   val: `${dashboard?.today_buys?.length ?? 0}건` },
                     { label: "Regime",      val: dashboard?.market?.regime ?? '-' },
                     { label: "마지막 실행", val: dashboard?.last_updated ? String(dashboard.last_updated).substring(11, 16) + ' KST' : '-' },
                   ].map(({ label, val }) => (

@@ -221,9 +221,12 @@ export default function PortfolioDuelCard() {
   //   현금+주식평가액 분해를 총액 아래 함께 표기(총액=cash+positions는 portfolioValue()가 이미 통합 계산).
   const sideStockVal = (side) => side.positions.reduce((s, p) => s + (quotes[p.code] != null ? quotes[p.code] : p.avgPrice) * p.qty, 0);
 
-  // 오늘의 매수 후보(dash.recommend_stocks 중 매수 신호(score>=70)이고 오늘 아직 결정 안 한 것)
-  const buyCands = (dash?.recommend_stocks || [])
-    .filter((c) => c.code && (c.score ?? 0) >= 70 && !hasDecisionToday(trader, c.code, "buy"))
+  // [버그 수정] dash.recommend_stocks는 백엔드에 없는 필드(항상 undefined) + score>=70은
+  //   screening_candidates의 실제 척도(0~15)에 안 맞는 기준이라 매수 후보가 한 번도 안 떴다
+  //   (오늘의 대결 카드가 매번 "오늘은 새로운 추천이 없습니다"만 보였던 원인). index.js의
+  //   verdict 로직과 동일하게 score>=12를 "AI 판단: 매수" 기준으로 재사용.
+  const buyCands = (dash?.screening_candidates || [])
+    .filter((c) => c.code && (c.score ?? 0) >= 12 && !hasDecisionToday(trader, c.code, "buy"))
     .slice(0, 3);
   // 오늘의 매도 후보(AI 보유 중 손절/익절 구간)
   const sellCands = detectSellCandidates(aiPortfolio.positions, quotes).filter((c) => !hasDecisionToday(trader, c.code, "sell"));

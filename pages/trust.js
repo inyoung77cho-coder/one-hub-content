@@ -53,7 +53,7 @@ export default function TrustCenter() {
   const balance  = data?.balance;
   const summary  = accuracy?.summary ?? {};
   const blocked  = data?.blocked_stocks ?? [];
-  const buys     = (data?.recommend_stocks ?? []).filter(s => (s.score ?? 0) >= 70);
+  const buys     = data?.today_buys ?? [];
   const lastRun  = data?.last_updated ?? '-';
 
   return (

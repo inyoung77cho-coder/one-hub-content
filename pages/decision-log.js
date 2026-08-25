@@ -81,7 +81,10 @@ export default function DecisionLog() {
   // 대시보드 요약 수치
   const candidates = dashboard?.screening_candidates ?? [];
   const blocked    = dashboard?.blocked_stocks ?? [];
-  const buys       = (dashboard?.recommend_stocks ?? []).filter(s => (s.score ?? 0) >= 70);
+  // [버그 수정] recommend_stocks는 백엔드에 존재하지 않는 필드(항상 빈 배열) + score>=70은
+  //   screening_candidates의 실제 척도(0~15)에 안 맞는 기준이었다 — index.js의 verdict 로직과
+  //   동일하게 score>=12를 "AI 판단: 매수" 기준으로 재사용.
+  const buys       = candidates.filter(s => (s.score ?? 0) >= 12);
 
   return (
     <>

@@ -170,7 +170,6 @@ export default function AssetsMapPage() {
 
   // [사용자 지시] "주식" 뷰 — 주식 페이지(보유·추천)와 연결되는 계좌현황 요약 카드용 데이터.
   const positions = parsePositions(dash);
-  const recAll = [...(dash?.recommend_stocks ?? [])].sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
   // 도넛(stroke-dasharray) — 뷰 분모(mapDenom) 기준
   const donut = (() => {
@@ -359,19 +358,11 @@ export default function AssetsMapPage() {
                 </div>
               )
             ) : (
-              recAll.length === 0 ? (
-                <div className="as-vc-empty">추천 종목이 없어요</div>
-              ) : (
-                <div className="as-sl-list">
-                  {recAll.map((s) => (
-                    <div className="as-sl-row" key={s.code}>
-                      <span className="as-sl-name">{s.name}</span>
-                      {s.reason && <span className="as-sl-mid">{s.reason}</span>}
-                      <span className="as-vc-score">{Math.round(s.score ?? 0)}</span>
-                    </div>
-                  ))}
-                </div>
-              )
+              // [버그 수정] 존재하지 않는 dash.recommend_stocks 필드를 읽고 있어 항상
+              // "추천 종목이 없어요"로 보였다. 자산지도는 읽기 전용 요약이라 이 카드에서
+              // 목록을 다시 그리는 대신(주식 › 추천 탭과 내용이 겹치는 게 사용자 리포트의
+              // 핵심 불만이었음), 바로 그 탭으로 안내만 한다.
+              <div className="as-vc-empty">오늘의 추천은 주식 › 추천 탭에서 확인하세요</div>
             )}
             <button className="as-vc-cta" onClick={() => router.push(stockTab === "hold" ? "/pwa?tab=portfolio" : "/pwa?tab=recommend")}>{stockTab === "hold" ? "보유 자세히 · 매도 →" : "추천 자세히 · 승인 →"}</button>
           </section>
@@ -468,7 +459,6 @@ export default function AssetsMapPage() {
         .as-vc-acct-sub b { font-weight: 800; }
         .as-vc-acct-sub b.up { color: var(--color-success); } .as-vc-acct-sub b.dn { color: var(--color-danger); }
         .as-vc-empty { font-size: 0.78rem; color: var(--color-ink-2); padding: 6px 2px; }
-        .as-vc-score { color: var(--color-primary); font-weight: 800; flex: none; }
         /* [사용자 지시] 보유/추천 탭 전체 목록(핵심 정보만 간결하게) */
         .as-sl-list { display: flex; flex-direction: column; margin-bottom: 12px; }
         .as-sl-row { display: flex; align-items: baseline; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--color-line); font-size: 0.8rem; }

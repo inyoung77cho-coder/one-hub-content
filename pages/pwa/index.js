@@ -2429,7 +2429,7 @@ export default function PWADashboard({ latestReport }) {
               const analysisDate = aiDaily.today_date;
               const isStale = !analysisDate || analysisDate !== realToday;
               // 오늘의 실제 판단은 대시보드 data 에서(매수/차단). ai_logs 는 매수만 기록해 관망일엔 비어있다.
-              const todayBuys = (data?.recommend_stocks ?? []).filter(s => (s.score ?? 0) >= 70).length;
+              const todayBuys = data?.today_buys?.length ?? 0;
               const todayBlocked = data?.market?.block_count ?? ((data?.today_blocked ?? data?.blocked_stocks ?? []).length || null);
               return (
                 <div className="aid-card">
@@ -2647,7 +2647,7 @@ export default function PWADashboard({ latestReport }) {
               //   기존엔 blocked_stocks 슬라이스 length라 오늘/종합/보유(=4)와 어긋나 자기검증만 0/3으로 표시됐다.
               const blockedNames = (data.today_blocked ?? data.blocked_stocks ?? []);
               const blocked = dedupBy(blockedNames, (b) => b.code || b.stock || b.name).slice(0, 3);
-              const buys = (data.recommend_stocks ?? []).filter(s => (s.score ?? 0) >= 70).slice(0, 2);
+              const buys = candidates.filter(s => (s.score ?? 0) >= 12).slice(0, 2);
               const kst = new Date(Date.now() + 9*60*60*1000);
               const fmtTime = (d, offsetMin) => {
                 const t = new Date(d.getTime() - offsetMin * 60 * 1000);
