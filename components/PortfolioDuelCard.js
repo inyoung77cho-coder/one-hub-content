@@ -221,12 +221,12 @@ export default function PortfolioDuelCard() {
   //   현금+주식평가액 분해를 총액 아래 함께 표기(총액=cash+positions는 portfolioValue()가 이미 통합 계산).
   const sideStockVal = (side) => side.positions.reduce((s, p) => s + (quotes[p.code] != null ? quotes[p.code] : p.avgPrice) * p.qty, 0);
 
-  // [버그 수정] dash.recommend_stocks는 백엔드에 없는 필드(항상 undefined) + score>=70은
-  //   screening_candidates의 실제 척도(0~15)에 안 맞는 기준이라 매수 후보가 한 번도 안 떴다
-  //   (오늘의 대결 카드가 매번 "오늘은 새로운 추천이 없습니다"만 보였던 원인). index.js의
-  //   verdict 로직과 동일하게 score>=12를 "AI 판단: 매수" 기준으로 재사용.
-  const buyCands = (dash?.screening_candidates || [])
-    .filter((c) => c.code && (c.score ?? 0) >= 12 && !hasDecisionToday(trader, c.code, "buy"))
+  // [2026-08-25] 매수 후보 = valid_signals(텔레그램에 실제로 나가는 것과 같은 실거래 검증 통과
+  //   신호). 이전엔 screening_candidates(선별 전 폭넓은 후보, 0~15점)로 대체 표시했는데, 대결의
+  //   취지가 "실제 AI 판단 vs 나"라서 검증 전 후보를 섞으면 다시 신뢰도 문제가 생긴다 — 없으면
+  //   그냥 "오늘은 새로운 추천이 없습니다"가 맞는 표시(하루 최대 2회 분석 때만 생긴다).
+  const buyCands = (dash?.valid_signals || [])
+    .filter((c) => c.code && !hasDecisionToday(trader, c.code, "buy"))
     .slice(0, 3);
   // 오늘의 매도 후보(AI 보유 중 손절/익절 구간)
   const sellCands = detectSellCandidates(aiPortfolio.positions, quotes).filter((c) => !hasDecisionToday(trader, c.code, "sell"));
@@ -299,6 +299,7 @@ export default function PortfolioDuelCard() {
               <span className="pd-item-tag buy">매수 추천</span>
               <span className="pd-item-name">{c.name}</span>
               <span className="pd-item-amt">{wonFmt(BUY_AMOUNT_WON)} 규모</span>
+              {c.reason && <span className="pd-item-reason">{c.reason}</span>}
               <div className="pd-item-btns">
                 <button type="button" className="pd-b accept" onClick={() => decide(c, "buy", true)}>수용</button>
                 <button type="button" className="pd-b reject" onClick={() => decide(c, "buy", false)}>거부</button>
@@ -400,6 +401,7 @@ export default function PortfolioDuelCard() {
         .pd-item-tag.sell { background: var(--color-danger); }
         .pd-item-name { font-size: 0.82rem; font-weight: 700; color: var(--color-ink); }
         .pd-item-amt { font-size: 0.72rem; color: var(--color-ink-3); }
+        .pd-item-reason { flex-basis: 100%; font-size: 0.72rem; color: var(--color-ink-2); word-break: keep-all; }
         .pd-item-btns { flex-basis: 100%; display: flex; gap: 6px; margin-top: 4px; }
         .pd-b { flex: 1; padding: 7px; border-radius: 7px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: 0.76rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .pd-b.accept { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }

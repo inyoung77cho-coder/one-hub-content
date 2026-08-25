@@ -114,6 +114,21 @@ function deriveRecMeta(s) {
   const vol = s?.vol_ratio != null ? Number(s.vol_ratio) : null;
   const mom = s?.change_5d != null ? Number(s.change_5d) : null;
   const score = Math.round(s?.score ?? 0);
+  // [2026-08-25] valid_signals 매칭 종목은 텔레그램에 실제로 나간 것과 같은 진짜 검증 신호라,
+  //   여기서부터 지어내지 않고 실제 값(근거 문구·목표가 기반 기대수익·확신도)을 그대로 쓴다.
+  //   매칭 안 된 종목(screening_candidates만 있는, 선별 전 폭넓은 후보)은 기존 추정 로직 유지.
+  const v = s?._valid || null;
+  if (v) {
+    const upside = v.price > 0 && v.target > 0 ? Math.round(((v.target / v.price - 1) * 100) * 10) / 10 : null;
+    const conv = Math.round(Math.min(99, Math.max(1, v.final_score ?? 0)));
+    return {
+      reason: v.reason || `AI 확신도 ${conv}% · 실거래 검증 통과`,
+      upside: upside ?? 8,
+      stance: { label: '검증 통과', color: 'var(--color-success)' },
+      score, real: true, conv,
+      verdict: { label: '✅ AI 판단: 매수(검증 완료)', short: '매수', color: 'var(--color-success)', bg: 'var(--color-success-soft)' },
+    };
+  }
   // 근거 1줄: 가장 두드러진 신호 우선
   let reason;
   if (vol != null && vol >= 2.5) reason = `거래량 급증(${vol.toFixed(1)}배) · ${(mom ?? 0) >= 0 ? '상승' : '조정'} 모멘텀`;
@@ -132,7 +147,7 @@ function deriveRecMeta(s) {
   const verdict = score >= 12 ? { label: 'AI 판단: 매수', short: '매수', color: 'var(--color-danger)', bg: 'var(--color-danger-soft)' }
     : score >= 9 ? { label: 'AI 판단: 관심', short: '관심', color: 'var(--color-warning-ink, var(--color-warning))', bg: 'var(--color-warning-soft)' }
     : { label: 'AI 판단: 관망', short: '관망', color: 'var(--color-ink-2)', bg: 'var(--color-card-soft)' };
-  return { reason, upside, stance, score, verdict };
+  return { reason, upside, stance, score, real: false, verdict };
 }
 
 // [§3-4 피드백8] 보유 종목 AI 스탠스(유지/추가/축소/매도) + 근거 1줄 — 목표가/손절가 기반.
@@ -1621,7 +1636,11 @@ export default function PWADashboard({ latestReport }) {
               </div>
               {/* [§3.5] 의미 없는 '방금' 대신 증시 세션 표기 — 매매 시간에 맞춰 맥락을 준다. */}
               <div className="rec-hero-upd"><MarketSession /></div>
-              <p className="rec-hero-desc">AI 매수 선별 전 기술 스코어링 상위 후보입니다. 실제 매수 신호와는 별개입니다.</p>
+              <p className="rec-hero-desc">
+                {data?.valid_signals?.length > 0
+                  ? <>✅ 표시는 텔레그램에 실제로 발송된 <b>실거래 검증 통과 신호</b>입니다. 나머지는 매수 선별 전 기술 스코어링 후보로, 실제 매수 신호와는 별개입니다.</>
+                  : 'AI 매수 선별 전 기술 스코어링 상위 후보입니다. 실제 매수 신호와는 별개입니다.'}
+              </p>
             </section>
 
             {/* [매매 승인] 추천 탭 상단 — AI 매매 제안 승인/거절 카드 (승인대기 있을 때만) */}
@@ -1691,12 +1710,25 @@ export default function PWADashboard({ latestReport }) {
                   if (profile.style === 'conservative') return base - Math.abs((s.vol_ratio ?? 1) - 1) * 3;
                   return base;
                 };
+                // [2026-08-25] valid_signals(텔레그램과 동일한 실거래 검증 통과 신호) 코드 기준 매핑 —
+                //   screening_candidates(선별 전 폭넓은 후보)와 코드가 겹치면 진짜 데이터로 승격시키고,
+                //   screening에 없는 검증 신호도 후보 목록에 직접 추가해 누락 없이 보여준다.
+                const validByCode = {};
+                (data.valid_signals || []).forEach((v) => { if (v.code) validByCode[v.code] = v; });
                 // [S1.4] 종목코드 기준 공용 dedup(이중 방어) 후 정렬
-                const uniqCands = dedupBy(data.screening_candidates, (c) => c.code || c.name);
-                // [S7.2] 정렬 칩: 관심도순(개인화 점수) / 기대수익순
-                const sorted = [...uniqCands].sort((a, b) => recSort === 'upside'
-                  ? (deriveRecMeta(b).upside - deriveRecMeta(a).upside)
-                  : (personalScore(b) - personalScore(a)));
+                const uniqCands = dedupBy(data.screening_candidates, (c) => c.code || c.name)
+                  .map((c) => (validByCode[c.code] ? { ...c, _valid: validByCode[c.code] } : c));
+                const uniqCodes = new Set(uniqCands.map((c) => c.code));
+                Object.values(validByCode).forEach((v) => {
+                  if (!uniqCodes.has(v.code)) uniqCands.push({ code: v.code, name: v.name, score: 15, regime: v.regime, _valid: v });
+                });
+                // [S7.2] 정렬 칩: 관심도순(개인화 점수) / 기대수익순 — 실거래 검증 통과 종목은 항상 최상단.
+                const sorted = [...uniqCands].sort((a, b) => {
+                  if (!!b._valid !== !!a._valid) return b._valid ? 1 : -1;
+                  return recSort === 'upside'
+                    ? (deriveRecMeta(b).upside - deriveRecMeta(a).upside)
+                    : (personalScore(b) - personalScore(a));
+                });
                 // [S7.2] 관심도 5신호 점등(MA·RSI·볼린저·거래량·수급) — 백엔드 s.signals 우선, 없으면 근사
                 const sig5 = (s) => {
                   if (Array.isArray(s.signals) && s.signals.length >= 5) return s.signals.slice(0, 5).map(Boolean);
@@ -1723,6 +1755,16 @@ export default function PWADashboard({ latestReport }) {
                 // [R2/G10] 금·은·동 메달 제거 — 순위는 숫자(1·2·3)로 표시(과장·이모지 남발 완화)
                 const openSheet = (s) => {
                   const sc = deriveScores(s); // 종목별 실제 신호로 서브점수 재계산(상수 표기 방지)
+                  const v = s._valid;
+                  // [2026-08-25] 실거래 검증 통과 종목은 텔레그램에 나간 것과 같은 진짜 목표가·손절가·
+                  //   R:R·ML신호를 상세 시트 상단에 별도로 보여준다(아래 4점수 차트는 기존 추정치라
+                  //   그대로 두되, 이 블록이 있으면 그게 참고용임을 알 수 있게 구분).
+                  const real = v ? (() => {
+                    const rr = (v.price > 0 && v.target > 0 && v.stop_loss > 0)
+                      ? (() => { const rw = (v.target / v.price - 1) * 100; const rk = (1 - v.stop_loss / v.price) * 100; return { rw, rk, r: rk > 0 ? rw / rk : null }; })()
+                      : null;
+                    return { price: v.price, target: v.target, stop_loss: v.stop_loss, rr, ml_signal: v.ml_signal, conv: Math.round(Math.min(99, Math.max(1, v.final_score ?? 0))), reason: v.reason };
+                  })() : null;
                   setBottomSheet({
                     name: s.name, code: s.code,
                     scores: { macro: sc.macro, ml: sc.ml, technical: sc.technical, risk: sc.risk },
@@ -1730,8 +1772,14 @@ export default function PWADashboard({ latestReport }) {
                     interest: Math.round(s.score ?? 0), // 백엔드 관심도(스크리닝 원점수) — 별도 표기
                     tie: tieNote(s), // [N8] 동점 2차 정렬 근거 — 카드에서 접고 여기서만 밝힌다
                     win_rate: s.win_rate ?? null,
-                    // [v9.0][13] Why Now? -- 근거를 최대 5개까지 노출
+                    real,
+                    // [비용 절감] 실거래 검증 종목은 목표가·손절가를 이미 갖고 있어(real), 이 값을
+                    //   미리 채워두면 아래 priceMeta 이펙트가 조건부(=== undefined일 때만) 건너뛰어
+                    //   불필요한 /api/analyze-stock(전체 AI 분석) 호출을 막는다 — 응답도 즉시 뜬다.
+                    ...(real ? { priceMeta: { ok: true, cur: real.price || null, tgt: real.target || null, stp: real.stop_loss || null, info: null, horizonDays: null } } : {}),
+                    // [v9.0][13] Why Now? -- 근거를 최대 5개까지 노출. 실거래 검증 종목은 진짜 근거를 최우선.
                     reasons: [
+                      ...(real?.reason ? [{ text: `✅ ${real.reason}`, positive: true }] : []),
                       ...(s.regime ? [{ text: `${s.regime} 시장 대응 종목`, positive: true }] : []),
                       { text: `ML 매수 신호 ${sc.ml}%`, positive: sc.ml > 50 },
                       ...(s.rsi != null ? [{ text: `RSI ${s.rsi}`, positive: s.rsi < 70 }] : []),
@@ -3222,7 +3270,7 @@ export default function PWADashboard({ latestReport }) {
               );
               return (
                 <div style={box}>
-                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 10 }}>🎯 목표가 · 손절가 <span style={{ fontWeight: 600, fontSize: '0.64rem', color: 'var(--text-secondary)' }}>· AI 산출</span></div>
+                  <div style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-primary)', marginBottom: 10 }}>🎯 목표가 · 손절가 <span style={{ fontWeight: 600, fontSize: '0.64rem', color: bottomSheet.real ? 'var(--color-success)' : 'var(--text-secondary)' }}>{bottomSheet.real ? '· ✅ 실거래 검증(텔레그램 발송분과 동일)' : '· AI 산출'}</span></div>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
                     {cell('현재가', pm.cur ? `${pm.cur.toLocaleString()}원` : '-', 'var(--text-primary)')}
                     {cell('목표가', `${pm.tgt.toLocaleString()}원`, 'var(--color-success)')}
@@ -3247,6 +3295,12 @@ export default function PWADashboard({ latestReport }) {
                       </div>
                     );
                   })()}
+                  {bottomSheet.real && (
+                    <div style={{ marginTop: 9, fontSize: '0.72rem', color: 'var(--text-secondary)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                      <span>AI 확신도 <b style={{ color: 'var(--color-success)', fontFamily: 'var(--font-mono)' }}>{bottomSheet.real.conv}%</b></span>
+                      {bottomSheet.real.ml_signal && <span>ML신호 <b style={{ color: 'var(--text-primary)' }}>{bottomSheet.real.ml_signal}</b></span>}
+                    </div>
+                  )}
                 </div>
               );
             })()}
