@@ -1843,9 +1843,22 @@ export default function PWADashboard({ latestReport }) {
                             <div className="top3-reason">{m.reason}</div>
                             {/* [S-4] 관심도·기대수익(소수1자리) + 동점 2차근거 */}
                             <div className="top3-ai-pct mono">관심도 {sc} · 기대 +{m.upside.toFixed(1)}%</div>
+                            {/* [2026-08-25] 검증 통과 종목은 목표가·손절가·RR·확신도를 클릭 없이 카드에서
+                                바로 확인 — "상세를 또 눌러야 한다"는 리포트에 대한 응답(Phase 3). */}
+                            {m.real && s._valid && (() => {
+                              const v = s._valid;
+                              const rr = (v.price > 0 && v.target > 0 && v.stop_loss > 0)
+                                ? (() => { const rw = (v.target / v.price - 1) * 100; const rk = (1 - v.stop_loss / v.price) * 100; return rk > 0 ? rw / rk : null; })()
+                                : null;
+                              return (
+                                <div className="top3-real mono">
+                                  🎯{v.target ? v.target.toLocaleString() : '-'} · 🛑{v.stop_loss ? v.stop_loss.toLocaleString() : '-'}{rr != null && <> · RR {rr.toFixed(1)}</>} · 확신도 {m.conv}%
+                                </div>
+                              );
+                            })()}
                             {/* [N8] 동점 2차근거는 카드에서 접는다 — '정렬 근거'이지 '판단 근거'가 아니라서
                                 카드 위계를 뺏을 이유가 없다. 판단근거 시트 안으로 옮김(openSheet.tie). */}
-                            <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>판단근거 ›</button>
+                            <button className="top3-why-btn" onClick={(e) => { e.stopPropagation(); openSheet(s); }}>{m.real ? '기술 분석 더보기 ›' : '판단근거 ›'}</button>
                             {/* [S-8] 나 vs AI 예고 */}
                             <div className="vs-teaser">AI는 <b style={{ color: m.verdict.color }}>{m.verdict.short}</b> · 당신의 선택은?</div>
                             {/* [N8] 이 버튼은 주문을 넣지 않는다(실주문 연동 없음) — 라벨이 하는 일과 같아야 한다.
@@ -1894,9 +1907,10 @@ export default function PWADashboard({ latestReport }) {
                                   ); })()}
                                 </div>
                                 <div className="rec-row-r">
-                                  <span className="rec-interest mono">관심도 {sc}</span>
-                                  <span className="rec-upside">기대 +{m.upside.toFixed(1)}%</span>
-                                  <button className="rec-detail" onClick={() => openSheet(s)}>상세 →</button>
+                                  {m.real && s._valid
+                                    ? <span className="rec-interest mono">🎯{s._valid.target ? s._valid.target.toLocaleString() : '-'} · 확신도 {m.conv}%</span>
+                                    : <><span className="rec-interest mono">관심도 {sc}</span><span className="rec-upside">기대 +{m.upside.toFixed(1)}%</span></>}
+                                  <button className="rec-detail" onClick={() => openSheet(s)}>{m.real ? '기술분석 →' : '상세 →'}</button>
                                 </div>
                               </div>
                             );
@@ -2334,22 +2348,12 @@ export default function PWADashboard({ latestReport }) {
                           return (
                             <div>
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: 8, gap: 5 }}>
+                                {/* [2026-08-25] "AI 분석 보기"(상세 팝업) 제거 — 매수가/현재가/목표가/손절가/
+                                    RSI·MACD·ATR·AI점수/AI 스탠스+근거/다음 트리거가 이미 카드 위에 전부
+                                    있어 클릭해서 열어봐도 대부분 반복이었고, 유일하게 새로 보여주던 4점수
+                                    차트는 백엔드 실값이 아니라 프론트에서 지어낸 추정치였다(사용자 리포트:
+                                    "보유 상세가 한번 더 나오는데 굳이 그럴 필요 없이 카드로"). */}
                                 <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                                  <button
-                                    style={{ fontSize: '0.68rem', padding: '3px 9px', borderRadius: 8, background: 'var(--inset-bg)', color: 'var(--text-secondary)', border: '1px solid var(--border)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}
-                                    onClick={() => setBottomSheet({
-                                      name: p.name, code: p.code,
-                                      scores: deriveScores(p), // 종목별 실제 신호로 서브점수 재계산(상수 표기 방지)
-                                      final_score: deriveScores(p).final, // 4개 지표 가중 평균(서브점수와 일관)
-                                      win_rate: p.win_rate ?? null,
-                                      reasons: [
-                                        ...(p.reason ? [{ text: p.reason, positive: true }] : []),
-                                        ...(p.pnl_rate != null ? [{ text: `현재 ${p.pnl_rate >= 0 ? '+' : ''}${p.pnl_rate}% 수익중`, positive: p.pnl_rate >= 0 }] : []),
-                                      ],
-                                    })}
-                                  >
-                                    AI 분석 보기
-                                  </button>
                                   <button
                                     className={`sell-btn${sellConfirm[posKey] ? ' confirm' : ''}`}
                                     disabled={sellLoading[posKey]}
@@ -3894,6 +3898,7 @@ export default function PWADashboard({ latestReport }) {
         .top3-stars { font-size: 0.7rem; letter-spacing: -1px; color: var(--color-warning); }
         /* [M5] 폭 대응 — 모바일 1열 가로형(@media 430px)에서 전폭 확보. 데스크톱은 중앙정렬 줄바꿈. */
         .top3-ai-pct { font-size: 0.78rem; font-weight: 800; color: var(--color-primary); width: 100%; text-align: center; word-break: keep-all; line-height: 1.4; }
+        .top3-real { font-size: 0.68rem; font-weight: 700; color: var(--color-success); width: 100%; text-align: center; word-break: keep-all; margin-top: 2px; }
         .top3-why-btn { font-size: 0.62rem; padding: 3px 8px; border-radius: 6px; background: var(--inset-bg); border: 1px solid var(--border); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; margin-top: 2px; }
         /* [§3-3] 추천 카드 인라인 근거·스탠스·기대여력 */
         /* [나 vs AI] 추천 카드 판단 버튼 */
