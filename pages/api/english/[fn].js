@@ -9,6 +9,7 @@ const ENDPOINTS = {
   today: (q) => `/english/today${qs(q, ["medium", "track", "language"])}`,
   lessons: (q) => `/english/lessons${qs(q, ["medium", "track", "language", "limit", "before"])}`,
   lesson: (q) => `/english/lesson/${encodeURIComponent(q.id || "")}`,
+  "weekly-review": (q) => `/english/weekly-review${qs(q, ["language"])}`,
 };
 
 function qs(query, allowed) {

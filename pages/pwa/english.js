@@ -10,10 +10,11 @@ const TABS = [
   ["news", "📰", "뉴스"],
   ["video", "▶️", "영상"],
   ["idiom", "💬", "이디엄"],
+  ["review", "📝", "주간복습"],
 ];
 // 중국어 모드에서 탭 글자를 중국어로 — "생활중국어"(4글자)처럼 길어지면 그 버튼만
 // box 가 커져 나머지 탭과 크기가 안 맞는다. 전부 한자 2글자로 맞춰 폭을 통일한다.
-const TABS_ZH_LABEL = { news: "新闻", video: "视频", idiom: "口语" };
+const TABS_ZH_LABEL = { news: "新闻", video: "视频", idiom: "口语", review: "复习" };
 const LANGS = [
   ["en", "🇬🇧", "영어"],
   ["zh", "🇨🇳", "중국어"],
@@ -21,6 +22,27 @@ const LANGS = [
 const TRACK_KO = { economy: "경제", display: "디스플레이", general: "생활영어" };
 const TRACK_KO_ZH = { economy: "경제", display: "디스플레이", general: "생활중국어" };
 const SPEEDS = [0.75, 1, 1.25];
+
+// [2026-08-26] 발음 듣기 — 단어를 복사해 다른 곳에서 듣던 번거로움 해소.
+//   edge-tts(무료·LLM 사용량 한도와 무관)라 lesson.has_audio(LLM으로 만든 지문 낭독)
+//   여부와 상관없이 항상 눌러볼 수 있다.
+function SpeakButton({ text, lang }) {
+  const [playing, setPlaying] = useState(false);
+  const play = (e) => {
+    e.stopPropagation();
+    if (!text) return;
+    setPlaying(true);
+    const audio = new Audio(`/api/english/speak?text=${encodeURIComponent(text)}&language=${lang}`);
+    audio.play().catch(() => {});
+    audio.onended = () => setPlaying(false);
+    audio.onerror = () => setPlaying(false);
+  };
+  return (
+    <button type="button" className={`lc-speak${playing ? " on" : ""}`} onClick={play} aria-label={`${text} 발음 듣기`} title="발음 듣기">
+      🔊
+    </button>
+  );
+}
 
 function fmtDate(iso) {
   if (!iso) return "";
@@ -109,6 +131,7 @@ function LessonCard({ lesson, lang }) {
                 {exprs.map((e, i) => (
                   <li key={i}>
                     <b>{e.expr}</b>
+                    <SpeakButton text={e.expr} lang={lang} />
                     {e.pinyin && <span className="lc-pinyin"> [{e.pinyin}]</span>}
                     <span className="lc-mean"> — {e.meaning_ko}</span>
                     {/* 아래 2개는 이디엄에서만 온다. 직역을 같이 보여주면
@@ -131,6 +154,7 @@ function LessonCard({ lesson, lang }) {
                 {words.map((w, i) => (
                   <li key={i}>
                     <b>{w.word}</b>
+                    <SpeakButton text={w.word} lang={lang} />
                     {w.pinyin && <span className="lc-pinyin"> [{w.pinyin}]</span>}
                     {w.pos && <i className="lc-pos"> {w.pos}</i>}
                     <span className="lc-mean"> {w.meaning_ko}</span>
@@ -189,6 +213,8 @@ function LessonCard({ lesson, lang }) {
         .lc-exprs li, .lc-words li { font-size: .84rem; color: var(--color-ink); line-height: 1.5; }
         .lc-pos { font-size: .72rem; color: var(--color-ink-3); font-style: normal; }
         .lc-pinyin { font-size: .78rem; color: var(--color-primary); font-weight: 600; }
+        .lc-speak { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin-left: 4px; padding: 0; border: none; background: var(--color-card-soft); border-radius: 50%; cursor: pointer; font-size: .74rem; vertical-align: middle; }
+        .lc-speak.on { background: var(--color-primary-soft); }
         .lc-mean { color: var(--color-ink-2); }
         .lc-ex { font-size: .8rem; color: var(--color-ink-2); margin-top: 3px; padding-left: 8px; border-left: 2px solid var(--color-line); }
         .lc-exko { font-size: .74rem; color: var(--color-ink-3); padding-left: 10px; }
@@ -202,16 +228,81 @@ function LessonCard({ lesson, lang }) {
   );
 }
 
+// [2026-08-26] 주간 복습 — 최근 7일치 레슨에서 나온 표현·단어를 하나로 모아, 매일 새로 쌓인
+//   것들 중 뭘 놓쳤는지 주말에 한 번에 훑어볼 수 있게 한다. 새 LLM 생성 없이 이미 만들어진
+//   레슨을 재구성만 해서 보여주는 화면이라 발음 듣기와 마찬가지로 항상 동작한다.
+function WeeklyReviewCard({ item, textKey, lang }) {
+  return (
+    <li className="wr-row">
+      <div className="wr-top">
+        <b>{item[textKey]}</b>
+        <SpeakButton text={item[textKey]} lang={lang} />
+        {item.pinyin && <span className="lc-pinyin"> [{item.pinyin}]</span>}
+        <span className="wr-date mono">{item.lesson_date?.slice(5)}</span>
+      </div>
+      <span className="lc-mean">{item.meaning_ko}</span>
+      {item.example_en && <div className="lc-ex">{item.example_en}</div>}
+      <style jsx>{`
+        .wr-row { list-style: none; padding: 10px 0; border-bottom: 1px solid var(--color-line); }
+        .wr-top { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+        .wr-date { margin-left: auto; font-size: .66rem; color: var(--color-ink-3); }
+      `}</style>
+    </li>
+  );
+}
+
+function WeeklyReview({ weekly, lang }) {
+  if (weekly.loading) return <div className="en-state">불러오는 중…</div>;
+  const exprs = weekly.data?.expressions || [];
+  const words = weekly.data?.words || [];
+  if (exprs.length === 0 && words.length === 0) {
+    return <div className="en-state">지난 7일간 쌓인 표현·단어가 아직 없어요.</div>;
+  }
+  return (
+    <div className="wr">
+      <div className="wr-range">{weekly.data.since} ~ {weekly.data.until} · 레슨 {weekly.data.lesson_count}건에서 모음</div>
+      {exprs.length > 0 && (
+        <section className="lc-sec">
+          <h3>이번 주 표현 · {exprs.length}개</h3>
+          <ul className="lc-exprs">
+            {exprs.map((e, i) => <WeeklyReviewCard key={i} item={e} textKey="expr" lang={lang} />)}
+          </ul>
+        </section>
+      )}
+      {words.length > 0 && (
+        <section className="lc-sec">
+          <h3>이번 주 단어 · {words.length}개</h3>
+          <ul className="lc-exprs">
+            {words.map((w, i) => <WeeklyReviewCard key={i} item={w} textKey="word" lang={lang} />)}
+          </ul>
+        </section>
+      )}
+      <style jsx>{`
+        .wr-range { font-size: .74rem; color: var(--color-ink-3); margin-bottom: 4px; }
+      `}</style>
+    </div>
+  );
+}
+
 export default function EnglishPage() {
   const [lang, setLang] = useState("en");
   const [tab, setTab] = useState("news");
   const [feed, setFeed] = useState({ loading: true, date: null, items: [], error: null });
   const [past, setPast] = useState({ open: false, loading: false, items: [] });
+  const [weekly, setWeekly] = useState({ loading: true, data: null });
 
   const switchLang = (next) => setLang(next);
 
   useEffect(() => {
     let alive = true;
+    if (tab === "review") {
+      setWeekly({ loading: true, data: null });
+      fetch(`/api/english/weekly-review?language=${lang}`)
+        .then((r) => r.json())
+        .then((d) => { if (alive) setWeekly({ loading: false, data: d }); })
+        .catch(() => alive && setWeekly({ loading: false, data: { expressions: [], words: [] } }));
+      return () => { alive = false; };
+    }
     setFeed({ loading: true, date: null, items: [], error: null });
     setPast({ open: false, loading: false, items: [] });
     fetch(`/api/english/today?medium=${tab}&language=${lang}`)
@@ -281,7 +372,9 @@ export default function EnglishPage() {
         ))}
       </div>
 
-      {feed.loading ? (
+      {tab === "review" ? (
+        <WeeklyReview weekly={weekly} lang={lang} />
+      ) : feed.loading ? (
         <div className="en-state">불러오는 중…</div>
       ) : feed.items.length === 0 ? (
         <div className="en-state">
@@ -301,10 +394,12 @@ export default function EnglishPage() {
         </>
       )}
 
+      {tab !== "review" && (
       <button type="button" className="en-past" onClick={loadPast}>
         {past.open ? "지난 학습 접기" : "지난 학습 보기"}
       </button>
-      {past.open && (
+      )}
+      {tab !== "review" && past.open && (
         <div className="en-list">
           {past.loading ? (
             <div className="en-state">불러오는 중…</div>
