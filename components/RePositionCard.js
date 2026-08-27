@@ -93,10 +93,11 @@ function TargetList({ rows, onSelect, selected }) {
       if (!pts.length) return;
       // 세로 점선: 각 행의 목표가 위치를 위아래로 가로지르는 수직 틱(별도 path — 점선 처리)
       const tickD = pts.map((p) => `M ${p.x},${p.yTop} L ${p.x},${p.yBot}`).join(" ");
-      // 사선: 행-행 사이는 실선으로 연결(평형별 계단식을 세로로 세운 형태)
+      // 사선: 세로 점선 틱의 끝(아래쪽 끝)과 다음 틱의 끝(위쪽 끝)을 실선으로 연결
+      //   — 중간지점끼리가 아니라 점선이 "끝나는" 지점에서 바로 이어지도록.
       let connD = "";
       for (let i = 1; i < pts.length; i++) {
-        connD += `M ${pts[i - 1].x},${pts[i - 1].yMid} L ${pts[i].x},${pts[i].yMid} `;
+        connD += `M ${pts[i - 1].x},${pts[i - 1].yBot} L ${pts[i].x},${pts[i].yTop} `;
       }
       setTickPath(tickD);
       setConnPath(connD);
