@@ -139,7 +139,7 @@ function TargetList({ rows, onSelect, selected }) {
       })}
       {(tickPath || connPath) && (
         <svg className="rp-overlay" width={box.w} height={box.h}>
-          <path d={connPath} fill="none" stroke="var(--color-warning)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={connPath} fill="none" stroke="var(--color-warning)" strokeWidth="2.2" strokeDasharray="4,3.5" strokeLinecap="round" strokeLinejoin="round" />
           <path d={tickPath} fill="none" stroke="var(--color-warning)" strokeWidth="2.4" strokeDasharray="4,3.5" strokeLinecap="round" />
         </svg>
       )}
@@ -208,7 +208,7 @@ function AreaStepChart({ areas, myPyeongM2 }) {
           </g>
         );
       })}
-      <path d={stepD} fill="none" stroke="var(--color-warning)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={stepD} fill="none" stroke="var(--color-warning)" strokeWidth="2.6" strokeDasharray="5,3.5" strokeLinecap="round" strokeLinejoin="round" />
       <style jsx>{`.ac-svg { width: 100%; display: block; overflow: visible; }`}</style>
     </svg>
   );
@@ -240,7 +240,7 @@ function RatioTrendChart({ leaderName, subjectName, leaderSeries, subjectSeries 
           <text key={yLbl} x={x(i)} y={h - 5} textAnchor="middle" fontSize="8" fontWeight="600" fill="var(--color-ink-3)">{yLbl.slice(2)}</text>
         ))}
         <polyline points={linePts(yearlyRatio)} fill="none" stroke="var(--color-primary)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-        <polyline points={linePts(trendRatio)} fill="none" stroke="var(--color-warning)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        <polyline points={linePts(trendRatio)} fill="none" stroke="var(--color-warning)" strokeWidth="2.2" strokeDasharray="5,3.5" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
       <div className="rt-legend">
         <span className="li"><i style={{ background: "var(--color-primary)" }} />실제 비율({subjectName}/{leaderName})</span>
