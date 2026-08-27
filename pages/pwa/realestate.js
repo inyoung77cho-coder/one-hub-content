@@ -8,6 +8,7 @@ import { dedupBy } from "../../lib/useDedup";
 import { ReForm } from "../../components/shared/AssetForms";
 import Term from "../../components/Term";
 import ReportTeaser from "../../components/ReportTeaser";
+import RePositionCard from "../../components/RePositionCard";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -316,25 +317,11 @@ export default function RealEstateDashboard() {
         </div>
       )}
 
-      {/* [§3.7·§3.8] 내 단지 포지션 — 최상단(내 단지 가격 최우선). 대장 대비 어느 위치인지 + 대장 트렌드. */}
-      {myProp?.name && brief && !brief.error && (() => {
-        const mineUk = repEvalUk > 0 ? repEvalUk : null;
-        const leadUk = brief.leader_price != null ? Number(brief.leader_price) : null;
-        const ratio = mineUk != null && leadUk ? Math.round((mineUk / leadUk) * 100) : null;
-        return (
-          <section className="card mypos">
-            <div className="mypos-h">🏠 내 단지 포지션</div>
-            <div className="mypos-main"><b>{myProp.name}</b>{mineUk != null ? <> · {uk(mineUk)}</> : null}</div>
-            <div className="mypos-vs">
-              {ratio != null
-                ? <>대장 <b>{brief.leader}</b> {uk(leadUk)} 대비 <b className="mypos-r">{ratio}% 수준</b></>
-                : <>이 지역 대장 <b>{brief.leader}</b> {uk(leadUk)}</>}
-            </div>
-            <div className="mypos-trend">대장 트렌드 · 분기 {pct(brief.chg_q)} · 연간 {pct(brief.chg_yr)}</div>
-            <button className="mypos-cta" onClick={() => { try { document.querySelector(".myprop-card")?.scrollIntoView({ behavior: "smooth" }); } catch (e) {} }}>내 단지 상세 보기 →</button>
-          </section>
-        );
-      })()}
+      {/* [§3.7·§3.8, 2026-08-27 v2] 내 단지 포지션 — 최상단. 막대+실선(계단)으로 대장 대비 위치·
+          평형별 적정가·시점별 갭 추이를 시각화(과거엔 텍스트 두 줄뿐이었음). */}
+      {myProp?.name && brief && !brief.error && (
+        <RePositionCard brief={brief} myProp={myProp} dongOf={dongOf} />
+      )}
 
       {/* 1) HERO — 시장 브리핑 (다른 페이지와 통일된 라이트 카드) */}
       <section className="hero">

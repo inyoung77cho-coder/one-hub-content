@@ -22,21 +22,29 @@ const ENDPOINTS = {
   weekly: "/api/re/weekly", // [FB-5 §5.4] 주간 부동산 리포트 요약(확정+미검증 병기)
 };
 
+// [내단지 포지션 v2] /api/trend/{apt_name} 는 단지명이 쿼리가 아니라 경로 파라미터라
+//   위 fn→고정경로 매핑으로는 못 붙인다 — apt 쿼리를 받아 경로에 끼워 넣는다.
+const PATH_PARAM_ENDPOINTS = {
+  trend: (query) => `/api/trend/${encodeURIComponent(query.apt || "")}`,
+};
+
 // fn·key 외 추가 쿼리(complex 등)는 백엔드로 그대로 전달
-function passThroughQuery(query) {
+function passThroughQuery(query, skipKeys) {
   const p = new URLSearchParams();
   for (const [k, v] of Object.entries(query)) {
-    if (k === "fn" || k === "key" || v == null) continue;
+    if (k === "fn" || k === "key" || v == null || (skipKeys && skipKeys.includes(k))) continue;
     p.set(k, Array.isArray(v) ? v[0] : String(v));
   }
   return p;
 }
 
 export default async function handler(req, res) {
-  const path = ENDPOINTS[req.query.fn];
+  const fn = req.query.fn;
+  const pathBuilder = PATH_PARAM_ENDPOINTS[fn];
+  const path = pathBuilder ? pathBuilder(req.query) : ENDPOINTS[fn];
   if (!path) return res.status(404).json({ error: "unknown endpoint" });
   try {
-    const p = passThroughQuery(req.query);
+    const p = passThroughQuery(req.query, pathBuilder ? ["apt"] : null);
     if (RE_KEY) p.set("key", RE_KEY);
     const qs = p.toString();
     const url = `${RE_API}${path}${qs ? `?${qs}` : ""}`;

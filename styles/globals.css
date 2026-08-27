@@ -193,6 +193,7 @@
   --blue:        #2F6BFF;
   --blue-dim:    #3576C4;
   --purple:      #A855F7;
+  --purple-soft: rgba(168,85,247,.16);   /* [나 vs AI] AI 진영 색(초록=나 와 짝) 소프트 배경 */
 
   /* Backgrounds */
   --bg-base:     #F4F9FF;
