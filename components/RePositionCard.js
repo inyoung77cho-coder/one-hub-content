@@ -51,11 +51,23 @@ function ratioFairPrice(subjectSeries, refSeries) {
   const yIdx = years.map((_, i) => i);
   const fit = linreg(yIdx, yearlyRatio);
   const trendRatio = fit ? yIdx.map((i) => fit.slope * i + fit.intercept) : yearlyRatio.slice();
-  const fairRatio = trendRatio[trendRatio.length - 1];
-  const lastMonth = months[months.length - 1];
-  const refNow = refMap[lastMonth], subjectNow = subMap[lastMonth];
+  // [정확도 수정] 20년 전체를 그대로 선형회귀하면 2006~2012년처럼 지금과 완전히 다른
+  //   시장 국면까지 같은 비중으로 반영돼, 최근 실제 관측치와 크게 어긋난 "적정비율"이
+  //   나오는 문제가 있었다(실측: 최근 5개년 평균 64% vs 20년 회귀값 71.7%, 사용자 지적).
+  //   → "적정비율"은 최근 구간(최대 5개년, 표본 부족하면 있는 만큼) 평균으로 계산하고,
+  //   20년 전체 회귀선(trendRatio)은 장기 흐름 참고용으로 차트에만 남겨둔다.
+  const recentN = Math.min(5, yearlyRatio.length);
+  const recentRatios = yearlyRatio.slice(-recentN);
+  const fairRatio = recentRatios.reduce((a, b) => a + b, 0) / recentRatios.length;
+  // [정확도 수정] "현재가"는 두 단지의 공통 거래월이 아니라, 각자의 가장 최근 실거래월을
+  //   써야 한다 — 공통월 기준이면 한쪽 거래가 뜸할 때 실제보다 오래된 가격이 "현재가"로
+  //   표시되는 문제가 있었다(사용자 지적: 비교 금액이 실제와 크게 다름).
+  const refMonths = refSeries.map((s) => s.month).sort();
+  const subMonths = subjectSeries.map((s) => s.month).sort();
+  const refNow = refMap[refMonths[refMonths.length - 1]];
+  const subjectNow = subMap[subMonths[subMonths.length - 1]];
   const fairPrice = refNow * fairRatio;
-  return { years, yearlyRatio, trendRatio, fairRatio, refNow, subjectNow, fairPrice, gap: subjectNow - fairPrice };
+  return { years, yearlyRatio, trendRatio, fairRatio, recentN, refNow, subjectNow, fairPrice, gap: subjectNow - fairPrice };
 }
 
 // ── 재사용 리스트: 대장(기준)이 맨 위, 행마다 자기 target(회귀 적정가) — 세로 점선 틱 +
@@ -222,7 +234,7 @@ function RatioTrendChart({ leaderName, subjectName, leaderSeries, subjectSeries 
   }
   const r = ratioFairPrice(subjectSeries, leaderSeries);
   if (!r) return <div style={emptyStyle}>{leaderName}·{subjectName} 공통 실거래 구간이 장기분석(2년 이상)에는 부족합니다.</div>;
-  const { years, yearlyRatio, trendRatio, fairRatio, refNow, subjectNow, fairPrice, gap } = r;
+  const { years, yearlyRatio, trendRatio, fairRatio, recentN, refNow, subjectNow, fairPrice, gap } = r;
 
   const w = 320, h = 150, padL = 8, padR = 8, padT = 14, padB = 20;
   const innerW = w - padL - padR, innerH = h - padT - padB;
@@ -244,15 +256,16 @@ function RatioTrendChart({ leaderName, subjectName, leaderSeries, subjectSeries 
       </svg>
       <div className="rt-legend">
         <span className="li"><i style={{ background: "var(--color-primary)" }} />실제 비율({subjectName}/{leaderName})</span>
-        <span className="li"><i style={{ background: "var(--color-warning)" }} />20년 장기추세 적정비율</span>
+        <span className="li"><i style={{ background: "var(--color-warning)" }} />20년 추세선(참고용)</span>
       </div>
       <div className="pj-callouts">
         <div className="pj-c"><span className="k">{leaderName} 현재가</span><span className="v">{uk(refNow)}억</span></div>
-        <div className="pj-c"><span className="k">장기추세 적정가</span><span className="v">{uk(fairPrice)}억</span></div>
+        <div className="pj-c"><span className="k">최근 {recentN}개년 평균 적정가</span><span className="v">{uk(fairPrice)}억</span></div>
       </div>
       <div className="pj-note">
-        {years[0]}~{years[years.length - 1]}년 {years.length}개년 비율 장기 추세로는 <b>{(fairRatio * 100).toFixed(1)}%</b>가 적정 — {subjectName} 실제가 {uk(subjectNow)}억은 적정가 대비
-        {" "}<b className={gap < 0 ? "lo" : "hi"}>{signed(gap)}억</b>({gap < 0 ? "저평가" : "고평가"}) 구간입니다.
+        {years[0]}~{years[years.length - 1]}년 {years.length}개년 비율(파란선)을 보여드리되, "적정 비율"은 최근 {recentN}개년 평균 <b>{(fairRatio * 100).toFixed(1)}%</b>로 계산했습니다
+        (20년 전체를 그대로 선형회귀하면 2006~2012년 같은 다른 시장 국면까지 같은 비중으로 섞여 최근 실제와 크게 어긋나는 값이 나와, 최근 구간 평균으로 보정했습니다).
+        {" "}{subjectName} 실제가 {uk(subjectNow)}억은 적정가 대비 <b className={gap < 0 ? "lo" : "hi"}>{signed(gap)}억</b>({gap < 0 ? "저평가" : "고평가"}) 구간입니다.
       </div>
       <style jsx>{`
         .rt-svg { width: 100%; display: block; overflow: visible; }
