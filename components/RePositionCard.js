@@ -1,13 +1,17 @@
-// components/RePositionCard.js — [내단지 포지션 v2] 2026-08-27
-//   기존엔 "대장 대비 91% 수준" 텍스트 두 줄뿐이었다 — 막대그래프+실선(계단)으로 재설계.
+// components/RePositionCard.js — [내단지 포지션 v2] 2026-08-27, v3 같은 날 업데이트
+//   기존엔 "대장 대비 91% 수준" 텍스트 두 줄뿐이었다 — 막대그래프+실선으로 재설계.
 //   ① 동네 비교: 대장이 맨 위, 아래로 대장과의 가격 동조(lag_map, 개월) 순 — 실제 위경도가
 //      DB에 없어 "직선거리"는 못 쓰고, 이미 검증된 lag_map(0~4개월)을 근접도 대용으로 쓴다.
-//      행마다 회귀 기반 적정가(brief.all_ranking[].pred)를 표시하고, 전체를 하나의 연속된
-//      실선(계단형, 점선 없음)으로 이어 그린다.
+//      행마다 회귀 기반 적정가(brief.all_ranking[].pred)를 표시 — 세로 점선(각 행의 목표가
+//      위치를 가로지르는 수직 틱) + 행 사이는 사선(실선)으로 연결(=평형별 계단식을 세로로
+//      세운 형태, 사용자 지시).
 //   ② 평형별 적정가: complex-areas(실거래 평형별 대표가)에 평형↔가격 선형회귀를 얹어 계단선.
 //      동네 비교에서 단지를 클릭하면 ②가 그 단지로 바뀐다(원 요청: gap 큰 단지 클릭→평형별 갭).
-//   ③ 시점별 갭 + 예상가: /api/trend/{apt} 월별 실거래로 대장·내 단지 라인을 그리고,
-//      최근 구간 선형 추세를 연장해 향후 갭을 추정(실선, 예측 구간은 옅게 — 점선 미사용).
+//   ③ 대장 대비 장기(20년) 비율 추세 + 적정가: /api/trend/{apt}?months=240 월별 실거래로
+//      내 단지/대장 가격 비율을 연도별로 집계, 그 장기 추세(회귀)가 가리키는 "적정 비율" ×
+//      현재 대장가 = 적정가. 단기 변동이 아니라 20년 구조적 관계를 본다(사용자 지시).
+//   ④ 대장 아파트끼리 비교: 주변 도시·강남 등 다른 동네의 "대장 아파트"들을 모아, 그중 최고가를
+//      기준(대장 중의 대장)으로 삼아 ①과 같은 방식(세로 점선 틱 + 사선 연결)으로 비교(사용자 지시).
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}`);
@@ -26,11 +30,41 @@ function linreg(xs, ys) {
   return { slope, intercept: my - slope * mx };
 }
 
-// ── ① 동네 비교: 행마다 자기 target(회귀 적정가) + 연속 계단 실선 오버레이 ──
-function NeighborList({ rows, onSelect, selected }) {
+// 두 월별 시계열(series:[{month,price}])의 공통월로 연도별 평균 "비율"을 만들고,
+// 그 장기추세(회귀)가 가리키는 "적정 비율" × 기준 현재가 = 적정가를 계산한다.
+// [카드②③ 공용] 내 단지 vs 대장, 지역 대장 vs 최상위 대장 양쪽에서 재사용.
+function ratioFairPrice(subjectSeries, refSeries) {
+  if (!subjectSeries?.length || !refSeries?.length) return null;
+  const subMap = Object.fromEntries(subjectSeries.map((s) => [s.month, s.price]));
+  const refMap = Object.fromEntries(refSeries.map((s) => [s.month, s.price]));
+  const months = [...new Set([...subjectSeries.map((s) => s.month), ...refSeries.map((s) => s.month)])]
+    .filter((m) => subMap[m] != null && refMap[m] > 0).sort();
+  if (months.length < 24) return null; // 장기 분석 최소 표본(2년 이상)
+
+  const byYear = {};
+  months.forEach((m) => {
+    const yr = m.slice(0, 4);
+    (byYear[yr] = byYear[yr] || []).push(subMap[m] / refMap[m]);
+  });
+  const years = Object.keys(byYear).sort();
+  const yearlyRatio = years.map((y) => byYear[y].reduce((a, b) => a + b, 0) / byYear[y].length);
+  const yIdx = years.map((_, i) => i);
+  const fit = linreg(yIdx, yearlyRatio);
+  const trendRatio = fit ? yIdx.map((i) => fit.slope * i + fit.intercept) : yearlyRatio.slice();
+  const fairRatio = trendRatio[trendRatio.length - 1];
+  const lastMonth = months[months.length - 1];
+  const refNow = refMap[lastMonth], subjectNow = subMap[lastMonth];
+  const fairPrice = refNow * fairRatio;
+  return { years, yearlyRatio, trendRatio, fairRatio, refNow, subjectNow, fairPrice, gap: subjectNow - fairPrice };
+}
+
+// ── 재사용 리스트: 대장(기준)이 맨 위, 행마다 자기 target(회귀 적정가) — 세로 점선 틱 +
+//    행 사이 사선(실선) 연결. Card① 동네비교와 Card④ 지역 대장 비교가 공유. ──
+function TargetList({ rows, onSelect, selected }) {
   const wrapRef = useRef(null);
   const rowRefs = useRef([]);
-  const [overlayPath, setOverlayPath] = useState("");
+  const [tickPath, setTickPath] = useState("");
+  const [connPath, setConnPath] = useState("");
   const [box, setBox] = useState({ w: 0, h: 0 });
 
   const max = useMemo(() => {
@@ -48,18 +82,24 @@ function NeighborList({ rows, onSelect, selected }) {
         if (!trackEl) return null;
         const tr = trackEl.getBoundingClientRect();
         const tpct = r.isLeader ? (r.value / max) * 100 : (r.target / max) * 100;
+        const xLoc = (tr.left - wrapRect.left) + tr.width * (tpct / 100);
         return {
-          x: (tr.left - wrapRect.left) + tr.width * (tpct / 100),
-          y: (tr.top - wrapRect.top) + tr.height / 2,
+          x: xLoc,
+          yTop: tr.top - wrapRect.top,
+          yBot: (tr.top - wrapRect.top) + tr.height,
+          yMid: (tr.top - wrapRect.top) + tr.height / 2,
         };
       }).filter(Boolean);
       if (!pts.length) return;
-      const tickW = 9;
-      let d = `M ${pts[0].x - tickW},${pts[0].y} L ${pts[0].x + tickW},${pts[0].y}`;
+      // 세로 점선: 각 행의 목표가 위치를 위아래로 가로지르는 수직 틱(별도 path — 점선 처리)
+      const tickD = pts.map((p) => `M ${p.x},${p.yTop} L ${p.x},${p.yBot}`).join(" ");
+      // 사선: 행-행 사이는 실선으로 연결(평형별 계단식을 세로로 세운 형태)
+      let connD = "";
       for (let i = 1; i < pts.length; i++) {
-        d += ` L ${pts[i].x - tickW},${pts[i].y} L ${pts[i].x + tickW},${pts[i].y}`;
+        connD += `M ${pts[i - 1].x},${pts[i - 1].yMid} L ${pts[i].x},${pts[i].yMid} `;
       }
-      setOverlayPath(d);
+      setTickPath(tickD);
+      setConnPath(connD);
       setBox({ w: wrapRect.width, h: wrapRect.height });
     };
     measure();
@@ -96,9 +136,10 @@ function NeighborList({ rows, onSelect, selected }) {
           </div>
         );
       })}
-      {overlayPath && (
+      {(tickPath || connPath) && (
         <svg className="rp-overlay" width={box.w} height={box.h}>
-          <path d={overlayPath} fill="none" stroke="var(--color-warning)" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={connPath} fill="none" stroke="var(--color-warning)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          <path d={tickPath} fill="none" stroke="var(--color-warning)" strokeWidth="2.4" strokeDasharray="4,3.5" strokeLinecap="round" />
         </svg>
       )}
       <style jsx>{`
@@ -172,73 +213,51 @@ function AreaStepChart({ areas, myPyeongM2 }) {
   );
 }
 
-// ── ③ 시점별 갭 + 예상가: 실측(실선) + 예측(옅은 실선) ──
-function ProjectionChart({ leaderName, meName, leaderSeries, meSeries }) {
+// ── ③ 대장 대비 장기(20년) 비율 추세 + 적정가 ──
+function RatioTrendChart({ leaderName, subjectName, leaderSeries, subjectSeries }) {
   const emptyStyle = { fontSize: "0.72rem", color: "var(--color-ink-3)", textAlign: "center", padding: "16px 8px" };
-  if (!leaderSeries?.length || !meSeries?.length) {
-    return <div style={emptyStyle}>시점별 실거래 데이터가 아직 충분하지 않습니다.</div>;
+  if (!leaderSeries?.length || !subjectSeries?.length) {
+    return <div style={emptyStyle}>장기(20년) 실거래 데이터가 아직 로딩 중이거나 부족합니다.</div>;
   }
-  // 공통 월만 정렬 정합 후 최근 구간 사용
-  const leaderMap = Object.fromEntries(leaderSeries.map((s) => [s.month, s.price]));
-  const meMap = Object.fromEntries(meSeries.map((s) => [s.month, s.price]));
-  const months = [...new Set([...leaderSeries.map((s) => s.month), ...meSeries.map((s) => s.month)])]
-    .filter((m) => leaderMap[m] != null && meMap[m] != null).sort().slice(-8);
-  if (months.length < 3) return <div style={emptyStyle}>대장·내 단지 공통 실거래 구간이 부족합니다.</div>;
+  const r = ratioFairPrice(subjectSeries, leaderSeries);
+  if (!r) return <div style={emptyStyle}>{leaderName}·{subjectName} 공통 실거래 구간이 장기분석(2년 이상)에는 부족합니다.</div>;
+  const { years, yearlyRatio, trendRatio, fairRatio, refNow, subjectNow, fairPrice, gap } = r;
 
-  const leaderVals = months.map((m) => leaderMap[m]);
-  const meVals = months.map((m) => meMap[m]);
-  const idx = months.map((_, i) => i);
-  const fitL = linreg(idx, leaderVals), fitM = linreg(idx, meVals);
-  const FUT = 2;
-  const futIdx = [months.length, months.length + 1];
-  const leaderFut = fitL ? futIdx.map((i) => fitL.slope * i + fitL.intercept) : [];
-  const meFut = fitM ? futIdx.map((i) => fitM.slope * i + fitM.intercept) : [];
-  const xLabels = [...months.map((m) => m.slice(2).replace("-", "/")), ...futIdx.map((_, i) => `+${i + 1}M`)];
-  const leaderAll = [...leaderVals, ...leaderFut], meAll = [...meVals, ...meFut];
-  const nowIndex = months.length - 1;
-
-  const w = 320, h = 158, padL = 8, padR = 8, padT = 18, padB = 20;
+  const w = 320, h = 150, padL = 8, padR = 8, padT = 14, padB = 20;
   const innerW = w - padL - padR, innerH = h - padT - padB;
-  const n = xLabels.length;
-  const allVals = [...leaderAll, ...meAll];
-  const lo = Math.min(...allVals) * 0.95, hi = Math.max(...allVals) * 1.05;
-  const x = (i) => padL + (innerW / (n - 1)) * i;
-  const y = (v) => padT + innerH - ((v - lo) / (hi - lo)) * innerH;
-  const nowX = x(nowIndex);
-
-  const line = (vals, from, to) => vals.slice(from, to + 1).map((v, i) => `${x(from + i)},${y(v)}`).join(" ");
-
-  const gapNow = leaderAll[nowIndex] - meAll[nowIndex];
-  const gapFuture = leaderAll[leaderAll.length - 1] - meAll[meAll.length - 1];
-  const narrowing = gapFuture < gapNow;
+  const n = years.length;
+  const lo = Math.min(...yearlyRatio, ...trendRatio) * 0.92, hi = Math.max(...yearlyRatio, ...trendRatio) * 1.08;
+  const x = (i) => padL + (n > 1 ? (innerW / (n - 1)) * i : innerW / 2);
+  const y = (v) => padT + innerH - ((v - lo) / (hi - lo || 1)) * innerH;
+  const linePts = (vals) => vals.map((v, i) => `${x(i)},${y(v)}`).join(" ");
 
   return (
     <div>
-      <svg viewBox={`0 0 ${w} ${h}`} className="pj-svg">
+      <svg viewBox={`0 0 ${w} ${h}`} className="rt-svg">
         <line x1={padL} x2={w - padR} y1={padT + innerH} y2={padT + innerH} stroke="var(--color-line)" strokeWidth="1" />
-        <line x1={nowX} x2={nowX} y1={padT - 6} y2={padT + innerH} stroke="var(--color-ink-3)" strokeWidth="1" opacity="0.5" />
-        <text x={nowX} y={padT - 9} textAnchor="middle" fontSize="9" fontWeight="800" fill="var(--color-ink-3)">현재</text>
-        {xLabels.map((lb, i) => (i % 2 === 0 || i === n - 1) && (
-          <text key={i} x={x(i)} y={h - 5} textAnchor="middle" fontSize="8" fontWeight="600" fill="var(--color-ink-3)">{lb}</text>
+        {years.map((yLbl, i) => (i % 3 === 0 || i === n - 1) && (
+          <text key={yLbl} x={x(i)} y={h - 5} textAnchor="middle" fontSize="8" fontWeight="600" fill="var(--color-ink-3)">{yLbl.slice(2)}</text>
         ))}
-        <polyline points={line(leaderAll, 0, nowIndex)} fill="none" stroke="var(--color-warning)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-        <polyline points={line(leaderAll, nowIndex, n - 1)} fill="none" stroke="var(--color-warning)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.4" />
-        <polyline points={line(meAll, 0, nowIndex)} fill="none" stroke="var(--color-primary)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-        <polyline points={line(meAll, nowIndex, n - 1)} fill="none" stroke="var(--color-primary)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.4" />
-        <text x={x(n - 1)} y={y(leaderAll[leaderAll.length - 1]) - 8} textAnchor="end" fontSize="9" fontWeight="800" fill="var(--color-warning)">{leaderName} {uk(leaderAll[leaderAll.length - 1])}억</text>
-        <text x={x(n - 1)} y={y(meAll[meAll.length - 1]) + 14} textAnchor="end" fontSize="9" fontWeight="800" fill="var(--color-primary)">{meName} {uk(meAll[meAll.length - 1])}억</text>
+        <polyline points={linePts(yearlyRatio)} fill="none" stroke="var(--color-primary)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+        <polyline points={linePts(trendRatio)} fill="none" stroke="var(--color-warning)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
+      <div className="rt-legend">
+        <span className="li"><i style={{ background: "var(--color-primary)" }} />실제 비율({subjectName}/{leaderName})</span>
+        <span className="li"><i style={{ background: "var(--color-warning)" }} />20년 장기추세 적정비율</span>
+      </div>
       <div className="pj-callouts">
-        <div className="pj-c"><span className="k">현재 갭</span><span className="v">{uk(gapNow)}억</span></div>
-        <div className="pj-c"><span className="k">2개월 후 예상 갭</span><span className="v">{uk(gapFuture)}억</span></div>
+        <div className="pj-c"><span className="k">{leaderName} 현재가</span><span className="v">{uk(refNow)}억</span></div>
+        <div className="pj-c"><span className="k">장기추세 적정가</span><span className="v">{uk(fairPrice)}억</span></div>
       </div>
       <div className="pj-note">
-        최근 실거래 추세를 연장하면 격차가 {narrowing
-          ? <><b className="lo">{uk(gapNow - gapFuture)}억 좁혀질</b> 전망입니다.</>
-          : <><b className="hi">{uk(gapFuture - gapNow)}억 더 벌어질</b> 전망입니다.</>} (선형 추세 연장 · 참고용)
+        {years[0]}~{years[years.length - 1]}년 {years.length}개년 비율 장기 추세로는 <b>{(fairRatio * 100).toFixed(1)}%</b>가 적정 — {subjectName} 실제가 {uk(subjectNow)}억은 적정가 대비
+        {" "}<b className={gap < 0 ? "lo" : "hi"}>{signed(gap)}억</b>({gap < 0 ? "저평가" : "고평가"}) 구간입니다.
       </div>
       <style jsx>{`
-        .pj-svg { width: 100%; display: block; overflow: visible; }
+        .rt-svg { width: 100%; display: block; overflow: visible; }
+        .rt-legend { display: flex; gap: 12px; margin-top: 6px; flex-wrap: wrap; }
+        .rt-legend .li { display: inline-flex; align-items: center; gap: 5px; font-size: 0.62rem; font-weight: 700; color: var(--color-ink-2); }
+        .rt-legend .li i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
         .pj-callouts { display: flex; gap: 8px; margin-top: 8px; }
         .pj-c { flex: 1; background: var(--color-card-soft); border-radius: 10px; padding: 8px 10px; }
         .pj-c .k { display: block; font-size: 0.62rem; color: var(--color-ink-3); margin-bottom: 2px; }
@@ -250,10 +269,16 @@ function ProjectionChart({ leaderName, meName, leaderSeries, meSeries }) {
   );
 }
 
+// [④ 지역 대장 비교] 주변 도시·강남 등 다른 동네의 "대장 아파트" watchlist.
+//   region_config.json에 이미 큐레이션돼 있는 동만 골랐다(분당 인접 + 강남 주요 동).
+const REGION_WATCHLIST = ["정자동", "판교동", "대치동", "반포동", "압구정동", "도곡동"];
+
 export default function RePositionCard({ brief, myProp, dongOf }) {
   const [dbAreas, setDbAreas] = useState({});
   const [selected, setSelected] = useState(null);
   const [trendCache, setTrendCache] = useState({});
+  const [regionLeaders, setRegionLeaders] = useState(null); // [{region,name,value}] (brief_price 로딩 후)
+  const [regionTrendCache, setRegionTrendCache] = useState({});
 
   useEffect(() => { if (myProp?.name) setSelected(myProp.name); }, [myProp?.name]);
 
@@ -279,6 +304,7 @@ export default function RePositionCard({ brief, myProp, dongOf }) {
     return [{ name: leader, value: brief.leader_price, isLeader: true, distLabel: "대장 기준" }, ...rows];
   }, [brief, myDong, myProp?.name, dongOf, leader]);
 
+  // ② 평형별 적정가 — 클릭된(또는 기본 내 단지) 단지의 complex-areas 로딩
   useEffect(() => {
     if (!selected || dbAreas[selected] !== undefined) return;
     setDbAreas((m) => ({ ...m, [selected]: null }));
@@ -294,18 +320,77 @@ export default function RePositionCard({ brief, myProp, dongOf }) {
       .catch(() => setDbAreas((m) => ({ ...m, [selected]: null })));
   }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ③ 대장·내 단지 20년 월별 시계열
   useEffect(() => {
-    [leader, myProp?.name].filter(Boolean).forEach((apt) => {
-      if (trendCache[apt] !== undefined) return;
+    [[leader, brief?.region], [myProp?.name, brief?.region]].forEach(([apt, region]) => {
+      if (!apt || trendCache[apt] !== undefined) return;
       setTrendCache((m) => ({ ...m, [apt]: null }));
-      const qs = new URLSearchParams({ apt, months: "18" });
-      if (brief?.region) qs.set("region", brief.region);
+      const qs = new URLSearchParams({ apt, months: "240" });
+      if (region) qs.set("region", region);
       fetch(`/api/pwa/re/trend?${qs}`)
         .then((r) => r.json())
         .then((d) => setTrendCache((m) => ({ ...m, [apt]: Array.isArray(d?.series) ? d.series : null })))
         .catch(() => setTrendCache((m) => ({ ...m, [apt]: null })));
     });
   }, [leader, myProp?.name, brief?.region]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ④ 지역 대장 watchlist — 각 지역 briefing(대장명+현재가) 로딩
+  useEffect(() => {
+    if (!brief?.region || !leader || regionLeaders !== null) return;
+    const list = [{ region: brief.region, name: leader, value: brief.leader_price }];
+    Promise.all(REGION_WATCHLIST.map((rg) =>
+      fetch(`/api/pwa/re/briefing?region=${encodeURIComponent(rg)}`).then((r) => r.json()).catch(() => null)
+    )).then((results) => {
+      results.forEach((b, i) => {
+        if (b && !b.error && b.leader && b.leader_price != null) {
+          list.push({ region: REGION_WATCHLIST[i], name: b.leader, value: Number(b.leader_price) });
+        }
+      });
+      setRegionLeaders(list);
+    });
+  }, [brief?.region, leader, brief?.leader_price, regionLeaders]);
+
+  // ④ 지역 대장들 중 최고가(대장 중의 대장) 기준으로 나머지 20년 시계열 로딩
+  const topRef = useMemo(() => {
+    if (!regionLeaders || regionLeaders.length < 2) return null;
+    return regionLeaders.reduce((a, b) => (b.value > a.value ? b : a));
+  }, [regionLeaders]);
+
+  useEffect(() => {
+    if (!regionLeaders || !topRef) return;
+    regionLeaders.forEach((rl) => {
+      const key = `${rl.region}:${rl.name}`;
+      if (regionTrendCache[key] !== undefined) return;
+      setRegionTrendCache((m) => ({ ...m, [key]: null }));
+      const qs = new URLSearchParams({ apt: rl.name, region: rl.region, months: "240" });
+      fetch(`/api/pwa/re/trend?${qs}`)
+        .then((r) => r.json())
+        .then((d) => setRegionTrendCache((m) => ({ ...m, [key]: Array.isArray(d?.series) ? d.series : null })))
+        .catch(() => setRegionTrendCache((m) => ({ ...m, [key]: null })));
+    });
+  }, [regionLeaders, topRef]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const regionRows = useMemo(() => {
+    if (!regionLeaders || !topRef) return [];
+    const topKey = `${topRef.region}:${topRef.name}`;
+    const topSeries = regionTrendCache[topKey];
+    if (!topSeries) return [];
+    const rows = regionLeaders
+      .filter((rl) => rl !== topRef)
+      .map((rl) => {
+        const key = `${rl.region}:${rl.name}`;
+        const series = regionTrendCache[key];
+        const r = series ? ratioFairPrice(series, topSeries) : null;
+        return {
+          name: `${rl.name}`, value: rl.value,
+          target: r ? r.fairPrice : null,
+          distLabel: rl.region,
+        };
+      })
+      .filter((r) => r.target != null)
+      .sort((a, b) => b.value - a.value);
+    return [{ name: topRef.name, value: topRef.value, isLeader: true, distLabel: `${topRef.region} · 최상위 기준` }, ...rows];
+  }, [regionLeaders, topRef, regionTrendCache]);
 
   if (!brief || brief.error || !leader) return null;
   if (!neighborRows.length) return null;
@@ -314,19 +399,27 @@ export default function RePositionCard({ brief, myProp, dongOf }) {
     <section className="card rp-card">
       <span className="rp-card-label">내단지 포지션</span>
       <h2 className="rp-card-title">🏠 동네 비교 <span className="rp-badge-note">참고용</span></h2>
-      <p className="rp-card-sub">대장이 맨 위, 아래로 대장과 가격이 함께 움직이는 정도(동조 개월수)순 — 위경도 데이터가 없어 직선거리 대신 씁니다. 막대=현재가, 실선=회귀 기반 적정가.</p>
-      <NeighborList rows={neighborRows} onSelect={setSelected} selected={selected} />
+      <p className="rp-card-sub">대장이 맨 위, 아래로 대장과 가격이 함께 움직이는 정도(동조 개월수)순 — 위경도 데이터가 없어 직선거리 대신 씁니다. 막대=현재가, 세로 점선=회귀 기반 적정가, 사선=단지 간 연결.</p>
+      <TargetList rows={neighborRows} onSelect={setSelected} selected={selected} />
 
       <h3 className="rp-sub-title">📐 {selected || myProp?.name || ""} 평형별 적정가</h3>
       <AreaStepChart areas={selected ? dbAreas[selected] : null} myPyeongM2={selected === myProp?.name ? myProp?.pyeong : null} />
 
       {myProp?.name && leader && (
         <>
-          <h3 className="rp-sub-title">📈 대장 대비 갭 추이 &amp; 예상가</h3>
-          <ProjectionChart
-            leaderName={leader} meName={myProp.name}
-            leaderSeries={trendCache[leader]} meSeries={trendCache[myProp.name]}
+          <h3 className="rp-sub-title">📈 대장 대비 20년 장기 비율 &amp; 적정가</h3>
+          <RatioTrendChart
+            leaderName={leader} subjectName={myProp.name}
+            leaderSeries={trendCache[leader]} subjectSeries={trendCache[myProp.name]}
           />
+        </>
+      )}
+
+      {regionRows.length > 0 && (
+        <>
+          <h3 className="rp-sub-title">🌆 지역 대장 아파트끼리 비교</h3>
+          <p className="rp-card-sub">주변 도시·강남 등 다른 동네의 대장 아파트를 모아, 그중 최고가를 기준으로 20년 비율 추세 대비 위치를 봅니다.</p>
+          <TargetList rows={regionRows} />
         </>
       )}
 
