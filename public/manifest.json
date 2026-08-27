@@ -3,7 +3,7 @@
   "short_name": "ONE-HUB",
   "description": "ONE-HUB — AI 투자 의사결정 대시보드",
   "id": "/pwa",
-  "start_url": "/pwa/pick",
+  "start_url": "/pwa",
   "scope": "/pwa",
   "display": "standalone",
   "background_color": "#f0f6ff",

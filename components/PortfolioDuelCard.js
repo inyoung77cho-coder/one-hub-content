@@ -16,6 +16,8 @@ import {
 // [사용자 지시] 억 단위 반올림은 소액 계좌에서 나/AI 차이가 0.00억으로 뭉개져 보였다 —
 //   원 단위 그대로(백원 단위까지) 표기해 실제 차이가 보이게 한다.
 const wonFmt = (n) => (n == null ? "-" : `${Math.round(n).toLocaleString()}원`);
+// [2026-08-27] Y축 눈금용 압축 표기(예: 15,320,000 → "1,532만") — wonFmt는 축에 쓰기엔 너무 길다.
+const wonCompact = (n) => (n == null ? "-" : `${Math.round(n / 10000).toLocaleString()}만`);
 const BUY_AMOUNT_WON = 1000000; // [단순화] 매수 추천 크기 = 100만원어치(최소 1주) 고정 — 사이즈 커스터마이즈는 범위 밖
 // [버그 수정] "나"는 실보유 시작이면 base+결정로그 재계산이 아니라 실시간 KIS 잔고를 써야
 //   결정 버튼을 거치지 않고 KIS에서 직접 산/판 종목도 반영된다(실사용자 사례: 직접 매수한
@@ -280,10 +282,17 @@ export default function PortfolioDuelCard() {
       {err && <div className="pd-err">{err}</div>}
 
       {chartData.length > 1 && (
-        <ResponsiveContainer width="100%" height={140}>
+        <ResponsiveContainer width="100%" height={160}>
           <LineChart data={chartData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
             <XAxis dataKey="label" stroke="var(--color-ink-3)" fontSize={10} tickLine={false} />
-            <YAxis hide domain={["dataMin", "dataMax"]} />
+            <YAxis
+              domain={["dataMin", "dataMax"]}
+              tickFormatter={wonCompact}
+              stroke="var(--color-ink-3)"
+              fontSize={10}
+              tickLine={false}
+              width={52}
+            />
             <Line type="monotone" dataKey="나" stroke="var(--color-success)" strokeWidth={2} dot={{ r: 2 }} />
             <Line type="monotone" dataKey="AI" stroke="var(--purple, #8b5cf6)" strokeWidth={2} dot={{ r: 2 }} />
           </LineChart>

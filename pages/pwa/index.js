@@ -353,16 +353,17 @@ export default function PWADashboard({ latestReport }) {
     // [N2] 종합자산 지도는 /pwa/assets 하나로 통합 — 구 dashboard로 오는 경로를 전부 리다이렉트.
     //   지도가 2개면 총자산이 같아도 '어느 화면이 정답인지' 알 수 없어 신뢰가 무너진다.
     if (tabParam === 'dashboard') { router.replace('/pwa/assets'); return; }
-    // [OS-2] 탭 없이 /pwa 진입(로고 클릭·PWA start_url)은 "AI 추천 선택→대결결과" 흐름이 첫 화면.
+    // [OS-2] 탭 없이 /pwa 진입(로고 클릭·PWA start_url)은 "오늘의 대결" 결과가 첫 화면.
     //   구버전엔 "오늘"이 기본 홈이었으나, 앱 첫 후킹을 주식 판단 게임에 맞추도록 사용자 지시로 교체.
-    //   manifest.json의 start_url도 /pwa/pick으로 함께 바뀌었다(이 리다이렉트는 로고 클릭 등 재진입용).
+    //   [2026-08-27] 중간 단계였던 /pwa/pick(관망/샀어요 체크인)은 실제 "오늘의 대결"과
+    //   무관한 별개 시스템(verdictLedger/gameWallet)이라 사용자 지시로 제거 — 곧장 대결로 진입.
     if (!tabParam && !code) {
       let onboarded = false;
       try {
         onboarded = !!window.localStorage.getItem('onehub_profile')
           || window.localStorage.getItem('onehub_onboarded') === '1';
       } catch (e) {}
-      if (onboarded) { router.replace('/pwa/pick'); return; }
+      if (onboarded) { router.replace('/pwa?tab=report&sec=vs'); return; }
       // 최초 사용자(프로필·온보딩 모두 없음) → 위저드 1회 진입.
       //   ★ 딥링크(?tab=·?code=)로 들어온 경우엔 절대 튕기지 않는다. isReady 이후라 판정이 정확하다.
       router.replace('/pwa/onboarding');
