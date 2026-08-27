@@ -20,6 +20,26 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# ── API 비용 계측 (1층) — 모듈이 없어도 기존 동작 유지 ──────
+try:
+    from claude_usage import call_and_log, MODEL_REPORT
+except Exception:
+    MODEL_REPORT = "claude-sonnet-4-6"
+    def call_and_log(_client, _feature, **kwargs):
+        return _client.messages.create(**kwargs)
+
+# ── ThinkingBlock 안전 파싱 — 모듈이 없어도 폴백으로 동작 ──
+try:
+    from claude_text import extract_text
+except Exception:
+    def extract_text(message):
+        parts = []
+        for block in getattr(message, "content", None) or []:
+            t = getattr(block, "text", None)
+            if t:
+                parts.append(t)
+        return "".join(parts)
+
 JOURNAL_DIR = Path.home() / "one_hub_journals"
 # [2026-08-05] 이 스크립트는 GitHub Actions(daily_publish.yml)에서 저장소 체크아웃
 # 루트를 cwd로 실행된다 — EC2 서버 전용 절대경로(/home/ubuntu/one-hub-publish/...)를
@@ -135,12 +155,13 @@ Regime: {db['regime']} | Heat: {db['heat_score']}/100 ({db['heat_grade']})
 
     try:
         client  = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model="claude-sonnet-4-6",
+        message = call_and_log(
+            client, "daily_report",
+            model=MODEL_REPORT,
             max_tokens=150,
             messages=[{"role": "user", "content": prompt}]
         )
-        raw = message.content[0].text.strip().strip('"\'「」')
+        raw = extract_text(message).strip().strip('"\'「」')
         if len(raw) > 100:
             raw = raw[:97] + "..."
         print(f"[INSIGHT] {raw}")
