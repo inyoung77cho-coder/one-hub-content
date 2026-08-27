@@ -269,16 +269,18 @@ function RatioTrendChart({ leaderName, subjectName, leaderSeries, subjectSeries 
   );
 }
 
-// [④ 지역 대장 비교] 주변 도시·강남 등 다른 동네의 "대장 아파트" watchlist.
-//   region_config.json에 이미 큐레이션돼 있는 동만 골랐다(분당 인접 + 강남 주요 동).
-const REGION_WATCHLIST = ["정자동", "판교동", "대치동", "반포동", "압구정동", "도곡동"];
+// [④ 지역 대장 비교] 2026-08-27 임시 비활성화 — region_config.json에 큐레이션된 다른 동네
+//   대장 6곳을 페이지 로드마다 동시 조회하도록 짰더니, 백엔드 /api/briefing·/api/trend가
+//   매 호출마다 raw_transactions(46만 행) 전체를 pandas로 새로 읽는 무거운 구조라 서버
+//   메모리가 급격히 치솟는 사고가 났다(onehub-realestate RSS 1.5GB·스왑 1.7GB, 서버 응답불능).
+//   재발 방지를 위해 프론트에서 완전히 뺐다 — 되살리려면 백엔드에 _load_pivot() 캐싱
+//   (region별 TTL 캐시)을 먼저 넣어야 한다.
+// const REGION_WATCHLIST = ["정자동", "판교동", "대치동", "반포동", "압구정동", "도곡동"];
 
 export default function RePositionCard({ brief, myProp, dongOf }) {
   const [dbAreas, setDbAreas] = useState({});
   const [selected, setSelected] = useState(null);
   const [trendCache, setTrendCache] = useState({});
-  const [regionLeaders, setRegionLeaders] = useState(null); // [{region,name,value}] (brief_price 로딩 후)
-  const [regionTrendCache, setRegionTrendCache] = useState({});
 
   useEffect(() => { if (myProp?.name) setSelected(myProp.name); }, [myProp?.name]);
 
@@ -334,63 +336,7 @@ export default function RePositionCard({ brief, myProp, dongOf }) {
     });
   }, [leader, myProp?.name, brief?.region]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ④ 지역 대장 watchlist — 각 지역 briefing(대장명+현재가) 로딩
-  useEffect(() => {
-    if (!brief?.region || !leader || regionLeaders !== null) return;
-    const list = [{ region: brief.region, name: leader, value: brief.leader_price }];
-    Promise.all(REGION_WATCHLIST.map((rg) =>
-      fetch(`/api/pwa/re/briefing?region=${encodeURIComponent(rg)}`).then((r) => r.json()).catch(() => null)
-    )).then((results) => {
-      results.forEach((b, i) => {
-        if (b && !b.error && b.leader && b.leader_price != null) {
-          list.push({ region: REGION_WATCHLIST[i], name: b.leader, value: Number(b.leader_price) });
-        }
-      });
-      setRegionLeaders(list);
-    });
-  }, [brief?.region, leader, brief?.leader_price, regionLeaders]);
-
-  // ④ 지역 대장들 중 최고가(대장 중의 대장) 기준으로 나머지 20년 시계열 로딩
-  const topRef = useMemo(() => {
-    if (!regionLeaders || regionLeaders.length < 2) return null;
-    return regionLeaders.reduce((a, b) => (b.value > a.value ? b : a));
-  }, [regionLeaders]);
-
-  useEffect(() => {
-    if (!regionLeaders || !topRef) return;
-    regionLeaders.forEach((rl) => {
-      const key = `${rl.region}:${rl.name}`;
-      if (regionTrendCache[key] !== undefined) return;
-      setRegionTrendCache((m) => ({ ...m, [key]: null }));
-      const qs = new URLSearchParams({ apt: rl.name, region: rl.region, months: "240" });
-      fetch(`/api/pwa/re/trend?${qs}`)
-        .then((r) => r.json())
-        .then((d) => setRegionTrendCache((m) => ({ ...m, [key]: Array.isArray(d?.series) ? d.series : null })))
-        .catch(() => setRegionTrendCache((m) => ({ ...m, [key]: null })));
-    });
-  }, [regionLeaders, topRef]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const regionRows = useMemo(() => {
-    if (!regionLeaders || !topRef) return [];
-    const topKey = `${topRef.region}:${topRef.name}`;
-    const topSeries = regionTrendCache[topKey];
-    if (!topSeries) return [];
-    const rows = regionLeaders
-      .filter((rl) => rl !== topRef)
-      .map((rl) => {
-        const key = `${rl.region}:${rl.name}`;
-        const series = regionTrendCache[key];
-        const r = series ? ratioFairPrice(series, topSeries) : null;
-        return {
-          name: `${rl.name}`, value: rl.value,
-          target: r ? r.fairPrice : null,
-          distLabel: rl.region,
-        };
-      })
-      .filter((r) => r.target != null)
-      .sort((a, b) => b.value - a.value);
-    return [{ name: topRef.name, value: topRef.value, isLeader: true, distLabel: `${topRef.region} · 최상위 기준` }, ...rows];
-  }, [regionLeaders, topRef, regionTrendCache]);
+  // [④ 지역 대장 비교]는 서버 메모리 사고로 비활성화 — 위 주석 참고.
 
   if (!brief || brief.error || !leader) return null;
   if (!neighborRows.length) return null;
@@ -412,14 +358,6 @@ export default function RePositionCard({ brief, myProp, dongOf }) {
             leaderName={leader} subjectName={myProp.name}
             leaderSeries={trendCache[leader]} subjectSeries={trendCache[myProp.name]}
           />
-        </>
-      )}
-
-      {regionRows.length > 0 && (
-        <>
-          <h3 className="rp-sub-title">🌆 지역 대장 아파트끼리 비교</h3>
-          <p className="rp-card-sub">주변 도시·강남 등 다른 동네의 대장 아파트를 모아, 그중 최고가를 기준으로 20년 비율 추세 대비 위치를 봅니다.</p>
-          <TargetList rows={regionRows} />
         </>
       )}
 
