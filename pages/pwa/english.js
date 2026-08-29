@@ -490,6 +490,8 @@ function WeekendChat({ lang = "en" }) {
   const [hints, setHints] = useState([]);
   const [usedList, setUsedList] = useState([]);
   const [err, setErr] = useState("");
+  const [rec, setRec] = useState("idle");   // idle | recording | thinking(받아쓰는 중)
+  const [recErr, setRecErr] = useState("");
   const inputRef = useRef(null);
   const scrollRef = useRef(null);
   const targetsRef = useRef([]);   // 이번 주 미완료 표현(대화 유도 대상)
@@ -497,6 +499,9 @@ function WeekendChat({ lang = "en" }) {
   const usedRef = useRef([]);      // 이번 세션에서 사용에 성공한 표현
   const focusRef = useRef("");
   const sessionTotalRef = useRef(0);
+  const mrRef = useRef(null);
+  const chunksRef = useRef([]);
+  const streamRef = useRef(null);
 
   const DONE_KEY = `onehub_wk_done_${lang}`;
   const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").trim();
@@ -510,6 +515,55 @@ function WeekendChat({ lang = "en" }) {
     saveDone(d);
   };
   const speak = (text) => { try { new Audio(`/api/english/speak?text=${encodeURIComponent(text)}&language=en`).play().catch(() => {}); } catch (e) {} };
+
+  // ── 말하기(녹음)로 답하기 — 인식 결과를 입력창에 채워 검토 후 전송 ──────────────
+  const hintStr = () => {   // 튜터가 유도 중인 표현들 → whisper 편향 힌트(정확도↑)
+    const exprs = (targetsRef.current || []).map((t) => t.expr).filter(Boolean);
+    const uniq = [...new Set([...(focusRef.current ? [focusRef.current] : []), ...exprs])].slice(0, 8);
+    return uniq.length ? "Expressions: " + uniq.join("; ") + "." : "";
+  };
+  const pickMime = () => {
+    for (const m of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac", "audio/ogg"]) {
+      try { if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(m)) return m; } catch (e) {}
+    }
+    return "";
+  };
+  const sendAudio = (blob) => {
+    setRec("thinking"); setRecErr("");
+    const h = hintStr();
+    fetch("/api/english/transcribe" + (h ? `?hint=${encodeURIComponent(h)}` : ""), {
+      method: "POST", headers: { "Content-Type": blob.type || "application/octet-stream" }, body: blob,
+    }).then((r) => r.json()).then((d) => {
+      setRec("idle");
+      const text = ((d && d.text) || "").trim();
+      if (!text) { setRecErr("잘 안 들렸어요. 다시 말해볼까요?"); return; }
+      setInput((prev) => (prev.trim() ? prev.trim() + " " : "") + text);   // 채우고, 검토 후 '보내기'
+      try { inputRef.current && inputRef.current.focus(); } catch (e) {}
+    }).catch(() => { setRec("idle"); setRecErr("녹음 전송 실패 — 다시 시도해 주세요."); });
+  };
+  const startRec = async () => {
+    setRecErr("");
+    if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === "undefined") {
+      setRecErr("이 브라우저는 녹음을 지원하지 않아요. 아래에 입력해 주세요."); return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mime = pickMime();
+      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      chunksRef.current = [];
+      mr.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        try { streamRef.current && streamRef.current.getTracks().forEach((t) => t.stop()); } catch (e) {}
+        const blob = new Blob(chunksRef.current, { type: mr.mimeType || mime || "audio/webm" });
+        if (blob.size < 600) { setRec("idle"); setRecErr("너무 짧아요. 한 문장으로 말해볼까요?"); return; }
+        sendAudio(blob);
+      };
+      mr.start(); mrRef.current = mr; setRec("recording");
+    } catch (e) { setRecErr("마이크 사용 권한이 필요해요. 아래에 입력도 가능해요."); }
+  };
+  const stopRec = () => { try { if (mrRef.current && mrRef.current.state === "recording") mrRef.current.stop(); } catch (e) {} };
+  const toggleRec = () => { if (rec === "recording") stopRec(); else if (rec === "idle") startRec(); };
 
   const callTutor = (history) => {
     setSending(true); setErr(""); setHints([]);
@@ -538,7 +592,7 @@ function WeekendChat({ lang = "en" }) {
 
   useEffect(() => {
     let alive = true;
-    setStatus("load"); setMsgs([]); setInput(""); setHints([]); setUsedList([]); setErr("");
+    setStatus("load"); setMsgs([]); setInput(""); setHints([]); setUsedList([]); setErr(""); setRec("idle"); setRecErr("");
     usedRef.current = []; focusRef.current = "";
     fetch(`/api/english/weekly-review?language=${lang}`).then((r) => r.json()).then((d) => {
       if (!alive) return;
@@ -560,6 +614,8 @@ function WeekendChat({ lang = "en" }) {
 
   // 새 메시지/입력중 표시마다 스레드를 아래로 스크롤
   useEffect(() => { try { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; } catch (e) {} }, [msgs, sending]);
+  // 언마운트 시 마이크 스트림 정리
+  useEffect(() => () => { try { streamRef.current && streamRef.current.getTracks().forEach((t) => t.stop()); } catch (e) {} }, []);
 
   const send = () => {
     const text = input.trim();
@@ -577,7 +633,7 @@ function WeekendChat({ lang = "en" }) {
     targetsRef.current = allRef.current; usedRef.current = [];
     sessionTotalRef.current = allRef.current.length;
     focusRef.current = allRef.current.length ? allRef.current[0].expr : "";
-    setUsedList([]); setMsgs([]); setInput(""); setHints([]); setErr("");
+    setUsedList([]); setMsgs([]); setInput(""); setHints([]); setErr(""); setRec("idle"); setRecErr("");
     if (allRef.current.length === 0) { setStatus("none"); return; }
     setStatus("chat"); callTutor([]);
   };
@@ -623,12 +679,18 @@ function WeekendChat({ lang = "en" }) {
             </div>
           )}
 
+          {/* 답하기 — 말하기(녹음)가 기본, 인식 결과는 입력창에 채워져 검토 후 전송 */}
+          <input ref={inputRef} className="qz-input full" value={input} onChange={(e) => setInput(e.target.value)}
+            placeholder="🎤 말하기로 답하거나, 여기에 입력…" disabled={sending}
+            onKeyDown={(e) => e.key === "Enter" && send()} />
           <div className="qz-row">
-            <input ref={inputRef} className="qz-input flex" value={input} onChange={(e) => setInput(e.target.value)}
-              placeholder="영어로 답을 작성하세요…" disabled={sending}
-              onKeyDown={(e) => e.key === "Enter" && send()} />
-            <button type="button" className="qz-btn flex2" onClick={send} disabled={sending || !input.trim()}>보내기</button>
+            <button type="button" className={`qz-mic flex${rec === "recording" ? " on" : ""}`} onClick={toggleRec} disabled={sending || rec === "thinking"}>
+              {rec === "recording" ? "● 녹음 중 — 멈추기" : rec === "thinking" ? "받아쓰는 중…" : "🎤 말하기"}
+            </button>
+            <button type="button" className="qz-btn flex2" onClick={send} disabled={sending || rec !== "idle" || !input.trim()}>보내기</button>
           </div>
+          {rec === "recording" && <div className="qz-rechint">지금 영어로 대답하세요. 끝나면 버튼을 다시 누르면 됩니다.</div>}
+          {recErr && <div className="qz-fb wrong">{recErr}</div>}
         </>
       )}
 
@@ -649,8 +711,15 @@ function WeekendChat({ lang = "en" }) {
         .qz-listen { margin-top: 9px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; padding: 5px 11px; font-size: .72rem; font-weight: 700; cursor: pointer; font-family: inherit; }
         .qz-input { box-sizing: border-box; padding: 12px 13px; border: 1.5px solid var(--color-line); border-radius: 11px; font-size: 1rem; font-family: inherit; background: var(--color-bg); color: var(--color-ink); }
         .qz-input.flex { flex: 1; min-width: 0; }
+        .qz-input.full { width: 100%; margin-top: 14px; }
         .qz-input:focus { outline: none; border-color: var(--color-primary); }
         .qz-input:disabled { opacity: .6; }
+        .qz-mic { border: none; border-radius: 12px; padding: 13px; background: var(--color-primary); color: #fff; font-size: .92rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .qz-mic.flex { flex: 1; }
+        .qz-mic.on { background: var(--color-danger); animation: qzpulse 1s ease-in-out infinite; }
+        .qz-mic:disabled { opacity: .6; }
+        @keyframes qzpulse { 0%,100% { opacity: 1; } 50% { opacity: .72; } }
+        .qz-rechint { margin-top: 8px; font-size: .76rem; font-weight: 700; color: var(--color-danger); }
         .qz-hint { margin-top: 12px; }
         .qz-hl { font-size: .72rem; font-weight: 800; color: var(--color-ink-3); margin-bottom: 6px; }
         .qz-chips { display: flex; flex-wrap: wrap; gap: 7px; }

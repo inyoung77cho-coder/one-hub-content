@@ -14,7 +14,10 @@ export default async function handler(req, res) {
     for await (const c of req) chunks.push(c);
     const body = Buffer.concat(chunks);
     if (body.length > 8_000_000) return res.status(413).json({ error: "audio too large" });
-    const r = await fetch(`${ENGLISH_API}/english/transcribe`, {
+    // 튜터가 유도 중인 표현을 힌트로 상류에 전달 → whisper initial_prompt 편향(정확도↑)
+    const hint = typeof req.query.hint === "string" ? req.query.hint.slice(0, 400) : "";
+    const upstream = `${ENGLISH_API}/english/transcribe${hint ? `?hint=${encodeURIComponent(hint)}` : ""}`;
+    const r = await fetch(upstream, {
       method: "POST",
       headers: { "Content-Type": req.headers["content-type"] || "application/octet-stream" },
       body,
