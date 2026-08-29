@@ -10,7 +10,7 @@ import { fetchStockQuotes } from "../lib/stockLive";
 import {
   isDuelStarted, startDuel, resetDuel, getPortfolios, getSnapshots,
   recordSnapshot, recordDuelDecision, hasDecisionToday, detectSellCandidates, portfolioValue,
-  getDecisionAnalysis, correctBaseCash, computeAiFromLive, DEFAULT_CASH,
+  getDecisionAnalysis, correctBaseCash, computeAiFromLive, DEFAULT_CASH, removeSnapshot,
 } from "../lib/portfolioDuel";
 
 // [사용자 지시] 억 단위 반올림은 소액 계좌에서 나/AI 차이가 0.00억으로 뭉개져 보였다 —
@@ -51,6 +51,7 @@ export default function PortfolioDuelCard() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [showHistory, setShowHistory] = useState(false);
+  const [showSnapMgr, setShowSnapMgr] = useState(false);
   const [news, setNews] = useState([]); // [2단계] 종목별 뉴스 추적 — 전용 백엔드 없이 기존 종합뉴스에서 이름 매칭
 
   const trader = typeof window !== "undefined" ? getTrader() : "A";
@@ -330,6 +331,26 @@ export default function PortfolioDuelCard() {
       )}
       {buyCands.length === 0 && sellCands.length === 0 && (
         <div className="pd-todo-empty">오늘은 새로운 추천이 없습니다 — 스캔·보유종목 상황에 따라 매일 달라집니다.</div>
+      )}
+
+      {snapshots.length > 0 && (
+        <>
+          <button type="button" className="pd-history-toggle" onClick={() => setShowSnapMgr((v) => !v)}>
+            {showSnapMgr ? "그래프 값 관리 접기" : "📅 그래프 값 관리 (이상한 날 삭제)"}
+          </button>
+          {showSnapMgr && (
+            <div className="pd-history">
+              {snapshots.slice().reverse().map((s) => (
+                <div className="pd-hist-row" key={s.date} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span className="pd-hist-date">{s.date}</span>
+                  <span style={{ flex: 1, fontSize: "0.72rem", color: "var(--color-ink-2)", fontVariantNumeric: "tabular-nums" }}>나 {Math.round(s.myValue).toLocaleString()} · AI {Math.round(s.aiValue).toLocaleString()}</span>
+                  <button type="button" onClick={() => { if (window.confirm(`${s.date} 대결 값을 삭제할까요?`)) { removeSnapshot(trader, s.date); setSnapshots(getSnapshots(trader)); } }}
+                    style={{ border: "1px solid var(--color-line)", background: "var(--color-card)", color: "var(--color-danger)", borderRadius: 8, padding: "3px 8px", fontSize: "0.7rem", fontWeight: 800, cursor: "pointer", fontFamily: "inherit" }}>삭제</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       <button type="button" className="pd-history-toggle" onClick={() => setShowHistory((v) => !v)}>
