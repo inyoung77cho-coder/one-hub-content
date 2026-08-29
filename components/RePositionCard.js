@@ -81,6 +81,7 @@ function TargetList({ rows, onSelect, selected }) {
   const rowRefs = useRef([]);
   const [tickPath, setTickPath] = useState("");
   const [connPath, setConnPath] = useState("");
+  const [wavePath, setWavePath] = useState("");
   const [box, setBox] = useState({ w: 0, h: 0 });
 
   // [차이 강조] baseline을 0이 아니라 최저값 아래로 내려, 단지 간 가격차를 크게 보이게(사용자 요청).
@@ -90,10 +91,11 @@ function TargetList({ rows, onSelect, selected }) {
     if (!vals.length) return { lo: 0, hi: 1 };
     const mn = Math.min(...vals), mx = Math.max(...vals);
     const span = mx - mn;
-    if (span < mx * 0.03) return { lo: Math.max(0, mx * 0.6), hi: mx * 1.08 };
-    return { lo: Math.max(0, mn - span * 0.55), hi: mx + span * 0.12 };
+    if (span < mx * 0.03) return { lo: Math.max(0, mx * 0.7), hi: mx * 1.06 };
+    return { lo: Math.max(0, mn - span * 0.25), hi: mx + span * 0.1 }; // 완화된 확대(과장↓)
   }, [rows]);
-  const scale = (v) => (v == null ? 0 : Math.max(3, Math.min(100, ((v - lo) / (hi - lo)) * 100)));
+  const scale = (v) => (v == null ? 0 : Math.max(6, Math.min(100, ((v - lo) / (hi - lo)) * 100)));
+  const truncated = lo > 0.01; // baseline이 0이 아니면(확대) 물결 표시
 
   useEffect(() => {
     const measure = () => {
@@ -104,23 +106,37 @@ function TargetList({ rows, onSelect, selected }) {
         const trackEl = rowRefs.current[i];
         if (!trackEl) return null;
         const tr = trackEl.getBoundingClientRect();
-        // [갭 과장] 적정가 틱을 막대 끝(현재가)에서 실제 차이의 3.2배로 밀어 시각적으로 크게 벌린다.
-        //   (억·% 실제값은 배지에 그대로 표기 — 여긴 '차이를 눈에 띄게'만.)
+        // [갭 강조·완화] 적정가 틱을 막대 끝에서 실제차의 1.6배만 밀어 살짝 벌린다(과장 완화).
         let tpct;
         if (r.isLeader) tpct = scale(r.value);
         else {
           const be = scale(r.value), tp = scale(r.target);
-          tpct = Math.max(3, Math.min(99, be + (tp - be) * 3.2));
+          tpct = Math.max(4, Math.min(98, be + (tp - be) * 1.6));
         }
-        const xLoc = (tr.left - wrapRect.left) + tr.width * (tpct / 100);
+        const left = tr.left - wrapRect.left;
+        const xLoc = left + tr.width * (tpct / 100);
         return {
-          x: xLoc,
+          x: xLoc, left,
           yTop: tr.top - wrapRect.top,
           yBot: (tr.top - wrapRect.top) + tr.height,
           yMid: (tr.top - wrapRect.top) + tr.height / 2,
         };
       }).filter(Boolean);
       if (!pts.length) return;
+      // [물결] 확대(baseline≠0)일 때 각 막대 시작부에 축 끊김 물결 — 정직하게 '0부터 아님' 표시.
+      let waveD = "";
+      if (truncated) {
+        pts.forEach((p) => {
+          const xw = p.left + 9, y0 = p.yTop + 3, y1 = p.yBot - 3, seg = (y1 - y0) / 3;
+          let d = `M ${xw},${y0}`;
+          for (let s = 0; s < 3; s++) {
+            const a = y0 + seg * s, b = a + seg, dir = s % 2 === 0 ? 3.2 : -3.2;
+            d += ` Q ${xw + dir},${(a + b) / 2} ${xw},${b}`;
+          }
+          waveD += d + " ";
+        });
+      }
+      setWavePath(waveD);
       // 세로 점선: 각 행의 목표가 위치를 위아래로 가로지르는 수직 틱(별도 path — 점선 처리)
       const tickD = pts.map((p) => `M ${p.x},${p.yTop} L ${p.x},${p.yBot}`).join(" ");
       // 사선: 세로 점선 틱의 끝(아래쪽 끝)과 다음 틱의 끝(위쪽 끝)을 실선으로 연결
@@ -168,10 +184,12 @@ function TargetList({ rows, onSelect, selected }) {
           </div>
         );
       })}
-      {(tickPath || connPath) && (
+      {(tickPath || connPath || wavePath) && (
         <svg className="rp-overlay" width={box.w} height={box.h}>
           <path d={connPath} fill="none" stroke="var(--color-warning)" strokeWidth="2.2" strokeDasharray="4,3.5" strokeLinecap="round" strokeLinejoin="round" />
           <path d={tickPath} fill="none" stroke="var(--color-warning)" strokeWidth="2.4" strokeDasharray="4,3.5" strokeLinecap="round" />
+          {wavePath && <path d={wavePath} fill="none" stroke="var(--color-card)" strokeWidth="5" strokeLinecap="round" />}
+          {wavePath && <path d={wavePath} fill="none" stroke="var(--color-ink-3)" strokeWidth="1.4" strokeLinecap="round" />}
         </svg>
       )}
       <style jsx>{`
@@ -234,7 +252,7 @@ function AreaStepChart({ areas, myPyeongM2 }) {
         return (
           <g key={a.m2}>
             <rect x={x(i) - bw / 2} y={by} width={bw} height={Math.max(2, bh)} rx="4"
-              fill={isMine ? "var(--color-primary)" : "var(--color-line)"} />
+              className={`ac-bar${isMine ? " mine" : ""}`} />
             <text x={x(i)} y={h - 6} textAnchor="middle" fontSize="9" fontWeight="700" fill="var(--color-ink-3)">{a.m2}㎡</text>
             <text x={x(i)} y={Math.min(by, y(trend[i])) - 6} textAnchor="middle" fontSize="9" fontWeight="800"
               fill={diff < 0 ? "var(--color-success)" : "var(--color-danger)"}>{signed(diff)}억</text>
@@ -242,7 +260,11 @@ function AreaStepChart({ areas, myPyeongM2 }) {
         );
       })}
       <path d={stepD} fill="none" stroke="var(--color-warning)" strokeWidth="2.6" strokeDasharray="5,3.5" strokeLinecap="round" strokeLinejoin="round" />
-      <style jsx>{`.ac-svg { width: 100%; display: block; overflow: visible; }`}</style>
+      <style jsx>{`
+        .ac-svg { width: 100%; display: block; overflow: visible; }
+        .ac-bar { fill: color-mix(in srgb, var(--color-ink-3) 45%, var(--color-line)); }
+        .ac-bar.mine { fill: var(--color-primary); }
+      `}</style>
     </svg>
   );
 }
@@ -499,7 +521,7 @@ export default function RePositionCard({ brief, myProp, dongOf, userAvm = null }
       )}
 
       <h3 className="rp-sub-title">🏘 동네 비교 <span className="rp-mini">국민평형 84㎡ 기준</span></h3>
-      <p className="rp-card-sub">대장이 맨 위, 아래로 <b>국민평형 84㎡ 실거래가 높은 순</b>. 막대=현재가, 세로 점선=84㎡ 회귀 적정가, 오른쪽=적정가 대비 갭(억·%). 단지를 누르면 아래 평형별로 바뀝니다.</p>
+      <p className="rp-card-sub">대장이 맨 위, 아래로 <b>국민평형 84㎡ 실거래가 높은 순</b>. 막대=현재가, 세로 점선=84㎡ 회귀 적정가, 오른쪽=적정가 대비 갭(억·%). 막대 앞 <b>물결〰=0부터가 아니라 확대</b>(차이를 잘 보이게). 단지를 누르면 아래 평형별로 바뀝니다.</p>
       <TargetList rows={neighborRows} onSelect={setSelected} selected={selected} />
 
       <h3 className="rp-sub-title">📐 {selected || myProp?.name || ""} 평형별 적정가</h3>
@@ -591,7 +613,7 @@ export function RegionLeadersCard({ myRegion = "서현동" }) {
         .rl-dong { font-size: 0.78rem; font-weight: 800; color: var(--color-ink); }
         .rl-apt { font-size: 0.68rem; font-weight: 600; color: var(--color-ink-3); margin-left: auto; }
         .rl-track { position: relative; height: 24px; background: var(--color-card-soft); border-radius: 6px; }
-        .rl-fill { height: 100%; border-radius: 6px; background: var(--color-line); display: flex; align-items: center; transition: width .4s cubic-bezier(.2,.8,.2,1); }
+        .rl-fill { height: 100%; border-radius: 6px; background: color-mix(in srgb, var(--color-ink-3) 45%, var(--color-line)); display: flex; align-items: center; transition: width .4s cubic-bezier(.2,.8,.2,1); }
         .rl-fill.mine { background: var(--color-primary); }
         .rl-val { font-size: 0.68rem; font-weight: 800; color: var(--color-ink); margin-left: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
         .rl-fill.mine .rl-val { color: #fff; }
@@ -623,35 +645,55 @@ function buildForecast(item, horizon = 3) {
 }
 
 function ForecastChart({ item }) {
-  const f = buildForecast(item, 3);
+  const f = buildForecast(item, 5);
   if (!f.hist.length) return <div style={{ fontSize: "0.72rem", color: "var(--color-ink-3)", padding: "10px" }}>이력 데이터가 아직 부족합니다.</div>;
-  const hist = f.hist.slice(-10);
-  const years = [...hist.map((hh) => hh.year), ...f.fc.map((p) => p.year)];
-  const allV = [...hist.map((hh) => hh.uk), ...f.fc.map((p) => p.hi), ...f.fc.map((p) => p.lo)];
-  const w = 320, h = 150, padL = 8, padR = 8, padT = 10, padB = 20;
+  const hist = f.hist.slice(-7);
+  const bars = [
+    ...hist.map((hh) => ({ year: hh.year, kind: "hist", v: hh.uk })),
+    ...f.fc.map((p) => ({ year: p.year, kind: "fc", lo: p.lo, mid: p.mid, hi: p.hi })),
+  ];
+  const w = 340, h = 165, padL = 8, padR = 8, padT = 12, padB = 22;
   const iw = w - padL - padR, ih = h - padT - padB;
-  const y0 = years[0], y1 = years[years.length - 1];
-  const lo = Math.min(...allV) * 0.96, hi = Math.max(...allV) * 1.04;
-  const X = (yr) => padL + iw * ((yr - y0) / ((y1 - y0) || 1));
-  const Y = (v) => padT + ih - ((v - lo) / ((hi - lo) || 1)) * ih;
-  const lastH = hist[hist.length - 1];
-  const histPts = hist.map((hh) => `${X(hh.year)},${Y(hh.uk)}`).join(" ");
-  const midPts = [`${X(lastH.year)},${Y(lastH.uk)}`, ...f.fc.map((p) => `${X(p.year)},${Y(p.mid)}`)].join(" ");
-  const band = [
-    `${X(lastH.year)},${Y(lastH.uk)}`,
-    ...f.fc.map((p) => `${X(p.year)},${Y(p.hi)}`),
-    ...f.fc.slice().reverse().map((p) => `${X(p.year)},${Y(p.lo)}`),
-  ].join(" ");
-  const labels = [...hist.filter((_, i) => i % 2 === 0), ...f.fc];
+  const n = bars.length;
+  const bw = (iw / n) * 0.6;
+  const X = (i) => padL + (iw / n) * (i + 0.5);
+  const top = Math.max(...hist.map((hh) => hh.uk), ...f.fc.map((p) => p.hi)) * 1.06 || 1;
+  const Y = (v) => padT + ih - (v / top) * ih;
+  const baseY = padT + ih;
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="fc-svg">
-      <polygon points={band} fill="var(--color-primary-soft)" opacity="0.75" />
-      <polyline points={histPts} fill="none" stroke="var(--color-ink-2)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-      <polyline points={midPts} fill="none" stroke="var(--color-primary)" strokeWidth="2.2" strokeDasharray="5,3.5" strokeLinecap="round" />
-      {labels.map((p, i) => (
-        <text key={i} x={X(p.year)} y={h - 6} textAnchor="middle" fontSize="7.5" fontWeight="600" fill="var(--color-ink-3)">{String(p.year).slice(2)}</text>
-      ))}
-      <style jsx>{`.fc-svg { width: 100%; display: block; overflow: visible; }`}</style>
+      <line x1={padL} x2={w - padR} y1={baseY} y2={baseY} stroke="var(--color-line)" strokeWidth="1" />
+      {bars.map((b, i) => {
+        const cx = X(i), x0 = cx - bw / 2;
+        if (b.kind === "hist") {
+          const y = Y(b.v);
+          return (
+            <g key={i}>
+              <rect className="fc-bar-hist" x={x0} y={y} width={bw} height={Math.max(1, baseY - y)} rx="3" />
+              <text x={cx} y={h - 7} textAnchor="middle" fontSize="7.5" fontWeight="600" fill="var(--color-ink-3)">'{String(b.year).slice(2)}</text>
+            </g>
+          );
+        }
+        const yLo = Y(b.lo), yHi = Y(b.hi), yMid = Y(b.mid);
+        return (
+          <g key={i}>
+            {/* 보수(lo)까지 진한 파랑 */}
+            <rect className="fc-bar-base" x={x0} y={yLo} width={bw} height={Math.max(1, baseY - yLo)} rx="3" />
+            {/* 보수~낙관 범위는 연한색 */}
+            <rect className="fc-bar-range" x={x0} y={yHi} width={bw} height={Math.max(1, yLo - yHi)} rx="2" />
+            {/* 추세지속(mid) 점선 */}
+            <line x1={x0} x2={x0 + bw} y1={yMid} y2={yMid} className="fc-mid" />
+            <text x={cx} y={h - 7} textAnchor="middle" fontSize="7.5" fontWeight="700" fill="var(--color-primary)">'{String(b.year).slice(2)}</text>
+          </g>
+        );
+      })}
+      <style jsx>{`
+        .fc-svg { width: 100%; display: block; overflow: visible; }
+        .fc-bar-hist { fill: color-mix(in srgb, var(--color-ink-3) 45%, var(--color-line)); }
+        .fc-bar-base { fill: var(--color-primary); opacity: .78; }
+        .fc-bar-range { fill: var(--color-primary); opacity: .26; }
+        .fc-mid { stroke: var(--color-primary); stroke-width: 1.6; stroke-dasharray: 3,2; }
+      `}</style>
     </svg>
   );
 }
@@ -669,36 +711,43 @@ export function RegionForecastCard({ myRegion = "서현동" }) {
   const withHist = items.filter((x) => Array.isArray(x.hist) && x.hist.length);
   if (!withHist.length) return null;
   const mine = items.find((x) => x.dong === myRegion) || items.find((x) => x.tier === "기준") || items[0];
-  const mineF = buildForecast(mine, 3);
-  const p3m = mineF.fc[2];
+  const H = 5; // 5년 시나리오
+  const mineF = buildForecast(mine, H);
+  const p5m = mineF.fc[H - 1];
   const pct = (v) => (v == null ? "-" : `${(v * 100).toFixed(1)}%`);
 
   return (
     <section className="card fc-card">
       <span className="fc-label">가격 추세 · 예측</span>
       <h2 className="fc-title">🔮 {mine.dong} 대장 {mine.leader} <span className="fc-mini">시나리오 · 예측 아님</span></h2>
-      <p className="fc-sub">국민평형 84㎡ 연도별 실거래(회색)와 향후 3년 시나리오 밴드(추세지속=파란 점선, 보수~낙관=음영). CAGR {pct(mine.cagr5)}(5년)·{pct(mine.cagr10)}(10년) 기반 — 부동산은 불확실하니 참고용입니다.</p>
+      <p className="fc-sub">국민평형 84㎡ 연도별 실거래(회색 막대)와 향후 5년 예측 막대 — 진한색=보수, <b>연한색=보수~낙관 범위</b>, 점선=추세지속. CAGR {pct(mine.cagr5)}(5년)·{pct(mine.cagr10)}(10년) 기반 — 부동산은 불확실하니 참고용입니다.</p>
       <ForecastChart item={mine} />
+      <div className="fc-legend">
+        <span className="li"><i className="hist" />실거래</span>
+        <span className="li"><i className="base" />보수</span>
+        <span className="li"><i className="range" />보수~낙관 범위</span>
+        <span className="li"><i className="mid" />추세지속</span>
+      </div>
       <div className="fc-callouts">
         <div className="fc-c"><span className="k">현재 84㎡</span><span className="v">{uk(mineF.base)}억</span></div>
-        <div className="fc-c"><span className="k">3년 후(추세지속)</span><span className="v">{uk(p3m.mid)}억</span></div>
-        <div className="fc-c"><span className="k">범위(보수~낙관)</span><span className="v">{uk(p3m.lo)}~{uk(p3m.hi)}</span></div>
+        <div className="fc-c"><span className="k">5년 후(추세지속)</span><span className="v">{uk(p5m.mid)}억</span></div>
+        <div className="fc-c"><span className="k">범위(보수~낙관)</span><span className="v">{uk(p5m.lo)}~{uk(p5m.hi)}</span></div>
       </div>
 
-      <h3 className="fc-h3">동네별 3년 후 예상 &amp; 격차 변화</h3>
+      <h3 className="fc-h3">동네별 5년 후 예상 &amp; 격차 변화</h3>
       <div className="fc-rows">
         {items.map((x) => {
-          const f = buildForecast(x, 3); const p3 = f.fc[2];
+          const f = buildForecast(x, H); const p5 = f.fc[H - 1];
           const isMine = x.dong === myRegion;
           const gapNow = Math.round((x.price84_uk - mine.price84_uk) * 10) / 10;
-          const gap3 = Math.round((p3.mid - p3m.mid) * 10) / 10;
-          const narrowing = Math.abs(gap3) < Math.abs(gapNow);
+          const gap5 = Math.round((p5.mid - p5m.mid) * 10) / 10;
+          const narrowing = Math.abs(gap5) < Math.abs(gapNow);
           return (
             <div className={`fc-row${isMine ? " mine" : ""}`} key={x.dong}>
               <span className="fc-dong"><b>{x.dong}</b> {x.leader}</span>
-              <span className="fc-now">{uk(x.price84_uk)}→{uk(p3.mid)}억</span>
+              <span className="fc-now">{uk(x.price84_uk)}→{uk(p5.mid)}억</span>
               {isMine ? <span className="fc-gap base">내 동네 기준</span>
-                : <span className={`fc-gap ${narrowing ? "nar" : "wid"}`}>격차 {signed(gapNow)}→{signed(gap3)} {narrowing ? "↓좁아짐" : "↑벌어짐"}</span>}
+                : <span className={`fc-gap ${narrowing ? "nar" : "wid"}`}>격차 {signed(gapNow)}→{signed(gap5)} {narrowing ? "↓좁아짐" : "↑벌어짐"}</span>}
             </div>
           );
         })}
@@ -710,6 +759,14 @@ export function RegionForecastCard({ myRegion = "서현동" }) {
         .fc-title { font-size: 0.98rem; font-weight: 800; color: var(--color-ink); margin: 0 0 4px; }
         .fc-mini { font-size: 0.62rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 7px; margin-left: 5px; vertical-align: middle; }
         .fc-sub { font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; margin: 0 0 10px; word-break: keep-all; }
+        .fc-sub b { color: var(--color-primary); }
+        .fc-legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+        .fc-legend .li { display: inline-flex; align-items: center; gap: 4px; font-size: 0.62rem; font-weight: 700; color: var(--color-ink-2); }
+        .fc-legend .li i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+        .fc-legend .li i.hist { background: color-mix(in srgb, var(--color-ink-3) 45%, var(--color-line)); }
+        .fc-legend .li i.base { background: var(--color-primary); opacity: .78; }
+        .fc-legend .li i.range { background: var(--color-primary); opacity: .26; }
+        .fc-legend .li i.mid { background: var(--color-primary); height: 2px; }
         .fc-callouts { display: flex; gap: 8px; margin-top: 8px; }
         .fc-c { flex: 1; background: var(--color-card-soft); border-radius: 10px; padding: 8px 10px; text-align: center; }
         .fc-c .k { display: block; font-size: 0.6rem; color: var(--color-ink-3); margin-bottom: 2px; }
