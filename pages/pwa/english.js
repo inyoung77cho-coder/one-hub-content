@@ -336,90 +336,56 @@ function Karaoke({ text, lang, onActive, onClear }) {
   );
 }
 
-function LiveEnglish({ lang }) {
-  const [exprs, setExprs] = useState(null);
-  const [videos, setVideos] = useState([]);
+function LiveEnglish() {
+  const [videos, setVideos] = useState(null);
   const [vidIdx, setVidIdx] = useState(0);
-  const [cap, setCap] = useState(null); // 영상 위 자막 {words, idx}
   useEffect(() => {
     let alive = true;
-    setExprs(null); setVideos([]); setVidIdx(0); setCap(null);
-    // [재미있는 생활영어] 이디엄(생활영어) 표현 우선 + 주간 표현 보강 — 경제 지문 대신 회화 표현.
-    Promise.all([
-      fetch(`/api/english/lessons?medium=idiom&language=${lang}&limit=7`).then((r) => r.json()).catch(() => ({ items: [] })),
-      fetch(`/api/english/weekly-review?language=${lang}`).then((r) => r.json()).catch(() => ({ expressions: [] })),
-    ]).then(([idiomD, wk]) => {
-      if (!alive) return;
-      const pool = [
-        ...(idiomD.items || []).flatMap((l) => l.expressions || []),
-        ...(wk.expressions || []),
-      ];
-      const seen = new Set();
-      const all = pool.filter((e) => {
-        const k = (e.example_en || "").trim().toLowerCase();
-        if (!k || seen.has(k)) return false;
-        seen.add(k); return true;
-      }).slice(0, 15);
-      setExprs(all);
-    });
-    // [재미있는 생활영어 유튜브] 큐레이션 채널(BBC Learning English·Vanessa·TV Series 등) 최신 영상.
     fetch(`/api/english/live-videos`).then((r) => r.json())
       .then((d) => { if (alive) setVideos((d.items || []).filter((x) => x.video_id)); })
-      .catch(() => {});
+      .catch(() => alive && setVideos([]));
     return () => { alive = false; };
-  }, [lang]);
+  }, []);
 
-  if (exprs == null) return <div className="en-state">불러오는 중…</div>;
-  const video = videos[vidIdx] || null;
+  if (videos == null) return <div className="en-state">라이브 영상 불러오는 중…</div>;
+  if (!videos.length) return <div className="en-state">라이브 영상을 불러오지 못했어요.</div>;
+  const v = videos[vidIdx] || videos[0];
+  const shortCh = (c) => String(c || "").replace(/\s*\(.*\)\s*/, "");
+  // 유튜브 자체 자막(CC)을 켠다 — cc_load_policy=1. (임의 영상의 단어 카라오케는 유튜브 차단으로 불가.)
+  const src = `https://www.youtube.com/embed/${v.video_id}?cc_load_policy=1&hl=en&cc_lang_pref=en&rel=0&modestbranding=1`;
+
   return (
     <div className="live">
-      <div className="live-intro">🎬 <b>Live English</b> — 영상 위에 표현 <b>자막이 얹히고</b>, 발음에 맞춰 <b>단어가 하이라이트</b>됩니다. 경제 밖 <b>재미있는 생활영어</b> 표현으로 따라 읽어요.</div>
       <div className="live-vid">
-        {video?.video_id
-          ? <iframe src={`https://www.youtube.com/embed/${video.video_id}`} title={video.title || "video"}
-              allow="accelerometer; encrypted-media; picture-in-picture" allowFullScreen loading="lazy" />
-          : <div className="live-vph">🎬 생활영어 영상 불러오는 중…</div>}
-        {cap && cap.words.length > 0 && (
-          <div className="live-cap">
-            {cap.words.map((w, i) => <span key={i} className={i === cap.idx ? "on" : ""}>{w} </span>)}
-          </div>
+        <iframe key={v.video_id} src={src} title={v.title || "video"}
+          allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" allowFullScreen loading="lazy" />
+      </div>
+      <div className="live-vcap">
+        <span className="live-vtitle">{v.is_short ? "⚡" : "▶"} {v.channel} · {v.title}</span>
+        {videos.length > 1 && (
+          <button type="button" className="live-next" onClick={() => setVidIdx((i) => (i + 1) % videos.length)}>다른 영상 →</button>
         )}
       </div>
-      {video && (
-        <div className="live-vcap">
-          <span className="live-vtitle">▶ {video.channel} · {video.title}</span>
-          {videos.length > 1 && (
-            <button type="button" className="live-next" onClick={() => { setCap(null); setVidIdx((i) => (i + 1) % videos.length); }}>다른 영상 →</button>
-          )}
-        </div>
-      )}
-      {!exprs.length ? (
-        <div className="en-state">표현이 아직 없어요. 이디엄 탭에서 학습하면 여기에 모입니다.</div>
-      ) : exprs.map((e, i) => (
-        <div className="live-card" key={i}>
-          <Karaoke text={e.example_en} lang={lang}
-            onActive={(w, idx) => setCap({ words: w, idx })} onClear={() => setCap(null)} />
-          <div className="live-mean"><b>{e.expr}</b> — {e.meaning_ko}</div>
-          {e.example_ko && <div className="live-ko">{e.example_ko}</div>}
-        </div>
-      ))}
+      <div className="live-chips">
+        {videos.map((x, i) => (
+          <button key={i} type="button" className={`live-chip${i === vidIdx ? " on" : ""}`} onClick={() => setVidIdx(i)}>
+            {x.is_short ? "⚡ " : ""}{shortCh(x.channel)}
+          </button>
+        ))}
+      </div>
+      <p className="live-note">셀럽·BBC 짧은 영어 영상. 영상 플레이어의 <b>자막(CC)</b>을 켜면 화면에 자막이 나옵니다.</p>
       <style jsx>{`
-        .live { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px 20px; }
-        .live-intro { font-size: .78rem; color: var(--color-ink-2); line-height: 1.6; background: var(--color-card-soft); border-radius: 12px; padding: 12px 14px; word-break: keep-all; }
-        .live-intro b { color: var(--color-primary); }
-        .live-vid { position: relative; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-card); }
+        .live { display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 20px; }
+        .live-vid { border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-card); }
         .live-vid iframe { width: 100%; aspect-ratio: 16/9; border: 0; display: block; }
-        .live-vph { width: 100%; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; background: var(--color-card-soft); color: var(--color-ink-3); font-size: 1rem; font-weight: 700; }
-        .live-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 14px 14px; background: linear-gradient(transparent, rgba(0,0,0,.82)); color: #fff; font-size: 1.2rem; font-weight: 800; line-height: 1.4; text-align: center; pointer-events: none; }
-        .live-cap span { padding: 0 1px; border-radius: 4px; transition: color .1s, background .1s; }
-        .live-cap span.on { color: #191600; background: #ffd54a; }
-        .live-vcap { display: flex; align-items: center; gap: 8px; font-size: .74rem; font-weight: 700; color: var(--color-ink-2); padding: 8px 12px; background: var(--color-card); border-radius: 10px; }
+        .live-vcap { display: flex; align-items: center; gap: 8px; font-size: .76rem; font-weight: 700; color: var(--color-ink); padding: 9px 12px; background: var(--color-card); border-radius: 10px; }
         .live-vtitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .live-next { flex-shrink: 0; border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-primary); border-radius: 8px; padding: 5px 9px; font-size: .7rem; font-weight: 800; cursor: pointer; font-family: inherit; }
-        .live-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 16px; padding: 18px 16px; box-shadow: var(--shadow-card); }
-        .live-mean { margin-top: 12px; font-size: .82rem; color: var(--color-ink-2); word-break: keep-all; }
-        .live-mean b { color: var(--color-primary); font-weight: 800; }
-        .live-ko { margin-top: 4px; font-size: .78rem; color: var(--color-ink-3); }
+        .live-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+        .live-chip { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); border-radius: 999px; padding: 6px 11px; font-size: .72rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .live-chip.on { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-primary); }
+        .live-note { font-size: .68rem; color: var(--color-ink-3); line-height: 1.5; margin: 2px 0 0; word-break: keep-all; }
+        .live-note b { color: var(--color-primary); }
       `}</style>
     </div>
   );
