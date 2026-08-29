@@ -8,7 +8,7 @@ import { dedupBy } from "../../lib/useDedup";
 import { ReForm } from "../../components/shared/AssetForms";
 import Term from "../../components/Term";
 import ReportTeaser from "../../components/ReportTeaser";
-import RePositionCard from "../../components/RePositionCard";
+import RePositionCard, { RegionLeadersCard } from "../../components/RePositionCard";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -320,7 +320,12 @@ export default function RealEstateDashboard() {
       {/* [§3.7·§3.8, 2026-08-27 v2] 내 단지 포지션 — 최상단. 막대+실선(계단)으로 대장 대비 위치·
           평형별 적정가·시점별 갭 추이를 시각화(과거엔 텍스트 두 줄뿐이었음). */}
       {myProp?.name && brief && !brief.error && (
-        <RePositionCard brief={brief} myProp={myProp} dongOf={dongOf} />
+        <RePositionCard brief={brief} myProp={myProp} dongOf={dongOf} userAvm={userAvm} />
+      )}
+
+      {/* [Card2] 동네별 대장 비교 — 주간 사전선정(region_leaders) 가벼운 읽기 */}
+      {myProp?.name && (
+        <RegionLeadersCard myRegion={myDong || brief?.region || "서현동"} />
       )}
 
       {/* 1) HERO — 시장 브리핑 (다른 페이지와 통일된 라이트 카드) */}

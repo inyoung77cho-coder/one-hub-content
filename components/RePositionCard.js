@@ -291,7 +291,70 @@ function RatioTrendChart({ leaderName, subjectName, leaderSeries, subjectSeries 
 //   (region별 TTL 캐시)을 먼저 넣어야 한다.
 // const REGION_WATCHLIST = ["정자동", "판교동", "대치동", "반포동", "압구정동", "도곡동"];
 
-export default function RePositionCard({ brief, myProp, dongOf }) {
+// ── 🎯 히어로: 내 단지 84㎡ 현재가 vs 적정가 갭(크게, 자꾸 보게) + 대장 대비 + 내 실제 평형 ──
+function GapHero({ myName, cur84, fair84, leader84, leaderName, area, userAvm }) {
+  if (cur84 == null) return null;
+  const scaleMax = Math.max(cur84, fair84 || 0, leader84 || 0) * 1.18 || 1;
+  const pct = (v) => `${Math.max(2, Math.min(100, (v / scaleMax) * 100))}%`;
+  const gap = fair84 != null ? Math.round((cur84 - fair84) * 10) / 10 : null; // +고평가 / −저평가
+  const over = gap != null && gap > 0;
+  const vsLeader = leader84 != null ? Math.round((cur84 - leader84) * 10) / 10 : null;
+  return (
+    <div className="gh">
+      <div className="gh-top">
+        <div className="gh-cur">
+          <span className="gh-cur-v">{uk(cur84)}<em>억</em></span>
+          <span className="gh-cur-k">{myName} · 국민평형 84㎡ 현재가</span>
+        </div>
+        {gap != null && (
+          <div className={`gh-verdict ${over ? "over" : "under"}`}>
+            <b>{over ? "고평가" : "저평가"}</b>
+            <span>적정가 {signed(gap)}억</span>
+          </div>
+        )}
+      </div>
+      <div className="gh-bar">
+        <div className={`gh-fill ${over ? "over" : "under"}`} style={{ width: pct(cur84) }} />
+        {fair84 != null && <div className="gh-fair" style={{ left: pct(fair84) }}><i /><span>적정 {uk(fair84)}</span></div>}
+      </div>
+      <div className="gh-lines">
+        {vsLeader != null && (
+          <span className="gh-line">🏆 대장 <b>{leaderName}</b> 84㎡ {uk(leader84)}억 대비 <b className={vsLeader > 0 ? "hi" : "lo"}>{signed(vsLeader)}억</b></span>
+        )}
+        {area && (
+          <span className="gh-line gh-mine">📍 내 실제 평형 {area.pyeong ? `${area.pyeong}평` : `${area.m2}㎡`} 실거래 {uk(area.priceUk)}~{uk(area.maxUk)}억{area.n != null ? ` (${area.n}건${area.n < 3 ? "·표본 얇음" : ""})` : ""}{userAvm ? ` · 내 시세 ${uk(userAvm)}억` : ""}</span>
+        )}
+      </div>
+      <style jsx>{`
+        .gh { background: linear-gradient(135deg, var(--color-primary-soft), var(--color-card-soft)); border: 1px solid var(--color-line); border-radius: 14px; padding: 14px 15px 13px; margin-bottom: 14px; }
+        .gh-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+        .gh-cur { display: flex; flex-direction: column; gap: 2px; }
+        .gh-cur-v { font-size: 1.7rem; font-weight: 900; color: var(--color-ink); line-height: 1; font-variant-numeric: tabular-nums; }
+        .gh-cur-v em { font-size: 0.9rem; font-weight: 800; font-style: normal; margin-left: 2px; }
+        .gh-cur-k { font-size: 0.68rem; font-weight: 700; color: var(--color-ink-3); }
+        .gh-verdict { text-align: right; display: flex; flex-direction: column; gap: 1px; }
+        .gh-verdict b { font-size: 0.9rem; font-weight: 900; }
+        .gh-verdict span { font-size: 0.66rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .gh-verdict.over b, .gh-verdict.over span { color: var(--color-danger); }
+        .gh-verdict.under b, .gh-verdict.under span { color: var(--color-success); }
+        .gh-bar { position: relative; height: 22px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 7px; margin: 12px 0 8px; overflow: visible; }
+        .gh-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 7px 0 0 7px; opacity: .5; }
+        .gh-fill.over { background: var(--color-danger); }
+        .gh-fill.under { background: var(--color-success); }
+        .gh-fair { position: absolute; top: -4px; bottom: -4px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; }
+        .gh-fair i { width: 2.5px; flex: 1; background: var(--color-ink-2); border-radius: 2px; }
+        .gh-fair span { position: absolute; top: -14px; font-size: 0.6rem; font-weight: 800; color: var(--color-ink-2); white-space: nowrap; }
+        .gh-lines { display: flex; flex-direction: column; gap: 3px; margin-top: 10px; }
+        .gh-line { font-size: 0.72rem; color: var(--color-ink-2); font-weight: 600; word-break: keep-all; }
+        .gh-line b { font-weight: 800; color: var(--color-ink); }
+        .gh-line b.hi { color: var(--color-danger); } .gh-line b.lo { color: var(--color-success); }
+        .gh-mine { color: var(--color-ink-3); }
+      `}</style>
+    </div>
+  );
+}
+
+export default function RePositionCard({ brief, myProp, dongOf, userAvm = null }) {
   const [dbAreas, setDbAreas] = useState({});
   const [selected, setSelected] = useState(null);
   const [trendCache, setTrendCache] = useState({});
@@ -311,14 +374,28 @@ export default function RePositionCard({ brief, myProp, dongOf }) {
     const rows = pool
       .filter((r) => r.pred != null && r.cur != null)
       .sort((a, b) => (a.lag ?? 99) - (b.lag ?? 99))
-      .slice(0, 5)
-      .map((r) => ({
-        name: r.단지명, value: r.cur, target: r.pred,
-        isMe: r.단지명 === myProp?.name,
-        distLabel: r.lag === 0 ? "동조(0개월)" : r.lag != null ? `${r.lag}개월 지연` : null,
-      }));
-    return [{ name: leader, value: brief.leader_price, isLeader: true, distLabel: "대장 기준" }, ...rows];
+      .slice(0, 6)
+      .map((r) => {
+        // [가격기준 통일] 막대=국민평형 84㎡ 실거래가(cur84). 없으면 전체평균(cur)로 폴백.
+        //   적정가 마커=cur84 × (pred/cur) — 대장 대비 회귀 괴리율(gap)을 84㎡ 스케일로 유지.
+        const v = r.cur84 != null ? r.cur84 : r.cur;
+        const ratio = r.cur ? r.pred / r.cur : 1;
+        const tgt = Math.round(v * ratio * 100) / 100;
+        return {
+          name: r.단지명, value: v, target: tgt,
+          isMe: r.단지명 === myProp?.name,
+          distLabel: r.lag === 0 ? "동조(0개월)" : r.lag != null ? `${r.lag}개월 지연` : null,
+        };
+      });
+    const leaderVal = brief.leader_84 != null ? brief.leader_84 : brief.leader_price;
+    return [{ name: leader, value: leaderVal, isLeader: true, distLabel: "대장 기준" }, ...rows];
   }, [brief, myDong, myProp?.name, dongOf, leader]);
+
+  // [히어로] 내 단지 84㎡ 갭 요약 데이터
+  const myRankRow = useMemo(
+    () => (brief?.all_ranking || []).find((r) => r.단지명 === myProp?.name) || null,
+    [brief, myProp?.name]
+  );
 
   // ② 평형별 적정가 — 클릭된(또는 기본 내 단지) 단지의 complex-areas 로딩
   useEffect(() => {
@@ -328,7 +405,13 @@ export default function RePositionCard({ brief, myProp, dongOf }) {
       .then((r) => r.json())
       .then((d) => {
         const areas = Array.isArray(d?.areas) ? d.areas
-          .map((a) => ({ m2: Math.round(Number(a.m2 ?? a.전용면적)), priceUk: a.rep_price_uk != null ? Number(a.rep_price_uk) : null }))
+          .map((a) => ({
+            m2: Math.round(Number(a.m2 ?? a.전용면적)),
+            pyeong: a.평 != null ? Number(a.평) : null,
+            priceUk: a.rep_price_uk != null ? Number(a.rep_price_uk) : (a.rep_price_manwon != null ? Number(a.rep_price_manwon) / 10000 : null),
+            maxUk: a.max_price_uk != null ? Number(a.max_price_uk) : (a.max_price_manwon != null ? Number(a.max_price_manwon) / 10000 : null),
+            n: a.n != null ? Number(a.n) : null,
+          }))
           .filter((a) => a.m2 > 0 && a.priceUk != null)
           .sort((a, b) => a.m2 - b.m2) : null;
         setDbAreas((m) => ({ ...m, [selected]: areas && areas.length ? areas : null }));
@@ -350,29 +433,57 @@ export default function RePositionCard({ brief, myProp, dongOf }) {
     });
   }, [leader, myProp?.name, brief?.region]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // [④ 지역 대장 비교]는 서버 메모리 사고로 비활성화 — 위 주석 참고.
+  // [④ 지역 대장 비교]는 별도 카드(RegionLeadersCard, 주간 사전선정)로 이관됨.
+
+  // [히어로] 내 실제 평형을 complex-areas에서 매칭(전용㎡ 또는 평 중 가까운 쪽) — 표기/실거래 범위용.
+  const myArea = useMemo(() => {
+    const list = myProp?.name ? dbAreas[myProp.name] : null;
+    if (!Array.isArray(list) || !list.length) return null;
+    const p = Number(myProp?.pyeong);
+    if (!p) return null;
+    let best = null, bd = Infinity;
+    for (const a of list) {
+      const d = Math.min(Math.abs(a.m2 - p), a.pyeong != null ? Math.abs(a.pyeong - p) : Infinity);
+      if (d < bd) { bd = d; best = a; }
+    }
+    return best;
+  }, [dbAreas, myProp?.name, myProp?.pyeong]);
 
   if (!brief || brief.error || !leader) return null;
   if (!neighborRows.length) return null;
 
+  // 히어로 입력 — 내 단지 84㎡ 현재가/적정가(=cur84×pred/cur, 대장 회귀 괴리 유지)/대장 84㎡
+  const heroCur84 = myRankRow ? (myRankRow.cur84 != null ? myRankRow.cur84 : myRankRow.cur) : null;
+  const heroFair84 = (myRankRow && myRankRow.cur) ? Math.round(heroCur84 * (myRankRow.pred / myRankRow.cur) * 100) / 100 : null;
+  const heroLeader84 = brief.leader_84 != null ? brief.leader_84 : brief.leader_price;
+
   return (
     <section className="card rp-card">
       <span className="rp-card-label">내단지 포지션</span>
-      <h2 className="rp-card-title">🏠 동네 비교 <span className="rp-badge-note">참고용</span></h2>
-      <p className="rp-card-sub">대장이 맨 위, 아래로 대장과 가격이 함께 움직이는 정도(동조 개월수)순 — 위경도 데이터가 없어 직선거리 대신 씁니다. 막대=현재가, 세로 점선=회귀 기반 적정가, 사선=단지 간 연결.</p>
+      <h2 className="rp-card-title">🏠 내 단지 가격 위치 <span className="rp-badge-note">참고용</span></h2>
+
+      {myProp?.name && heroCur84 != null && (
+        <GapHero
+          myName={myProp.name} cur84={heroCur84} fair84={heroFair84}
+          leader84={heroLeader84} leaderName={leader} area={myArea} userAvm={userAvm}
+        />
+      )}
+
+      <h3 className="rp-sub-title">🏘 동네 비교 <span className="rp-mini">국민평형 84㎡ 기준</span></h3>
+      <p className="rp-card-sub">대장이 맨 위, 아래로 대장과 가격이 함께 움직이는 정도(동조 개월수)순. 막대=국민평형 84㎡ 실거래가, 세로 점선=대장 대비 적정가, 사선=단지 간 연결. 단지를 누르면 아래 평형별로 바뀝니다.</p>
       <TargetList rows={neighborRows} onSelect={setSelected} selected={selected} />
 
       <h3 className="rp-sub-title">📐 {selected || myProp?.name || ""} 평형별 적정가</h3>
       <AreaStepChart areas={selected ? dbAreas[selected] : null} myPyeongM2={selected === myProp?.name ? myProp?.pyeong : null} />
 
       {myProp?.name && leader && (
-        <>
-          <h3 className="rp-sub-title">📈 대장 대비 20년 장기 비율 &amp; 적정가</h3>
+        <details className="rp-more">
+          <summary>📈 대장 대비 20년 장기 비율 &amp; 적정가 <span>(자세히)</span></summary>
           <RatioTrendChart
             leaderName={leader} subjectName={myProp.name}
             leaderSeries={trendCache[leader]} subjectSeries={trendCache[myProp.name]}
           />
-        </>
+        </details>
       )}
 
       <style jsx>{`
@@ -382,6 +493,91 @@ export default function RePositionCard({ brief, myProp, dongOf }) {
         .rp-badge-note { font-size: 0.62rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 7px; margin-left: 5px; vertical-align: middle; }
         .rp-card-sub { font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; margin: 0 0 12px; word-break: keep-all; }
         .rp-sub-title { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); margin: 16px 0 8px; }
+        .rp-mini { font-size: 0.62rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 7px; margin-left: 5px; vertical-align: middle; }
+        .rp-more { margin-top: 14px; border-top: 1px solid var(--color-line); padding-top: 8px; }
+        .rp-more > summary { font-size: 0.8rem; font-weight: 800; color: var(--color-ink-2); cursor: pointer; list-style: revert; }
+        .rp-more > summary span { font-size: 0.66rem; font-weight: 600; color: var(--color-ink-3); }
+        .rp-more[open] > summary { margin-bottom: 8px; }
+      `}</style>
+    </section>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  Card 2 — 동네별 대장 비교 (주간 사전선정 region_leaders 읽기 · 가벼움)
+//    서현동 대장 vs 상위(강남 대치·반포)·하위(분당) 동네 대장을 84㎡ 기준 막대로.
+//    ④가 페이지마다 46만행을 재조회해 서버가 폭주했던 문제를, 주간 배치 사전계산으로 해결.
+// ══════════════════════════════════════════════════════════════════
+export function RegionLeadersCard({ myRegion = "서현동" }) {
+  const [items, setItems] = useState(null);
+  const [updated, setUpdated] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/pwa/re/regionLeaders`)
+      .then((r) => r.json())
+      .then((d) => { if (!alive) return; setItems(Array.isArray(d?.items) ? d.items : []); setUpdated(d?.updated || null); })
+      .catch(() => { if (alive) setItems([]); });
+    return () => { alive = false; };
+  }, []);
+
+  if (items == null) return null;              // 로딩 중
+  if (!items.length) return null;              // 배치 미실행/데이터 없음 → 조용히 숨김
+
+  const top = Math.max(...items.map((x) => x.price84_uk || 0)) * 1.1 || 1;
+  const tierColor = (t) => (t === "상위" ? "var(--color-danger)" : t === "하위" ? "var(--color-ink-3)" : "var(--color-primary)");
+
+  return (
+    <section className="card rl-card">
+      <span className="rl-label">동네 대장 비교</span>
+      <h2 className="rl-title">🏙 동네별 대장 아파트 <span className="rl-mini">국민평형 84㎡ · 주간 갱신</span></h2>
+      <p className="rl-sub">내 동네(서현동) 대장이 상위(강남)·하위 동네 대장과 어디쯤 있는지. 매주 실거래로 대장을 다시 뽑아 사전 계산합니다{updated ? ` (기준 ${updated})` : ""}.</p>
+
+      <div className="rl-list">
+        {items.map((x) => {
+          const isMine = x.dong === myRegion;
+          const pct = Math.max(4, Math.min(100, (x.price84_uk / top) * 100));
+          const vsMine = (() => {
+            const mine = items.find((y) => y.dong === myRegion);
+            return mine && !isMine ? Math.round((x.price84_uk - mine.price84_uk) * 10) / 10 : null;
+          })();
+          return (
+            <div className={`rl-row${isMine ? " mine" : ""}`} key={x.dong}>
+              <div className="rl-head">
+                <span className="rl-tier" style={{ color: tierColor(x.tier), borderColor: tierColor(x.tier) }}>{x.tier}</span>
+                <span className="rl-dong">{x.dong}{isMine ? " · 내 동네" : ""}</span>
+                <span className="rl-apt">{x.leader}</span>
+              </div>
+              <div className="rl-track">
+                <div className={`rl-fill${isMine ? " mine" : ""}`} style={{ width: `${pct}%` }}>
+                  <span className="rl-val">{uk(x.price84_uk)}억</span>
+                </div>
+                {vsMine != null && <span className={`rl-vs ${vsMine > 0 ? "hi" : "lo"}`}>{signed(vsMine)}억</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <style jsx>{`
+        .rl-card { background: var(--color-card); border-radius: var(--radius-card, 16px); padding: 16px 15px 15px; box-shadow: var(--shadow-card); margin-bottom: 12px; }
+        .rl-label { display: block; font-size: 0.68rem; font-weight: 800; color: var(--color-ink-3); letter-spacing: .3px; text-transform: uppercase; margin-bottom: 2px; }
+        .rl-title { font-size: 0.98rem; font-weight: 800; color: var(--color-ink); margin: 0 0 4px; }
+        .rl-mini { font-size: 0.62rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 7px; margin-left: 5px; vertical-align: middle; }
+        .rl-sub { font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; margin: 0 0 12px; word-break: keep-all; }
+        .rl-list { display: flex; flex-direction: column; gap: 12px; }
+        .rl-row.mine { background: var(--color-primary-soft); border-radius: 10px; padding: 6px 8px; margin: -2px -4px; }
+        .rl-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+        .rl-tier { font-size: 0.6rem; font-weight: 800; border: 1px solid; border-radius: 999px; padding: 0 6px; }
+        .rl-dong { font-size: 0.78rem; font-weight: 800; color: var(--color-ink); }
+        .rl-apt { font-size: 0.68rem; font-weight: 600; color: var(--color-ink-3); margin-left: auto; }
+        .rl-track { position: relative; height: 24px; background: var(--color-card-soft); border-radius: 6px; }
+        .rl-fill { height: 100%; border-radius: 6px; background: var(--color-line); display: flex; align-items: center; transition: width .4s cubic-bezier(.2,.8,.2,1); }
+        .rl-fill.mine { background: var(--color-primary); }
+        .rl-val { font-size: 0.68rem; font-weight: 800; color: var(--color-ink); margin-left: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .rl-fill.mine .rl-val { color: #fff; }
+        .rl-vs { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 0.64rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .rl-vs.hi { color: var(--color-danger); } .rl-vs.lo { color: var(--color-success); }
       `}</style>
     </section>
   );

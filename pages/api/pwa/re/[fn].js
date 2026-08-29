@@ -20,6 +20,7 @@ const ENDPOINTS = {
   upgradeGap: "/api/v2/upgrade-gap", // [R-5 시나리오B] 같은 동 단지 갈아타기 후보·갭·판정
   regionGap: "/api/v2/region-gap", // [R-5 시나리오C] 지역 변경 동 평균단가 갭·추적·판정
   weekly: "/api/re/weekly", // [FB-5 §5.4] 주간 부동산 리포트 요약(확정+미검증 병기)
+  regionLeaders: "/api/region-leaders", // [Card2] 동네별 대장(주간 사전선정) 가벼운 읽기
 };
 
 // [내단지 포지션 v2] /api/trend/{apt_name} 는 단지명이 쿼리가 아니라 경로 파라미터라
