@@ -729,3 +729,154 @@ export function RegionForecastCard({ myRegion = "서현동" }) {
     </section>
   );
 }
+
+// ══════════════════════════════════════════════════════════════════
+//  Card 4 — 갈아타기 시나리오: 투자금 + 예상 이익률(세금 제외)
+//    새 백엔드 없이 위 카드 데이터 재활용 — ①평형이동(내 단지) ②같은 동네 이사(all_ranking 84㎡)
+//    ③동네 변경(region_leaders 예측). '이익률'=저평가 갭(갭 축소 시 기대) 또는 3년 초과상승률(시나리오).
+// ══════════════════════════════════════════════════════════════════
+const MOVE_TABS = [
+  { id: "pyeong", label: "평형 이동" },
+  { id: "dong", label: "같은 동네" },
+  { id: "region", label: "동네 변경" },
+];
+
+export function MoveScenarioCard({ brief, myProp, dongOf, userAvm = null }) {
+  const [tab, setTab] = useState("pyeong");
+  const [areas, setAreas] = useState(null);
+  const [regions, setRegions] = useState(null);
+
+  useEffect(() => {
+    if (!myProp?.name) return;
+    let alive = true;
+    fetch(`/api/pwa/re/complexAreas?complex=${encodeURIComponent(myProp.name)}`).then((r) => r.json())
+      .then((d) => {
+        if (!alive) return;
+        const a = Array.isArray(d?.areas) ? d.areas.map((x) => ({
+          m2: Math.round(Number(x.m2 ?? x.전용면적)), pyeong: x.평 != null ? Number(x.평) : null,
+          priceUk: x.rep_price_uk != null ? Number(x.rep_price_uk) : null,
+          maxUk: x.max_price_uk != null ? Number(x.max_price_uk) : null,
+        })).filter((x) => x.m2 > 0 && x.priceUk != null).sort((p, q) => p.m2 - q.m2) : null;
+        setAreas(a);
+      }).catch(() => { if (alive) setAreas(null); });
+    return () => { alive = false; };
+  }, [myProp?.name]);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/pwa/re/regionLeaders`).then((r) => r.json())
+      .then((d) => { if (alive) setRegions(Array.isArray(d?.items) ? d.items : []); })
+      .catch(() => { if (alive) setRegions([]); });
+    return () => { alive = false; };
+  }, []);
+
+  if (!myProp?.name || !brief) return null;
+
+  // 내 평형(전용㎡·평 가까운 쪽) 매칭
+  const myArea = (() => {
+    if (!Array.isArray(areas) || !areas.length) return null;
+    const p = Number(myProp?.pyeong); if (!p) return null;
+    let best = null, bd = Infinity;
+    for (const a of areas) {
+      const d = Math.min(Math.abs(a.m2 - p), a.pyeong != null ? Math.abs(a.pyeong - p) : Infinity);
+      if (d < bd) { bd = d; best = a; }
+    }
+    return best;
+  })();
+  // 내 매도값(팔 값) — 사용자입력 > 내 평형 최고가(고층 가정) > 내 평형 대표 > 84㎡
+  const myRank = (brief.all_ranking || []).find((r) => r.단지명 === myProp.name);
+  const my84 = myRank ? (myRank.cur84 ?? myRank.cur) : null;
+  const sellBase = userAvm != null ? userAvm
+    : (myArea ? (myArea.maxUk || myArea.priceUk) : my84);
+
+  // 시나리오 행 만들기
+  const rows = (() => {
+    if (sellBase == null) return [];
+    if (tab === "pyeong") {
+      if (!Array.isArray(areas) || areas.length < 2) return [];
+      const fit = linreg(areas.map((a) => a.m2), areas.map((a) => a.priceUk));
+      return areas.filter((a) => a !== myArea).map((a) => {
+        const fair = fit ? fit.slope * a.m2 + fit.intercept : a.priceUk;
+        const upside = fair > 0 ? (fair / a.priceUk - 1) * 100 : 0; // 저평가 갭%
+        return { key: `${a.m2}`, name: `${a.pyeong ? a.pyeong + "평" : a.m2 + "㎡"}`, price: a.priceUk,
+          invest: Math.round((a.priceUk - sellBase) * 10) / 10, ret: Math.round(upside * 10) / 10 };
+      }).sort((x, y) => y.ret - x.ret);
+    }
+    if (tab === "dong") {
+      const pool = (brief.all_ranking || []).filter((r) => (r.cur84 != null || r.cur != null) && canon(r.단지명) !== canon(myProp.name));
+      return pool.map((r) => {
+        const price = r.cur84 != null ? r.cur84 : r.cur;
+        const upside = r.pred84 && price ? (r.pred84 / price - 1) * 100 : 0;
+        return { key: r.단지명, name: r.단지명, price,
+          invest: Math.round((price - sellBase) * 10) / 10, ret: Math.round(upside * 10) / 10 };
+      }).sort((x, y) => y.ret - x.ret).slice(0, 6);
+    }
+    // region
+    if (!Array.isArray(regions) || !regions.length) return [];
+    const myDong = dongOf ? dongOf(myProp.name) : brief.region;
+    const mineR = regions.find((x) => x.dong === myDong);
+    const myCagr = mineR?.cagr5 != null ? mineR.cagr5 : 0.03;
+    return regions.filter((x) => x.dong !== myDong).map((x) => {
+      const price = x.price84_uk;
+      const excess = ((x.cagr5 != null ? x.cagr5 : myCagr) - myCagr) * 100; // 3년 초과 연상승률
+      return { key: x.dong, name: `${x.dong} ${x.leader}`, price,
+        invest: Math.round((price - sellBase) * 10) / 10, ret: Math.round(excess * 3 * 10) / 10 }; // 3년 누적 초과
+    }).sort((x, y) => y.ret - x.ret);
+  })();
+
+  const retNote = tab === "region"
+    ? "이익률 = 3년 누적 초과 상승률(그 동네 CAGR − 내 동네, 시나리오)"
+    : "이익률 = 적정가 대비 저평가 갭(갭 축소 시 기대)";
+
+  return (
+    <section className="card mv-card">
+      <span className="mv-label">갈아타기 시나리오</span>
+      <h2 className="mv-title">🔀 이사·갈아타기 수익 <span className="mv-mini">세금 미반영 · 시나리오</span></h2>
+      <div className="mv-tabs">
+        {MOVE_TABS.map((t) => (
+          <button key={t.id} className={`mv-tab${tab === t.id ? " on" : ""}`} onClick={() => setTab(t.id)}>{t.label}</button>
+        ))}
+      </div>
+      <div className="mv-base">기준 매도값 <b>{sellBase != null ? `${uk(sellBase)}억` : "미확정"}</b>{userAvm != null ? " (내 시세 입력)" : myArea ? " (내 평형 실거래 최고)" : ""} · {retNote}</div>
+
+      {sellBase == null ? (
+        <div className="mv-empty">내 단지 시세가 없어 계산할 수 없습니다 — 위에서 내 단지·평형을 등록해 주세요.</div>
+      ) : !rows.length ? (
+        <div className="mv-empty">이 시나리오에 쓸 데이터가 아직 부족합니다.</div>
+      ) : (
+        <div className="mv-rows">
+          {rows.map((r) => (
+            <div className="mv-row" key={r.key}>
+              <span className="mv-nm">{r.name}<em>{uk(r.price)}억</em></span>
+              <span className={`mv-inv ${r.invest > 0 ? "up" : "down"}`}>{r.invest > 0 ? "추가 " : "회수 "}{uk(Math.abs(r.invest))}억</span>
+              <span className={`mv-ret ${r.ret >= 0 ? "pos" : "neg"}`}>{r.ret >= 0 ? "+" : ""}{r.ret}%</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="mv-foot">※ 세금(취득·양도)·거래비용·대출은 미반영한 단순 시나리오입니다. 실제 갈아타기는 세금·자금계획을 별도로 확인하세요.</p>
+
+      <style jsx>{`
+        .mv-card { background: var(--color-card); border-radius: var(--radius-card, 16px); padding: 16px 15px 15px; box-shadow: var(--shadow-card); margin-bottom: 12px; }
+        .mv-label { display: block; font-size: 0.68rem; font-weight: 800; color: var(--color-ink-3); letter-spacing: .3px; text-transform: uppercase; margin-bottom: 2px; }
+        .mv-title { font-size: 0.98rem; font-weight: 800; color: var(--color-ink); margin: 0 0 8px; }
+        .mv-mini { font-size: 0.62rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 7px; margin-left: 5px; vertical-align: middle; }
+        .mv-tabs { display: flex; gap: 5px; background: var(--color-card-soft); padding: 4px; border-radius: 10px; margin-bottom: 8px; }
+        .mv-tab { flex: 1; border: none; background: none; padding: 7px 0; border-radius: 7px; font-size: 0.76rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; font-family: inherit; }
+        .mv-tab.on { background: var(--color-primary); color: #fff; }
+        .mv-base { font-size: 0.68rem; color: var(--color-ink-3); margin-bottom: 8px; word-break: keep-all; }
+        .mv-base b { color: var(--color-ink); font-weight: 800; }
+        .mv-rows { display: flex; flex-direction: column; gap: 6px; }
+        .mv-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 9px; background: var(--color-card-soft); }
+        .mv-nm { flex: 1; font-size: 0.76rem; font-weight: 700; color: var(--color-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .mv-nm em { font-style: normal; font-weight: 600; color: var(--color-ink-3); font-size: 0.68rem; margin-left: 6px; }
+        .mv-inv { font-size: 0.72rem; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .mv-inv.up { color: var(--color-danger); } .mv-inv.down { color: var(--color-success); }
+        .mv-ret { font-size: 0.82rem; font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; min-width: 46px; text-align: right; }
+        .mv-ret.pos { color: var(--color-success); } .mv-ret.neg { color: var(--color-danger); }
+        .mv-empty { font-size: 0.74rem; color: var(--color-ink-3); text-align: center; padding: 16px 8px; }
+        .mv-foot { font-size: 0.64rem; color: var(--color-ink-3); line-height: 1.5; margin: 10px 0 0; word-break: keep-all; }
+      `}</style>
+    </section>
+  );
+}

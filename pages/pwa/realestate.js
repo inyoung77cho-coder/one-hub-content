@@ -8,7 +8,7 @@ import { dedupBy } from "../../lib/useDedup";
 import { ReForm } from "../../components/shared/AssetForms";
 import Term from "../../components/Term";
 import ReportTeaser from "../../components/ReportTeaser";
-import RePositionCard, { RegionLeadersCard, RegionForecastCard } from "../../components/RePositionCard";
+import RePositionCard, { RegionLeadersCard, RegionForecastCard, MoveScenarioCard } from "../../components/RePositionCard";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -23,6 +23,7 @@ export default function RealEstateDashboard() {
   const [macro, setMacro] = useState(null);
   const [weekly, setWeekly] = useState(null); // [2026-08-22] 주간 전파·예측 리포트(다음주 시나리오 + 단지별 예측)
   const [feed, setFeed] = useState(null); // [v11 #16] 최근 실거래 피드
+  const [showToday, setShowToday] = useState(false); // [Card5] 시황·실거래·시장예상을 '오늘의 부동산'으로 분리(기본 접힘)
   const [err, setErr] = useState(null);
   const [myC, setMyC] = useState("");   // [S5] 내 단지
   const [tgtC, setTgtC] = useState(""); // [S5] 갈아탈 목표 단지
@@ -333,7 +334,22 @@ export default function RealEstateDashboard() {
         <RegionForecastCard myRegion={myDong || brief?.region || "서현동"} />
       )}
 
+      {/* [Card4] 갈아타기 시나리오 — 투자금 + 예상 이익률(세금 제외) */}
+      {myProp?.name && brief && !brief.error && (
+        <MoveScenarioCard brief={brief} myProp={myProp} dongOf={dongOf} userAvm={userAvm} />
+      )}
+
+      {/* [Card5] 오늘의 부동산 토글 — 시황·실거래·시장예상은 분석 페이지에서 접고, 여기서 펼쳐 봄 */}
+      <button
+        onClick={() => setShowToday((v) => !v)}
+        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, margin: "2px 0 12px", padding: "13px 15px", border: "1px solid var(--color-line)", borderRadius: 14, background: showToday ? "var(--color-primary-soft)" : "var(--color-card)", color: "var(--color-ink)", fontFamily: "inherit", fontSize: "0.86rem", fontWeight: 800, cursor: "pointer" }}
+      >
+        <span>📅 오늘의 부동산 <span style={{ fontWeight: 600, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>시황 · 최근 실거래 · 시장 예상</span></span>
+        <span style={{ color: "var(--color-primary)", fontSize: "0.8rem" }}>{showToday ? "접기 ▲" : "펼치기 ▼"}</span>
+      </button>
+
       {/* 1) HERO — 시장 브리핑 (다른 페이지와 통일된 라이트 카드) */}
+      {showToday && (
       <section className="hero">
         <div className="eyebrow">
           <span className="lbl">🏢 시장 브리핑{brief?.region ? ` · ${brief.region}` : ""}</span>
@@ -351,6 +367,7 @@ export default function RealEstateDashboard() {
           <div className="brief-lead">{err ? "데이터 로드 오류" : "불러오는 중…"}</div>
         )}
       </section>
+      )}
 
       {/* 카톡방 수집정보 종합 리포트 → board 유도 (미검증 참고용) */}
       <ReportTeaser />
@@ -897,8 +914,8 @@ export default function RealEstateDashboard() {
         </section>
       )}
 
-      {/* 2.5) 최근 실거래 피드 (#16) — raw_transactions 기반, 동일 단지·평형 직전 대비 변동률 */}
-      {feed?.feed?.length > 0 && (
+      {/* 2.5) 최근 실거래 피드 (#16) — [Card5] 오늘의 부동산으로 이관 */}
+      {showToday && feed?.feed?.length > 0 && (
         <section className="card">
           <div className="label">📈 최근 실거래 <span className="sub">동일 단지·평형 직전 거래 대비</span></div>
           {feed.feed.slice(0, 8).map((f, i) => (
@@ -921,8 +938,8 @@ export default function RealEstateDashboard() {
         </section>
       )}
 
-      {/* 3) 저평가 후보 */}
-      {brief?.under?.length > 0 && (
+      {/* 3) 저평가 후보 — [Card5] 오늘의 부동산으로 이관 */}
+      {showToday && brief?.under?.length > 0 && (
         <section className="card">
           <div className="label">💎 저평가 후보 <span className="sub">현재가 vs 회귀예측</span></div>
           {brief.under.slice(0, 6).map((u) => (
@@ -999,7 +1016,7 @@ export default function RealEstateDashboard() {
 
       {/* [2026-08-22] 다음 주 AI 시나리오 — weekly_report.py(주간 전파·예측 리포트)에서.
           시장 전체 방향성 3가지 확률 시나리오(단지 특정 예측 아님) — 내 단지 예측은 아래 별도 카드. */}
-      {weekly?.scenarios?.length > 0 && (
+      {showToday && weekly?.scenarios?.length > 0 && (
         <section className="card">
           <div className="label">🔮 다음 주 시장 예상 <span className="sub">{weekly.week}</span></div>
           {weekly.scenarios.map((s, i) => (
