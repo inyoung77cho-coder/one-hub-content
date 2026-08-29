@@ -6,21 +6,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 
-// 상단 모드 = 경제영어(en) / 중국어(zh) / 라이브영어(live). live는 독립 탭(하위 탭 없음).
+// 상단 대메뉴 = 경제영어(en) / 중국어(zh) / 일반영어(gen). 각 대메뉴 아래 하위 메뉴로 계층 구분.
 const MODES = [
   ["en", "💼", "경제영어"],
   ["zh", "🇨🇳", "중국어"],
-  ["live", "🎬", "라이브영어"],
+  ["gen", "🎬", "일반영어"],
 ];
-// 경제영어·중국어 하위 탭 — 매체 공통, 라벨만 언어별(영어: 뉴스/영상/이디엄, 중국어: 신문/영상/구어).
-const TABS = [
-  ["news", "📰"],
-  ["video", "▶️"],
-  ["idiom", "💬"],
-];
-const TAB_LABEL = {
-  en: { news: "뉴스", video: "영상", idiom: "이디엄" },
-  zh: { news: "신문", video: "영상", idiom: "구어" },
+// 대메뉴별 하위 메뉴 [키, 아이콘, 라벨]
+const SUBTABS = {
+  en:  [["news", "📰", "뉴스"], ["video", "▶️", "영상"], ["idiom", "💬", "이디엄"]],
+  zh:  [["news", "📰", "신문"], ["video", "▶️", "영상"], ["idiom", "💬", "구어"]],
+  gen: [["live", "🎬", "라이브"], ["review", "📝", "주말복습"]],
 };
 const TRACK_KO = { economy: "경제", display: "디스플레이", general: "생활영어" };
 const TRACK_KO_ZH = { economy: "경제", display: "디스플레이", general: "생활중국어" };
@@ -429,22 +425,123 @@ function LiveEnglish({ lang }) {
   );
 }
 
+// [주말 AI 튜터 시험] 그 주 배운 표현으로 빈칸 채우기 — 선생 페르소나 + TTS 질문 + 정답 시 마무리 카라오케.
+function maskExpr(example, expr) {
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  let re = new RegExp(esc(expr), "i");
+  if (re.test(example)) return example.replace(re, "____");
+  const first = expr.split(/\s+/)[0];
+  return example.replace(new RegExp(esc(first), "i"), "____");
+}
+
+function WeekendQuiz({ lang = "en" }) {
+  const [items, setItems] = useState(null);
+  const [i, setI] = useState(0);
+  const [ans, setAns] = useState("");
+  const [state, setState] = useState("ask"); // ask | hint | correct
+  const [score, setScore] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    setItems(null); setI(0); setScore(0); setState("ask"); setAns("");
+    fetch(`/api/english/weekly-review?language=${lang}`).then((r) => r.json())
+      .then((d) => {
+        if (!alive) return;
+        const q = (d.expressions || []).filter((e) => e.expr && e.example_en &&
+          e.example_en.toLowerCase().includes(e.expr.toLowerCase().split(/\s+/)[0]));
+        setItems(q.slice(0, 10));
+      }).catch(() => alive && setItems([]));
+    return () => { alive = false; };
+  }, [lang]);
+
+  if (items == null) return <div className="en-state">시험 준비 중…</div>;
+  if (!items.length) return <div className="en-state">이번 주 배운 표현이 아직 없어요.<br />뉴스·이디엄에서 학습하면 주말 시험이 만들어집니다.</div>;
+
+  const done = i >= items.length;
+  const cur = items[i];
+  const speak = (text) => { try { new Audio(`/api/english/speak?text=${encodeURIComponent(text)}&language=${lang}`).play().catch(() => {}); } catch (e) {} };
+  const norm = (s) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  const check = () => {
+    if (norm(ans).includes(norm(cur.expr))) { setState("correct"); setScore((s) => s + 1); }
+    else setState("hint");
+  };
+  const next = () => { setI((x) => x + 1); setAns(""); setState("ask"); };
+
+  return (
+    <div className="qz">
+      <div className="qz-teacher"><span className="qz-av">👩‍🏫</span><b>AI 튜터</b>
+        {!done && <span className="qz-prog">{i + 1} / {items.length}</span>}</div>
+
+      {done ? (
+        <>
+          <div className="qz-done">이번 주 복습 완료! 정답 <b>{score} / {items.length}</b> 👏</div>
+          <button type="button" className="qz-btn" onClick={() => { setI(0); setScore(0); setState("ask"); setAns(""); }}>다시 풀기</button>
+        </>
+      ) : (
+        <>
+          <div className="qz-q">이번 주 배운 표현으로 빈칸을 채워보세요.</div>
+          <div className="qz-blank">{maskExpr(cur.example_en, cur.expr)}</div>
+          <div className="qz-ko">뜻: {cur.meaning_ko}</div>
+          <button type="button" className="qz-listen" onClick={() => speak(cur.example_en)}>🔊 선생님 발음 듣기</button>
+          {state !== "correct" ? (
+            <>
+              <input className="qz-input" value={ans} onChange={(e) => setAns(e.target.value)}
+                placeholder="빈칸에 들어갈 표현" onKeyDown={(e) => e.key === "Enter" && ans.trim() && check()} />
+              {state === "hint" && <div className="qz-fb wrong">아직이에요. 힌트 <b>{cur.expr.split(/\s+/).map((w) => w[0]).join(".")}…</b> · 뜻을 떠올려 다시!</div>}
+              <button type="button" className="qz-btn" onClick={check} disabled={!ans.trim()}>제출</button>
+            </>
+          ) : (
+            <>
+              <div className="qz-fb ok">✅ 정답! <b>{cur.expr}</b> 을(를) 잘 활용했어요.</div>
+              <div className="qz-reveal"><Karaoke text={cur.example_en} lang={lang} /></div>
+              {cur.example_ko && <div className="qz-exko">{cur.example_ko}</div>}
+              <button type="button" className="qz-btn" onClick={next}>{i + 1 < items.length ? "다음 문제 →" : "결과 보기 →"}</button>
+            </>
+          )}
+        </>
+      )}
+
+      <style jsx>{`
+        .qz { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 16px; padding: 18px 16px 20px; box-shadow: var(--shadow-card); }
+        .qz-teacher { display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--color-ink); }
+        .qz-av { font-size: 1.4rem; }
+        .qz-teacher b { font-weight: 800; }
+        .qz-prog { margin-left: auto; font-size: .72rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 999px; padding: 2px 9px; }
+        .qz-q { margin-top: 14px; font-size: .82rem; font-weight: 700; color: var(--color-ink-2); }
+        .qz-blank { margin-top: 10px; font-size: 1.25rem; font-weight: 800; line-height: 1.5; color: var(--color-ink); word-break: keep-all; }
+        .qz-ko { margin-top: 6px; font-size: .8rem; color: var(--color-primary); font-weight: 700; }
+        .qz-listen { margin-top: 10px; border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink-2); border-radius: 9px; padding: 7px 12px; font-size: .76rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .qz-input { width: 100%; box-sizing: border-box; margin-top: 12px; padding: 12px 13px; border: 1.5px solid var(--color-line); border-radius: 11px; font-size: 1rem; font-family: inherit; background: var(--color-bg); color: var(--color-ink); }
+        .qz-input:focus { outline: none; border-color: var(--color-primary); }
+        .qz-fb { margin-top: 10px; font-size: .82rem; font-weight: 700; word-break: keep-all; }
+        .qz-fb.ok { color: var(--color-success); } .qz-fb.wrong { color: var(--color-danger); }
+        .qz-reveal { margin-top: 10px; }
+        .qz-exko { margin-top: 6px; font-size: .78rem; color: var(--color-ink-3); }
+        .qz-done { margin-top: 14px; font-size: .95rem; font-weight: 800; color: var(--color-ink); }
+        .qz-btn { width: 100%; margin-top: 14px; border: none; border-radius: 12px; padding: 13px; background: var(--color-primary); color: #fff; font-size: .92rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .qz-btn:disabled { opacity: .55; }
+      `}</style>
+    </div>
+  );
+}
+
 export default function EnglishPage() {
-  const [mode, setMode] = useState("en");        // en(경제영어) / zh(중국어) / live(라이브영어)
+  const [mode, setMode] = useState("en");        // en(경제영어) / zh(중국어) / gen(일반영어)
   const [tab, setTab] = useState("news");
   const [feed, setFeed] = useState({ loading: true, date: null, items: [], error: null, review: false });
   const [past, setPast] = useState({ open: false, loading: false, items: [] });
 
   const lang = mode === "zh" ? "zh" : "en";
   const isWeekend = [0, 6].includes(new Date().getDay());
+  const changeMode = (m) => { setMode(m); setTab(SUBTABS[m][0][0]); };
 
   useEffect(() => {
-    if (mode === "live") return;                 // LiveEnglish가 자체 로드
     let alive = true;
+    if (mode === "gen") return () => { alive = false; };   // 라이브/복습(WeekendQuiz)이 자체 로드
+    // 경제영어(en)·중국어(zh) 매체 피드
     setFeed({ loading: true, date: null, items: [], error: null, review: false });
     setPast({ open: false, loading: false, items: [] });
     if (isWeekend) {
-      // [주말 복습] 새 콘텐츠 없이 그 주 이 매체 레슨을 복습으로 보여준다(뉴스/영상/이디엄 각각).
       fetch(`/api/english/lessons?medium=${tab}&language=${lang}&limit=7`)
         .then((r) => r.json())
         .then((d) => { if (alive) setFeed({ loading: false, date: null, items: d.items || [], error: d.error || null, review: true }); })
@@ -475,42 +572,44 @@ export default function EnglishPage() {
     <div className="en pwa-shell">
       <AppHeader />
       <div className="en-hd">
-        <h1>{mode === "live" ? "🎬 라이브 영어" : mode === "zh" ? "🇨🇳 매일 중국어" : "💼 경제 영어"}</h1>
+        <h1>{mode === "gen" ? "🎬 일반 영어" : mode === "zh" ? "🇨🇳 매일 중국어" : "💼 경제 영어"}</h1>
         <span className="en-sub">
-          {mode === "live"
-            ? "영상 몰입 + 표현 카라오케 — 자막 단어를 발음에 맞춰 따라 읽기"
+          {mode === "gen"
+            ? "생활영어 라이브(셀럽 영상+카라오케) · 주말 복습"
             : mode === "zh"
-            ? "경제 · 디스플레이 신문/영상 + 오늘의 구어(HSK4-5)"
-            : "경제 · 디스플레이 뉴스/영상 + 오늘의 이디엄"}
+            ? "경제 · 디스플레이 신문/영상 + 구어(HSK4-5)"
+            : "경제 · 디스플레이 뉴스/영상 + 이디엄"}
         </span>
       </div>
 
+      {/* 대메뉴 (경제영어/중국어/일반영어) */}
       <div className="en-langs" role="tablist">
         {MODES.map(([key, ic, label]) => (
           <button key={key} type="button" role="tab" aria-selected={mode === key}
-            className={mode === key ? "on" : ""} onClick={() => setMode(key)}>
+            className={mode === key ? "on" : ""} onClick={() => changeMode(key)}>
             <span aria-hidden="true">{ic}</span> {label}
           </button>
         ))}
       </div>
 
-      {mode !== "live" && (
-        <div className="en-tabs" role="tablist">
-          {TABS.map(([key, ic]) => (
-            <button key={key} type="button" role="tab" aria-selected={tab === key}
-              className={tab === key ? "on" : ""} onClick={() => setTab(key)}>
-              <span aria-hidden="true">{ic}</span> {TAB_LABEL[lang][key]}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* 하위 메뉴 — 대메뉴별로 다름(계층). */}
+      <div className="en-subtabs" role="tablist">
+        {SUBTABS[mode].map(([key, ic, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={tab === key}
+            className={tab === key ? "on" : ""} onClick={() => setTab(key)}>
+            <span aria-hidden="true">{ic}</span> {label}
+          </button>
+        ))}
+      </div>
 
-      {mode === "live" ? (
+      {mode === "gen" && tab === "live" ? (
         <LiveEnglish lang="en" />
+      ) : mode === "gen" && tab === "review" ? (
+        <WeekendQuiz lang="en" />
       ) : (
         <>
           {feed.review && (
-            <div className="en-review-hd">📚 주말 <b>이번 주 복습</b> · {TAB_LABEL[lang][tab]} — 주말엔 새 학습 대신 이번 주 것을 다시 봐요.</div>
+            <div className="en-review-hd">📚 주말 <b>이번 주 복습</b> · {(SUBTABS[mode].find((t) => t[0] === tab) || [, , ""])[2]} — 주말엔 새 학습 대신 이번 주 것을 다시 봐요.</div>
           )}
           {feed.loading ? (
             <div className="en-state">불러오는 중…</div>
@@ -574,6 +673,10 @@ export default function EnglishPage() {
         .en-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
         .en-tabs button { flex: 1 1 0; padding: 10px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .85rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .en-tabs button.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        /* 하위 메뉴 — 대메뉴보다 작게·연하게(계층 구분). 알약형. */
+        .en-subtabs { display: flex; gap: 6px; margin: 0 0 14px; padding-left: 6px; }
+        .en-subtabs button { padding: 6px 13px; border-radius: 999px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); font-size: .76rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .en-subtabs button.on { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-primary); }
         .en-date { font-size: .78rem; font-weight: 700; color: var(--color-ink-3); margin: 0 2px 10px; }
         .en-pastdate { font-size: .74rem; font-weight: 700; color: var(--color-ink-3); margin: 0 2px 6px; }
         .en-list { display: flex; flex-direction: column; gap: 14px; }
