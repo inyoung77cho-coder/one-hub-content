@@ -478,165 +478,157 @@ function LiveEnglish() {
   );
 }
 
-// [주말 AI 튜터] 글 대신 '대화형' — 튜터가 영어로 묻고(음성), 학습자가 영어로 답한다.
-// 배운 표현이 나오면 정답. 막히면 ① 관련 단어 → ② 표현 힌트 → ③ 정답 이디엄 을 차례로 눌러 넣어 유도.
-const QZ_OPENERS = [
-  "Okay, let's chat! Answer me in English.",
-  "Your turn — reply to me in English.",
-  "Let's practice speaking. Say it in English!",
-  "Nice. Now tell me in your own English.",
-  "Great, keep going — answer me in English.",
-];
-
+// [주말 AI 튜터] Claude 기반 '자유 대화' — 튜터가 영어로 대화를 이끌며 그 주 배운 표현을
+// 자연스럽게 쓰도록 유도한다. 표현을 성공적으로 쓰면 완료로 기록(다음 접속 땐 미완료만).
+// 막히면 튜터가 관련 단어/표현/이디엄 힌트를 준다(칩으로 입력창에 삽입).
 function WeekendChat({ lang = "en" }) {
-  const [items, setItems] = useState(null);  // 이번 주 '미완료' 표현(복습 대상)
+  const [status, setStatus] = useState("load"); // load | none | chat | done
   const [weekTotal, setWeekTotal] = useState(0);
-  const [i, setI] = useState(0);
-  const [ans, setAns] = useState("");
-  const [state, setState] = useState("ask"); // ask | correct
-  const [hint, setHint] = useState(0);       // 0 없음 · 1 관련단어 · 2 표현힌트 · 3 정답이디엄
-  const [tries, setTries] = useState(0);
-  const [score, setScore] = useState(0);
+  const [msgs, setMsgs] = useState([]);          // {role:'tutor'|'student', text, ko?}
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [hints, setHints] = useState([]);
+  const [usedList, setUsedList] = useState([]);
+  const [err, setErr] = useState("");
   const inputRef = useRef(null);
-  const allRef = useRef([]);                  // 이번 주 전체('전체 다시 복습'용)
+  const scrollRef = useRef(null);
+  const targetsRef = useRef([]);   // 이번 주 미완료 표현(대화 유도 대상)
+  const allRef = useRef([]);       // 이번 주 전체
+  const usedRef = useRef([]);      // 이번 세션에서 사용에 성공한 표현
+  const focusRef = useRef("");
+  const sessionTotalRef = useRef(0);
 
-  // 완료 기록(브라우저 localStorage) — 한번 맞힌 표현은 다음 접속 때 제외한다.
   const DONE_KEY = `onehub_wk_done_${lang}`;
-  const keyOf = (e) => (e.expr || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const norm = (s) => (s || "").toLowerCase().replace(/\s+/g, " ").trim();
   const loadDone = () => { try { return JSON.parse(localStorage.getItem(DONE_KEY) || "{}") || {}; } catch (e) { return {}; } };
   const saveDone = (o) => { try { localStorage.setItem(DONE_KEY, JSON.stringify(o)); } catch (e) {} };
-  const markDone = (e) => {
+  const markDoneExpr = (expr) => {
     const d = loadDone();
-    d[keyOf(e)] = new Date().toISOString().slice(0, 10);
-    const cutoff = Date.now() - 21 * 864e5;   // 21일 지난 기록은 정리(같은 표현이 훗날 다시 나오면 복습되게)
+    d[norm(expr)] = new Date().toISOString().slice(0, 10);
+    const cutoff = Date.now() - 21 * 864e5;   // 21일 지난 기록 정리(같은 표현이 훗날 다시 나오면 복습되게)
     Object.keys(d).forEach((k) => { const t = Date.parse(d[k] + "T00:00:00Z"); if (!(t > cutoff)) delete d[k]; });
     saveDone(d);
+  };
+  const speak = (text) => { try { new Audio(`/api/english/speak?text=${encodeURIComponent(text)}&language=en`).play().catch(() => {}); } catch (e) {} };
+
+  const callTutor = (history) => {
+    setSending(true); setErr(""); setHints([]);
+    fetch("/api/english/tutor-chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        language: lang,
+        targets: targetsRef.current.map((t) => ({ expr: t.expr, meaning_ko: t.meaning_ko })),
+        used: usedRef.current, focus: focusRef.current, history,
+      }),
+    }).then((r) => r.json()).then((d) => {
+      setSending(false);
+      if (!d || !d.say) { setErr("튜터 응답을 받지 못했어요."); return; }
+      if (d.used && !usedRef.current.some((u) => norm(u) === norm(d.used))) {
+        usedRef.current = [...usedRef.current, d.used];
+        markDoneExpr(d.used);
+        setUsedList([...usedRef.current]);
+      }
+      focusRef.current = d.focus || focusRef.current;
+      setHints(Array.isArray(d.hints) ? d.hints : []);
+      setMsgs((m) => [...m, { role: "tutor", text: d.say, ko: d.ko }]);
+      speak(d.say);
+      if (d.done || usedRef.current.length >= (sessionTotalRef.current || 1)) setStatus("done");
+    }).catch(() => { setSending(false); setErr("연결 실패 — 잠시 후 다시 시도해 주세요."); });
   };
 
   useEffect(() => {
     let alive = true;
-    setItems(null); setI(0); setScore(0); setState("ask"); setAns(""); setHint(0); setTries(0);
-    fetch(`/api/english/weekly-review?language=${lang}`).then((r) => r.json())
-      .then((d) => {
-        if (!alive) return;
-        const all = (d.expressions || []).filter((e) => e.expr && e.meaning_ko && e.example_en).slice(0, 10);
-        allRef.current = all;
-        setWeekTotal(all.length);
-        const doneMap = loadDone();
-        setItems(all.filter((e) => !doneMap[keyOf(e)]));   // 완료한 건 제외
-      }).catch(() => { if (alive) { setItems([]); setWeekTotal(0); } });
+    setStatus("load"); setMsgs([]); setInput(""); setHints([]); setUsedList([]); setErr("");
+    usedRef.current = []; focusRef.current = "";
+    fetch(`/api/english/weekly-review?language=${lang}`).then((r) => r.json()).then((d) => {
+      if (!alive) return;
+      const all = (d.expressions || []).filter((e) => e.expr && e.meaning_ko).slice(0, 10);
+      allRef.current = all;
+      setWeekTotal(all.length);
+      const doneMap = loadDone();
+      const remaining = all.filter((e) => !doneMap[norm(e.expr)]);
+      targetsRef.current = remaining;
+      sessionTotalRef.current = remaining.length;
+      if (all.length === 0) { setStatus("none"); return; }
+      if (remaining.length === 0) { setStatus("done"); return; }
+      focusRef.current = remaining[0].expr;
+      setStatus("chat");
+      callTutor([]);   // 오프닝(튜터가 먼저 말 건다)
+    }).catch(() => { if (alive) { setStatus("none"); setWeekTotal(0); } });
     return () => { alive = false; };
   }, [lang]);
 
-  if (items == null) return <div className="en-state">튜터 준비 중…</div>;
-  if (weekTotal === 0) return <div className="en-state">이번 주 배운 표현이 아직 없어요.<br />뉴스·이디엄에서 학습하면 주말 복습이 만들어집니다.</div>;
+  // 새 메시지/입력중 표시마다 스레드를 아래로 스크롤
+  useEffect(() => { try { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; } catch (e) {} }, [msgs, sending]);
 
-  const allCleared = items.length === 0;             // 접속 시 이미 전부 완료
-  const finished = !allCleared && i >= items.length; // 이번 세션에서 남은 걸 다 끝냄
-  const cur = allCleared || finished ? null : items[i];
-  const opener = QZ_OPENERS[i % QZ_OPENERS.length];
-  const speak = (text) => { try { new Audio(`/api/english/speak?text=${encodeURIComponent(text)}&language=en`).play().catch(() => {}); } catch (e) {} };
-  const norm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
-  const exprWords = cur ? cur.expr.split(/\s+/).filter(Boolean) : [];
-  const skeleton = exprWords.map((w) => w[0] + "·".repeat(Math.max(1, w.length - 1))).join("  ");
+  const send = () => {
+    const text = input.trim();
+    if (!text || sending || status !== "chat") return;
+    const nm = [...msgs, { role: "student", text }];
+    setMsgs(nm); setInput("");
+    callTutor(nm.map((m) => ({ role: m.role, text: m.text })));
+  };
   const insert = (chip) => {
-    setAns((a) => (a && !a.endsWith(" ") ? a + " " : a) + chip + " ");
+    setInput((a) => (a && !a.endsWith(" ") ? a + " " : a) + chip + " ");
     try { inputRef.current && inputRef.current.focus(); } catch (e) {}
   };
-  const check = () => {
-    if (norm(ans).includes(norm(cur.expr))) {
-      markDone(cur);                                  // 완료 기록
-      setState("correct"); setScore((s) => s + 1);
-      speak("Perfect! That's exactly right. Well done.");
-    } else {
-      const t = tries + 1; setTries(t);
-      setHint((h) => Math.min(3, Math.max(h, t)));    // 틀릴수록 힌트를 한 단계씩 더 연다
-    }
+  const reviewAll = () => {   // 완료기록 지우고 이번 주 전체를 처음부터 다시 대화
+    try { const d = loadDone(); allRef.current.forEach((e) => delete d[norm(e.expr)]); saveDone(d); } catch (e) {}
+    targetsRef.current = allRef.current; usedRef.current = [];
+    sessionTotalRef.current = allRef.current.length;
+    focusRef.current = allRef.current.length ? allRef.current[0].expr : "";
+    setUsedList([]); setMsgs([]); setInput(""); setHints([]); setErr("");
+    if (allRef.current.length === 0) { setStatus("none"); return; }
+    setStatus("chat"); callTutor([]);
   };
-  const resetTurn = () => { setAns(""); setState("ask"); setHint(0); setTries(0); };
-  const next = () => { setI((x) => x + 1); resetTurn(); };
-  const reviewAll = () => {   // 이번 주 완료기록을 지우고 전체를 처음부터 다시 복습
-    try { const d = loadDone(); allRef.current.forEach((e) => delete d[keyOf(e)]); saveDone(d); } catch (e) {}
-    setItems(allRef.current); setI(0); setScore(0); resetTurn();
-  };
+
+  if (status === "load") return <div className="en-state">튜터 준비 중…</div>;
+  if (status === "none") return <div className="en-state">이번 주 배운 표현이 아직 없어요.<br />뉴스·이디엄에서 학습하면 주말 대화가 만들어집니다.</div>;
 
   return (
     <div className="qz">
       <div className="qz-teacher"><span className="qz-av">👩‍🏫</span><b>AI 영어 튜터</b>
-        {!allCleared && !finished && <span className="qz-prog">{i + 1} / {items.length}</span>}</div>
+        <span className="qz-prog">{usedList.length} / {sessionTotalRef.current || weekTotal} 표현</span></div>
 
-      {allCleared ? (
+      {status === "done" ? (
         <>
-          <div className="qz-done">이번 주 복습을 모두 마쳤어요! (총 {weekTotal}개 완료) 👏
-            <span className="qz-sub">완료한 표현은 기록돼요. 새 표현이 쌓이면 여기서 이어서 복습해요.</span></div>
-          <button type="button" className="qz-btn" onClick={reviewAll}>전체 다시 복습</button>
-        </>
-      ) : finished ? (
-        <>
-          <div className="qz-done">복습 완료! 이번에 <b>{score} / {items.length}</b>개 성공 👏
-            <span className="qz-sub">완료한 표현은 다음 접속 때 제외되고, 미완료만 다시 나와요.</span></div>
+          <div className="qz-done">이번 주 표현을 모두 복습했어요! (총 {weekTotal}개) 👏
+            <span className="qz-sub">완료한 표현은 기록돼요. 다음 접속 땐 미완료 표현만 대화에 나와요.</span></div>
           <button type="button" className="qz-btn" onClick={reviewAll}>전체 다시 복습</button>
         </>
       ) : (
         <>
-          {/* 튜터 말풍선 — 영어로 질문(음성) */}
-          <div className="qz-bubble tutor">
-            <p className="qz-say">{opener}</p>
-            <p className="qz-say sm">Reply so it means: <b>“{cur.meaning_ko}”</b></p>
-            <button type="button" className="qz-listen" onClick={() => speak(opener + " Try to use today's expression.")}>🔊 튜터 목소리로 듣기</button>
+          <div className="qz-thread" ref={scrollRef}>
+            {msgs.map((m, k) => (
+              <div key={k} className={`qz-bubble ${m.role === "tutor" ? "tutor" : "me"}`}>
+                <p className="qz-say">{m.text}</p>
+                {m.role === "tutor" && m.ko ? <p className="qz-say sm">{m.ko}</p> : null}
+                {m.role === "tutor" ? <button type="button" className="qz-listen" onClick={() => speak(m.text)}>🔊 듣기</button> : null}
+              </div>
+            ))}
+            {sending && <div className="qz-bubble tutor"><p className="qz-say typing">· · ·</p></div>}
           </div>
 
-          {state === "correct" ? (
-            <>
-              {/* 내 답 말풍선 + 튜터 확인 + 원어민 예문 카라오케 */}
-              <div className="qz-bubble me"><p className="qz-say">{ans.trim()}</p></div>
-              <div className="qz-fb ok">✅ Perfect! <b>{cur.expr}</b> — 자연스럽게 나왔어요.</div>
-              <div className="qz-reveal"><Karaoke text={cur.example_en} lang={lang} /></div>
-              {cur.example_ko && <div className="qz-exko">{cur.example_ko}</div>}
-              <button type="button" className="qz-btn" onClick={next}>{i + 1 < items.length ? "다음 대화 →" : "결과 보기 →"}</button>
-            </>
-          ) : (
-            <>
-              {/* 내가 쓴 답 */}
-              {ans.trim() && <div className="qz-bubble me"><p className="qz-say">{ans.trim()}</p></div>}
+          {err && <div className="qz-fb wrong">{err} <button type="button" className="qz-linkbtn" onClick={() => callTutor(msgs.map((m) => ({ role: m.role, text: m.text })))}>다시</button></div>}
 
-              {tries > 0 && hint === 0 && <div className="qz-fb wrong">거의 다 왔어요! 배운 표현을 넣어 다시 써볼까요?</div>}
-
-              {/* 막히면 차례로 유도 — ① 관련 단어 → ② 표현 힌트 → ③ 정답 이디엄 */}
-              {hint >= 1 && (
-                <div className="qz-hint">
-                  <div className="qz-hl">① 관련 단어 — 눌러서 문장에 넣어보세요</div>
-                  <div className="qz-chips">
-                    {exprWords.map((w, k) => (
-                      <button key={k} type="button" className="qz-chip" onClick={() => insert(w)}>{w}</button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {hint >= 2 && (
-                <div className="qz-hint">
-                  <div className="qz-hl">② 표현 힌트</div>
-                  <div className="qz-skel">{skeleton}</div>
-                </div>
-              )}
-              {hint >= 3 && (
-                <div className="qz-hint">
-                  <div className="qz-hl">③ 이 표현(idiom)을 그대로 써보세요</div>
-                  <div className="qz-chips">
-                    <button type="button" className="qz-chip solid" onClick={() => insert(cur.expr)}>{cur.expr}</button>
-                  </div>
-                </div>
-              )}
-
-              {/* 답하기 — 영어로 직접 작성 */}
-              <input ref={inputRef} className="qz-input" value={ans} onChange={(e) => setAns(e.target.value)}
-                placeholder="영어로 답을 작성하세요…" onKeyDown={(e) => e.key === "Enter" && ans.trim() && check()} />
-              <div className="qz-row">
-                {hint < 3 && <button type="button" className="qz-ghost" onClick={() => setHint((h) => Math.min(3, h + 1))}>💡 힌트</button>}
-                <button type="button" className="qz-btn flex" onClick={check} disabled={!ans.trim()}>보내기</button>
+          {/* 막히면 튜터가 준 힌트 — 눌러서 입력창에 넣기 */}
+          {hints.length > 0 && (
+            <div className="qz-hint">
+              <div className="qz-hl">💡 이 표현을 써보세요</div>
+              <div className="qz-chips">
+                {hints.map((h, k) => (
+                  <button key={k} type="button" className="qz-chip" onClick={() => insert(h)}>{h}</button>
+                ))}
               </div>
-            </>
+            </div>
           )}
+
+          <div className="qz-row">
+            <input ref={inputRef} className="qz-input flex" value={input} onChange={(e) => setInput(e.target.value)}
+              placeholder="영어로 답을 작성하세요…" disabled={sending}
+              onKeyDown={(e) => e.key === "Enter" && send()} />
+            <button type="button" className="qz-btn flex2" onClick={send} disabled={sending || !input.trim()}>보내기</button>
+          </div>
         </>
       )}
 
@@ -646,40 +638,32 @@ function WeekendChat({ lang = "en" }) {
         .qz-av { font-size: 1.4rem; }
         .qz-teacher b { font-weight: 800; }
         .qz-prog { margin-left: auto; font-size: .72rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 999px; padding: 2px 9px; }
-        .qz-bubble { margin-top: 14px; padding: 12px 14px; border-radius: 14px; }
+        .qz-thread { margin-top: 12px; max-height: 46vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+        .qz-bubble { margin-top: 12px; padding: 12px 14px; border-radius: 14px; }
+        .qz-bubble:first-child { margin-top: 0; }
         .qz-bubble.tutor { background: var(--color-card-soft); border: 1px solid var(--color-line); border-top-left-radius: 4px; }
-        .qz-bubble.me { background: var(--color-primary-soft); border: 1px solid var(--color-primary); border-top-right-radius: 4px; margin-left: 18%; }
-        .qz-say { margin: 0; font-size: 1.02rem; font-weight: 700; line-height: 1.5; color: var(--color-ink); word-break: break-word; }
+        .qz-bubble.me { background: var(--color-primary-soft); border: 1px solid var(--color-primary); border-top-right-radius: 4px; margin-left: 16%; }
+        .qz-say { margin: 0; font-size: 1.0rem; font-weight: 700; line-height: 1.55; color: var(--color-ink); word-break: break-word; white-space: pre-wrap; }
         .qz-say.sm { margin-top: 6px; font-size: .82rem; font-weight: 600; color: var(--color-ink-2); }
-        .qz-say.sm b { color: var(--color-primary); }
-        .qz-listen { margin-top: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; padding: 7px 12px; font-size: .76rem; font-weight: 700; cursor: pointer; font-family: inherit; }
-        .qz-input { width: 100%; box-sizing: border-box; margin-top: 12px; padding: 12px 13px; border: 1.5px solid var(--color-line); border-radius: 11px; font-size: 1rem; font-family: inherit; background: var(--color-bg); color: var(--color-ink); }
+        .qz-say.typing { letter-spacing: 3px; color: var(--color-ink-3); }
+        .qz-listen { margin-top: 9px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; padding: 5px 11px; font-size: .72rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .qz-input { box-sizing: border-box; padding: 12px 13px; border: 1.5px solid var(--color-line); border-radius: 11px; font-size: 1rem; font-family: inherit; background: var(--color-bg); color: var(--color-ink); }
+        .qz-input.flex { flex: 1; min-width: 0; }
         .qz-input:focus { outline: none; border-color: var(--color-primary); }
+        .qz-input:disabled { opacity: .6; }
         .qz-hint { margin-top: 12px; }
         .qz-hl { font-size: .72rem; font-weight: 800; color: var(--color-ink-3); margin-bottom: 6px; }
         .qz-chips { display: flex; flex-wrap: wrap; gap: 7px; }
         .qz-chip { border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink); border-radius: 999px; padding: 7px 13px; font-size: .86rem; font-weight: 700; cursor: pointer; font-family: inherit; }
-        .qz-chip.solid { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
-        .qz-skel { font-size: 1.15rem; font-weight: 800; letter-spacing: 1px; color: var(--color-primary); word-break: break-word; }
         .qz-fb { margin-top: 10px; font-size: .84rem; font-weight: 700; word-break: keep-all; }
-        .qz-fb.ok { color: var(--color-success); } .qz-fb.wrong { color: var(--color-danger); }
-        .qz-reveal { margin-top: 10px; }
-        .qz-exko { margin-top: 6px; font-size: .78rem; color: var(--color-ink-3); }
+        .qz-fb.wrong { color: var(--color-danger); }
+        .qz-linkbtn { margin-left: 6px; border: none; background: none; color: var(--color-primary); font-weight: 800; font-size: .82rem; cursor: pointer; font-family: inherit; text-decoration: underline; }
         .qz-done { margin-top: 14px; font-size: .95rem; font-weight: 800; color: var(--color-ink); }
         .qz-sub { display: block; margin-top: 8px; font-size: .78rem; font-weight: 600; color: var(--color-ink-3); line-height: 1.5; }
-        .qz-row { display: flex; gap: 8px; align-items: stretch; margin-top: 14px; }
-        .qz-ghost { flex-shrink: 0; border: 1.5px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink-2); border-radius: 12px; padding: 0 14px; font-size: .82rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .qz-row { display: flex; gap: 8px; align-items: stretch; margin-top: 12px; }
         .qz-btn { width: 100%; margin-top: 14px; border: none; border-radius: 12px; padding: 13px; background: var(--color-primary); color: #fff; font-size: .92rem; font-weight: 800; cursor: pointer; font-family: inherit; }
-        .qz-btn.flex { flex: 1; width: auto; margin-top: 0; }
+        .qz-btn.flex2 { width: auto; margin-top: 0; flex-shrink: 0; padding: 12px 16px; }
         .qz-btn:disabled { opacity: .55; }
-        .qz-mic { flex: 1; border: none; border-radius: 12px; padding: 14px; background: var(--color-primary); color: #fff; font-size: .95rem; font-weight: 800; cursor: pointer; font-family: inherit; }
-        .qz-mic.on { background: var(--color-danger); animation: qzpulse 1s ease-in-out infinite; }
-        .qz-mic:disabled { opacity: .6; }
-        @keyframes qzpulse { 0%,100% { opacity: 1; } 50% { opacity: .72; } }
-        .qz-rechint { margin-top: 8px; font-size: .76rem; font-weight: 700; color: var(--color-danger); }
-        .qz-linkbtn { margin-left: 8px; border: none; background: none; color: var(--color-primary); font-weight: 800; font-size: .8rem; cursor: pointer; font-family: inherit; text-decoration: underline; }
-        .qz-typerow { display: flex; gap: 8px; align-items: stretch; margin-top: 10px; }
-        .qz-typerow .qz-input { margin-top: 0; }
       `}</style>
     </div>
   );
