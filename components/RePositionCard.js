@@ -17,6 +17,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}`);
 const signed = (n) => (n == null ? "-" : `${n >= 0 ? "+" : ""}${Number(n).toFixed(1)}`);
 
+// [동일단지 별칭] 실거래는 나뉘어 있으나 같은 아파트로 취급 — 대장(시범삼성)과 시범한신은 하나로.
+const COMPLEX_ALIAS = { "시범삼성": "시범삼성·한신", "시범한신": "시범삼성·한신" };
+const canon = (n) => COMPLEX_ALIAS[n] || n;
+
 // 최소자승 선형회귀: xs/ys 같은 길이 배열 → {slope, intercept} | null(표본 부족)
 function linreg(xs, ys) {
   const n = xs.length;
@@ -79,10 +83,17 @@ function TargetList({ rows, onSelect, selected }) {
   const [connPath, setConnPath] = useState("");
   const [box, setBox] = useState({ w: 0, h: 0 });
 
-  const max = useMemo(() => {
-    if (!rows.length) return 1;
-    return Math.max(...rows.map((r) => Math.max(r.value, r.target != null ? r.target : r.value))) * 1.14;
+  // [차이 강조] baseline을 0이 아니라 최저값 아래로 내려, 단지 간 가격차를 크게 보이게(사용자 요청).
+  const { lo, hi } = useMemo(() => {
+    const vals = [];
+    rows.forEach((r) => { if (r.value != null) vals.push(r.value); if (r.target != null) vals.push(r.target); });
+    if (!vals.length) return { lo: 0, hi: 1 };
+    const mn = Math.min(...vals), mx = Math.max(...vals);
+    const span = mx - mn;
+    if (span < mx * 0.03) return { lo: Math.max(0, mx * 0.6), hi: mx * 1.08 };
+    return { lo: Math.max(0, mn - span * 0.55), hi: mx + span * 0.12 };
   }, [rows]);
+  const scale = (v) => (v == null ? 0 : Math.max(3, Math.min(100, ((v - lo) / (hi - lo)) * 100)));
 
   useEffect(() => {
     const measure = () => {
@@ -93,7 +104,7 @@ function TargetList({ rows, onSelect, selected }) {
         const trackEl = rowRefs.current[i];
         if (!trackEl) return null;
         const tr = trackEl.getBoundingClientRect();
-        const tpct = r.isLeader ? (r.value / max) * 100 : (r.target / max) * 100;
+        const tpct = scale(r.isLeader ? r.value : r.target);
         const xLoc = (tr.left - wrapRect.left) + tr.width * (tpct / 100);
         return {
           x: xLoc,
@@ -118,13 +129,14 @@ function TargetList({ rows, onSelect, selected }) {
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [rows, max]);
+  }, [rows, lo, hi]);
 
   return (
     <div className="rp-wrap" ref={wrapRef}>
       {rows.map((r, i) => {
-        const diff = r.isLeader ? 0 : r.value - r.target;
-        const pct = (r.value / max) * 100;
+        const diff = r.isLeader || r.target == null ? null : Math.round((r.value - r.target) * 10) / 10;
+        const diffPct = !r.isLeader && r.target ? Math.round((r.value / r.target - 1) * 1000) / 10 : null;
+        const pct = scale(r.value);
         const clickable = !r.isLeader && !!onSelect;
         return (
           <div
@@ -142,9 +154,9 @@ function TargetList({ rows, onSelect, selected }) {
               </div>
               {r.isLeader ? (
                 <div className="rp-badge">기준</div>
-              ) : (
-                <div className={`rp-gap ${diff < 0 ? "under" : "over"}`}>{signed(diff)}억</div>
-              )}
+              ) : diff != null ? (
+                <div className={`rp-gap ${diff < 0 ? "under" : "over"}`}>{signed(diff)}억<em>{diffPct >= 0 ? "+" : ""}{diffPct}%</em></div>
+              ) : null}
             </div>
           </div>
         );
@@ -168,7 +180,8 @@ function TargetList({ rows, onSelect, selected }) {
         .rp-val { font-size: 0.66rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; margin-left: 8px; white-space: nowrap; }
         .rp-fill.me .rp-val, .rp-fill.leader .rp-val { color: #fff; }
         .rp-badge { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 0.6rem; font-weight: 800; color: var(--color-warning-ink, var(--color-warning)); background: var(--color-card); border: 1px solid var(--color-warning); border-radius: 999px; padding: 1px 7px; }
-        .rp-gap { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 0.64rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .rp-gap { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 0.66rem; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; line-height: 1.15; }
+        .rp-gap em { font-style: normal; font-weight: 700; font-size: 0.56rem; display: block; opacity: .82; }
         .rp-gap.under { color: var(--color-success); }
         .rp-gap.over { color: var(--color-danger); }
         .rp-row.clickable { cursor: pointer; }
@@ -292,11 +305,16 @@ function RatioTrendChart({ leaderName, subjectName, leaderSeries, subjectSeries 
 // const REGION_WATCHLIST = ["정자동", "판교동", "대치동", "반포동", "압구정동", "도곡동"];
 
 // ── 🎯 히어로: 내 단지 84㎡ 현재가 vs 적정가 갭(크게, 자꾸 보게) + 대장 대비 + 내 실제 평형 ──
-function GapHero({ myName, cur84, fair84, leader84, leaderName, area, userAvm }) {
+function GapHero({ myName, cur84, fair84, leader84, leaderName, amLeader, area, userAvm }) {
   if (cur84 == null) return null;
-  const scaleMax = Math.max(cur84, fair84 || 0, leader84 || 0) * 1.18 || 1;
-  const pct = (v) => `${Math.max(2, Math.min(100, (v / scaleMax) * 100))}%`;
+  // [갭 강조] 스케일을 현재가·적정가 주변으로 좁혀(baseline 0 아님) 차이를 크게 보이게.
+  const vals = [cur84, fair84].filter((v) => v != null);
+  const mn = Math.min(...vals), mx = Math.max(...vals);
+  const span = mx - mn || mx * 0.1;
+  const lo = Math.max(0, mn - span * 1.1), hi = mx + span * 1.1;
+  const pct = (v) => `${Math.max(3, Math.min(97, ((v - lo) / (hi - lo)) * 100))}%`;
   const gap = fair84 != null ? Math.round((cur84 - fair84) * 10) / 10 : null; // +고평가 / −저평가
+  const gapPct = fair84 ? Math.round((cur84 / fair84 - 1) * 1000) / 10 : null;
   const over = gap != null && gap > 0;
   const vsLeader = leader84 != null ? Math.round((cur84 - leader84) * 10) / 10 : null;
   return (
@@ -308,8 +326,8 @@ function GapHero({ myName, cur84, fair84, leader84, leaderName, area, userAvm })
         </div>
         {gap != null && (
           <div className={`gh-verdict ${over ? "over" : "under"}`}>
-            <b>{over ? "고평가" : "저평가"}</b>
-            <span>적정가 {signed(gap)}억</span>
+            <b>{over ? "▲ 고평가" : "▼ 저평가"}</b>
+            <span>적정가 {signed(gap)}억 ({gapPct >= 0 ? "+" : ""}{gapPct}%)</span>
           </div>
         )}
       </div>
@@ -318,7 +336,9 @@ function GapHero({ myName, cur84, fair84, leader84, leaderName, area, userAvm })
         {fair84 != null && <div className="gh-fair" style={{ left: pct(fair84) }}><i /><span>적정 {uk(fair84)}</span></div>}
       </div>
       <div className="gh-lines">
-        {vsLeader != null && (
+        {amLeader ? (
+          <span className="gh-line">🏆 <b>이 동네(서현동) 대장 단지</b>입니다 (시범삼성·한신 = 동일 단지)</span>
+        ) : vsLeader != null && (
           <span className="gh-line">🏆 대장 <b>{leaderName}</b> 84㎡ {uk(leader84)}억 대비 <b className={vsLeader > 0 ? "hi" : "lo"}>{signed(vsLeader)}억</b></span>
         )}
         {area && (
@@ -371,24 +391,34 @@ export default function RePositionCard({ brief, myProp, dongOf, userAvm = null }
       const sameDong = pool.filter((r) => dongOf(r.단지명) === myDong);
       if (sameDong.length >= 2) pool = sameDong; // 같은 동 표본 부족하면 지역 전체로 폴백
     }
+    const leaderCanon = canon(leader);
+    // [동일단지 병합] 대장(시범삼성)과 별칭 단지(시범한신)는 같은 아파트 → 84㎡가를 평균내 한 행으로.
+    const aliased = pool.filter((r) => canon(r.단지명) === leaderCanon);
+    const lvals = [brief.leader_84 != null ? brief.leader_84 : brief.leader_price,
+                   ...aliased.map((r) => (r.cur84 != null ? r.cur84 : r.cur))].filter((v) => v != null);
+    const leaderVal = lvals.length ? Math.round((lvals.reduce((a, b) => a + b, 0) / lvals.length) * 100) / 100 : null;
+    const iOwnLeader = myProp?.name ? canon(myProp.name) === leaderCanon : false;
+
+    const val = (r) => (r.cur84 != null ? r.cur84 : r.cur);
     const rows = pool
-      .filter((r) => r.pred != null && r.cur != null)
-      .sort((a, b) => (a.lag ?? 99) - (b.lag ?? 99))
+      .filter((r) => canon(r.단지명) !== leaderCanon && val(r) != null)
+      .sort((a, b) => val(b) - val(a)) // 국민평형 84㎡ 가격 높은 순(가격 위계)
       .slice(0, 6)
       .map((r) => {
-        // [가격기준 통일] 막대=국민평형 84㎡ 실거래가(cur84). 없으면 전체평균(cur)로 폴백.
-        //   적정가 마커=cur84 × (pred/cur) — 대장 대비 회귀 괴리율(gap)을 84㎡ 스케일로 유지.
-        const v = r.cur84 != null ? r.cur84 : r.cur;
-        const ratio = r.cur ? r.pred / r.cur : 1;
-        const tgt = Math.round(v * ratio * 100) / 100;
+        const v = val(r);
+        // [적정가] 84㎡ 전용 회귀(pred84) 우선. 없으면 blended 괴리로 폴백, 최종은 현재가.
+        const tgt = r.pred84 != null ? r.pred84
+          : (r.cur ? Math.round(v * (r.pred / r.cur) * 100) / 100 : v);
         return {
           name: r.단지명, value: v, target: tgt,
-          isMe: r.단지명 === myProp?.name,
-          distLabel: r.lag === 0 ? "동조(0개월)" : r.lag != null ? `${r.lag}개월 지연` : null,
+          isMe: myProp?.name ? canon(r.단지명) === canon(myProp.name) : false,
+          distLabel: leaderVal != null ? `대장 ${signed(v - leaderVal)}억` : null,
         };
       });
-    const leaderVal = brief.leader_84 != null ? brief.leader_84 : brief.leader_price;
-    return [{ name: leader, value: leaderVal, isLeader: true, distLabel: "대장 기준" }, ...rows];
+    return [{
+      name: leaderCanon, value: leaderVal, isLeader: true, isMe: iOwnLeader,
+      distLabel: iOwnLeader ? "내 단지 · 대장" : "대장 기준",
+    }, ...rows];
   }, [brief, myDong, myProp?.name, dongOf, leader]);
 
   // [히어로] 내 단지 84㎡ 갭 요약 데이터
@@ -452,10 +482,14 @@ export default function RePositionCard({ brief, myProp, dongOf, userAvm = null }
   if (!brief || brief.error || !leader) return null;
   if (!neighborRows.length) return null;
 
-  // 히어로 입력 — 내 단지 84㎡ 현재가/적정가(=cur84×pred/cur, 대장 회귀 괴리 유지)/대장 84㎡
+  // 히어로 입력 — 내 단지 84㎡ 현재가 / 적정가(84㎡ 전용 회귀 pred84) / 대장 84㎡
   const heroCur84 = myRankRow ? (myRankRow.cur84 != null ? myRankRow.cur84 : myRankRow.cur) : null;
-  const heroFair84 = (myRankRow && myRankRow.cur) ? Math.round(heroCur84 * (myRankRow.pred / myRankRow.cur) * 100) / 100 : null;
+  const heroFair84 = myRankRow
+    ? (myRankRow.pred84 != null ? myRankRow.pred84
+       : (myRankRow.cur ? Math.round(heroCur84 * (myRankRow.pred / myRankRow.cur) * 100) / 100 : null))
+    : null;
   const heroLeader84 = brief.leader_84 != null ? brief.leader_84 : brief.leader_price;
+  const amLeader = myProp?.name ? canon(myProp.name) === canon(leader) : false;
 
   return (
     <section className="card rp-card">
@@ -464,13 +498,13 @@ export default function RePositionCard({ brief, myProp, dongOf, userAvm = null }
 
       {myProp?.name && heroCur84 != null && (
         <GapHero
-          myName={myProp.name} cur84={heroCur84} fair84={heroFair84}
-          leader84={heroLeader84} leaderName={leader} area={myArea} userAvm={userAvm}
+          myName={amLeader ? canon(leader) : myProp.name} cur84={heroCur84} fair84={heroFair84}
+          leader84={heroLeader84} leaderName={leader} amLeader={amLeader} area={myArea} userAvm={userAvm}
         />
       )}
 
       <h3 className="rp-sub-title">🏘 동네 비교 <span className="rp-mini">국민평형 84㎡ 기준</span></h3>
-      <p className="rp-card-sub">대장이 맨 위, 아래로 대장과 가격이 함께 움직이는 정도(동조 개월수)순. 막대=국민평형 84㎡ 실거래가, 세로 점선=대장 대비 적정가, 사선=단지 간 연결. 단지를 누르면 아래 평형별로 바뀝니다.</p>
+      <p className="rp-card-sub">대장이 맨 위, 아래로 <b>국민평형 84㎡ 실거래가 높은 순</b>. 막대=현재가, 세로 점선=84㎡ 회귀 적정가, 오른쪽=적정가 대비 갭(억·%). 단지를 누르면 아래 평형별로 바뀝니다.</p>
       <TargetList rows={neighborRows} onSelect={setSelected} selected={selected} />
 
       <h3 className="rp-sub-title">📐 {selected || myProp?.name || ""} 평형별 적정가</h3>
