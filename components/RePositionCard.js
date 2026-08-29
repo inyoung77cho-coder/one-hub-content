@@ -116,18 +116,20 @@ function TargetList({ rows, onSelect, selected }) {
         const left = tr.left - wrapRect.left;
         const xLoc = left + tr.width * (tpct / 100);
         return {
-          x: xLoc, left,
+          x: xLoc, left, fillW: tr.width * (scale(r.value) / 100),
           yTop: tr.top - wrapRect.top,
           yBot: (tr.top - wrapRect.top) + tr.height,
           yMid: (tr.top - wrapRect.top) + tr.height / 2,
         };
       }).filter(Boolean);
       if (!pts.length) return;
-      // [물결] 확대(baseline≠0)일 때 각 막대 시작부에 축 끊김 물결 — 정직하게 '0부터 아님' 표시.
+      // [물결] 확대(baseline≠0)일 때 각 막대 '중앙'에 축 끊김 물결 — 정직하게 '0부터 아님' 표시(가격 글자와 겹치지 않게 중앙).
       let waveD = "";
       if (truncated) {
         pts.forEach((p) => {
-          const xw = p.left + 9, y0 = p.yTop + 3, y1 = p.yBot - 3, seg = (y1 - y0) / 3;
+          let xw = p.left + Math.max(p.fillW * 0.5, 48);
+          xw = Math.min(xw, p.left + Math.max(16, p.fillW - 8));
+          const y0 = p.yTop + 3, y1 = p.yBot - 3, seg = (y1 - y0) / 3;
           let d = `M ${xw},${y0}`;
           for (let s = 0; s < 3; s++) {
             const a = y0 + seg * s, b = a + seg, dir = s % 2 === 0 ? 3.2 : -3.2;
@@ -521,7 +523,7 @@ export default function RePositionCard({ brief, myProp, dongOf, userAvm = null }
       )}
 
       <h3 className="rp-sub-title">🏘 동네 비교 <span className="rp-mini">국민평형 84㎡ 기준</span></h3>
-      <p className="rp-card-sub">대장이 맨 위, 아래로 <b>국민평형 84㎡ 실거래가 높은 순</b>. 막대=현재가, 세로 점선=84㎡ 회귀 적정가, 오른쪽=적정가 대비 갭(억·%). 막대 앞 <b>물결〰=0부터가 아니라 확대</b>(차이를 잘 보이게). 단지를 누르면 아래 평형별로 바뀝니다.</p>
+      <p className="rp-card-sub">대장이 맨 위, 아래로 <b>국민평형 84㎡ 실거래가 높은 순</b>. 막대=현재가, 세로 점선=84㎡ 회귀 적정가, 오른쪽=적정가 대비 갭(억·%). 막대 중앙 <b>물결〰=0부터가 아니라 확대</b>(차이를 잘 보이게). 단지를 누르면 아래 평형별로 바뀝니다.</p>
       <TargetList rows={neighborRows} onSelect={setSelected} selected={selected} />
 
       <h3 className="rp-sub-title">📐 {selected || myProp?.name || ""} 평형별 적정가</h3>
@@ -565,60 +567,35 @@ export function RegionLeadersCard({ myRegion = "서현동" }) {
   if (items == null) return null;              // 로딩 중
   if (!items.length) return null;              // 배치 미실행/데이터 없음 → 조용히 숨김
 
-  const top = Math.max(...items.map((x) => x.price84_uk || 0)) * 1.1 || 1;
-  const tierColor = (t) => (t === "상위" ? "var(--color-danger)" : t === "하위" ? "var(--color-ink-3)" : "var(--color-primary)");
+  // [카드1과 동일 형식] TargetList 재사용 — 막대=현재 84㎡, 세로 점선=3년 후 예측가(추세지속).
+  const rows = items
+    .slice()
+    .sort((a, b) => (b.price84_uk || 0) - (a.price84_uk || 0))
+    .map((x) => {
+      const f = buildForecast(x, 3);
+      const tgt = f.fc.length ? f.fc[f.fc.length - 1].mid : x.price84_uk;
+      return {
+        name: `${x.dong} · ${x.leader}`,
+        value: x.price84_uk,
+        target: Math.round(tgt * 100) / 100,
+        isMe: x.dong === myRegion,
+        distLabel: x.tier,
+      };
+    });
 
   return (
     <section className="card rl-card">
       <span className="rl-label">동네 대장 비교</span>
       <h2 className="rl-title">🏙 동네별 대장 아파트 <span className="rl-mini">국민평형 84㎡ · 주간 갱신</span></h2>
-      <p className="rl-sub">내 동네(서현동) 대장이 상위(강남)·하위 동네 대장과 어디쯤 있는지. 매주 실거래로 대장을 다시 뽑아 사전 계산합니다{updated ? ` (기준 ${updated})` : ""}.</p>
-
-      <div className="rl-list">
-        {items.map((x) => {
-          const isMine = x.dong === myRegion;
-          const pct = Math.max(4, Math.min(100, (x.price84_uk / top) * 100));
-          const vsMine = (() => {
-            const mine = items.find((y) => y.dong === myRegion);
-            return mine && !isMine ? Math.round((x.price84_uk - mine.price84_uk) * 10) / 10 : null;
-          })();
-          return (
-            <div className={`rl-row${isMine ? " mine" : ""}`} key={x.dong}>
-              <div className="rl-head">
-                <span className="rl-tier" style={{ color: tierColor(x.tier), borderColor: tierColor(x.tier) }}>{x.tier}</span>
-                <span className="rl-dong">{x.dong}{isMine ? " · 내 동네" : ""}</span>
-                <span className="rl-apt">{x.leader}</span>
-              </div>
-              <div className="rl-track">
-                <div className={`rl-fill${isMine ? " mine" : ""}`} style={{ width: `${pct}%` }}>
-                  <span className="rl-val">{uk(x.price84_uk)}억</span>
-                </div>
-                {vsMine != null && <span className={`rl-vs ${vsMine > 0 ? "hi" : "lo"}`}>{signed(vsMine)}억</span>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
+      <p className="rl-sub">막대=현재가, 세로 점선=<b>3년 후 예측가</b>(추세지속), 오른쪽=예측 대비 갭(− 이면 예측보다 낮음 = 상승 여력). 매주 실거래로 대장을 다시 뽑아 사전 계산{updated ? ` (기준 ${updated})` : ""}.</p>
+      <TargetList rows={rows} />
       <style jsx>{`
         .rl-card { background: var(--color-card); border-radius: var(--radius-card, 16px); padding: 16px 15px 15px; box-shadow: var(--shadow-card); margin-bottom: 12px; }
         .rl-label { display: block; font-size: 0.68rem; font-weight: 800; color: var(--color-ink-3); letter-spacing: .3px; text-transform: uppercase; margin-bottom: 2px; }
         .rl-title { font-size: 0.98rem; font-weight: 800; color: var(--color-ink); margin: 0 0 4px; }
         .rl-mini { font-size: 0.62rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 7px; margin-left: 5px; vertical-align: middle; }
         .rl-sub { font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; margin: 0 0 12px; word-break: keep-all; }
-        .rl-list { display: flex; flex-direction: column; gap: 12px; }
-        .rl-row.mine { background: var(--color-primary-soft); border-radius: 10px; padding: 6px 8px; margin: -2px -4px; }
-        .rl-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
-        .rl-tier { font-size: 0.6rem; font-weight: 800; border: 1px solid; border-radius: 999px; padding: 0 6px; }
-        .rl-dong { font-size: 0.78rem; font-weight: 800; color: var(--color-ink); }
-        .rl-apt { font-size: 0.68rem; font-weight: 600; color: var(--color-ink-3); margin-left: auto; }
-        .rl-track { position: relative; height: 24px; background: var(--color-card-soft); border-radius: 6px; }
-        .rl-fill { height: 100%; border-radius: 6px; background: color-mix(in srgb, var(--color-ink-3) 45%, var(--color-line)); display: flex; align-items: center; transition: width .4s cubic-bezier(.2,.8,.2,1); }
-        .rl-fill.mine { background: var(--color-primary); }
-        .rl-val { font-size: 0.68rem; font-weight: 800; color: var(--color-ink); margin-left: 8px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-        .rl-fill.mine .rl-val { color: #fff; }
-        .rl-vs { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); font-size: 0.64rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-        .rl-vs.hi { color: var(--color-danger); } .rl-vs.lo { color: var(--color-success); }
+        .rl-sub b { color: var(--color-primary); }
       `}</style>
     </section>
   );
