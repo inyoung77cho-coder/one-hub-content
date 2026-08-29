@@ -11,6 +11,7 @@ const ENDPOINTS = {
   lesson: (q) => `/english/lesson/${encodeURIComponent(q.id || "")}`,
   "weekly-review": (q) => `/english/weekly-review${qs(q, ["language"])}`,
   "speak-timed": (q) => `/english/speak-timed${qs(q, ["text", "language"])}`, // [Live] 단어 타이밍(카라오케)
+  "live-videos": () => `/english/live-videos`, // [Live] 생활영어 유튜브 채널 최신 영상
 };
 
 function qs(query, allowed) {

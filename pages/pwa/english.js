@@ -342,11 +342,12 @@ function Karaoke({ text, lang, onActive, onClear }) {
 
 function LiveEnglish({ lang }) {
   const [exprs, setExprs] = useState(null);
-  const [video, setVideo] = useState(null);
+  const [videos, setVideos] = useState([]);
+  const [vidIdx, setVidIdx] = useState(0);
   const [cap, setCap] = useState(null); // 영상 위 자막 {words, idx}
   useEffect(() => {
     let alive = true;
-    setExprs(null); setVideo(null); setCap(null);
+    setExprs(null); setVideos([]); setVidIdx(0); setCap(null);
     // [재미있는 생활영어] 이디엄(생활영어) 표현 우선 + 주간 표현 보강 — 경제 지문 대신 회화 표현.
     Promise.all([
       fetch(`/api/english/lessons?medium=idiom&language=${lang}&limit=7`).then((r) => r.json()).catch(() => ({ items: [] })),
@@ -365,29 +366,37 @@ function LiveEnglish({ lang }) {
       }).slice(0, 15);
       setExprs(all);
     });
-    // 영상은 오늘의 영어 유튜브 레슨(엔진). 없으면 플레이스홀더.
-    fetch(`/api/english/today?medium=video&language=${lang}`).then((r) => r.json())
-      .then((d) => { const v = (d.items || []).find((x) => x.video_id); if (alive) setVideo(v || null); })
+    // [재미있는 생활영어 유튜브] 큐레이션 채널(BBC Learning English·Vanessa·TV Series 등) 최신 영상.
+    fetch(`/api/english/live-videos`).then((r) => r.json())
+      .then((d) => { if (alive) setVideos((d.items || []).filter((x) => x.video_id)); })
       .catch(() => {});
     return () => { alive = false; };
   }, [lang]);
 
   if (exprs == null) return <div className="en-state">불러오는 중…</div>;
+  const video = videos[vidIdx] || null;
   return (
     <div className="live">
       <div className="live-intro">🎬 <b>Live English</b> — 영상 위에 표현 <b>자막이 얹히고</b>, 발음에 맞춰 <b>단어가 하이라이트</b>됩니다. 경제 밖 <b>재미있는 생활영어</b> 표현으로 따라 읽어요.</div>
       <div className="live-vid">
         {video?.video_id
-          ? <iframe src={`https://www.youtube.com/embed/${video.video_id}`} title={video.title_en || "video"}
+          ? <iframe src={`https://www.youtube.com/embed/${video.video_id}`} title={video.title || "video"}
               allow="accelerometer; encrypted-media; picture-in-picture" allowFullScreen loading="lazy" />
-          : <div className="live-vph">🎬 오늘의 영상 준비 중</div>}
+          : <div className="live-vph">🎬 생활영어 영상 불러오는 중…</div>}
         {cap && cap.words.length > 0 && (
           <div className="live-cap">
             {cap.words.map((w, i) => <span key={i} className={i === cap.idx ? "on" : ""}>{w} </span>)}
           </div>
         )}
       </div>
-      {video && <div className="live-vcap">▶ {video.title_ko || video.title_en}</div>}
+      {video && (
+        <div className="live-vcap">
+          <span className="live-vtitle">▶ {video.channel} · {video.title}</span>
+          {videos.length > 1 && (
+            <button type="button" className="live-next" onClick={() => { setCap(null); setVidIdx((i) => (i + 1) % videos.length); }}>다른 영상 →</button>
+          )}
+        </div>
+      )}
       {!exprs.length ? (
         <div className="en-state">표현이 아직 없어요. 이디엄 탭에서 학습하면 여기에 모입니다.</div>
       ) : exprs.map((e, i) => (
@@ -408,7 +417,9 @@ function LiveEnglish({ lang }) {
         .live-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 14px 14px; background: linear-gradient(transparent, rgba(0,0,0,.82)); color: #fff; font-size: 1.2rem; font-weight: 800; line-height: 1.4; text-align: center; pointer-events: none; }
         .live-cap span { padding: 0 1px; border-radius: 4px; transition: color .1s, background .1s; }
         .live-cap span.on { color: #191600; background: #ffd54a; }
-        .live-vcap { font-size: .74rem; font-weight: 700; color: var(--color-ink-2); padding: 8px 12px; background: var(--color-card); border-radius: 10px; }
+        .live-vcap { display: flex; align-items: center; gap: 8px; font-size: .74rem; font-weight: 700; color: var(--color-ink-2); padding: 8px 12px; background: var(--color-card); border-radius: 10px; }
+        .live-vtitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .live-next { flex-shrink: 0; border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-primary); border-radius: 8px; padding: 5px 9px; font-size: .7rem; font-weight: 800; cursor: pointer; font-family: inherit; }
         .live-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 16px; padding: 18px 16px; box-shadow: var(--shadow-card); }
         .live-mean { margin-top: 12px; font-size: .82rem; color: var(--color-ink-2); word-break: keep-all; }
         .live-mean b { color: var(--color-primary); font-weight: 800; }
