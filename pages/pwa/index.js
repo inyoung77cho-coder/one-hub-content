@@ -20,6 +20,7 @@ import SampleSizeBadge from '../../components/SampleSizeBadge';
 import AppHeader from '../../components/AppHeader';
 import TraderBadge from '../../components/shared/TraderBadge';
 import BottomNav from '../../components/BottomNav';
+import ReTodaySection from '../../components/ReTodaySection';
 import { getStockHoldings, removeStock, buyStock } from '../../lib/stockHoldings';
 import { fetchStockQuotes, fetchStockQuote } from '../../lib/stockLive';
 import { getKrxSession } from '../../lib/marketHours';
@@ -1437,6 +1438,9 @@ export default function PWADashboard({ latestReport }) {
                   </>
                 );
               })()}
+
+              {/* [Card5 이동] 오늘의 부동산 — 시황·최근 실거래·매매 입력(분석은 /pwa/realestate) */}
+              <ReTodaySection />
 
               {/* [브리핑] ③ 오늘의 브리핑 · 판단 근거 — 상단 '판단·액션'과 다른 '근거'를 제시.
                     경제지표 + 부동산 신고가·실거래 + 내 자산 활동(실데이터만, 허위 헤드라인 금지) */}

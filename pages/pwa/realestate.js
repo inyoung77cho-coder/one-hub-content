@@ -23,7 +23,7 @@ export default function RealEstateDashboard() {
   const [macro, setMacro] = useState(null);
   const [weekly, setWeekly] = useState(null); // [2026-08-22] 주간 전파·예측 리포트(다음주 시나리오 + 단지별 예측)
   const [feed, setFeed] = useState(null); // [v11 #16] 최근 실거래 피드
-  const [showToday, setShowToday] = useState(false); // [Card5] 시황·실거래·시장예상을 '오늘의 부동산'으로 분리(기본 접힘)
+  const showToday = false; // [Card5] 시황·실거래·시장예상·입력은 '오늘'(홈)으로 이동 → 이 페이지에선 렌더 안 함(링크만)
   const [err, setErr] = useState(null);
   const [myC, setMyC] = useState("");   // [S5] 내 단지
   const [tgtC, setTgtC] = useState(""); // [S5] 갈아탈 목표 단지
@@ -339,14 +339,11 @@ export default function RealEstateDashboard() {
         <MoveScenarioCard brief={brief} myProp={myProp} dongOf={dongOf} userAvm={userAvm} />
       )}
 
-      {/* [Card5] 오늘의 부동산 토글 — 시황·실거래·시장예상은 분석 페이지에서 접고, 여기서 펼쳐 봄 */}
-      <button
-        onClick={() => setShowToday((v) => !v)}
-        style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, margin: "2px 0 12px", padding: "13px 15px", border: "1px solid var(--color-line)", borderRadius: 14, background: showToday ? "var(--color-primary-soft)" : "var(--color-card)", color: "var(--color-ink)", fontFamily: "inherit", fontSize: "0.86rem", fontWeight: 800, cursor: "pointer" }}
-      >
-        <span>📅 오늘의 부동산 <span style={{ fontWeight: 600, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>시황 · 최근 실거래 · 시장 예상</span></span>
-        <span style={{ color: "var(--color-primary)", fontSize: "0.8rem" }}>{showToday ? "접기 ▲" : "펼치기 ▼"}</span>
-      </button>
+      {/* [Card5] 시황·실거래·시장예상·매매입력은 '오늘'(홈)의 오늘의 부동산으로 이동. 여기선 링크만. */}
+      <a href="/pwa" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, margin: "2px 0 12px", padding: "13px 15px", border: "1px solid var(--color-line)", borderRadius: 14, background: "var(--color-card)", color: "var(--color-ink)", fontSize: "0.86rem", fontWeight: 800, textDecoration: "none" }}>
+        <span>📅 오늘의 부동산 <span style={{ fontWeight: 600, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>시황 · 최근 실거래 · 매매 입력</span></span>
+        <span style={{ color: "var(--color-primary)", fontSize: "0.8rem" }}>홈에서 보기 →</span>
+      </a>
 
       {/* 1) HERO — 시장 브리핑 (다른 페이지와 통일된 라이트 카드) */}
       {showToday && (
