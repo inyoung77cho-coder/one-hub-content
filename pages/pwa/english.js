@@ -10,11 +10,12 @@ const TABS = [
   ["news", "📰", "뉴스"],
   ["video", "▶️", "영상"],
   ["idiom", "💬", "이디엄"],
+  ["live", "🎬", "라이브"],
   ["review", "📝", "주간복습"],
 ];
 // 중국어 모드에서 탭 글자를 중국어로 — "생활중국어"(4글자)처럼 길어지면 그 버튼만
 // box 가 커져 나머지 탭과 크기가 안 맞는다. 전부 한자 2글자로 맞춰 폭을 통일한다.
-const TABS_ZH_LABEL = { news: "新闻", video: "视频", idiom: "口语", review: "复习" };
+const TABS_ZH_LABEL = { news: "新闻", video: "视频", idiom: "口语", live: "现场", review: "复习" };
 const LANGS = [
   ["en", "🇬🇧", "영어"],
   ["zh", "🇨🇳", "중국어"],
@@ -284,6 +285,108 @@ function WeeklyReview({ weekly, lang }) {
   );
 }
 
+// [Live English] 큰 자막 + 단어 카라오케 — /speak-timed 의 단어 타이밍으로 재생에 맞춰 하이라이트.
+function Karaoke({ text, lang }) {
+  const [marks, setMarks] = useState(null);      // null=미로딩, []=경계없음
+  const [idx, setIdx] = useState(-1);
+  const [loading, setLoading] = useState(false);
+  const audioRef = useRef(null);
+  const words = String(text || "").trim().split(/\s+/);
+  // 오디오는 기존 /speak(같은 text·voice → 동일 합성), 타이밍은 /speak-timed 마크로.
+  const audioSrc = `/api/english/speak?text=${encodeURIComponent(text)}&language=${lang}`;
+
+  const play = async () => {
+    if (marks == null) {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/english/speak-timed?text=${encodeURIComponent(text)}&language=${lang}`);
+        const d = await r.json();
+        setMarks(Array.isArray(d.marks) ? d.marks : []);
+      } catch (e) { setMarks([]); }
+      setLoading(false);
+    }
+    setIdx(-1);
+    try { audioRef.current.currentTime = 0; await audioRef.current.play(); } catch (e) {}
+  };
+  const onTime = () => {
+    const t = (audioRef.current?.currentTime || 0) * 1000;
+    const m = marks || [];
+    let i = -1;
+    for (let k = 0; k < m.length; k++) { if (t + 60 >= m[k].t) i = k; else break; }
+    setIdx(i);
+  };
+  return (
+    <div className="ka">
+      <div className="ka-text">
+        {words.map((w, i) => <span key={i} className={i === idx ? "on" : ""}>{w} </span>)}
+      </div>
+      <button type="button" className="ka-play" onClick={play} disabled={loading}>
+        {loading ? "준비 중…" : "▶ 자막 따라 듣기"}
+      </button>
+      <audio ref={audioRef} src={audioSrc} onTimeUpdate={onTime} onEnded={() => setIdx(-1)} preload="none" />
+      <style jsx>{`
+        .ka { }
+        .ka-text { font-size: 1.5rem; font-weight: 800; line-height: 1.5; color: var(--color-ink); letter-spacing: -.01em; }
+        .ka-text span { transition: color .1s, background .1s; padding: 0 1px; border-radius: 4px; }
+        .ka-text span.on { color: #fff; background: var(--color-primary); }
+        .ka-play { margin-top: 10px; border: none; border-radius: 10px; padding: 9px 16px; background: var(--color-primary-soft); color: var(--color-primary); font-weight: 800; font-size: .82rem; cursor: pointer; font-family: inherit; }
+        .ka-play:disabled { opacity: .6; }
+      `}</style>
+    </div>
+  );
+}
+
+function LiveEnglish({ lang }) {
+  const [exprs, setExprs] = useState(null);
+  const [video, setVideo] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    setExprs(null); setVideo(null);
+    fetch(`/api/english/weekly-review?language=${lang}`).then((r) => r.json())
+      .then((d) => { if (alive) setExprs((d.expressions || []).filter((e) => e.example_en).slice(0, 12)); })
+      .catch(() => alive && setExprs([]));
+    fetch(`/api/english/today?medium=video&language=${lang}`).then((r) => r.json())
+      .then((d) => { const v = (d.items || []).find((x) => x.video_id); if (alive) setVideo(v || null); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [lang]);
+
+  if (exprs == null) return <div className="en-state">불러오는 중…</div>;
+  return (
+    <div className="live">
+      <div className="live-intro">🎬 <b>Live English</b> — 영상으로 몰입하고, 표현을 큰 자막으로 <b>단어별 따라 읽기</b>. 자막을 누르면 발음에 맞춰 단어가 하이라이트됩니다.</div>
+      {video?.video_id && (
+        <div className="live-vid">
+          <iframe src={`https://www.youtube.com/embed/${video.video_id}`} title={video.title_en || "video"}
+            allow="accelerometer; encrypted-media; picture-in-picture" allowFullScreen loading="lazy" />
+          <div className="live-vcap">▶ {video.title_ko || video.title_en}</div>
+        </div>
+      )}
+      {!exprs.length ? (
+        <div className="en-state">이번 주 표현이 아직 없어요. 뉴스·이디엄 탭에서 학습하면 여기에 모입니다.</div>
+      ) : exprs.map((e, i) => (
+        <div className="live-card" key={i}>
+          <Karaoke text={e.example_en} lang={lang} />
+          <div className="live-mean"><b>{e.expr}</b> — {e.meaning_ko}</div>
+          {e.example_ko && <div className="live-ko">{e.example_ko}</div>}
+        </div>
+      ))}
+      <style jsx>{`
+        .live { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px 20px; }
+        .live-intro { font-size: .78rem; color: var(--color-ink-2); line-height: 1.6; background: var(--color-card-soft); border-radius: 12px; padding: 12px 14px; word-break: keep-all; }
+        .live-intro b { color: var(--color-primary); }
+        .live-vid { border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-card); }
+        .live-vid iframe { width: 100%; aspect-ratio: 16/9; border: 0; display: block; }
+        .live-vcap { font-size: .74rem; font-weight: 700; color: var(--color-ink-2); padding: 8px 12px; background: var(--color-card); }
+        .live-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 16px; padding: 18px 16px; box-shadow: var(--shadow-card); }
+        .live-mean { margin-top: 12px; font-size: .82rem; color: var(--color-ink-2); word-break: keep-all; }
+        .live-mean b { color: var(--color-primary); font-weight: 800; }
+        .live-ko { margin-top: 4px; font-size: .78rem; color: var(--color-ink-3); }
+      `}</style>
+    </div>
+  );
+}
+
 export default function EnglishPage() {
   const [lang, setLang] = useState("en");
   const [tab, setTab] = useState("news");
@@ -303,6 +406,7 @@ export default function EnglishPage() {
         .catch(() => alive && setWeekly({ loading: false, data: { expressions: [], words: [] } }));
       return () => { alive = false; };
     }
+    if (tab === "live") { return () => { alive = false; }; } // LiveEnglish가 자체 로드
     setFeed({ loading: true, date: null, items: [], error: null });
     setPast({ open: false, loading: false, items: [] });
     fetch(`/api/english/today?medium=${tab}&language=${lang}`)
@@ -372,7 +476,15 @@ export default function EnglishPage() {
         ))}
       </div>
 
-      {tab === "review" ? (
+      {[0, 6].includes(new Date().getDay()) && tab !== "review" && tab !== "live" && (
+        <button type="button" className="en-weekend" onClick={() => setTab("review")}>
+          📚 주말은 새 학습 대신 <b>이번 주 복습</b> — 눌러서 주간 복습 보기 →
+        </button>
+      )}
+
+      {tab === "live" ? (
+        <LiveEnglish lang={lang} />
+      ) : tab === "review" ? (
         <WeeklyReview weekly={weekly} lang={lang} />
       ) : feed.loading ? (
         <div className="en-state">불러오는 중…</div>
@@ -394,7 +506,7 @@ export default function EnglishPage() {
         </>
       )}
 
-      {tab !== "review" && (
+      {tab !== "review" && tab !== "live" && (
       <button type="button" className="en-past" onClick={loadPast}>
         {past.open ? "지난 학습 접기" : "지난 학습 보기"}
       </button>
@@ -440,6 +552,8 @@ export default function EnglishPage() {
         .en-state { font-size: .85rem; color: var(--color-ink-2); text-align: center; padding: 32px 8px; line-height: 1.7; }
         .en-err { font-size: .72rem; color: var(--color-ink-3); margin-top: 6px; }
         .en-past { width: 100%; margin-top: 16px; padding: 11px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .82rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .en-weekend { width: 100%; margin: 4px 0 10px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--color-primary-soft); background: var(--color-primary-soft); color: var(--color-ink); font-size: .8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); text-align: left; }
+        .en-weekend b { color: var(--color-primary); }
         .en-foot { font-size: .72rem; color: var(--color-ink-3); text-align: center; margin-top: 18px; line-height: 1.6; word-break: keep-all; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>

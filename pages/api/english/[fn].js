@@ -10,6 +10,7 @@ const ENDPOINTS = {
   lessons: (q) => `/english/lessons${qs(q, ["medium", "track", "language", "limit", "before"])}`,
   lesson: (q) => `/english/lesson/${encodeURIComponent(q.id || "")}`,
   "weekly-review": (q) => `/english/weekly-review${qs(q, ["language"])}`,
+  "speak-timed": (q) => `/english/speak-timed${qs(q, ["text", "language"])}`, // [Live] 단어 타이밍(카라오케)
 };
 
 function qs(query, allowed) {
