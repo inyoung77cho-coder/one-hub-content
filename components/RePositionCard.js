@@ -14,7 +14,7 @@
 //      기준(대장 중의 대장)으로 삼아 ①과 같은 방식(세로 점선 틱 + 사선 연결)으로 비교(사용자 지시).
 import { useEffect, useMemo, useRef, useState } from "react";
 
-const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}`);
+const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(1)}`);      // 억, 소수점 1자리 통일
 const signed = (n) => (n == null ? "-" : `${n >= 0 ? "+" : ""}${Number(n).toFixed(1)}`);
 
 // [동일단지 별칭] 실거래는 나뉘어 있으나 같은 아파트로 취급 — 대장(시범삼성)과 시범한신은 하나로.
@@ -430,16 +430,15 @@ export default function RePositionCard({ brief, myProp, dongOf, userAvm = null }
     const leaderVal = lvals.length ? Math.round((lvals.reduce((a, b) => a + b, 0) / lvals.length) * 100) / 100 : null;
     const iOwnLeader = myProp?.name ? canon(myProp.name) === leaderCanon : false;
 
-    const val = (r) => (r.cur84 != null ? r.cur84 : r.cur);
+    // ★84㎡ 실거래가 있는 단지만(국민평형 비교). 미래타운처럼 84㎡ 없으면 제외 — 오염된 blended 적정가 방지.
     const rows = pool
-      .filter((r) => canon(r.단지명) !== leaderCanon && val(r) != null)
-      .sort((a, b) => val(b) - val(a)) // 국민평형 84㎡ 가격 높은 순(가격 위계)
+      .filter((r) => canon(r.단지명) !== leaderCanon && r.cur84 != null)
+      .sort((a, b) => b.cur84 - a.cur84) // 84㎡ 가격 높은 순(가격 위계)
       .slice(0, 6)
       .map((r) => {
-        const v = val(r);
-        // [적정가] 84㎡ 전용 회귀(pred84) 우선. 없으면 blended 괴리로 폴백, 최종은 현재가.
-        const tgt = r.pred84 != null ? r.pred84
-          : (r.cur ? Math.round(v * (r.pred / r.cur) * 100) / 100 : v);
+        const v = r.cur84;
+        // [적정가] 84㎡ 전용 회귀(pred84)만. 없으면 적정=현재(오염된 blended 폴백 안 씀).
+        const tgt = r.pred84 != null ? r.pred84 : v;
         return {
           name: r.단지명, value: v, target: tgt,
           isMe: myProp?.name ? canon(r.단지명) === canon(myProp.name) : false,
@@ -522,9 +521,9 @@ export default function RePositionCard({ brief, myProp, dongOf, userAvm = null }
         />
       )}
 
-      <h3 className="rp-sub-title">🏘 동네 비교 <span className="rp-mini">국민평형 84㎡ 기준</span></h3>
-      <p className="rp-card-sub">대장이 맨 위, 아래로 <b>국민평형 84㎡ 실거래가 높은 순</b>. 막대=현재가, 세로 점선=84㎡ 회귀 적정가, 오른쪽=적정가 대비 갭(억·%). 막대 중앙 <b>물결〰=0부터가 아니라 확대</b>(차이를 잘 보이게). 단지를 누르면 아래 평형별로 바뀝니다.</p>
+      <h3 className="rp-sub-title">🏘 동네 비교 <span className="rp-mini">84㎡ 기준</span></h3>
       <TargetList rows={neighborRows} onSelect={setSelected} selected={selected} />
+      <p className="rp-note">막대=현재가 · 점선=적정가 · 물결〰=확대(0부터 아님) · 단지 눌러 평형별 보기</p>
 
       <h3 className="rp-sub-title">📐 {selected || myProp?.name || ""} 평형별 적정가</h3>
       <AreaStepChart areas={selected ? dbAreas[selected] : null} myPyeongM2={selected === myProp?.name ? myProp?.pyeong : null} />
@@ -535,6 +534,7 @@ export default function RePositionCard({ brief, myProp, dongOf, userAvm = null }
         .rp-card-title { font-size: 0.98rem; font-weight: 800; color: var(--color-ink); margin: 0 0 4px; }
         .rp-badge-note { font-size: 0.62rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 7px; margin-left: 5px; vertical-align: middle; }
         .rp-card-sub { font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; margin: 0 0 12px; word-break: keep-all; }
+        .rp-note { font-size: 0.62rem; color: var(--color-ink-3); margin: 6px 0 0; text-align: center; word-break: keep-all; }
         .rp-sub-title { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); margin: 16px 0 8px; }
         .rp-mini { font-size: 0.62rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 7px; margin-left: 5px; vertical-align: middle; }
         .rp-more { margin-top: 14px; border-top: 1px solid var(--color-line); padding-top: 8px; }
@@ -588,8 +588,8 @@ export function RegionLeadersCard({ myRegion = "서현동" }) {
     <section className="card rl-card">
       <span className="rl-label">동네 대장 비교</span>
       <h2 className="rl-title">🏙 동네별 대장 아파트 <span className="rl-mini">국민평형 84㎡ · 주간 갱신</span></h2>
-      <p className="rl-sub">막대=현재가, 세로 점선=<b>적정가</b>(동네 <b>평균</b> 가격 추세 기준·최고가 아님), 오른쪽=적정가 대비 갭(− 저평가/+ 고평가). 매주 실거래로 대장·추세를 다시 계산{updated ? ` (기준 ${updated})` : ""}.</p>
       <TargetList rows={rows} />
+      <p className="rl-note">막대=현재가 · 점선=적정가(동네 평균 추세) · 갭 −저평가/+고평가{updated ? ` · ${updated}` : ""}</p>
       <style jsx>{`
         .rl-card { background: var(--color-card); border-radius: var(--radius-card, 16px); padding: 16px 15px 15px; box-shadow: var(--shadow-card); margin-bottom: 12px; }
         .rl-label { display: block; font-size: 0.68rem; font-weight: 800; color: var(--color-ink-3); letter-spacing: .3px; text-transform: uppercase; margin-bottom: 2px; }
@@ -597,6 +597,7 @@ export function RegionLeadersCard({ myRegion = "서현동" }) {
         .rl-mini { font-size: 0.62rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 7px; margin-left: 5px; vertical-align: middle; }
         .rl-sub { font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; margin: 0 0 12px; word-break: keep-all; }
         .rl-sub b { color: var(--color-primary); }
+        .rl-note { font-size: 0.62rem; color: var(--color-ink-3); margin: 6px 0 0; text-align: center; word-break: keep-all; }
       `}</style>
     </section>
   );
@@ -625,19 +626,20 @@ function buildForecast(item, horizon = 3) {
 function ForecastChart({ item }) {
   const f = buildForecast(item, 5);
   if (!f.hist.length) return <div style={{ fontSize: "0.72rem", color: "var(--color-ink-3)", padding: "10px" }}>이력 데이터가 아직 부족합니다.</div>;
-  const hist = f.hist.slice(-7);
+  const hist = f.hist.slice(-5);
   const bars = [
     ...hist.map((hh) => ({ year: hh.year, kind: "hist", v: hh.uk })),
     ...f.fc.map((p) => ({ year: p.year, kind: "fc", lo: p.lo, mid: p.mid, hi: p.hi })),
   ];
-  const w = 340, h = 165, padL = 8, padR = 8, padT = 12, padB = 22;
+  const w = 340, h = 178, padL = 8, padR = 8, padT = 20, padB = 18;
   const iw = w - padL - padR, ih = h - padT - padB;
   const n = bars.length;
-  const bw = (iw / n) * 0.6;
+  const bw = (iw / n) * 0.58;
   const X = (i) => padL + (iw / n) * (i + 0.5);
-  const top = Math.max(...hist.map((hh) => hh.uk), ...f.fc.map((p) => p.hi)) * 1.06 || 1;
+  const top = Math.max(...hist.map((hh) => hh.uk), ...f.fc.map((p) => p.hi)) * 1.1 || 1;
   const Y = (v) => padT + ih - (v / top) * ih;
   const baseY = padT + ih;
+  const d1 = (v) => Number(v).toFixed(1);
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="fc-svg">
       <line x1={padL} x2={w - padR} y1={baseY} y2={baseY} stroke="var(--color-line)" strokeWidth="1" />
@@ -648,20 +650,21 @@ function ForecastChart({ item }) {
           return (
             <g key={i}>
               <rect className="fc-bar-hist" x={x0} y={y} width={bw} height={Math.max(1, baseY - y)} rx="3" />
-              <text x={cx} y={h - 7} textAnchor="middle" fontSize="7.5" fontWeight="600" fill="var(--color-ink-3)">'{String(b.year).slice(2)}</text>
+              <text x={cx} y={y - 3} textAnchor="middle" fontSize="7" fontWeight="700" fill="var(--color-ink-2)">{d1(b.v)}</text>
+              <text x={cx} y={h - 5} textAnchor="middle" fontSize="7" fontWeight="600" fill="var(--color-ink-3)">'{String(b.year).slice(2)}</text>
             </g>
           );
         }
         const yLo = Y(b.lo), yHi = Y(b.hi), yMid = Y(b.mid);
         return (
           <g key={i}>
-            {/* 보수(lo)까지 진한 파랑 */}
             <rect className="fc-bar-base" x={x0} y={yLo} width={bw} height={Math.max(1, baseY - yLo)} rx="3" />
-            {/* 보수~낙관 범위는 연한색 */}
             <rect className="fc-bar-range" x={x0} y={yHi} width={bw} height={Math.max(1, yLo - yHi)} rx="2" />
-            {/* 추세지속(mid) 점선 */}
             <line x1={x0} x2={x0 + bw} y1={yMid} y2={yMid} className="fc-mid" />
-            <text x={cx} y={h - 7} textAnchor="middle" fontSize="7.5" fontWeight="700" fill="var(--color-primary)">'{String(b.year).slice(2)}</text>
+            {/* 낙관(hi) 위 · 보수(lo) 경계 — 년도별 금액(1자리) */}
+            <text x={cx} y={yHi - 3} textAnchor="middle" fontSize="7" fontWeight="800" fill="var(--color-primary)">{d1(b.hi)}</text>
+            <text x={cx} y={yLo - 2.5} textAnchor="middle" fontSize="6.5" fontWeight="700" fill="var(--color-ink-3)">{d1(b.lo)}</text>
+            <text x={cx} y={h - 5} textAnchor="middle" fontSize="7" fontWeight="700" fill="var(--color-primary)">'{String(b.year).slice(2)}</text>
           </g>
         );
       })}
@@ -672,6 +675,45 @@ function ForecastChart({ item }) {
         .fc-bar-range { fill: var(--color-primary); opacity: .26; }
         .fc-mid { stroke: var(--color-primary); stroke-width: 1.6; stroke-dasharray: 3,2; }
       `}</style>
+    </svg>
+  );
+}
+
+// [Card3 #3] 동네별 '격차 변화' 미니 그래프 — 각 동네의 서현 대비 격차(현재 → 5년후)를
+//   가로 점-선으로. 좁아지면 초록, 벌어지면 빨강. 텍스트 대신 한눈에.
+function GapDeltaChart({ items, mineDong, H }) {
+  const mine = items.find((x) => x.dong === mineDong) || items.find((x) => x.tier === "기준");
+  if (!mine) return null;
+  const mineF = buildForecast(mine, H);
+  const rows = items.filter((x) => x.dong !== mineDong).map((x) => {
+    const f = buildForecast(x, H);
+    return { dong: x.dong, now: (x.price84_uk - mine.price84_uk), fut: (f.fc[H - 1].mid - mineF.fc[H - 1].mid) };
+  });
+  if (!rows.length) return null;
+  const maxAbs = Math.max(1, ...rows.flatMap((r) => [Math.abs(r.now), Math.abs(r.fut)]));
+  const w = 340, rowH = 26, padL = 66, padR = 30, h = rows.length * rowH + 10;
+  const midX = padL + (w - padL - padR) / 2;
+  const scale = (v) => midX + (v / maxAbs) * ((w - padL - padR) / 2) * 0.92;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="gd-svg">
+      <line x1={midX} x2={midX} y1={4} y2={h - 4} stroke="var(--color-line)" strokeWidth="1" strokeDasharray="2,2" />
+      <text x={midX} y={h - 1} textAnchor="middle" fontSize="6.5" fill="var(--color-ink-3)">동일</text>
+      {rows.map((r, i) => {
+        const y = 8 + i * rowH + rowH / 2;
+        const xN = scale(r.now), xF = scale(r.fut);
+        const narrow = Math.abs(r.fut) < Math.abs(r.now);
+        const col = narrow ? "var(--color-success)" : "var(--color-danger)";
+        return (
+          <g key={r.dong}>
+            <text x={padL - 6} y={y + 3} textAnchor="end" fontSize="8" fontWeight="700" fill="var(--color-ink-2)">{r.dong}</text>
+            <line x1={xN} x2={xF} y1={y} y2={y} stroke={col} strokeWidth="2" strokeLinecap="round" />
+            <circle cx={xN} cy={y} r="3" fill="var(--color-ink-3)" />
+            <circle cx={xF} cy={y} r="3.5" fill={col} />
+            <text x={xF + (r.fut >= 0 ? 6 : -6)} y={y + 3} textAnchor={r.fut >= 0 ? "start" : "end"} fontSize="7" fontWeight="800" fill={col}>{signed(r.fut)}</text>
+          </g>
+        );
+      })}
+      <style jsx>{`.gd-svg { width: 100%; display: block; overflow: visible; }`}</style>
     </svg>
   );
 }
@@ -698,38 +740,23 @@ export function RegionForecastCard({ myRegion = "서현동" }) {
     <section className="card fc-card">
       <span className="fc-label">가격 추세 · 예측</span>
       <h2 className="fc-title">🔮 {mine.dong} 대장 {mine.leader} <span className="fc-mini">시나리오 · 예측 아님</span></h2>
-      <p className="fc-sub">국민평형 84㎡ 연도별 실거래(회색 막대)와 향후 5년 예측 막대 — 진한색=보수, <b>연한색=보수~낙관 범위</b>, 점선=추세지속. CAGR {pct(mine.cagr5)}(5년)·{pct(mine.cagr10)}(10년) 기반 — 부동산은 불확실하니 참고용입니다.</p>
       <ForecastChart item={mine} />
       <div className="fc-legend">
         <span className="li"><i className="hist" />실거래</span>
         <span className="li"><i className="base" />보수</span>
-        <span className="li"><i className="range" />보수~낙관 범위</span>
-        <span className="li"><i className="mid" />추세지속</span>
+        <span className="li"><i className="range" />낙관</span>
+        <span className="li"><i className="mid" />추세</span>
       </div>
       <div className="fc-callouts">
-        <div className="fc-c"><span className="k">현재 84㎡</span><span className="v">{uk(mineF.base)}억</span></div>
-        <div className="fc-c"><span className="k">5년 후(추세지속)</span><span className="v">{uk(p5m.mid)}억</span></div>
-        <div className="fc-c"><span className="k">범위(보수~낙관)</span><span className="v">{uk(p5m.lo)}~{uk(p5m.hi)}</span></div>
+        <div className="fc-c"><span className="k">현재</span><span className="v">{uk(mineF.base)}</span></div>
+        <div className="fc-c"><span className="k">5년(추세)</span><span className="v">{uk(p5m.mid)}</span></div>
+        <div className="fc-c"><span className="k">보수~낙관</span><span className="v">{uk(p5m.lo)}~{uk(p5m.hi)}</span></div>
       </div>
+      <p className="fc-note">단위 억 · CAGR {pct(mine.cagr5)} 기반 · 예측 아님(참고)</p>
 
-      <h3 className="fc-h3">동네별 5년 후 예상 &amp; 격차 변화</h3>
-      <div className="fc-rows">
-        {items.map((x) => {
-          const f = buildForecast(x, H); const p5 = f.fc[H - 1];
-          const isMine = x.dong === myRegion;
-          const gapNow = Math.round((x.price84_uk - mine.price84_uk) * 10) / 10;
-          const gap5 = Math.round((p5.mid - p5m.mid) * 10) / 10;
-          const narrowing = Math.abs(gap5) < Math.abs(gapNow);
-          return (
-            <div className={`fc-row${isMine ? " mine" : ""}`} key={x.dong}>
-              <span className="fc-dong"><b>{x.dong}</b> {x.leader}</span>
-              <span className="fc-now">{uk(x.price84_uk)}→{uk(p5.mid)}억</span>
-              {isMine ? <span className="fc-gap base">내 동네 기준</span>
-                : <span className={`fc-gap ${narrowing ? "nar" : "wid"}`}>격차 {signed(gapNow)}→{signed(gap5)} {narrowing ? "↓좁아짐" : "↑벌어짐"}</span>}
-            </div>
-          );
-        })}
-      </div>
+      <h3 className="fc-h3">동네별 격차 변화 <span className="fc-mini">5년 후</span></h3>
+      <GapDeltaChart items={items} mineDong={myRegion} H={H} />
+      <p className="fc-note">회색=현재 격차 · 색점=5년 후(억) · <b className="nar">초록 좁아짐</b>/<b className="wid">빨강 벌어짐</b></p>
 
       <style jsx>{`
         .fc-card { background: var(--color-card); border-radius: var(--radius-card, 16px); padding: 16px 15px 15px; box-shadow: var(--shadow-card); margin-bottom: 12px; }
@@ -750,6 +777,8 @@ export function RegionForecastCard({ myRegion = "서현동" }) {
         .fc-c .k { display: block; font-size: 0.6rem; color: var(--color-ink-3); margin-bottom: 2px; }
         .fc-c .v { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; }
         .fc-h3 { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); margin: 16px 0 8px; }
+        .fc-note { font-size: 0.62rem; color: var(--color-ink-3); margin: 6px 0 0; text-align: center; word-break: keep-all; }
+        .fc-note b.nar { color: var(--color-success); } .fc-note b.wid { color: var(--color-danger); }
         .fc-rows { display: flex; flex-direction: column; gap: 6px; }
         .fc-row { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; padding: 6px 8px; border-radius: 8px; background: var(--color-card-soft); }
         .fc-row.mine { background: var(--color-primary-soft); }
