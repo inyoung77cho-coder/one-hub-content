@@ -361,18 +361,21 @@ function BbcKaraoke() {
     for (let k = 0; k < cues.length; k++) { if (t + 0.05 >= cues[k].t) idx = k; else break; }
     setWi(idx);
   };
-  const start = Math.max(0, (wi < 0 ? 0 : wi) - 5);
-  const win = cues.slice(start, start + 16);
+  const start = Math.max(0, (wi < 0 ? 0 : wi) - 4);
+  const win = cues.slice(start, start + 10);   // 자막 한두 줄만(화면 밖으로 안 나가게)
+  const img = clip.image ? clip.image.replace(/^http:\/\//, "https://") : "";
 
   return (
     <div className="bk">
-      <div className="bk-hd">🎤 <b>BBC 카라오케</b> <span className="bk-sub">The English We Speak</span></div>
+      <div className="bk-hd">🎤 <b>BBC 카라오케</b> <span className="bk-sub">{clip.channel?.replace("BBC · ", "") || ""}</span></div>
       <div className="bk-title">{clip.title}</div>
-      <div className="bk-stage">
-        {win.map((c, k) => {
-          const gi = start + k;
-          return <span key={gi} className={gi === wi ? "on" : gi < wi ? "past" : ""}>{c.w} </span>;
-        })}
+      <div className="bk-stage" style={img ? { backgroundImage: `url(${img})` } : undefined}>
+        <div className="bk-cap">
+          {win.map((c, k) => {
+            const gi = start + k;
+            return <span key={gi} className={gi === wi ? "on" : gi < wi ? "past" : ""}>{c.w} </span>;
+          })}
+        </div>
       </div>
       <audio ref={audioRef} src={`/api${clip.audio_url}`} onTimeUpdate={onTime} onEnded={() => setWi(-1)} controls preload="none" />
       {clip.note && <p className="bk-note">💡 {clip.note}</p>}
@@ -390,11 +393,12 @@ function BbcKaraoke() {
         .bk-hd b { font-weight: 800; }
         .bk-sub { font-size: .7rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 8px; margin-left: 5px; }
         .bk-title { margin-top: 6px; font-size: .82rem; font-weight: 800; color: var(--color-ink-2); }
-        .bk-stage { margin: 12px 0; min-height: 96px; font-size: 1.35rem; font-weight: 800; line-height: 1.55; color: var(--color-ink-3); word-break: keep-all; }
-        .bk-stage span { transition: color .1s, background .1s; padding: 0 1px; border-radius: 4px; }
-        .bk-stage span.past { color: var(--color-ink-2); }
-        .bk-stage span.on { color: #fff; background: var(--color-primary); }
-        .bk audio { width: 100%; display: block; }
+        .bk-stage { position: relative; width: 100%; aspect-ratio: 16 / 9; margin: 12px 0 0; border-radius: 12px; overflow: hidden; background: #0b1220 center / cover no-repeat; display: flex; align-items: flex-end; }
+        .bk-cap { width: 100%; box-sizing: border-box; max-height: 100%; overflow: hidden; padding: 16px 16px 14px; background: linear-gradient(transparent, rgba(0,0,0,.35), rgba(0,0,0,.8)); color: rgba(255,255,255,.9); font-size: 1.12rem; font-weight: 800; line-height: 1.45; text-align: center; overflow-wrap: break-word; word-break: normal; }
+        .bk-cap span { transition: color .1s, background .1s; padding: 0 1px; border-radius: 4px; }
+        .bk-cap span.past { color: rgba(255,255,255,.5); }
+        .bk-cap span.on { color: #191600; background: #ffd54a; }
+        .bk audio { width: 100%; display: block; margin-top: 10px; }
         .bk-note { margin-top: 10px; font-size: .76rem; color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; }
         .bk-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
         .bk-chip { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); border-radius: 999px; padding: 5px 11px; font-size: .72rem; font-weight: 700; cursor: pointer; font-family: inherit; }
