@@ -6,20 +6,22 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 
-const TABS = [
-  ["news", "📰", "뉴스"],
-  ["video", "▶️", "영상"],
-  ["idiom", "💬", "이디엄"],
-  ["live", "🎬", "라이브"],
-  ["review", "📝", "주간복습"],
-];
-// 중국어 모드에서 탭 글자를 중국어로 — "생활중국어"(4글자)처럼 길어지면 그 버튼만
-// box 가 커져 나머지 탭과 크기가 안 맞는다. 전부 한자 2글자로 맞춰 폭을 통일한다.
-const TABS_ZH_LABEL = { news: "新闻", video: "视频", idiom: "口语", live: "现场", review: "复习" };
-const LANGS = [
-  ["en", "🇬🇧", "영어"],
+// 상단 모드 = 경제영어(en) / 중국어(zh) / 라이브영어(live). live는 독립 탭(하위 탭 없음).
+const MODES = [
+  ["en", "💼", "경제영어"],
   ["zh", "🇨🇳", "중국어"],
+  ["live", "🎬", "라이브영어"],
 ];
+// 경제영어·중국어 하위 탭 — 매체 공통, 라벨만 언어별(영어: 뉴스/영상/이디엄, 중국어: 신문/영상/구어).
+const TABS = [
+  ["news", "📰"],
+  ["video", "▶️"],
+  ["idiom", "💬"],
+];
+const TAB_LABEL = {
+  en: { news: "뉴스", video: "영상", idiom: "이디엄" },
+  zh: { news: "신문", video: "영상", idiom: "구어" },
+};
 const TRACK_KO = { economy: "경제", display: "디스플레이", general: "생활영어" };
 const TRACK_KO_ZH = { economy: "경제", display: "디스플레이", general: "생활중국어" };
 const SPEEDS = [0.75, 1, 1.25];
@@ -286,7 +288,7 @@ function WeeklyReview({ weekly, lang }) {
 }
 
 // [Live English] 큰 자막 + 단어 카라오케 — /speak-timed 의 단어 타이밍으로 재생에 맞춰 하이라이트.
-function Karaoke({ text, lang }) {
+function Karaoke({ text, lang, onActive, onClear }) {
   const [marks, setMarks] = useState(null);      // null=미로딩, []=경계없음
   const [idx, setIdx] = useState(-1);
   const [loading, setLoading] = useState(false);
@@ -314,7 +316,9 @@ function Karaoke({ text, lang }) {
     let i = -1;
     for (let k = 0; k < m.length; k++) { if (t + 60 >= m[k].t) i = k; else break; }
     setIdx(i);
+    if (onActive) onActive(words, i);          // 영상 위 자막 오버레이 동기
   };
+  const end = () => { setIdx(-1); if (onClear) onClear(); };
   return (
     <div className="ka">
       <div className="ka-text">
@@ -323,7 +327,7 @@ function Karaoke({ text, lang }) {
       <button type="button" className="ka-play" onClick={play} disabled={loading}>
         {loading ? "준비 중…" : "▶ 자막 따라 듣기"}
       </button>
-      <audio ref={audioRef} src={audioSrc} onTimeUpdate={onTime} onEnded={() => setIdx(-1)} preload="none" />
+      <audio ref={audioRef} src={audioSrc} onTimeUpdate={onTime} onEnded={end} preload="none" />
       <style jsx>{`
         .ka { }
         .ka-text { font-size: 1.5rem; font-weight: 800; line-height: 1.5; color: var(--color-ink); letter-spacing: -.01em; }
@@ -339,12 +343,29 @@ function Karaoke({ text, lang }) {
 function LiveEnglish({ lang }) {
   const [exprs, setExprs] = useState(null);
   const [video, setVideo] = useState(null);
+  const [cap, setCap] = useState(null); // 영상 위 자막 {words, idx}
   useEffect(() => {
     let alive = true;
-    setExprs(null); setVideo(null);
-    fetch(`/api/english/weekly-review?language=${lang}`).then((r) => r.json())
-      .then((d) => { if (alive) setExprs((d.expressions || []).filter((e) => e.example_en).slice(0, 12)); })
-      .catch(() => alive && setExprs([]));
+    setExprs(null); setVideo(null); setCap(null);
+    // [재미있는 생활영어] 이디엄(생활영어) 표현 우선 + 주간 표현 보강 — 경제 지문 대신 회화 표현.
+    Promise.all([
+      fetch(`/api/english/lessons?medium=idiom&language=${lang}&limit=7`).then((r) => r.json()).catch(() => ({ items: [] })),
+      fetch(`/api/english/weekly-review?language=${lang}`).then((r) => r.json()).catch(() => ({ expressions: [] })),
+    ]).then(([idiomD, wk]) => {
+      if (!alive) return;
+      const pool = [
+        ...(idiomD.items || []).flatMap((l) => l.expressions || []),
+        ...(wk.expressions || []),
+      ];
+      const seen = new Set();
+      const all = pool.filter((e) => {
+        const k = (e.example_en || "").trim().toLowerCase();
+        if (!k || seen.has(k)) return false;
+        seen.add(k); return true;
+      }).slice(0, 15);
+      setExprs(all);
+    });
+    // 영상은 오늘의 영어 유튜브 레슨(엔진). 없으면 플레이스홀더.
     fetch(`/api/english/today?medium=video&language=${lang}`).then((r) => r.json())
       .then((d) => { const v = (d.items || []).find((x) => x.video_id); if (alive) setVideo(v || null); })
       .catch(() => {});
@@ -354,19 +375,25 @@ function LiveEnglish({ lang }) {
   if (exprs == null) return <div className="en-state">불러오는 중…</div>;
   return (
     <div className="live">
-      <div className="live-intro">🎬 <b>Live English</b> — 영상으로 몰입하고, 표현을 큰 자막으로 <b>단어별 따라 읽기</b>. 자막을 누르면 발음에 맞춰 단어가 하이라이트됩니다.</div>
-      {video?.video_id && (
-        <div className="live-vid">
-          <iframe src={`https://www.youtube.com/embed/${video.video_id}`} title={video.title_en || "video"}
-            allow="accelerometer; encrypted-media; picture-in-picture" allowFullScreen loading="lazy" />
-          <div className="live-vcap">▶ {video.title_ko || video.title_en}</div>
-        </div>
-      )}
+      <div className="live-intro">🎬 <b>Live English</b> — 영상 위에 표현 <b>자막이 얹히고</b>, 발음에 맞춰 <b>단어가 하이라이트</b>됩니다. 경제 밖 <b>재미있는 생활영어</b> 표현으로 따라 읽어요.</div>
+      <div className="live-vid">
+        {video?.video_id
+          ? <iframe src={`https://www.youtube.com/embed/${video.video_id}`} title={video.title_en || "video"}
+              allow="accelerometer; encrypted-media; picture-in-picture" allowFullScreen loading="lazy" />
+          : <div className="live-vph">🎬 오늘의 영상 준비 중</div>}
+        {cap && cap.words.length > 0 && (
+          <div className="live-cap">
+            {cap.words.map((w, i) => <span key={i} className={i === cap.idx ? "on" : ""}>{w} </span>)}
+          </div>
+        )}
+      </div>
+      {video && <div className="live-vcap">▶ {video.title_ko || video.title_en}</div>}
       {!exprs.length ? (
-        <div className="en-state">이번 주 표현이 아직 없어요. 뉴스·이디엄 탭에서 학습하면 여기에 모입니다.</div>
+        <div className="en-state">표현이 아직 없어요. 이디엄 탭에서 학습하면 여기에 모입니다.</div>
       ) : exprs.map((e, i) => (
         <div className="live-card" key={i}>
-          <Karaoke text={e.example_en} lang={lang} />
+          <Karaoke text={e.example_en} lang={lang}
+            onActive={(w, idx) => setCap({ words: w, idx })} onClear={() => setCap(null)} />
           <div className="live-mean"><b>{e.expr}</b> — {e.meaning_ko}</div>
           {e.example_ko && <div className="live-ko">{e.example_ko}</div>}
         </div>
@@ -375,9 +402,13 @@ function LiveEnglish({ lang }) {
         .live { display: flex; flex-direction: column; gap: 14px; padding: 4px 2px 20px; }
         .live-intro { font-size: .78rem; color: var(--color-ink-2); line-height: 1.6; background: var(--color-card-soft); border-radius: 12px; padding: 12px 14px; word-break: keep-all; }
         .live-intro b { color: var(--color-primary); }
-        .live-vid { border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-card); }
+        .live-vid { position: relative; border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-card); }
         .live-vid iframe { width: 100%; aspect-ratio: 16/9; border: 0; display: block; }
-        .live-vcap { font-size: .74rem; font-weight: 700; color: var(--color-ink-2); padding: 8px 12px; background: var(--color-card); }
+        .live-vph { width: 100%; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; background: var(--color-card-soft); color: var(--color-ink-3); font-size: 1rem; font-weight: 700; }
+        .live-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 14px 14px; background: linear-gradient(transparent, rgba(0,0,0,.82)); color: #fff; font-size: 1.2rem; font-weight: 800; line-height: 1.4; text-align: center; pointer-events: none; }
+        .live-cap span { padding: 0 1px; border-radius: 4px; transition: color .1s, background .1s; }
+        .live-cap span.on { color: #191600; background: #ffd54a; }
+        .live-vcap { font-size: .74rem; font-weight: 700; color: var(--color-ink-2); padding: 8px 12px; background: var(--color-card); border-radius: 10px; }
         .live-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 16px; padding: 18px 16px; box-shadow: var(--shadow-card); }
         .live-mean { margin-top: 12px; font-size: .82rem; color: var(--color-ink-2); word-break: keep-all; }
         .live-mean b { color: var(--color-primary); font-weight: 800; }
@@ -388,38 +419,33 @@ function LiveEnglish({ lang }) {
 }
 
 export default function EnglishPage() {
-  const [lang, setLang] = useState("en");
+  const [mode, setMode] = useState("en");        // en(경제영어) / zh(중국어) / live(라이브영어)
   const [tab, setTab] = useState("news");
-  const [feed, setFeed] = useState({ loading: true, date: null, items: [], error: null });
+  const [feed, setFeed] = useState({ loading: true, date: null, items: [], error: null, review: false });
   const [past, setPast] = useState({ open: false, loading: false, items: [] });
-  const [weekly, setWeekly] = useState({ loading: true, data: null });
 
-  const switchLang = (next) => setLang(next);
+  const lang = mode === "zh" ? "zh" : "en";
+  const isWeekend = [0, 6].includes(new Date().getDay());
 
   useEffect(() => {
+    if (mode === "live") return;                 // LiveEnglish가 자체 로드
     let alive = true;
-    if (tab === "review") {
-      setWeekly({ loading: true, data: null });
-      fetch(`/api/english/weekly-review?language=${lang}`)
-        .then((r) => r.json())
-        .then((d) => { if (alive) setWeekly({ loading: false, data: d }); })
-        .catch(() => alive && setWeekly({ loading: false, data: { expressions: [], words: [] } }));
-      return () => { alive = false; };
-    }
-    if (tab === "live") { return () => { alive = false; }; } // LiveEnglish가 자체 로드
-    setFeed({ loading: true, date: null, items: [], error: null });
+    setFeed({ loading: true, date: null, items: [], error: null, review: false });
     setPast({ open: false, loading: false, items: [] });
-    fetch(`/api/english/today?medium=${tab}&language=${lang}`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (!alive) return;
-        setFeed({ loading: false, date: d.date, items: d.items || [], error: d.error || null });
-      })
-      .catch(() => alive && setFeed({ loading: false, date: null, items: [], error: "연결 실패" }));
-    return () => {
-      alive = false;
-    };
-  }, [tab, lang]);
+    if (isWeekend) {
+      // [주말 복습] 새 콘텐츠 없이 그 주 이 매체 레슨을 복습으로 보여준다(뉴스/영상/이디엄 각각).
+      fetch(`/api/english/lessons?medium=${tab}&language=${lang}&limit=7`)
+        .then((r) => r.json())
+        .then((d) => { if (alive) setFeed({ loading: false, date: null, items: d.items || [], error: d.error || null, review: true }); })
+        .catch(() => alive && setFeed({ loading: false, date: null, items: [], error: "연결 실패", review: true }));
+    } else {
+      fetch(`/api/english/today?medium=${tab}&language=${lang}`)
+        .then((r) => r.json())
+        .then((d) => { if (alive) setFeed({ loading: false, date: d.date, items: d.items || [], error: d.error || null, review: false }); })
+        .catch(() => alive && setFeed({ loading: false, date: null, items: [], error: "연결 실패", review: false }));
+    }
+    return () => { alive = false; };
+  }, [mode, tab, lang, isWeekend]);
 
   const loadPast = () => {
     if (past.open) return setPast((p) => ({ ...p, open: false }));
@@ -438,94 +464,85 @@ export default function EnglishPage() {
     <div className="en pwa-shell">
       <AppHeader />
       <div className="en-hd">
-        <h1>{lang === "zh" ? "🇨🇳 매일 중국어" : "🇬🇧 매일 영어"}</h1>
+        <h1>{mode === "live" ? "🎬 라이브 영어" : mode === "zh" ? "🇨🇳 매일 중국어" : "💼 경제 영어"}</h1>
         <span className="en-sub">
-          {lang === "zh"
-            ? "경제 · 디스플레이 뉴스/영상 + 오늘의 생활중국어(HSK4-5)"
+          {mode === "live"
+            ? "영상 몰입 + 표현 카라오케 — 자막 단어를 발음에 맞춰 따라 읽기"
+            : mode === "zh"
+            ? "경제 · 디스플레이 신문/영상 + 오늘의 구어(HSK4-5)"
             : "경제 · 디스플레이 뉴스/영상 + 오늘의 이디엄"}
         </span>
       </div>
 
       <div className="en-langs" role="tablist">
-        {LANGS.map(([key, ic, label]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={lang === key}
-            className={lang === key ? "on" : ""}
-            onClick={() => switchLang(key)}
-          >
+        {MODES.map(([key, ic, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={mode === key}
+            className={mode === key ? "on" : ""} onClick={() => setMode(key)}>
             <span aria-hidden="true">{ic}</span> {label}
           </button>
         ))}
       </div>
 
-      <div className="en-tabs" role="tablist">
-        {TABS.map(([key, ic, label]) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={tab === key}
-            className={tab === key ? "on" : ""}
-            onClick={() => setTab(key)}
-          >
-            <span aria-hidden="true">{ic}</span> {lang === "zh" ? TABS_ZH_LABEL[key] : label}
-          </button>
-        ))}
-      </div>
-
-      {[0, 6].includes(new Date().getDay()) && tab !== "review" && tab !== "live" && (
-        <button type="button" className="en-weekend" onClick={() => setTab("review")}>
-          📚 주말은 새 학습 대신 <b>이번 주 복습</b> — 눌러서 주간 복습 보기 →
-        </button>
+      {mode !== "live" && (
+        <div className="en-tabs" role="tablist">
+          {TABS.map(([key, ic]) => (
+            <button key={key} type="button" role="tab" aria-selected={tab === key}
+              className={tab === key ? "on" : ""} onClick={() => setTab(key)}>
+              <span aria-hidden="true">{ic}</span> {TAB_LABEL[lang][key]}
+            </button>
+          ))}
+        </div>
       )}
 
-      {tab === "live" ? (
-        <LiveEnglish lang={lang} />
-      ) : tab === "review" ? (
-        <WeeklyReview weekly={weekly} lang={lang} />
-      ) : feed.loading ? (
-        <div className="en-state">불러오는 중…</div>
-      ) : feed.items.length === 0 ? (
-        <div className="en-state">
-          아직 준비된 학습이 없어요.
-          <br />
-          매일 아침 6시에 새 레슨이 올라옵니다.
-          {feed.error && <div className="en-err">({feed.error})</div>}
-        </div>
+      {mode === "live" ? (
+        <LiveEnglish lang="en" />
       ) : (
         <>
-          <div className="en-date">{fmtDate(feed.date)}</div>
-          <div className="en-list">
-            {feed.items.map((l) => (
-              <LessonCard key={l.id} lesson={l} lang={lang} />
-            ))}
-          </div>
-        </>
-      )}
-
-      {tab !== "review" && tab !== "live" && (
-      <button type="button" className="en-past" onClick={loadPast}>
-        {past.open ? "지난 학습 접기" : "지난 학습 보기"}
-      </button>
-      )}
-      {tab !== "review" && past.open && (
-        <div className="en-list">
-          {past.loading ? (
-            <div className="en-state">불러오는 중…</div>
-          ) : past.items.length === 0 ? (
-            <div className="en-state">지난 학습이 없습니다.</div>
-          ) : (
-            past.items.map((l) => (
-              <div key={l.id}>
-                <div className="en-pastdate">{fmtDate(l.lesson_date)}</div>
-                <LessonCard lesson={l} lang={lang} />
-              </div>
-            ))
+          {feed.review && (
+            <div className="en-review-hd">📚 주말 <b>이번 주 복습</b> · {TAB_LABEL[lang][tab]} — 주말엔 새 학습 대신 이번 주 것을 다시 봐요.</div>
           )}
-        </div>
+          {feed.loading ? (
+            <div className="en-state">불러오는 중…</div>
+          ) : feed.items.length === 0 ? (
+            <div className="en-state">
+              {feed.review ? "이번 주 학습이 아직 없어요." : <>아직 준비된 학습이 없어요.<br />매일 아침 6시에 새 레슨이 올라옵니다.</>}
+              {feed.error && <div className="en-err">({feed.error})</div>}
+            </div>
+          ) : (
+            <>
+              {!feed.review && <div className="en-date">{fmtDate(feed.date)}</div>}
+              <div className="en-list">
+                {feed.items.map((l) => (
+                  feed.review
+                    ? <div key={l.id}><div className="en-pastdate">{fmtDate(l.lesson_date)}</div><LessonCard lesson={l} lang={lang} /></div>
+                    : <LessonCard key={l.id} lesson={l} lang={lang} />
+                ))}
+              </div>
+            </>
+          )}
+
+          {!feed.review && (
+            <button type="button" className="en-past" onClick={loadPast}>
+              {past.open ? "지난 학습 접기" : "지난 학습 보기"}
+            </button>
+          )}
+          {!feed.review && past.open && (
+            <div className="en-list">
+              {past.loading ? (
+                <div className="en-state">불러오는 중…</div>
+              ) : past.items.length === 0 ? (
+                <div className="en-state">지난 학습이 없습니다.</div>
+              ) : (
+                past.items.map((l) => (
+                  <div key={l.id}>
+                    <div className="en-pastdate">{fmtDate(l.lesson_date)}</div>
+                    <LessonCard lesson={l} lang={lang} />
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </>
       )}
 
       <p className="en-foot">
