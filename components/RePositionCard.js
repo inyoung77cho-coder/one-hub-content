@@ -567,17 +567,18 @@ export function RegionLeadersCard({ myRegion = "서현동" }) {
   if (items == null) return null;              // 로딩 중
   if (!items.length) return null;              // 배치 미실행/데이터 없음 → 조용히 숨김
 
-  // [카드1과 동일 형식] TargetList 재사용 — 막대=현재 84㎡, 세로 점선=3년 후 예측가(추세지속).
+  // [카드1과 동일 형식] TargetList 재사용 — 막대=현재 84㎡, 세로 점선=적정가(동네 평균 가격 추세 기준).
+  //   적정가 = 대장 현재가 × (동네 평균 84㎡ 추세 적정 ÷ 현재 평균) — 최고가 아닌 동네 평균 흐름이 기준.
   const rows = items
     .slice()
     .sort((a, b) => (b.price84_uk || 0) - (a.price84_uk || 0))
     .map((x) => {
-      const f = buildForecast(x, 3);
-      const tgt = f.fc.length ? f.fc[f.fc.length - 1].mid : x.price84_uk;
+      const ratio = x.fair_ratio != null ? x.fair_ratio : 1;
+      const tgt = Math.round(x.price84_uk * ratio * 100) / 100;
       return {
         name: `${x.dong} · ${x.leader}`,
         value: x.price84_uk,
-        target: Math.round(tgt * 100) / 100,
+        target: tgt,
         isMe: x.dong === myRegion,
         distLabel: x.tier,
       };
@@ -587,7 +588,7 @@ export function RegionLeadersCard({ myRegion = "서현동" }) {
     <section className="card rl-card">
       <span className="rl-label">동네 대장 비교</span>
       <h2 className="rl-title">🏙 동네별 대장 아파트 <span className="rl-mini">국민평형 84㎡ · 주간 갱신</span></h2>
-      <p className="rl-sub">막대=현재가, 세로 점선=<b>3년 후 예측가</b>(추세지속), 오른쪽=예측 대비 갭(− 이면 예측보다 낮음 = 상승 여력). 매주 실거래로 대장을 다시 뽑아 사전 계산{updated ? ` (기준 ${updated})` : ""}.</p>
+      <p className="rl-sub">막대=현재가, 세로 점선=<b>적정가</b>(동네 <b>평균</b> 가격 추세 기준·최고가 아님), 오른쪽=적정가 대비 갭(− 저평가/+ 고평가). 매주 실거래로 대장·추세를 다시 계산{updated ? ` (기준 ${updated})` : ""}.</p>
       <TargetList rows={rows} />
       <style jsx>{`
         .rl-card { background: var(--color-card); border-radius: var(--radius-card, 16px); padding: 16px 15px 15px; box-shadow: var(--shadow-card); margin-bottom: 12px; }
