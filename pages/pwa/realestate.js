@@ -8,7 +8,7 @@ import { dedupBy } from "../../lib/useDedup";
 import { ReForm } from "../../components/shared/AssetForms";
 import Term from "../../components/Term";
 import ReportTeaser from "../../components/ReportTeaser";
-import RePositionCard, { RegionLeadersCard } from "../../components/RePositionCard";
+import RePositionCard, { RegionLeadersCard, RegionForecastCard } from "../../components/RePositionCard";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -326,6 +326,11 @@ export default function RealEstateDashboard() {
       {/* [Card2] 동네별 대장 비교 — 주간 사전선정(region_leaders) 가벼운 읽기 */}
       {myProp?.name && (
         <RegionLeadersCard myRegion={myDong || brief?.region || "서현동"} />
+      )}
+
+      {/* [Card3] 동네별 대장 가격 추세 · 년도별 예측(시나리오 밴드) */}
+      {myProp?.name && (
+        <RegionForecastCard myRegion={myDong || brief?.region || "서현동"} />
       )}
 
       {/* 1) HERO — 시장 브리핑 (다른 페이지와 통일된 라이트 카드) */}

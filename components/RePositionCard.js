@@ -601,3 +601,131 @@ export function RegionLeadersCard({ myRegion = "서현동" }) {
     </section>
   );
 }
+
+// ══════════════════════════════════════════════════════════════════
+//  Card 3 — 동네별 대장 가격 추세 · 년도별 예측(시나리오 밴드)
+//    주간 배치가 넣은 84㎡ 연도별 이력 + CAGR로, 프론트가 향후 3년 밴드를 그린다.
+//    부동산 예측은 불확실 → 점 하나가 아니라 '보수~낙관' 밴드 + '예측 아님' 명시(정직).
+// ══════════════════════════════════════════════════════════════════
+function buildForecast(item, horizon = 3) {
+  const hist = (Array.isArray(item.hist) ? item.hist : []).filter((h) => h && h.uk > 0);
+  const base = hist.length ? hist[hist.length - 1].uk : item.price84_uk;
+  const baseYear = hist.length ? hist[hist.length - 1].year : new Date().getFullYear();
+  const c5 = item.cagr5 != null ? item.cagr5 : (item.cagr10 != null ? item.cagr10 : 0.03);
+  const cMid = c5;
+  const cLo = Math.max(-0.02, c5 * 0.4);              // 보수(상승률 절반 이하)
+  const cHi = Math.max(c5 * 1.5, item.cagr10 != null ? item.cagr10 : c5); // 낙관
+  const fc = [];
+  for (let k = 1; k <= horizon; k++) {
+    fc.push({ year: baseYear + k, lo: base * (1 + cLo) ** k, mid: base * (1 + cMid) ** k, hi: base * (1 + cHi) ** k });
+  }
+  return { hist, base, baseYear, cMid, cLo, cHi, fc };
+}
+
+function ForecastChart({ item }) {
+  const f = buildForecast(item, 3);
+  if (!f.hist.length) return <div style={{ fontSize: "0.72rem", color: "var(--color-ink-3)", padding: "10px" }}>이력 데이터가 아직 부족합니다.</div>;
+  const hist = f.hist.slice(-10);
+  const years = [...hist.map((hh) => hh.year), ...f.fc.map((p) => p.year)];
+  const allV = [...hist.map((hh) => hh.uk), ...f.fc.map((p) => p.hi), ...f.fc.map((p) => p.lo)];
+  const w = 320, h = 150, padL = 8, padR = 8, padT = 10, padB = 20;
+  const iw = w - padL - padR, ih = h - padT - padB;
+  const y0 = years[0], y1 = years[years.length - 1];
+  const lo = Math.min(...allV) * 0.96, hi = Math.max(...allV) * 1.04;
+  const X = (yr) => padL + iw * ((yr - y0) / ((y1 - y0) || 1));
+  const Y = (v) => padT + ih - ((v - lo) / ((hi - lo) || 1)) * ih;
+  const lastH = hist[hist.length - 1];
+  const histPts = hist.map((hh) => `${X(hh.year)},${Y(hh.uk)}`).join(" ");
+  const midPts = [`${X(lastH.year)},${Y(lastH.uk)}`, ...f.fc.map((p) => `${X(p.year)},${Y(p.mid)}`)].join(" ");
+  const band = [
+    `${X(lastH.year)},${Y(lastH.uk)}`,
+    ...f.fc.map((p) => `${X(p.year)},${Y(p.hi)}`),
+    ...f.fc.slice().reverse().map((p) => `${X(p.year)},${Y(p.lo)}`),
+  ].join(" ");
+  const labels = [...hist.filter((_, i) => i % 2 === 0), ...f.fc];
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="fc-svg">
+      <polygon points={band} fill="var(--color-primary-soft)" opacity="0.75" />
+      <polyline points={histPts} fill="none" stroke="var(--color-ink-2)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points={midPts} fill="none" stroke="var(--color-primary)" strokeWidth="2.2" strokeDasharray="5,3.5" strokeLinecap="round" />
+      {labels.map((p, i) => (
+        <text key={i} x={X(p.year)} y={h - 6} textAnchor="middle" fontSize="7.5" fontWeight="600" fill="var(--color-ink-3)">{String(p.year).slice(2)}</text>
+      ))}
+      <style jsx>{`.fc-svg { width: 100%; display: block; overflow: visible; }`}</style>
+    </svg>
+  );
+}
+
+export function RegionForecastCard({ myRegion = "서현동" }) {
+  const [items, setItems] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/pwa/re/regionLeaders`).then((r) => r.json())
+      .then((d) => { if (alive) setItems(Array.isArray(d?.items) ? d.items : []); })
+      .catch(() => { if (alive) setItems([]); });
+    return () => { alive = false; };
+  }, []);
+  if (items == null) return null;
+  const withHist = items.filter((x) => Array.isArray(x.hist) && x.hist.length);
+  if (!withHist.length) return null;
+  const mine = items.find((x) => x.dong === myRegion) || items.find((x) => x.tier === "기준") || items[0];
+  const mineF = buildForecast(mine, 3);
+  const p3m = mineF.fc[2];
+  const pct = (v) => (v == null ? "-" : `${(v * 100).toFixed(1)}%`);
+
+  return (
+    <section className="card fc-card">
+      <span className="fc-label">가격 추세 · 예측</span>
+      <h2 className="fc-title">🔮 {mine.dong} 대장 {mine.leader} <span className="fc-mini">시나리오 · 예측 아님</span></h2>
+      <p className="fc-sub">국민평형 84㎡ 연도별 실거래(회색)와 향후 3년 시나리오 밴드(추세지속=파란 점선, 보수~낙관=음영). CAGR {pct(mine.cagr5)}(5년)·{pct(mine.cagr10)}(10년) 기반 — 부동산은 불확실하니 참고용입니다.</p>
+      <ForecastChart item={mine} />
+      <div className="fc-callouts">
+        <div className="fc-c"><span className="k">현재 84㎡</span><span className="v">{uk(mineF.base)}억</span></div>
+        <div className="fc-c"><span className="k">3년 후(추세지속)</span><span className="v">{uk(p3m.mid)}억</span></div>
+        <div className="fc-c"><span className="k">범위(보수~낙관)</span><span className="v">{uk(p3m.lo)}~{uk(p3m.hi)}</span></div>
+      </div>
+
+      <h3 className="fc-h3">동네별 3년 후 예상 &amp; 격차 변화</h3>
+      <div className="fc-rows">
+        {items.map((x) => {
+          const f = buildForecast(x, 3); const p3 = f.fc[2];
+          const isMine = x.dong === myRegion;
+          const gapNow = Math.round((x.price84_uk - mine.price84_uk) * 10) / 10;
+          const gap3 = Math.round((p3.mid - p3m.mid) * 10) / 10;
+          const narrowing = Math.abs(gap3) < Math.abs(gapNow);
+          return (
+            <div className={`fc-row${isMine ? " mine" : ""}`} key={x.dong}>
+              <span className="fc-dong"><b>{x.dong}</b> {x.leader}</span>
+              <span className="fc-now">{uk(x.price84_uk)}→{uk(p3.mid)}억</span>
+              {isMine ? <span className="fc-gap base">내 동네 기준</span>
+                : <span className={`fc-gap ${narrowing ? "nar" : "wid"}`}>격차 {signed(gapNow)}→{signed(gap3)} {narrowing ? "↓좁아짐" : "↑벌어짐"}</span>}
+            </div>
+          );
+        })}
+      </div>
+
+      <style jsx>{`
+        .fc-card { background: var(--color-card); border-radius: var(--radius-card, 16px); padding: 16px 15px 15px; box-shadow: var(--shadow-card); margin-bottom: 12px; }
+        .fc-label { display: block; font-size: 0.68rem; font-weight: 800; color: var(--color-ink-3); letter-spacing: .3px; text-transform: uppercase; margin-bottom: 2px; }
+        .fc-title { font-size: 0.98rem; font-weight: 800; color: var(--color-ink); margin: 0 0 4px; }
+        .fc-mini { font-size: 0.62rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 7px; margin-left: 5px; vertical-align: middle; }
+        .fc-sub { font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; margin: 0 0 10px; word-break: keep-all; }
+        .fc-callouts { display: flex; gap: 8px; margin-top: 8px; }
+        .fc-c { flex: 1; background: var(--color-card-soft); border-radius: 10px; padding: 8px 10px; text-align: center; }
+        .fc-c .k { display: block; font-size: 0.6rem; color: var(--color-ink-3); margin-bottom: 2px; }
+        .fc-c .v { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+        .fc-h3 { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); margin: 16px 0 8px; }
+        .fc-rows { display: flex; flex-direction: column; gap: 6px; }
+        .fc-row { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; padding: 6px 8px; border-radius: 8px; background: var(--color-card-soft); }
+        .fc-row.mine { background: var(--color-primary-soft); }
+        .fc-dong { flex: 1; color: var(--color-ink-2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .fc-dong b { color: var(--color-ink); font-weight: 800; }
+        .fc-now { font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .fc-gap { font-size: 0.64rem; font-weight: 700; white-space: nowrap; }
+        .fc-gap.nar { color: var(--color-success); }
+        .fc-gap.wid { color: var(--color-danger); }
+        .fc-gap.base { color: var(--color-primary); }
+      `}</style>
+    </section>
+  );
+}
