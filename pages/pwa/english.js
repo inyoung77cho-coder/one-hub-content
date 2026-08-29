@@ -336,6 +336,75 @@ function Karaoke({ text, lang, onActive, onClear }) {
   );
 }
 
+// [진짜 자막 카라오케] BBC 'The English We Speak' 실제 오디오 + Whisper 단어 타임스탬프.
+//   오디오 재생시간에 맞춰 단어를 큰 글씨로 하이라이트(우리가 만든 카라오케). 매일 자동 갱신.
+function BbcKaraoke() {
+  const [clips, setClips] = useState(null);
+  const [ci, setCi] = useState(0);
+  const [wi, setWi] = useState(-1);
+  const audioRef = useRef(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/english/karaoke-clips`).then((r) => r.json())
+      .then((d) => { if (alive) setClips(d.items || []); })
+      .catch(() => alive && setClips([]));
+    return () => { alive = false; };
+  }, []);
+
+  if (clips == null) return <div className="en-state">카라오케 불러오는 중…</div>;
+  if (!clips.length) return <div className="en-state">카라오케 클립이 아직 준비 안 됐어요.</div>;
+  const clip = clips[ci] || clips[0];
+  const cues = clip.cues || [];
+  const onTime = () => {
+    const t = audioRef.current?.currentTime || 0;
+    let idx = -1;
+    for (let k = 0; k < cues.length; k++) { if (t + 0.05 >= cues[k].t) idx = k; else break; }
+    setWi(idx);
+  };
+  const start = Math.max(0, (wi < 0 ? 0 : wi) - 5);
+  const win = cues.slice(start, start + 16);
+
+  return (
+    <div className="bk">
+      <div className="bk-hd">🎤 <b>BBC 카라오케</b> <span className="bk-sub">The English We Speak</span></div>
+      <div className="bk-title">{clip.title}</div>
+      <div className="bk-stage">
+        {win.map((c, k) => {
+          const gi = start + k;
+          return <span key={gi} className={gi === wi ? "on" : gi < wi ? "past" : ""}>{c.w} </span>;
+        })}
+      </div>
+      <audio ref={audioRef} src={`/api${clip.audio_url}`} onTimeUpdate={onTime} onEnded={() => setWi(-1)} controls preload="none" />
+      {clip.note && <p className="bk-note">💡 {clip.note}</p>}
+      {clips.length > 1 && (
+        <div className="bk-chips">
+          {clips.map((c, i) => (
+            <button key={i} type="button" className={`bk-chip${i === ci ? " on" : ""}`} onClick={() => { setCi(i); setWi(-1); }}>{c.title}</button>
+          ))}
+        </div>
+      )}
+      <p className="bk-src">BBC Learning English 실제 오디오 + 자동 단어 동기(매일 갱신)</p>
+      <style jsx>{`
+        .bk { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 16px; padding: 16px 15px 15px; box-shadow: var(--shadow-card); }
+        .bk-hd { font-size: .9rem; color: var(--color-ink); }
+        .bk-hd b { font-weight: 800; }
+        .bk-sub { font-size: .7rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 8px; margin-left: 5px; }
+        .bk-title { margin-top: 6px; font-size: .82rem; font-weight: 800; color: var(--color-ink-2); }
+        .bk-stage { margin: 12px 0; min-height: 96px; font-size: 1.35rem; font-weight: 800; line-height: 1.55; color: var(--color-ink-3); word-break: keep-all; }
+        .bk-stage span { transition: color .1s, background .1s; padding: 0 1px; border-radius: 4px; }
+        .bk-stage span.past { color: var(--color-ink-2); }
+        .bk-stage span.on { color: #fff; background: var(--color-primary); }
+        .bk audio { width: 100%; display: block; }
+        .bk-note { margin-top: 10px; font-size: .76rem; color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; }
+        .bk-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+        .bk-chip { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); border-radius: 999px; padding: 5px 11px; font-size: .72rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .bk-chip.on { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-primary); }
+        .bk-src { margin-top: 10px; font-size: .64rem; color: var(--color-ink-3); }
+      `}</style>
+    </div>
+  );
+}
+
 function LiveEnglish() {
   const [videos, setVideos] = useState(null);
   const [vidIdx, setVidIdx] = useState(0);
@@ -356,6 +425,8 @@ function LiveEnglish() {
 
   return (
     <div className="live">
+      <BbcKaraoke />
+      <div className="live-vhd">🎬 셀럽·BBC 짧은 영상 <span>자막(CC) ON</span></div>
       <div className="live-vid">
         <iframe key={v.video_id} src={src} title={v.title || "video"}
           allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" allowFullScreen loading="lazy" />
@@ -376,6 +447,8 @@ function LiveEnglish() {
       <p className="live-note">셀럽·BBC 짧은 영어 영상. 영상 플레이어의 <b>자막(CC)</b>을 켜면 화면에 자막이 나옵니다.</p>
       <style jsx>{`
         .live { display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 20px; }
+        .live-vhd { font-size: .82rem; font-weight: 800; color: var(--color-ink); margin-top: 4px; }
+        .live-vhd span { font-size: .66rem; font-weight: 600; color: var(--color-ink-3); margin-left: 5px; }
         .live-vid { border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-card); }
         .live-vid iframe { width: 100%; aspect-ratio: 16/9; border: 0; display: block; }
         .live-vcap { display: flex; align-items: center; gap: 8px; font-size: .76rem; font-weight: 700; color: var(--color-ink); padding: 9px 12px; background: var(--color-card); border-radius: 10px; }

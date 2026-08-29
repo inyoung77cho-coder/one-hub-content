@@ -12,6 +12,7 @@ const ENDPOINTS = {
   "weekly-review": (q) => `/english/weekly-review${qs(q, ["language"])}`,
   "speak-timed": (q) => `/english/speak-timed${qs(q, ["text", "language"])}`, // [Live] 단어 타이밍(카라오케)
   "live-videos": () => `/english/live-videos`, // [Live] 생활영어 유튜브 채널 최신 영상
+  "karaoke-clips": () => `/english/karaoke-clips`, // [Live] BBC 카라오케 클립(오디오+단어 타임스탬프)
 };
 
 function qs(query, allowed) {
