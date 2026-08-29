@@ -104,7 +104,14 @@ function TargetList({ rows, onSelect, selected }) {
         const trackEl = rowRefs.current[i];
         if (!trackEl) return null;
         const tr = trackEl.getBoundingClientRect();
-        const tpct = scale(r.isLeader ? r.value : r.target);
+        // [갭 과장] 적정가 틱을 막대 끝(현재가)에서 실제 차이의 3.2배로 밀어 시각적으로 크게 벌린다.
+        //   (억·% 실제값은 배지에 그대로 표기 — 여긴 '차이를 눈에 띄게'만.)
+        let tpct;
+        if (r.isLeader) tpct = scale(r.value);
+        else {
+          const be = scale(r.value), tp = scale(r.target);
+          tpct = Math.max(3, Math.min(99, be + (tp - be) * 3.2));
+        }
         const xLoc = (tr.left - wrapRect.left) + tr.width * (tpct / 100);
         return {
           x: xLoc,
@@ -144,8 +151,8 @@ function TargetList({ rows, onSelect, selected }) {
             key={r.name}
             onClick={clickable ? () => onSelect(r.name) : undefined}
           >
-            <div className="rp-name">
-              <span>{r.name}{r.isMe ? " (내 단지)" : ""}</span>
+            <div className={`rp-name${r.isMe && !r.isLeader ? " mine" : ""}`}>
+              <span>{r.name}</span>
               {r.distLabel && <span className="rp-dist">{r.distLabel}</span>}
             </div>
             <div className="rp-track" ref={(el) => { rowRefs.current[i] = el; }}>
@@ -172,9 +179,10 @@ function TargetList({ rows, onSelect, selected }) {
         .rp-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; position: relative; }
         .rp-name { width: 92px; flex-shrink: 0; font-size: 0.7rem; font-weight: 700; color: var(--color-ink-2); text-align: right; line-height: 1.3; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
         .rp-row.leader .rp-name { color: var(--color-warning-ink, var(--color-warning)); font-weight: 800; }
+        .rp-name.mine { color: var(--color-primary); font-weight: 800; }
         .rp-dist { font-size: 0.6rem; font-weight: 600; color: var(--color-ink-3); }
         .rp-track { flex: 1; height: 24px; background: var(--color-card-soft); border-radius: 6px; position: relative; }
-        .rp-fill { height: 100%; border-radius: 6px; background: var(--color-line); display: flex; align-items: center; transition: width .4s cubic-bezier(.2,.8,.2,1); }
+        .rp-fill { height: 100%; border-radius: 6px; background: color-mix(in srgb, var(--color-ink-3) 45%, var(--color-line)); display: flex; align-items: center; transition: width .4s cubic-bezier(.2,.8,.2,1); }
         .rp-fill.me { background: var(--color-primary); }
         .rp-fill.leader { background: var(--color-warning); }
         .rp-val { font-size: 0.66rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; margin-left: 8px; white-space: nowrap; }
@@ -377,7 +385,6 @@ function GapHero({ myName, cur84, fair84, leader84, leaderName, amLeader, area, 
 export default function RePositionCard({ brief, myProp, dongOf, userAvm = null }) {
   const [dbAreas, setDbAreas] = useState({});
   const [selected, setSelected] = useState(null);
-  const [trendCache, setTrendCache] = useState({});
 
   useEffect(() => { if (myProp?.name) setSelected(myProp.name); }, [myProp?.name]);
 
@@ -417,7 +424,7 @@ export default function RePositionCard({ brief, myProp, dongOf, userAvm = null }
       });
     return [{
       name: leaderCanon, value: leaderVal, isLeader: true, isMe: iOwnLeader,
-      distLabel: iOwnLeader ? "내 단지 · 대장" : "대장 기준",
+      distLabel: "대장",
     }, ...rows];
   }, [brief, myDong, myProp?.name, dongOf, leader]);
 
@@ -449,21 +456,9 @@ export default function RePositionCard({ brief, myProp, dongOf, userAvm = null }
       .catch(() => setDbAreas((m) => ({ ...m, [selected]: null })));
   }, [selected]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ③ 대장·내 단지 20년 월별 시계열
-  useEffect(() => {
-    [[leader, brief?.region], [myProp?.name, brief?.region]].forEach(([apt, region]) => {
-      if (!apt || trendCache[apt] !== undefined) return;
-      setTrendCache((m) => ({ ...m, [apt]: null }));
-      const qs = new URLSearchParams({ apt, months: "240" });
-      if (region) qs.set("region", region);
-      fetch(`/api/pwa/re/trend?${qs}`)
-        .then((r) => r.json())
-        .then((d) => setTrendCache((m) => ({ ...m, [apt]: Array.isArray(d?.series) ? d.series : null })))
-        .catch(() => setTrendCache((m) => ({ ...m, [apt]: null })));
-    });
-  }, [leader, myProp?.name, brief?.region]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // [④ 지역 대장 비교]는 별도 카드(RegionLeadersCard, 주간 사전선정)로 이관됨.
+  // [20년 장기 비율 차트]는 삭제됨 — pred84(국민평형 84㎡ 회귀 적정가)가 대장 대비 적정가를
+  //   더 정확·가볍게 대체하므로 중복. /api/trend 호출도 함께 제거.
+  // [지역 대장 비교]는 별도 카드(RegionLeadersCard, 주간 사전선정)로 이관됨.
 
   // [히어로] 내 실제 평형을 complex-areas에서 매칭(전용㎡ 또는 평 중 가까운 쪽) — 표기/실거래 범위용.
   const myArea = useMemo(() => {
@@ -509,16 +504,6 @@ export default function RePositionCard({ brief, myProp, dongOf, userAvm = null }
 
       <h3 className="rp-sub-title">📐 {selected || myProp?.name || ""} 평형별 적정가</h3>
       <AreaStepChart areas={selected ? dbAreas[selected] : null} myPyeongM2={selected === myProp?.name ? myProp?.pyeong : null} />
-
-      {myProp?.name && leader && (
-        <details className="rp-more">
-          <summary>📈 대장 대비 20년 장기 비율 &amp; 적정가 <span>(자세히)</span></summary>
-          <RatioTrendChart
-            leaderName={leader} subjectName={myProp.name}
-            leaderSeries={trendCache[leader]} subjectSeries={trendCache[myProp.name]}
-          />
-        </details>
-      )}
 
       <style jsx>{`
         .rp-card { background: var(--color-card); border-radius: var(--radius-card, 16px); padding: 16px 15px 15px; box-shadow: var(--shadow-card); margin-bottom: 12px; }
