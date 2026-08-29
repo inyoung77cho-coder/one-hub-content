@@ -489,23 +489,29 @@ const QZ_OPENERS = [
 ];
 
 function WeekendChat({ lang = "en" }) {
-  const [items, setItems] = useState(null);
+  const [items, setItems] = useState(null);  // 이번 주 '미완료' 표현(복습 대상)
+  const [weekTotal, setWeekTotal] = useState(0);
   const [i, setI] = useState(0);
   const [ans, setAns] = useState("");
   const [state, setState] = useState("ask"); // ask | correct
   const [hint, setHint] = useState(0);       // 0 없음 · 1 관련단어 · 2 표현힌트 · 3 정답이디엄
   const [tries, setTries] = useState(0);
   const [score, setScore] = useState(0);
-  const [rec, setRec] = useState("idle");    // idle | recording | thinking(받아쓰는 중)
-  const [recErr, setRecErr] = useState("");
-  const [typeMode, setTypeMode] = useState(false);  // 녹음 불가 시 직접 입력 폴백
   const inputRef = useRef(null);
-  const mrRef = useRef(null);
-  const chunksRef = useRef([]);
-  const streamRef = useRef(null);
+  const allRef = useRef([]);                  // 이번 주 전체('전체 다시 복습'용)
 
-  // 컴포넌트가 사라질 때 마이크 스트림 확실히 정리.
-  useEffect(() => () => { try { streamRef.current && streamRef.current.getTracks().forEach((t) => t.stop()); } catch (e) {} }, []);
+  // 완료 기록(브라우저 localStorage) — 한번 맞힌 표현은 다음 접속 때 제외한다.
+  const DONE_KEY = `onehub_wk_done_${lang}`;
+  const keyOf = (e) => (e.expr || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const loadDone = () => { try { return JSON.parse(localStorage.getItem(DONE_KEY) || "{}") || {}; } catch (e) { return {}; } };
+  const saveDone = (o) => { try { localStorage.setItem(DONE_KEY, JSON.stringify(o)); } catch (e) {} };
+  const markDone = (e) => {
+    const d = loadDone();
+    d[keyOf(e)] = new Date().toISOString().slice(0, 10);
+    const cutoff = Date.now() - 21 * 864e5;   // 21일 지난 기록은 정리(같은 표현이 훗날 다시 나오면 복습되게)
+    Object.keys(d).forEach((k) => { const t = Date.parse(d[k] + "T00:00:00Z"); if (!(t > cutoff)) delete d[k]; });
+    saveDone(d);
+  };
 
   useEffect(() => {
     let alive = true;
@@ -513,17 +519,21 @@ function WeekendChat({ lang = "en" }) {
     fetch(`/api/english/weekly-review?language=${lang}`).then((r) => r.json())
       .then((d) => {
         if (!alive) return;
-        const q = (d.expressions || []).filter((e) => e.expr && e.meaning_ko && e.example_en);
-        setItems(q.slice(0, 10));
-      }).catch(() => alive && setItems([]));
+        const all = (d.expressions || []).filter((e) => e.expr && e.meaning_ko && e.example_en).slice(0, 10);
+        allRef.current = all;
+        setWeekTotal(all.length);
+        const doneMap = loadDone();
+        setItems(all.filter((e) => !doneMap[keyOf(e)]));   // 완료한 건 제외
+      }).catch(() => { if (alive) { setItems([]); setWeekTotal(0); } });
     return () => { alive = false; };
   }, [lang]);
 
   if (items == null) return <div className="en-state">튜터 준비 중…</div>;
-  if (!items.length) return <div className="en-state">이번 주 배운 표현이 아직 없어요.<br />뉴스·이디엄에서 학습하면 주말 대화가 만들어집니다.</div>;
+  if (weekTotal === 0) return <div className="en-state">이번 주 배운 표현이 아직 없어요.<br />뉴스·이디엄에서 학습하면 주말 복습이 만들어집니다.</div>;
 
-  const done = i >= items.length;
-  const cur = done ? null : items[i];
+  const allCleared = items.length === 0;             // 접속 시 이미 전부 완료
+  const finished = !allCleared && i >= items.length; // 이번 세션에서 남은 걸 다 끝냄
+  const cur = allCleared || finished ? null : items[i];
   const opener = QZ_OPENERS[i % QZ_OPENERS.length];
   const speak = (text) => { try { new Audio(`/api/english/speak?text=${encodeURIComponent(text)}&language=en`).play().catch(() => {}); } catch (e) {} };
   const norm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
@@ -533,76 +543,39 @@ function WeekendChat({ lang = "en" }) {
     setAns((a) => (a && !a.endsWith(" ") ? a + " " : a) + chip + " ");
     try { inputRef.current && inputRef.current.focus(); } catch (e) {}
   };
-  const check = (spoken) => {
-    const a = typeof spoken === "string" ? spoken : ans;
-    setAns(a);
-    if (norm(a).includes(norm(cur.expr))) {
+  const check = () => {
+    if (norm(ans).includes(norm(cur.expr))) {
+      markDone(cur);                                  // 완료 기록
       setState("correct"); setScore((s) => s + 1);
       speak("Perfect! That's exactly right. Well done.");
     } else {
       const t = tries + 1; setTries(t);
-      setHint((h) => Math.min(3, Math.max(h, t)));  // 틀릴수록 힌트를 한 단계씩 더 연다
+      setHint((h) => Math.min(3, Math.max(h, t)));    // 틀릴수록 힌트를 한 단계씩 더 연다
     }
   };
-  const resetTurn = () => { setAns(""); setState("ask"); setHint(0); setTries(0); setRec("idle"); setRecErr(""); setTypeMode(false); };
+  const resetTurn = () => { setAns(""); setState("ask"); setHint(0); setTries(0); };
   const next = () => { setI((x) => x + 1); resetTurn(); };
-  const restart = () => { setI(0); setScore(0); resetTurn(); };
-
-  // ── 녹음(말하기)으로 답하기 ──────────────────────────────────────────
-  const pickMime = () => {
-    for (const m of ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac", "audio/ogg"]) {
-      try { if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(m)) return m; } catch (e) {}
-    }
-    return "";
+  const reviewAll = () => {   // 이번 주 완료기록을 지우고 전체를 처음부터 다시 복습
+    try { const d = loadDone(); allRef.current.forEach((e) => delete d[keyOf(e)]); saveDone(d); } catch (e) {}
+    setItems(allRef.current); setI(0); setScore(0); resetTurn();
   };
-  const sendAudio = async (blob) => {
-    setRec("thinking");
-    try {
-      const r = await fetch("/api/english/transcribe", {
-        method: "POST", headers: { "Content-Type": blob.type || "application/octet-stream" }, body: blob,
-      });
-      const d = await r.json().catch(() => ({}));
-      const text = (d.text || "").trim();
-      setRec("idle");
-      if (!text) { setRecErr("잘 안 들렸어요. 다시 말해볼까요?"); return; }
-      check(text);   // 인식된 문장으로 바로 채점
-    } catch (e) { setRec("idle"); setRecErr("녹음 전송 실패 — 다시 시도해 주세요."); }
-  };
-  const startRec = async () => {
-    setRecErr("");
-    if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === "undefined") {
-      setRecErr("이 브라우저는 녹음을 지원하지 않아요. 직접 입력해 주세요."); setTypeMode(true); return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      const mime = pickMime();
-      const mr = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
-      chunksRef.current = [];
-      mr.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data); };
-      mr.onstop = () => {
-        try { streamRef.current && streamRef.current.getTracks().forEach((t) => t.stop()); } catch (e) {}
-        const blob = new Blob(chunksRef.current, { type: mr.mimeType || mime || "audio/webm" });
-        if (blob.size < 600) { setRec("idle"); setRecErr("너무 짧아요. 한 문장으로 말해볼까요?"); return; }
-        sendAudio(blob);
-      };
-      mr.start();
-      mrRef.current = mr;
-      setRec("recording");
-    } catch (e) { setRecErr("마이크 사용 권한이 필요해요. 직접 입력도 가능해요."); setTypeMode(true); }
-  };
-  const stopRec = () => { try { if (mrRef.current && mrRef.current.state === "recording") mrRef.current.stop(); } catch (e) {} };
-  const toggleRec = () => { if (rec === "recording") stopRec(); else if (rec === "idle") startRec(); };
 
   return (
     <div className="qz">
       <div className="qz-teacher"><span className="qz-av">👩‍🏫</span><b>AI 영어 튜터</b>
-        {!done && <span className="qz-prog">{i + 1} / {items.length}</span>}</div>
+        {!allCleared && !finished && <span className="qz-prog">{i + 1} / {items.length}</span>}</div>
 
-      {done ? (
+      {allCleared ? (
         <>
-          <div className="qz-done">오늘 대화 완료! 배운 표현 <b>{score} / {items.length}</b> 성공 👏</div>
-          <button type="button" className="qz-btn" onClick={restart}>다시 하기</button>
+          <div className="qz-done">이번 주 복습을 모두 마쳤어요! (총 {weekTotal}개 완료) 👏
+            <span className="qz-sub">완료한 표현은 기록돼요. 새 표현이 쌓이면 여기서 이어서 복습해요.</span></div>
+          <button type="button" className="qz-btn" onClick={reviewAll}>전체 다시 복습</button>
+        </>
+      ) : finished ? (
+        <>
+          <div className="qz-done">복습 완료! 이번에 <b>{score} / {items.length}</b>개 성공 👏
+            <span className="qz-sub">완료한 표현은 다음 접속 때 제외되고, 미완료만 다시 나와요.</span></div>
+          <button type="button" className="qz-btn" onClick={reviewAll}>전체 다시 복습</button>
         </>
       ) : (
         <>
@@ -624,10 +597,10 @@ function WeekendChat({ lang = "en" }) {
             </>
           ) : (
             <>
-              {/* 내가 말한 답(인식된 문장) */}
+              {/* 내가 쓴 답 */}
               {ans.trim() && <div className="qz-bubble me"><p className="qz-say">{ans.trim()}</p></div>}
 
-              {tries > 0 && hint === 0 && <div className="qz-fb wrong">거의 다 왔어요! 배운 표현을 넣어 다시 말해볼까요?</div>}
+              {tries > 0 && hint === 0 && <div className="qz-fb wrong">거의 다 왔어요! 배운 표현을 넣어 다시 써볼까요?</div>}
 
               {/* 막히면 차례로 유도 — ① 관련 단어 → ② 표현 힌트 → ③ 정답 이디엄 */}
               {hint >= 1 && (
@@ -655,28 +628,13 @@ function WeekendChat({ lang = "en" }) {
                 </div>
               )}
 
-              {/* 답하기 — 타이핑 대신 '말하기(녹음)'가 기본 */}
+              {/* 답하기 — 영어로 직접 작성 */}
+              <input ref={inputRef} className="qz-input" value={ans} onChange={(e) => setAns(e.target.value)}
+                placeholder="영어로 답을 작성하세요…" onKeyDown={(e) => e.key === "Enter" && ans.trim() && check()} />
               <div className="qz-row">
                 {hint < 3 && <button type="button" className="qz-ghost" onClick={() => setHint((h) => Math.min(3, h + 1))}>💡 힌트</button>}
-                <button type="button" className={`qz-mic${rec === "recording" ? " on" : ""}`} onClick={toggleRec} disabled={rec === "thinking"}>
-                  {rec === "recording" ? "● 녹음 중 — 멈추기" : rec === "thinking" ? "받아쓰는 중…" : ans.trim() ? "🎤 다시 말하기" : "🎤 눌러서 말하기"}
-                </button>
+                <button type="button" className="qz-btn flex" onClick={check} disabled={!ans.trim()}>보내기</button>
               </div>
-              {rec === "recording" && <div className="qz-rechint">지금 영어로 대답하세요. 끝나면 버튼을 다시 누르면 됩니다.</div>}
-              {recErr && (
-                <div className="qz-fb wrong">{recErr}
-                  {!typeMode && <button type="button" className="qz-linkbtn" onClick={() => setTypeMode(true)}>⌨️ 직접 입력</button>}
-                </div>
-              )}
-
-              {/* 폴백: 마이크가 막히거나 미지원일 때만 직접 입력 */}
-              {typeMode && (
-                <div className="qz-typerow">
-                  <input ref={inputRef} className="qz-input" value={ans} onChange={(e) => setAns(e.target.value)}
-                    placeholder="영어로 입력…" onKeyDown={(e) => e.key === "Enter" && ans.trim() && check()} />
-                  <button type="button" className="qz-btn flex" onClick={() => check()} disabled={!ans.trim()}>보내기</button>
-                </div>
-              )}
             </>
           )}
         </>
@@ -708,6 +666,7 @@ function WeekendChat({ lang = "en" }) {
         .qz-reveal { margin-top: 10px; }
         .qz-exko { margin-top: 6px; font-size: .78rem; color: var(--color-ink-3); }
         .qz-done { margin-top: 14px; font-size: .95rem; font-weight: 800; color: var(--color-ink); }
+        .qz-sub { display: block; margin-top: 8px; font-size: .78rem; font-weight: 600; color: var(--color-ink-3); line-height: 1.5; }
         .qz-row { display: flex; gap: 8px; align-items: stretch; margin-top: 14px; }
         .qz-ghost { flex-shrink: 0; border: 1.5px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink-2); border-radius: 12px; padding: 0 14px; font-size: .82rem; font-weight: 800; cursor: pointer; font-family: inherit; }
         .qz-btn { width: 100%; margin-top: 14px; border: none; border-radius: 12px; padding: 13px; background: var(--color-primary); color: #fff; font-size: .92rem; font-weight: 800; cursor: pointer; font-family: inherit; }
