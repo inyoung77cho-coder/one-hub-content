@@ -824,9 +824,10 @@ export default function EnglishPage() {
 
       <style jsx>{`
         .en { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 96px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
-        .en-hd { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 6px 2px 14px; }
-        .en-hd h1 { font-size: 22px; font-weight: 800; letter-spacing: -.5px; margin: 0; }
-        .en-sub { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
+        /* 제목+설명을 세로로 고정(설명은 항상 한 줄) → 모드가 바뀌어도 아래 버튼 위치가 안 밀림 */
+        .en-hd { margin: 6px 2px 12px; }
+        .en-hd h1 { font-size: 22px; font-weight: 800; letter-spacing: -.5px; margin: 0 0 3px; }
+        .en-sub { display: block; font-size: 12px; font-weight: 600; color: var(--color-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .en-langs { display: flex; gap: 8px; margin-bottom: 10px; }
         .en-langs button { flex: 1 1 0; padding: 8px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .en-langs button.on { background: var(--color-ink); border-color: var(--color-ink); color: #fff; }
@@ -834,7 +835,7 @@ export default function EnglishPage() {
         .en-tabs button { flex: 1 1 0; padding: 10px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .85rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .en-tabs button.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
         /* 하위 메뉴 — 대메뉴보다 작게·연하게(계층 구분). 알약형. */
-        .en-subtabs { display: flex; gap: 6px; margin: 0 0 14px; padding-left: 6px; }
+        .en-subtabs { display: flex; gap: 6px; margin: 0 0 14px; padding-left: 0; }
         .en-subtabs button { padding: 6px 13px; border-radius: 999px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); font-size: .76rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .en-subtabs button.on { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-primary); }
         .en-date { font-size: .78rem; font-weight: 700; color: var(--color-ink-3); margin: 0 2px 10px; }
