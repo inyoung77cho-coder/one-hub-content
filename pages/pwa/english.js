@@ -361,8 +361,19 @@ function BbcKaraoke() {
     for (let k = 0; k < cues.length; k++) { if (t + 0.05 >= cues[k].t) idx = k; else break; }
     setWi(idx);
   };
-  const start = Math.max(0, (wi < 0 ? 0 : wi) - 4);
-  const win = cues.slice(start, start + 10);   // 자막 한두 줄만(화면 밖으로 안 나가게)
+  // 자막을 '고정 2줄 페이지'로 끊는다(문장 끝, 6~14단어). 페이지는 경계에서만 통째로 바뀌고,
+  // 그 안에서 지금 읽는 단어만 반전 표시 → 글이 매 단어 밀리지 않아 헷갈리지 않는다.
+  const pages = [];
+  let curp = [];
+  for (let k = 0; k < cues.length; k++) {
+    curp.push(k);
+    const endsSent = /[.!?]["')\]]?$/.test(cues[k].w);
+    if ((endsSent && curp.length >= 6) || curp.length >= 14) { pages.push(curp); curp = []; }
+  }
+  if (curp.length) pages.push(curp);
+  let pageIdx = 0;
+  if (wi >= 0) { for (let p = 0; p < pages.length; p++) { if (pages[p].indexOf(wi) !== -1) { pageIdx = p; break; } } }
+  const pageWords = pages[pageIdx] || [];
   const img = clip.image ? clip.image.replace(/^http:\/\//, "https://") : "";
 
   return (
@@ -371,10 +382,9 @@ function BbcKaraoke() {
       <div className="bk-title">{clip.title}</div>
       <div className="bk-stage" style={img ? { backgroundImage: `url(${img})` } : undefined}>
         <div className="bk-cap">
-          {win.map((c, k) => {
-            const gi = start + k;
-            return <span key={gi} className={gi === wi ? "on" : gi < wi ? "past" : ""}>{c.w} </span>;
-          })}
+          {pageWords.map((gi) => (
+            <span key={gi} className={gi === wi ? "on" : gi < wi ? "past" : ""}>{cues[gi].w} </span>
+          ))}
         </div>
       </div>
       <audio ref={audioRef} src={`/api${clip.audio_url}`} onTimeUpdate={onTime} onEnded={() => setWi(-1)} controls preload="none" />
@@ -394,10 +404,10 @@ function BbcKaraoke() {
         .bk-sub { font-size: .7rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 8px; margin-left: 5px; }
         .bk-title { margin-top: 6px; font-size: .82rem; font-weight: 800; color: var(--color-ink-2); }
         .bk-stage { position: relative; width: 100%; aspect-ratio: 16 / 9; margin: 12px 0 0; border-radius: 12px; overflow: hidden; background: #0b1220 center / cover no-repeat; display: flex; align-items: flex-end; }
-        .bk-cap { width: 100%; box-sizing: border-box; max-height: 100%; overflow: hidden; padding: 16px 16px 14px; background: linear-gradient(transparent, rgba(0,0,0,.35), rgba(0,0,0,.8)); color: rgba(255,255,255,.9); font-size: 1.12rem; font-weight: 800; line-height: 1.45; text-align: center; overflow-wrap: break-word; word-break: normal; }
-        .bk-cap span { transition: color .1s, background .1s; padding: 0 1px; border-radius: 4px; }
-        .bk-cap span.past { color: rgba(255,255,255,.5); }
-        .bk-cap span.on { color: #191600; background: #ffd54a; }
+        .bk-cap { width: 100%; box-sizing: border-box; min-height: 3em; max-height: 100%; overflow: hidden; padding: 16px 16px 15px; background: linear-gradient(transparent, rgba(0,0,0,.35), rgba(0,0,0,.82)); color: rgba(255,255,255,.88); font-size: 1.15rem; font-weight: 800; line-height: 1.5; text-align: center; overflow-wrap: break-word; word-break: normal; }
+        .bk-cap span { transition: color .12s, background .12s; padding: 1px 3px; border-radius: 5px; }
+        .bk-cap span.past { color: rgba(255,255,255,.45); }
+        .bk-cap span.on { color: #191600; background: #ffe14a; box-shadow: 0 0 0 2px #ffe14a; }
         .bk audio { width: 100%; display: block; margin-top: 10px; }
         .bk-note { margin-top: 10px; font-size: .76rem; color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; }
         .bk-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
@@ -468,77 +478,129 @@ function LiveEnglish() {
   );
 }
 
-// [주말 AI 튜터 시험] 그 주 배운 표현으로 빈칸 채우기 — 선생 페르소나 + TTS 질문 + 정답 시 마무리 카라오케.
-function maskExpr(example, expr) {
-  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  let re = new RegExp(esc(expr), "i");
-  if (re.test(example)) return example.replace(re, "____");
-  const first = expr.split(/\s+/)[0];
-  return example.replace(new RegExp(esc(first), "i"), "____");
-}
+// [주말 AI 튜터] 글 대신 '대화형' — 튜터가 영어로 묻고(음성), 학습자가 영어로 답한다.
+// 배운 표현이 나오면 정답. 막히면 ① 관련 단어 → ② 표현 힌트 → ③ 정답 이디엄 을 차례로 눌러 넣어 유도.
+const QZ_OPENERS = [
+  "Okay, let's chat! Answer me in English.",
+  "Your turn — reply to me in English.",
+  "Let's practice speaking. Say it in English!",
+  "Nice. Now tell me in your own English.",
+  "Great, keep going — answer me in English.",
+];
 
-function WeekendQuiz({ lang = "en" }) {
+function WeekendChat({ lang = "en" }) {
   const [items, setItems] = useState(null);
   const [i, setI] = useState(0);
   const [ans, setAns] = useState("");
-  const [state, setState] = useState("ask"); // ask | hint | correct
+  const [state, setState] = useState("ask"); // ask | correct
+  const [hint, setHint] = useState(0);       // 0 없음 · 1 관련단어 · 2 표현힌트 · 3 정답이디엄
+  const [tries, setTries] = useState(0);
   const [score, setScore] = useState(0);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
-    setItems(null); setI(0); setScore(0); setState("ask"); setAns("");
+    setItems(null); setI(0); setScore(0); setState("ask"); setAns(""); setHint(0); setTries(0);
     fetch(`/api/english/weekly-review?language=${lang}`).then((r) => r.json())
       .then((d) => {
         if (!alive) return;
-        const q = (d.expressions || []).filter((e) => e.expr && e.example_en &&
-          e.example_en.toLowerCase().includes(e.expr.toLowerCase().split(/\s+/)[0]));
+        const q = (d.expressions || []).filter((e) => e.expr && e.meaning_ko && e.example_en);
         setItems(q.slice(0, 10));
       }).catch(() => alive && setItems([]));
     return () => { alive = false; };
   }, [lang]);
 
-  if (items == null) return <div className="en-state">시험 준비 중…</div>;
-  if (!items.length) return <div className="en-state">이번 주 배운 표현이 아직 없어요.<br />뉴스·이디엄에서 학습하면 주말 시험이 만들어집니다.</div>;
+  if (items == null) return <div className="en-state">튜터 준비 중…</div>;
+  if (!items.length) return <div className="en-state">이번 주 배운 표현이 아직 없어요.<br />뉴스·이디엄에서 학습하면 주말 대화가 만들어집니다.</div>;
 
   const done = i >= items.length;
-  const cur = items[i];
-  const speak = (text) => { try { new Audio(`/api/english/speak?text=${encodeURIComponent(text)}&language=${lang}`).play().catch(() => {}); } catch (e) {} };
-  const norm = (s) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
-  const check = () => {
-    if (norm(ans).includes(norm(cur.expr))) { setState("correct"); setScore((s) => s + 1); }
-    else setState("hint");
+  const cur = done ? null : items[i];
+  const opener = QZ_OPENERS[i % QZ_OPENERS.length];
+  const speak = (text) => { try { new Audio(`/api/english/speak?text=${encodeURIComponent(text)}&language=en`).play().catch(() => {}); } catch (e) {} };
+  const norm = (s) => (s || "").toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+  const exprWords = cur ? cur.expr.split(/\s+/).filter(Boolean) : [];
+  const skeleton = exprWords.map((w) => w[0] + "·".repeat(Math.max(1, w.length - 1))).join("  ");
+  const insert = (chip) => {
+    setAns((a) => (a && !a.endsWith(" ") ? a + " " : a) + chip + " ");
+    try { inputRef.current && inputRef.current.focus(); } catch (e) {}
   };
-  const next = () => { setI((x) => x + 1); setAns(""); setState("ask"); };
+  const check = () => {
+    if (norm(ans).includes(norm(cur.expr))) {
+      setState("correct"); setScore((s) => s + 1);
+      speak("Perfect! That's exactly right. Well done.");
+    } else {
+      const t = tries + 1; setTries(t);
+      setHint((h) => Math.min(3, Math.max(h, t)));  // 틀릴수록 힌트를 한 단계씩 더 연다
+    }
+  };
+  const next = () => { setI((x) => x + 1); setAns(""); setState("ask"); setHint(0); setTries(0); };
+  const restart = () => { setI(0); setScore(0); setState("ask"); setAns(""); setHint(0); setTries(0); };
 
   return (
     <div className="qz">
-      <div className="qz-teacher"><span className="qz-av">👩‍🏫</span><b>AI 튜터</b>
+      <div className="qz-teacher"><span className="qz-av">👩‍🏫</span><b>AI 영어 튜터</b>
         {!done && <span className="qz-prog">{i + 1} / {items.length}</span>}</div>
 
       {done ? (
         <>
-          <div className="qz-done">이번 주 복습 완료! 정답 <b>{score} / {items.length}</b> 👏</div>
-          <button type="button" className="qz-btn" onClick={() => { setI(0); setScore(0); setState("ask"); setAns(""); }}>다시 풀기</button>
+          <div className="qz-done">오늘 대화 완료! 배운 표현 <b>{score} / {items.length}</b> 성공 👏</div>
+          <button type="button" className="qz-btn" onClick={restart}>다시 하기</button>
         </>
       ) : (
         <>
-          <div className="qz-q">이번 주 배운 표현으로 빈칸을 채워보세요.</div>
-          <div className="qz-blank">{maskExpr(cur.example_en, cur.expr)}</div>
-          <div className="qz-ko">뜻: {cur.meaning_ko}</div>
-          <button type="button" className="qz-listen" onClick={() => speak(cur.example_en)}>🔊 선생님 발음 듣기</button>
-          {state !== "correct" ? (
+          {/* 튜터 말풍선 — 영어로 질문(음성) */}
+          <div className="qz-bubble tutor">
+            <p className="qz-say">{opener}</p>
+            <p className="qz-say sm">Reply so it means: <b>“{cur.meaning_ko}”</b></p>
+            <button type="button" className="qz-listen" onClick={() => speak(opener + " Try to use today's expression.")}>🔊 튜터 목소리로 듣기</button>
+          </div>
+
+          {state === "correct" ? (
             <>
-              <input className="qz-input" value={ans} onChange={(e) => setAns(e.target.value)}
-                placeholder="빈칸에 들어갈 표현" onKeyDown={(e) => e.key === "Enter" && ans.trim() && check()} />
-              {state === "hint" && <div className="qz-fb wrong">아직이에요. 힌트 <b>{cur.expr.split(/\s+/).map((w) => w[0]).join(".")}…</b> · 뜻을 떠올려 다시!</div>}
-              <button type="button" className="qz-btn" onClick={check} disabled={!ans.trim()}>제출</button>
+              {/* 내 답 말풍선 + 튜터 확인 + 원어민 예문 카라오케 */}
+              <div className="qz-bubble me"><p className="qz-say">{ans.trim()}</p></div>
+              <div className="qz-fb ok">✅ Perfect! <b>{cur.expr}</b> — 자연스럽게 나왔어요.</div>
+              <div className="qz-reveal"><Karaoke text={cur.example_en} lang={lang} /></div>
+              {cur.example_ko && <div className="qz-exko">{cur.example_ko}</div>}
+              <button type="button" className="qz-btn" onClick={next}>{i + 1 < items.length ? "다음 대화 →" : "결과 보기 →"}</button>
             </>
           ) : (
             <>
-              <div className="qz-fb ok">✅ 정답! <b>{cur.expr}</b> 을(를) 잘 활용했어요.</div>
-              <div className="qz-reveal"><Karaoke text={cur.example_en} lang={lang} /></div>
-              {cur.example_ko && <div className="qz-exko">{cur.example_ko}</div>}
-              <button type="button" className="qz-btn" onClick={next}>{i + 1 < items.length ? "다음 문제 →" : "결과 보기 →"}</button>
+              <input ref={inputRef} className="qz-input" value={ans} onChange={(e) => setAns(e.target.value)}
+                placeholder="영어로 대답해 보세요…" onKeyDown={(e) => e.key === "Enter" && ans.trim() && check()} />
+
+              {tries > 0 && hint === 0 && <div className="qz-fb wrong">거의 다 왔어요! 배운 표현을 넣어 다시 말해볼까요?</div>}
+
+              {/* 막히면 차례로 유도 — ① 관련 단어 → ② 표현 힌트 → ③ 정답 이디엄 */}
+              {hint >= 1 && (
+                <div className="qz-hint">
+                  <div className="qz-hl">① 관련 단어 — 눌러서 문장에 넣어보세요</div>
+                  <div className="qz-chips">
+                    {exprWords.map((w, k) => (
+                      <button key={k} type="button" className="qz-chip" onClick={() => insert(w)}>{w}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {hint >= 2 && (
+                <div className="qz-hint">
+                  <div className="qz-hl">② 표현 힌트</div>
+                  <div className="qz-skel">{skeleton}</div>
+                </div>
+              )}
+              {hint >= 3 && (
+                <div className="qz-hint">
+                  <div className="qz-hl">③ 이 표현(idiom)을 그대로 써보세요</div>
+                  <div className="qz-chips">
+                    <button type="button" className="qz-chip solid" onClick={() => insert(cur.expr)}>{cur.expr}</button>
+                  </div>
+                </div>
+              )}
+
+              <div className="qz-row">
+                {hint < 3 && <button type="button" className="qz-ghost" onClick={() => setHint((h) => Math.min(3, h + 1))}>💡 힌트</button>}
+                <button type="button" className="qz-btn flex" onClick={check} disabled={!ans.trim()}>보내기</button>
+              </div>
             </>
           )}
         </>
@@ -550,18 +612,30 @@ function WeekendQuiz({ lang = "en" }) {
         .qz-av { font-size: 1.4rem; }
         .qz-teacher b { font-weight: 800; }
         .qz-prog { margin-left: auto; font-size: .72rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 999px; padding: 2px 9px; }
-        .qz-q { margin-top: 14px; font-size: .82rem; font-weight: 700; color: var(--color-ink-2); }
-        .qz-blank { margin-top: 10px; font-size: 1.25rem; font-weight: 800; line-height: 1.5; color: var(--color-ink); word-break: keep-all; }
-        .qz-ko { margin-top: 6px; font-size: .8rem; color: var(--color-primary); font-weight: 700; }
-        .qz-listen { margin-top: 10px; border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink-2); border-radius: 9px; padding: 7px 12px; font-size: .76rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .qz-bubble { margin-top: 14px; padding: 12px 14px; border-radius: 14px; }
+        .qz-bubble.tutor { background: var(--color-card-soft); border: 1px solid var(--color-line); border-top-left-radius: 4px; }
+        .qz-bubble.me { background: var(--color-primary-soft); border: 1px solid var(--color-primary); border-top-right-radius: 4px; margin-left: 18%; }
+        .qz-say { margin: 0; font-size: 1.02rem; font-weight: 700; line-height: 1.5; color: var(--color-ink); word-break: break-word; }
+        .qz-say.sm { margin-top: 6px; font-size: .82rem; font-weight: 600; color: var(--color-ink-2); }
+        .qz-say.sm b { color: var(--color-primary); }
+        .qz-listen { margin-top: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; padding: 7px 12px; font-size: .76rem; font-weight: 700; cursor: pointer; font-family: inherit; }
         .qz-input { width: 100%; box-sizing: border-box; margin-top: 12px; padding: 12px 13px; border: 1.5px solid var(--color-line); border-radius: 11px; font-size: 1rem; font-family: inherit; background: var(--color-bg); color: var(--color-ink); }
         .qz-input:focus { outline: none; border-color: var(--color-primary); }
-        .qz-fb { margin-top: 10px; font-size: .82rem; font-weight: 700; word-break: keep-all; }
+        .qz-hint { margin-top: 12px; }
+        .qz-hl { font-size: .72rem; font-weight: 800; color: var(--color-ink-3); margin-bottom: 6px; }
+        .qz-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+        .qz-chip { border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink); border-radius: 999px; padding: 7px 13px; font-size: .86rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .qz-chip.solid { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+        .qz-skel { font-size: 1.15rem; font-weight: 800; letter-spacing: 1px; color: var(--color-primary); word-break: break-word; }
+        .qz-fb { margin-top: 10px; font-size: .84rem; font-weight: 700; word-break: keep-all; }
         .qz-fb.ok { color: var(--color-success); } .qz-fb.wrong { color: var(--color-danger); }
         .qz-reveal { margin-top: 10px; }
         .qz-exko { margin-top: 6px; font-size: .78rem; color: var(--color-ink-3); }
         .qz-done { margin-top: 14px; font-size: .95rem; font-weight: 800; color: var(--color-ink); }
+        .qz-row { display: flex; gap: 8px; align-items: stretch; margin-top: 14px; }
+        .qz-ghost { flex-shrink: 0; border: 1.5px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink-2); border-radius: 12px; padding: 0 14px; font-size: .82rem; font-weight: 800; cursor: pointer; font-family: inherit; }
         .qz-btn { width: 100%; margin-top: 14px; border: none; border-radius: 12px; padding: 13px; background: var(--color-primary); color: #fff; font-size: .92rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .qz-btn.flex { flex: 1; width: auto; margin-top: 0; }
         .qz-btn:disabled { opacity: .55; }
       `}</style>
     </div>
@@ -648,7 +722,7 @@ export default function EnglishPage() {
       {mode === "gen" && tab === "live" ? (
         <LiveEnglish lang="en" />
       ) : mode === "gen" && tab === "review" ? (
-        <WeekendQuiz lang="en" />
+        <WeekendChat lang="en" />
       ) : (
         <>
           {feed.review && (
