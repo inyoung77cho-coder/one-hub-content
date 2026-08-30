@@ -7,8 +7,11 @@ import BottomNav from "../../components/BottomNav";
 import AppHeader from "../../components/AppHeader";
 import AssetMapTitle from "../../components/AssetMapTitle";
 import { getTrader } from "../../lib/trader";
-import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS, getOtherAssets, addOtherAsset, removeOtherAsset } from "../../lib/etfHoldings";
+import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS, getOtherAssets, addOtherAsset, removeOtherAsset, updateOtherAsset, sellOtherAsset, OTHER_KINDS } from "../../lib/etfHoldings";
 import { classifyEtf } from "../../lib/etfClassify";
+import { useTabState } from "../../lib/pwa/useTabState";
+import EtfAllocationPie from "../../components/EtfAllocationPie";
+import { recommendEtfs } from "../../lib/etfRecommend";
 import { acctTaxNote, TAX_DISCLAIMER, pensionCreditLimit, pensionCreditProgress, pensionCreditLimitCombined, acctRule } from "../../lib/taxRules";
 import Term from "../../components/Term";
 import REBAL_PRESETS from "../../data/rebalance_presets.json";
@@ -167,6 +170,13 @@ export default function EtfDashboard() {
   const [targetAlloc, setTargetAlloc] = useState(null); // [E-4] 목표 배분(onehub_target_alloc)
   const [decompOpen, setDecompOpen] = useState(false); // [E-1] Tier3 수익 분해 접힘(기본)
   const toggleDecomp = () => { const n = !decompOpen; setDecompOpen(n); try { localStorage.setItem("onehub_etf_decomp", n ? "1" : "0"); } catch {} };
+  // [ETF 재구성 Phase1] 보유 | 추천 상위 탭(URL ?etf= 동기화)
+  const [etfTab, setEtfTab] = useTabState("etf", ["hold", "rec"], "hold");
+  // [ETF 재구성 Phase1] 기타 금융자산 카드 — 추가 폼 + 인라인 수정/매도 상태
+  const [oaForm, setOaForm] = useState({ name: "", valueKrw: "", account: "일반", kind: "fund" });
+  const [oaActId, setOaActId] = useState(null); // 인라인 액션(수정/매도) 열린 행
+  const [oaActMode, setOaActMode] = useState("edit"); // 'edit' | 'sell'
+  const [oaActVal, setOaActVal] = useState("");
   const applyPreset = (key) => {
     const p = REBAL_PRESETS.presets[key];
     if (!p) return;
@@ -460,6 +470,38 @@ export default function EtfDashboard() {
     setOtherAssets(getOtherAssets(tr));
     try { window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {}
   };
+  // [ETF 재구성 Phase1] 기타 금융자산 추가(간편 입력) — 이름·평가액·계좌·종류
+  const OA_KIND_LABEL = { etf: "ETF", fund: "펀드", bond: "채권", cash: "현금" };
+  const submitOtherAsset = () => {
+    const tr = getTrader();
+    const val = Math.round(Number(oaForm.valueKrw) * 10000); // 입력은 만원 → 원
+    const res = addOtherAsset({ name: oaForm.name, account: oaForm.account, valueKrw: val, kind: oaForm.kind, isCash: oaForm.kind === "cash", trader: tr });
+    if (!res.ok) return;
+    setOtherAssets(getOtherAssets(tr));
+    setOaForm({ name: "", valueKrw: "", account: oaForm.account, kind: oaForm.kind });
+    try { window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {}
+  };
+  // 인라인 수정(평가액 갱신) / 매도·인출(금액 차감) 액션 열기
+  const openOaAct = (o, mode) => {
+    setOaActId(o.id); setOaActMode(mode);
+    setOaActVal(mode === "edit" ? String(Math.round((Number(o.valueKrw) || 0) / 10000)) : "");
+  };
+  const closeOaAct = () => { setOaActId(null); setOaActVal(""); };
+  const commitOaAct = (o) => {
+    const tr = getTrader();
+    const won10k = Math.round(Number(oaActVal) * 10000); // 입력은 만원 → 원
+    if (!Number.isFinite(won10k)) return;
+    if (oaActMode === "edit") {
+      if (won10k < 0) return;
+      updateOtherAsset(o.id, { valueKrw: won10k }, tr);
+    } else {
+      if (!(won10k > 0)) return;
+      sellOtherAsset(o.id, won10k, tr);
+    }
+    setOtherAssets(getOtherAssets(tr));
+    closeOaAct();
+    try { window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {}
+  };
   const submitBulkRows = () => {
     const tr = getTrader();
     let ok = 0, skipped = 0, failed = 0;
@@ -532,6 +574,14 @@ export default function EtfDashboard() {
   // [2026-08-23] 기타 금융자산(펀드·디폴트옵션)은 위 P&L(수익률) 계산에 안 섞는다 —
   // 원가 이력이 없어 넣으면 수익률이 왜곡된다. 대신 별도 줄로 합계만 보여준다.
   const otherAssetsSum = otherAssets.reduce((acc, o) => acc + (Number(o.valueKrw) || 0), 0);
+
+  // [ETF 재구성 Phase1] 테마 도넛·추천에 넘길 '티커+원화평가액' 목록.
+  //   목표배분 섹션과 동일한 평가규칙(백엔드 value_krw 우선, 없으면 실측종가 기반 holdingMetrics).
+  const pieItems = [...positions, ...holdings]
+    .map((x) => ({ ticker: x.ticker, valueKrw: x.value_krw ?? x.eval_krw ?? (holdingMetrics(x).valueKrw || 0) }))
+    .filter((x) => x.ticker && x.valueKrw > 0);
+  // [ETF 재구성 Phase1] 규칙기반 추천 후보(순수함수). AI 이유설명은 Phase2.
+  const etfRecs = recommendEtfs({ holdings, positions: pieItems, target: targetAlloc, overlap });
 
   // [N1] onboard(etf_uk) 미러링 제거 — ETF 평가액은 lib/ledger가 lib/etfLive로 직접 계산한다.
   //   과거엔 이 미러가 onboard를 오염시켜 폴백 병합에서 ETF가 두 번 더해졌다(5.15+5.19=10.34억).
@@ -667,6 +717,15 @@ export default function EtfDashboard() {
         {/* [사용자 지시] "종합자산 자산지도" 탭에서 이 페이지로 direct 연결되므로, 상위 메뉴바가
             사라진 것처럼 보이지 않도록 동일한 타이틀 바를 여기도 얹는다. */}
         <AssetMapTitle current="ETF" />
+        {/* [ETF 재구성 Phase1] 보유 | 추천 상위 탭 — 주식(보유/추천) 미러. 계좌필터는 두 탭 공통 렌즈. */}
+        <nav className="etf-subtabs" role="tablist" aria-label="ETF 보유/추천">
+          {[["hold", "보유"], ["rec", "추천"]].map(([t, label]) => (
+            <button key={t} role="tab" aria-selected={etfTab === t}
+              className={`etf-subtab ${etfTab === t ? "active" : ""}`} onClick={() => setEtfTab(t)}>
+              {label}
+            </button>
+          ))}
+        </nav>
       </div>
 
       {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해. [사용자 지시] 다른 페이지처럼 밝은 카드로 통일 */}
@@ -754,8 +813,30 @@ export default function EtfDashboard() {
         })}
       </div>
 
+      {/* [ETF 재구성 Phase1] 보유 탭 상단 — 테마별 분배 도넛(지역/섹터) */}
+      {etfTab === "hold" && <EtfAllocationPie positions={pieItems} overlap={overlap} />}
+
+      {/* [ETF 재구성 Phase1] 추천 탭 상단 — 규칙기반 ETF 종목 추천 + 이유 */}
+      {etfTab === "rec" && (
+        <section className="card etf-reco">
+          <div className="label">💡 ETF 종목 추천 <span className="sub">규칙 기반 · 이유</span></div>
+          <div className="reco-list">
+            {etfRecs.map((r, i) => (
+              <div className={`reco-item ${r.axis}`} key={i}>
+                <div className="reco-top">
+                  <span className="reco-nm">{r.name}</span>
+                  <span className={`reco-axis ${r.axis}`}>{r.axis === "region" ? "지역" : "섹터"} · {r.bucket}</span>
+                </div>
+                <div className="reco-why">{r.reasonRule}</div>
+              </div>
+            ))}
+          </div>
+          <div className="reco-note">규칙 기반 후보입니다 — <b>AI 이유설명은 다음 단계</b>에서 제공됩니다. 특정 종목 매수 권유가 아니며 최종 판단은 본인이 하세요.</div>
+        </section>
+      )}
+
       {/* [E2·E3] 해야 할 일 · 리밸런싱 제안 — 계좌 필터가 곧 '할 일' 필터. 조치 없으면 보유 권장 */}
-      {s && (
+      {etfTab === "rec" && s && (
         <section className="card todo-card">
           <div className="label">📋 해야 할 일 · 리밸런싱 제안
             <span className="sub">{acctFilter === "전체" ? "전 계좌" : `${acctFilter} 계좌`}</span>
@@ -799,7 +880,7 @@ export default function EtfDashboard() {
       )}
 
       {/* [E-4] 목표 배분 · 국내/해외 이탈도 → 처방(진단 단독 금지). 목표 미설정 시 프리셋 3종. */}
-      {(positions.length > 0 || holdings.length > 0) && (() => {
+      {etfTab === "rec" && (positions.length > 0 || holdings.length > 0) && (() => {
         // [투자지역] 국내/해외는 '투자대상 지역'(classifyEtf: tax_type 기반)으로 가른다.
         //   ★기존 버그: holdings(직접입력)만 + 상장시장(market) 기준으로 판정 → 서버 등록
         //     positions(포트폴리오 대부분)를 무시하고, 국내상장 해외추종을 '국내'로 잡아
@@ -863,23 +944,57 @@ export default function EtfDashboard() {
         );
       })()}
 
-      {/* [E-5] 계좌 배치(asset location) 최적화 — 세제계좌 한도는 희소자원. 세금 큰 자산 우선 배치. */}
-      {holdings.length > 1 && (() => {
+      {/* [ETF 재구성 Phase1] 연금 운영 제안 — 계좌 배치 최적화(구 E-5) + 연금 세액공제 진행률을 묶음 */}
+      {etfTab === "rec" && (() => {
         const genAcct = holdings.filter((h) => (h.account || "일반") === "일반");
         const taxAcct = holdings.filter((h) => isPensionAcct(h.account || "일반") || (h.account || "일반") === "ISA");
         const overseasInGen = genAcct.filter(isOverseasHolding);   // [S18] 통화가 아니라 시장으로
         const domesticInTax = taxAcct.filter((h) => h.avgCcy === "KRW");
         const swap = overseasInGen.length > 0 && domesticInTax.length > 0;
+        const hasPen = holdings.some((h) => isPensionAcct(h.account || "일반")) || otherAssets.some((o) => isPensionAcct(o.account || "일반"));
+        const limit = pensionCreditLimitCombined();
+        const penRows = holdings.filter((h) => isPensionAcct(h.account || "일반"));
+        const acquired = penRows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
+        const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
+        const prog = Math.max(0, Math.min(1, limit ? contrib / limit : 0));
+        const est = pensionContrib === "";
         return (
           <section className="card">
-            <div className="label"><Term term="자산 배치">🧮 계좌 배치 최적화</Term></div>
-            {swap ? (
-              <div className="rb-why">
-                <div className="rb-why-h">💡 배치 개선 여지</div>
-                <div className="rb-why-row"><span className="rb-why-n">→</span><span className="rb-why-t">세금이 큰 <b>해외 ETF({overseasInGen.map((h) => h.ticker).join("·")})</b>가 일반계좌에, 세금이 작은 <b>국내형({domesticInTax.map((h) => h.ticker).join("·")})</b>이 세제계좌에 있습니다. <b>두 자산의 계좌를 맞바꾸면</b> 세제계좌(ISA·연금) 한도를 세금 큰 자산에 써서 세후 수익을 높일 수 있습니다.</span></div>
+            <div className="label"><Term term="자산 배치">🏛️ 연금 운영 제안</Term> <span className="sub">계좌 배치 · 세액공제</span></div>
+            {/* 계좌 배치 최적화 */}
+            <div className="op-h">🧮 계좌 배치 최적화</div>
+            {holdings.length > 1 ? (
+              swap ? (
+                <div className="rb-why">
+                  <div className="rb-why-h">💡 배치 개선 여지</div>
+                  <div className="rb-why-row"><span className="rb-why-n">→</span><span className="rb-why-t">세금이 큰 <b>해외 ETF({overseasInGen.map((h) => h.ticker).join("·")})</b>가 일반계좌에, 세금이 작은 <b>국내형({domesticInTax.map((h) => h.ticker).join("·")})</b>이 세제계좌에 있습니다. <b>두 자산의 계좌를 맞바꾸면</b> 세제계좌(ISA·연금) 한도를 세금 큰 자산에 써서 세후 수익을 높일 수 있습니다.</span></div>
+                </div>
+              ) : (
+                <div className="rb-tax sub">현재 계좌 배치에 뚜렷한 개선 여지는 없습니다. 원칙: <b>세제계좌 한도는 세금이 큰 해외·배당형에 우선</b> 배정하고, 매매차익 비과세 성격의 국내주식형은 일반계좌 여지가 큽니다.</div>
+              )
+            ) : (
+              <div className="rb-tax sub">보유 종목이 2개 이상이면 계좌 간 배치 개선 여지를 진단합니다.</div>
+            )}
+            {/* 연금 세액공제 진행률(개인연금+IRP 합산) */}
+            <div className="op-h" style={{ marginTop: 14 }}>🎁 연금 세액공제 진행률 <span className="pc-scope">개인연금+IRP 합산</span></div>
+            {hasPen ? (
+              <div className="pen-credit">
+                <div className="pc-h">
+                  <span className="pc-lbl">납입 대비 한도</span>
+                  <span className={`pc-tag ${est ? "est" : "fix"}`}>{est ? "추정" : "입력"}</span>
+                  <span className="pc-pct">{Math.round(prog * 100)}%</span>
+                </div>
+                <div className="pc-bar"><div className="pc-fill" style={{ width: `${prog * 100}%` }} /></div>
+                <div className="pc-nums">납입 {won(contrib)}원 / 한도 {won(limit)}원 {prog >= 1 ? "· 한도 소진" : `· 여유 ${won(Math.max(0, limit - contrib))}원`}</div>
+                <div className="pc-in-wrap">
+                  <span className="pc-in-lbl">올해 연금 납입액 직접 입력(원)</span>
+                  <input className="pc-in" type="number" inputMode="numeric" placeholder={`${Math.round(acquired).toLocaleString()} (취득 추정)`}
+                    value={pensionContrib} onChange={(e) => changePensionContrib(e.target.value)} />
+                </div>
+                <div className="pc-note">합산 한도(연 {won(limit)}원)는 개인연금+IRP <b>납입액 기준</b>이며 연금저축 단독 한도는 600만원입니다. 미입력 시 연금 계좌 취득원가로 <b>추정</b>합니다.</div>
               </div>
             ) : (
-              <div className="rb-tax sub">현재 계좌 배치에 뚜렷한 개선 여지는 없습니다. 원칙: <b>세제계좌 한도는 세금이 큰 해외·배당형에 우선</b> 배정하고, 매매차익 비과세 성격의 국내주식형은 일반계좌 여지가 큽니다.</div>
+              <div className="rb-tax sub">개인연금·퇴직연금 보유를 입력하면 세액공제 진행률(연 900만 합산 한도)을 추적합니다.</div>
             )}
             <div className="rb-tax sub" style={{ marginTop: 8 }}>⚠ 세무자문이 아닙니다. 실제 절세액은 개인 소득·거래·현행 세법에 따라 다릅니다.</div>
           </section>
@@ -889,6 +1004,7 @@ export default function EtfDashboard() {
       {/* [2026-08-23] 다음 매수 계좌 추천 — 종목을 검색하면 세제 분류(etf_master.tax_type)
           기반으로 어느 계좌가 유리한지 순위+이유를 보여준다. "이미 산 것"이 아니라
           "앞으로 살 것"을 위한 도구라 위 계좌 배치 최적화와 다르다. */}
+      {etfTab === "rec" && (
       <section className="card">
         <div className="label">💡 다음 매수, 어느 계좌가 유리할까 <span className="sub">종목 검색</span></div>
         <TickerSearchBox value={nbTicker} placeholder="티커/이름 검색(SCHD, TIGER 미국S&P500)"
@@ -916,12 +1032,13 @@ export default function EtfDashboard() {
           );
         })()}
       </section>
+      )}
 
       {/* [§3-2 원칙1] 포트폴리오 합계는 홈·AI자산 2곳에만. ETF 페이지는 ETF 슬라이스만 표시(피드백14) */}
       {err && <div className="err">데이터 로드 오류: {err}</div>}
 
       {/* 2) Portfolio Score — 블랙박스 금지, 구성요소 공개 */}
-      {s && tax && overlap && (
+      {etfTab === "hold" && s && tax && overlap && (
         <section className="card">
           <div className="label"><Term term="Portfolio Score">Portfolio Score</Term> <span className="sub">구성요소</span></div>
           <div className="score-grid">
@@ -936,7 +1053,7 @@ export default function EtfDashboard() {
       )}
 
       {/* 3) Overlap Heat Map — [S7.4] 실 주간수급 전까지 SAMPLE 섹션 숨김(오해 방지) */}
-      {overlap && !overlap.error && !overlap.note?.includes("SAMPLE") && (
+      {etfTab === "hold" && overlap && !overlap.error && !overlap.note?.includes("SAMPLE") && (
         <section className="card">
           <div className="label">종목 중복 노출 (Heat Map)
             <span className="sub">실 보유 기반</span>
@@ -968,7 +1085,7 @@ export default function EtfDashboard() {
       )}
 
       {/* 3.5) 자산 배분 / 리밸런싱 (P4) — [§3-6 피드백12] 왜(조정 이유) 명시 */}
-      {rebal && (
+      {etfTab === "rec" && rebal && (
         <section className="card">
           <div className="label">자산 배분 · 리밸런싱
             <span className="sub">{rebal.actions ? "현재 → 목표" : "현재 비중"}</span>
@@ -1009,7 +1126,7 @@ export default function EtfDashboard() {
       )}
 
       {/* [§3-6 피드백13] 시계열·예측(ForecastChart) — 실제 평가액을 기점으로 시나리오 투영. 항상 '참고용·확정 아님' */}
-      {s && s.value_krw > 0 && (() => {
+      {etfTab === "rec" && s && s.value_krw > 0 && (() => {
         // 가정(투명 공개): 연 기대수익 μ · 변동성 σ. 확정 예측이 아닌 통계적 시나리오.
         const MU = 0.07, SIG = 0.16, MONTHS = 12;
         const V0 = s.value_krw;
@@ -1081,25 +1198,9 @@ export default function EtfDashboard() {
         );
       })()}
 
-      {/* 4) 절세 (확정 계산) — 일반 계좌 기준 · 계좌 유형별 세제는 아래 '내 ETF' 버킷 참고 */}
-      {tax && (
-        <section className="card">
-          <div className="label">세금 · 절세 <span className="sub">일반 계좌 · 확정 계산</span>
-            <span className="tax-info" title="일반 계좌(해외상장 ETF) 기준 계산입니다. 연금·ISA 계좌는 세제가 다르므로 아래 '내 ETF' 계좌 버킷에서 확인하세요.">ⓘ</span>
-          </div>
-          <div className="tax-line"><span>전량 매도 시 양도세</span><b className="neg">{won(tax.tax_all)}원</b></div>
-          <div className="tax-hint">
-            순이익 {won(tax.net)}원 − 기본공제 250만 = 과세표준 {won(tax.base_all)}원 × 22%
-          </div>
-          <div className="tax-hint sub">
-            손실종목({tax.losses?.map((l) => l.ticker).join("·") || "-"}) <span className="term" title="같은 과세연도 내 이익과 손실을 합산해 순이익에만 과세하는 것. 손실 종목을 함께 매도하면 과세표준이 줄어듭니다.">손익통산</span> 후. <span className="term" title="평가손실 종목을 연내 매도해 손실을 확정(실현)하고, 이익 실현은 다음 해로 미뤄 올해 과세표준을 낮추는 절세 기법.">손실수확</span>+이익이연 시 올해 0원 가능.
-          </div>
-          <div className="tax-disclaim">⚖️ {TAX_DISCLAIMER}</div>
-        </section>
-      )}
-
-      {/* [#1 양도세 올해 실현 누계] 브로커 매도내역 기준 실현 양도차익 추적 — 연 250만 공제 사용/잔여·올해 세금 */}
-      {(() => {
+      {/* [ETF 재구성 Phase1] 연도별 개인투자 절세 방안 — 기존 '세금·절세'(미실현 전량매도)와
+          '올해 실현 양도차익'을 연도 기준 한 카드로 묶음. 일반계좌 250만 공제·손익통산. */}
+      {etfTab === "rec" && (() => {
         const yr = new Date(Date.now() + 9 * 3600 * 1000).getUTCFullYear();
         const yrItems = realized.filter((r) => String(r.date).startsWith(String(yr)));
         const net = yrItems.reduce((s, r) => s + (Number(r.gainKrw) || 0), 0);
@@ -1109,7 +1210,10 @@ export default function EtfDashboard() {
         const taxY = Math.max(0, Math.round((net - DED) * 0.22));
         return (
           <section className="card">
-            <div className="label">🧾 올해({yr}) 실현 양도차익 <span className="sub">브로커 매도내역 기준</span>
+            <div className="label">🧾 연도별 개인투자 절세 방안 <span className="sub">일반계좌 · 250만 공제·손익통산</span></div>
+
+            {/* (1) 올해 실현 양도차익 — 브로커 매도내역 기준 직접 입력 */}
+            <div className="op-h">📆 올해({yr}) 실현 양도차익
               <button className="rz-add" onClick={() => setAddReal((v) => !v)}>{addReal ? "취소" : "＋ 기록"}</button>
             </div>
             {addReal && (
@@ -1139,13 +1243,27 @@ export default function EtfDashboard() {
                 <div className="rz-srow big"><span>올해 실현 기준 양도세</span><b className="neg">{won(taxY)}원</b></div>
               </div>
             )}
-            <div className="tax-disclaim">※ 브로커 매도내역 기준 직접 입력. 미실현(현재 보유)은 위 ‘전량 매도 시’와 별개입니다. {TAX_DISCLAIMER}</div>
+
+            {/* (2) 미실현 — 지금 전량 매도 시(확정 계산) */}
+            {tax && (
+              <>
+                <div className="op-h" style={{ marginTop: 16 }}>💰 지금 전량 매도 시(미실현)
+                  <span className="tax-info" title="일반 계좌(해외상장 ETF) 기준 계산입니다. 연금·ISA 계좌는 세제가 다르므로 '보유' 탭 '내 ETF' 계좌 버킷에서 확인하세요.">ⓘ</span>
+                </div>
+                <div className="tax-line"><span>전량 매도 시 양도세</span><b className="neg">{won(tax.tax_all)}원</b></div>
+                <div className="tax-hint">순이익 {won(tax.net)}원 − 기본공제 250만 = 과세표준 {won(tax.base_all)}원 × 22%</div>
+                <div className="tax-hint sub">
+                  손실종목({tax.losses?.map((l) => l.ticker).join("·") || "-"}) <span className="term" title="같은 과세연도 내 이익과 손실을 합산해 순이익에만 과세하는 것. 손실 종목을 함께 매도하면 과세표준이 줄어듭니다.">손익통산</span> 후. <span className="term" title="평가손실 종목을 연내 매도해 손실을 확정(실현)하고, 이익 실현은 다음 해로 미뤄 올해 과세표준을 낮추는 절세 기법.">손실수확</span>+이익이연 시 올해 0원 가능.
+                </div>
+              </>
+            )}
+            <div className="tax-disclaim">※ 실현분은 브로커 매도내역 기준 직접 입력이며, 미실현(현재 보유)은 별개입니다. ⚖️ {TAX_DISCLAIMER}</div>
           </section>
         );
       })()}
 
       {/* 5) 종목별 수익 분해 — 총투자액/총이익금 SummaryBar + 3열 정렬(시안) */}
-      {positions.length > 0 && (
+      {etfTab === "hold" && positions.length > 0 && (
         <section className="card">
           {/* [D4] 상세는 기본 접힘 — 페이지 길이 축약(A1 동일 원칙) */}
           <button className="etf-acc-h" onClick={() => setDetailOpen((o) => !o)} aria-expanded={detailOpen}>
@@ -1213,6 +1331,7 @@ export default function EtfDashboard() {
 
       {/* 6) 내 ETF — 자동 시세 갱신. [사용자 지시] 신규 매수/매도 입력(대량가져오기·매수매도
           기록 폼)은 우측 하단 "+" 버튼과 중복이라 삭제 — 목록·수정·삭제는 이 카드에 유지. */}
+      {etfTab === "hold" && (
       <section className="card myetf">
         <div className="label">🧾 내 ETF <span className="sub">시세 자동 갱신</span>
           {myTotal > 0 && <span className="me-total">평가 {won(myTotal)}원</span>}
@@ -1366,23 +1485,11 @@ export default function EtfDashboard() {
           </div>
         )}
 
-        {/* [2026-08-23] 기타 금융자산(펀드·디폴트옵션 등 티커 없는 보유) — 항상 노출 */}
-        {otherAssets.length > 0 && (
-          <div className="other-assets">
-            <div className="other-h">💼 기타 금융자산 <span className="other-sub">티커 없는 펀드·디폴트옵션·현금 등</span></div>
-            {otherAssets.map((o) => (
-              <div className="other-row" key={o.id}>
-                <span className="other-name">{o.isCash ? "💰 " : ""}{o.name}<span className="other-acct">{o.account}</span></span>
-                <span className="other-val">{Number(o.valueKrw).toLocaleString()}원</span>
-                <button className="other-del" onClick={() => delOtherAsset(o)} aria-label="삭제">✕</button>
-              </div>
-            ))}
-            <div className="other-note">시세 자동 갱신이 안 됩니다(펀드라 애초에 실시간 공개 시세가 없어요) — 평가금액이 바뀌면 삭제 후 다시 등록해주세요.</div>
-          </div>
-        )}
+        {/* [ETF 재구성 Phase1] 기타 금융자산은 아래 별도 카드(추가·수정·매도)로 분리 */}
 
         {/* [사용자 지시] 신규 매수/매도 등록용 상시 노출 폼은 "+" 버튼과 중복이라 삭제하고,
-            기존 보유 "수정" 전용으로만 남긴다 — editHolding 클릭 시에만 나타난다. */}
+            기존 보유 "수정" 전용으로만 남긴다 — editHolding 클릭 시에만 나타난다.
+            보유 목록(이 보유 탭)에서만 트리거되므로 이 카드 안에 유지한다. */}
         {editingHolding && (
         <div className="me-form">
           <div className="mf-tabs">
@@ -1445,6 +1552,70 @@ export default function EtfDashboard() {
         )}
         <div className="me-foot">시세는 공개 소스(stooq)에서 5분 캐시로 자동 갱신 · USD는 오늘 환율({fxRate ? `${Math.round(fxRate).toLocaleString()}원` : "조회 중"})로 원화 환산 · 참고용 · 신규 매수/매도는 우측 하단 “+”</div>
       </section>
+      )}
+
+      {/* [ETF 재구성 Phase1] 기타 금융자산 — 추가·수정(평가액 갱신)·매도/인출(차감)·삭제. 계좌별 그룹. */}
+      {etfTab === "hold" && (
+        <section className="card oa-card">
+          <div className="label">💼 기타 금융자산 <span className="sub">펀드·채권·현금·디폴트옵션</span>
+            {otherAssetsSum > 0 && <span className="me-total">합계 {won(otherAssetsSum)}원</span>}
+          </div>
+          <div className="oa-add">
+            <input className="oa-in oa-nm" placeholder="이름(예: 디폴트옵션 성장형)" value={oaForm.name}
+              onChange={(e) => setOaForm((f) => ({ ...f, name: e.target.value }))} />
+            <input className="oa-in oa-val" type="number" inputMode="decimal" placeholder="평가액(만원)" value={oaForm.valueKrw}
+              onChange={(e) => setOaForm((f) => ({ ...f, valueKrw: e.target.value }))} />
+            <select className="oa-in" value={oaForm.account} onChange={(e) => setOaForm((f) => ({ ...f, account: e.target.value }))}>
+              {ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}
+            </select>
+            <select className="oa-in" value={oaForm.kind} onChange={(e) => setOaForm((f) => ({ ...f, kind: e.target.value }))}>
+              {OTHER_KINDS.map((k) => <option key={k} value={k}>{OA_KIND_LABEL[k]}</option>)}
+            </select>
+            <button className="oa-add-btn" onClick={submitOtherAsset} disabled={!oaForm.name.trim() || !(Number(oaForm.valueKrw) >= 0)}>추가</button>
+          </div>
+          {otherAssets.length > 0 ? (
+            <div className="oa-groups">
+              {ACCOUNTS.filter((a) => otherAssets.some((o) => (o.account || "일반") === a)).map((acct) => {
+                const rows = otherAssets.filter((o) => (o.account || "일반") === acct);
+                const sub = rows.reduce((s, o) => s + (Number(o.valueKrw) || 0), 0);
+                return (
+                  <div className="oa-grp" key={acct}>
+                    <div className="oa-grp-h">
+                      <span className={`me-acct-badge ${isPensionAcct(acct) ? "pension" : acct === "ISA" ? "isa" : "normal"}`}>{acct}</span>
+                      <span className="me-grp-sum">{won(sub)}원</span>
+                    </div>
+                    {rows.map((o) => (
+                      <div className="oa-row" key={o.id}>
+                        <div className="oa-main">
+                          <span className="oa-name">{o.kind === "cash" ? "💰 " : ""}{o.name}<span className="oa-kind">{OA_KIND_LABEL[o.kind] || "펀드"}</span></span>
+                          <span className="oa-val">{Number(o.valueKrw).toLocaleString()}원</span>
+                        </div>
+                        <div className="oa-act">
+                          <button className="oa-btn" onClick={() => openOaAct(o, "edit")}>수정</button>
+                          <button className="oa-btn" onClick={() => openOaAct(o, "sell")}>매도/인출</button>
+                          <button className="oa-btn del" onClick={() => delOtherAsset(o)} aria-label="삭제">✕</button>
+                        </div>
+                        {oaActId === o.id && (
+                          <div className="oa-edit">
+                            <input className="oa-in" type="number" inputMode="decimal"
+                              placeholder={oaActMode === "edit" ? "새 평가액(만원)" : "차감 금액(만원)"}
+                              value={oaActVal} onChange={(e) => setOaActVal(e.target.value)} />
+                            <button className="oa-commit" onClick={() => commitOaAct(o)}>{oaActMode === "edit" ? "평가액 갱신" : "인출 반영"}</button>
+                            <button className="oa-cancel" onClick={closeOaAct}>취소</button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="me-empty">티커 없는 펀드·디폴트옵션·채권·현금을 등록하면 <b>계좌별 운용결과</b>가 보이고 총자산에 반영됩니다. 개인연금·퇴직연금 계좌로 넣으면 연금 운용현황도 함께 집계됩니다.</div>
+          )}
+          <div className="other-note">시세 자동 갱신이 안 되는 자산입니다 — 평가금액이 바뀌면 <b>수정</b>으로 갱신하거나 <b>매도/인출</b>로 차감하세요. 변경은 총자산(원장)에 즉시 반영됩니다.</div>
+        </section>
+      )}
 
       <div className="foot">확정 계산(수익·세금·중복도)은 입력값 기반. 예측(Forecast)은 통계적 시나리오(참고용·확정 아님). · 세무자문 아님</div>
 
@@ -1454,6 +1625,45 @@ export default function EtfDashboard() {
         .etf { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 84px); font-family: var(--font-sans); color: var(--color-ink); }
         /* [사용자 지시] 상위 메뉴 고정 — 헤더+타이틀바를 뷰포트 상단에 붙인다 */
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
+        /* [ETF 재구성 Phase1] 보유|추천 상위 탭 (index.js .pwa-subtabs 패턴 복제) */
+        .etf-subtabs { display: flex; gap: 6px; margin: 8px 0 6px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 4px; box-shadow: var(--shadow-card); }
+        .etf-subtab { flex: 1; min-height: 36px; padding: 0; background: none; border: none; border-radius: 9px; cursor: pointer; color: var(--color-ink-2); font-family: var(--font-sans); font-size: 0.8rem; font-weight: 700; }
+        .etf-subtab.active { background: var(--color-primary); color: #fff; }
+        /* [ETF 재구성 Phase1] 종목 추천 카드 */
+        .etf-reco .reco-list { display: flex; flex-direction: column; gap: 8px; }
+        .reco-item { border-left: 3px solid var(--color-primary); background: var(--color-card-soft); border-radius: 10px; padding: 10px 12px; }
+        .reco-item.sector { border-left-color: var(--color-warning); }
+        .reco-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+        .reco-nm { font-size: 0.84rem; font-weight: 800; color: var(--color-ink); }
+        .reco-axis { font-size: 0.62rem; font-weight: 800; color: var(--color-ink-3); background: var(--color-card); border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
+        .reco-why { font-size: 0.76rem; color: var(--color-ink-2); line-height: 1.55; margin-top: 5px; word-break: keep-all; }
+        .reco-note { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 12px; line-height: 1.5; word-break: keep-all; }
+        .reco-note b { color: var(--color-ink-2); }
+        /* [ETF 재구성 Phase1] 연금운영/절세 카드 소제목 */
+        .op-h { font-size: 0.8rem; font-weight: 800; color: var(--color-ink); margin: 4px 0 8px; display: flex; align-items: center; gap: 6px; }
+        .op-h .rz-add { margin-left: auto; float: none; }
+        .op-h .pc-scope { font-weight: 700; }
+        /* [ETF 재구성 Phase1] 기타 금융자산 카드 */
+        .oa-card .me-total { float: right; font-size: 0.72rem; font-weight: 800; color: var(--color-primary); }
+        .oa-add { display: grid; grid-template-columns: 1.6fr 1fr; gap: 6px; margin-bottom: 12px; }
+        .oa-in { border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 9px; padding: 9px 10px; font-size: 0.82rem; font-family: var(--font-sans); color: var(--color-ink); min-width: 0; }
+        .oa-in:focus { outline: none; border-color: var(--color-primary); }
+        .oa-add-btn { grid-column: 1 / -1; border: none; border-radius: 10px; padding: 10px 0; background: var(--color-primary); color: #fff; font-size: 0.82rem; font-weight: 800; font-family: var(--font-sans); cursor: pointer; }
+        .oa-add-btn:disabled { opacity: 0.5; cursor: default; }
+        .oa-groups { display: flex; flex-direction: column; gap: 14px; }
+        .oa-grp-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+        .oa-row { background: var(--color-card-soft); border-radius: 11px; padding: 9px 12px; margin-bottom: 6px; }
+        .oa-main { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .oa-name { font-size: 0.8rem; font-weight: 700; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+        .oa-kind { margin-left: 6px; font-size: 0.6rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card); border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 7px; }
+        .oa-val { font-size: 0.8rem; font-weight: 700; color: var(--color-ink); font-family: ui-monospace, monospace; white-space: nowrap; flex-shrink: 0; }
+        .oa-act { display: flex; gap: 6px; margin-top: 8px; }
+        .oa-btn { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 7px; padding: 4px 9px; font-size: 0.68rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .oa-btn.del { margin-left: auto; color: var(--color-danger); border-color: var(--color-danger); }
+        .oa-edit { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+        .oa-edit .oa-in { flex: 1 1 120px; }
+        .oa-commit { border: none; background: var(--color-primary); color: #fff; border-radius: 8px; padding: 8px 12px; font-size: 0.74rem; font-weight: 800; font-family: var(--font-sans); cursor: pointer; }
+        .oa-cancel { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 8px; padding: 8px 12px; font-size: 0.74rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         /* [D4] 접기 헤더 — 라벨 전체가 44px 타깃 */
         .etf-acc-h { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); text-align: left; }
         .etf-caret { color: var(--color-ink-3); font-size: 0.9rem; flex-shrink: 0; }
