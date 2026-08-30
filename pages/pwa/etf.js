@@ -580,8 +580,29 @@ export default function EtfDashboard() {
   const pieItems = [...positions, ...holdings]
     .map((x) => ({ ticker: x.ticker, valueKrw: x.value_krw ?? x.eval_krw ?? (holdingMetrics(x).valueKrw || 0) }))
     .filter((x) => x.ticker && x.valueKrw > 0);
-  // [ETF 재구성 Phase1] 규칙기반 추천 후보(순수함수). AI 이유설명은 Phase2.
+  // [ETF 재구성 Phase1] 규칙기반 추천 후보(순수함수).
   const etfRecs = recommendEtfs({ holdings, positions: pieItems, target: targetAlloc, overlap });
+  // [ETF Phase2] 후보 '이유'를 Claude로 다듬어 채운다(추천 탭 진입 시 1회, 실패 시 규칙문구 폴백).
+  const [recReasons, setRecReasons] = useState([]);
+  const recKey = etfRecs.map((r) => r.name).join("|");
+  useEffect(() => {
+    if (etfTab !== "rec" || !etfRecs.length) return;
+    let alive = true;
+    const holdSummary = holdings && holdings.length
+      ? `${holdings.slice(0, 5).map((h) => h.ticker).filter(Boolean).join(", ")} 등 ${holdings.length}종목`
+      : "보유 ETF 없음";
+    fetch("/api/pwa/etf-reason", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        candidates: etfRecs.map((r) => ({ name: r.name, bucket: r.bucket, axis: r.axis, reasonRule: r.reasonRule })),
+        holdings_summary: holdSummary, target: targetAlloc || null,
+      }),
+    }).then((r) => r.json()).then((d) => {
+      if (alive && Array.isArray(d.reasons) && d.reasons.length === etfRecs.length) setRecReasons(d.reasons);
+    }).catch(() => {});
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recKey, etfTab]);
 
   // [N1] onboard(etf_uk) 미러링 제거 — ETF 평가액은 lib/ledger가 lib/etfLive로 직접 계산한다.
   //   과거엔 이 미러가 onboard를 오염시켜 폴백 병합에서 ETF가 두 번 더해졌다(5.15+5.19=10.34억).
@@ -827,11 +848,11 @@ export default function EtfDashboard() {
                   <span className="reco-nm">{r.name}</span>
                   <span className={`reco-axis ${r.axis}`}>{r.axis === "region" ? "지역" : "섹터"} · {r.bucket}</span>
                 </div>
-                <div className="reco-why">{r.reasonRule}</div>
+                <div className="reco-why">{recReasons[i] ? <><span className="reco-ai">AI</span>{recReasons[i]}</> : r.reasonRule}</div>
               </div>
             ))}
           </div>
-          <div className="reco-note">규칙 기반 후보입니다 — <b>AI 이유설명은 다음 단계</b>에서 제공됩니다. 특정 종목 매수 권유가 아니며 최종 판단은 본인이 하세요.</div>
+          <div className="reco-note">규칙 기반 후보 + <b>AI 이유설명</b>입니다. 특정 종목 매수 권유가 아니며 최종 판단은 본인이 하세요.</div>
         </section>
       )}
 
@@ -1637,6 +1658,7 @@ export default function EtfDashboard() {
         .reco-nm { font-size: 0.84rem; font-weight: 800; color: var(--color-ink); }
         .reco-axis { font-size: 0.62rem; font-weight: 800; color: var(--color-ink-3); background: var(--color-card); border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
         .reco-why { font-size: 0.76rem; color: var(--color-ink-2); line-height: 1.55; margin-top: 5px; word-break: keep-all; }
+        .reco-ai { display: inline-block; font-size: 0.56rem; font-weight: 800; color: #fff; background: var(--color-primary); border-radius: 4px; padding: 1px 5px; margin-right: 6px; vertical-align: middle; letter-spacing: .3px; }
         .reco-note { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 12px; line-height: 1.5; word-break: keep-all; }
         .reco-note b { color: var(--color-ink-2); }
         /* [ETF 재구성 Phase1] 연금운영/절세 카드 소제목 */
