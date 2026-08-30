@@ -109,6 +109,17 @@ export default function TodayPage({ announcements = [] }) {
     if (router.query.news) router.back();
   };
   const [view, setView] = useState(0); // [OS-2] 0=대결 1=부동산 2=ETF 3=이야기 — 종목변경 순환에 맞춰 콘텐츠 필터
+  // [ETF] 오늘의 ETF — 주간 상승률 최고(국내/해외) 실데이터(movers). ETF 뷰 진입 시 1회 로드.
+  const [etfMovers, setEtfMovers] = useState(null);
+  useEffect(() => {
+    if (view !== 2 || etfMovers != null) return;
+    let alive = true;
+    fetch(`/api/pwa/etf/movers?trader=${getTrader()}`).then((r) => r.json())
+      .then((d) => { if (alive) setEtfMovers(d && !d.error ? d : {}); })
+      .catch(() => { if (alive) setEtfMovers({}); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
 
   const load = useCallback(() => {
     const tr = getTrader();
@@ -639,9 +650,24 @@ export default function TodayPage({ announcements = [] }) {
             "ISA 만기 자금을 연금계좌로 옮기면 추가 세액공제 한도가 생깁니다.",
           ];
           const tip = TAX_TIPS[DAY % TAX_TIPS.length];
+          const mv = etfMovers && (etfMovers.domestic || etfMovers.overseas) ? etfMovers : null;
+          const mvRow = (label, m) => m ? (
+            <button type="button" className="etf1-mv" onClick={() => router.push("/pwa/etf")}>
+              <span className="etf1-mv-k">{label}</span>
+              <span className="etf1-mv-nm">{m.name}</span>
+              <span className={`etf1-mv-pct ${m.pct >= 0 ? "up" : "dn"}`}>{m.pct >= 0 ? "+" : ""}{m.pct}%</span>
+            </button>
+          ) : null;
           return (
             <section className="card sc">
               <div className="sc-h">🎯 오늘의 ETF 한 수</div>
+              {mv && (
+                <div className="etf1-movers">
+                  <div className="etf1-mv-h">🔥 이번 주 상승률 최고 <span>최근 7일 · 실거래 종가</span></div>
+                  {mvRow("국내", mv.domestic)}
+                  {mvRow("해외", mv.overseas)}
+                </div>
+              )}
               {pick ? (
                 <div className="etf1-reco">
                   <div className="etf1-nm">📌 {pick.name}</div>
@@ -854,6 +880,14 @@ export default function TodayPage({ announcements = [] }) {
         .etf1-tax { font-size: 0.78rem; color: var(--color-ink-2); line-height: 1.55; padding: 10px 12px; background: var(--color-card-soft); border-radius: 10px; word-break: keep-all; }
         .etf1-tax b { color: var(--color-primary); }
         .etf1-disc { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 6px; }
+        .etf1-movers { margin-bottom: 12px; }
+        .etf1-mv-h { font-size: 0.76rem; font-weight: 800; color: var(--color-ink); margin-bottom: 7px; }
+        .etf1-mv-h span { font-size: 0.62rem; font-weight: 600; color: var(--color-ink-3); margin-left: 5px; }
+        .etf1-mv { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: var(--color-card-soft); border: none; border-radius: 10px; padding: 9px 11px; margin-bottom: 6px; cursor: pointer; font-family: var(--font-sans); }
+        .etf1-mv-k { flex-shrink: 0; font-size: 0.62rem; font-weight: 800; color: #fff; background: var(--color-ink-3); border-radius: 5px; padding: 2px 6px; }
+        .etf1-mv-nm { flex: 1; min-width: 0; font-size: 0.78rem; font-weight: 700; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .etf1-mv-pct { flex-shrink: 0; font-size: 0.82rem; font-weight: 800; font-family: ui-monospace, monospace; }
+        .etf1-mv-pct.up { color: var(--color-danger); } .etf1-mv-pct.dn { color: var(--color-primary); }
         .sc-list { display: flex; flex-direction: column; }
         .sc-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--color-line); }
         .sc-row:last-child { border-bottom: none; }

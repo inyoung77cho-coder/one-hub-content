@@ -6,7 +6,7 @@
 // (구 기본값 3.36.171.171은 별개 구/스테이징 박스 → 정리대상. fallback으로 두면 EC2 폐기 시 ETF 깨짐)
 const ETF_API = process.env.ETF_API_URL || "http://54.180.54.132:5003";
 
-const ENDPOINTS = { report: "report", tax: "tax", overlap: "overlap", positions: "positions", rebalance: "rebalance", status: "status" };
+const ENDPOINTS = { report: "report", tax: "tax", overlap: "overlap", positions: "positions", rebalance: "rebalance", status: "status", movers: "movers" };
 
 export default async function handler(req, res) {
   const fn = ENDPOINTS[req.query.fn];
