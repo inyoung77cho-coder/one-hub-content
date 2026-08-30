@@ -41,6 +41,7 @@ export default function RealEstateDashboard() {
   const [addProp, setAddProp] = useState(false); // 추가 폼 열림
   const [pName, setPName] = useState(""); const [pVal, setPVal] = useState(""); const [pMemo, setPMemo] = useState("");
   const [pDeposit, setPDeposit] = useState(""); const [pMonthly, setPMonthly] = useState(""); // [피드백] 전세/월세 보증금(억)·월수익(만원)
+  const [pBuy, setPBuy] = useState(""); // [수익] 매수가(억, 선택) — 전체 평가손익 계산용
   const saveReProps = (list) => { setReProps(list); try { localStorage.setItem("onehub_re_properties", JSON.stringify(list)); window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {} };
   const addReProp = () => {
     const name = String(pName || "").trim(); const v = Number(pVal);
@@ -48,8 +49,9 @@ export default function RealEstateDashboard() {
     // [피드백] 보증금·월수익으로 순수투자금(평가−보증금)·월수익을 구분해 기록. 총자산(평가금액)은 그대로.
     const deposit = Math.max(0, Number(pDeposit) || 0);
     const monthly = Math.max(0, Number(pMonthly) || 0);
-    saveReProps([...reProps, { id: Date.now(), name, valueUk: v, deposit, monthly, memo: String(pMemo || "").trim() }]);
-    setPName(""); setPVal(""); setPMemo(""); setPDeposit(""); setPMonthly(""); setAddProp(false);
+    const buyUk = Number(pBuy) > 0 ? Number(pBuy) : null; // [수익] 매수가(선택) — 있으면 평가손익 집계
+    saveReProps([...reProps, { id: Date.now(), name, valueUk: v, buyUk, deposit, monthly, memo: String(pMemo || "").trim() }]);
+    setPName(""); setPVal(""); setPMemo(""); setPDeposit(""); setPMonthly(""); setPBuy(""); setAddProp(false);
   };
   const delReProp = (id) => saveReProps(reProps.filter((p) => p.id !== id));
   // [item1] 부동산 검색 — 상단 🔍를 종목검색이 아니라 단지/관심지역 검색으로.
@@ -424,6 +426,9 @@ export default function RealEstateDashboard() {
           {reProps.map((p) => {
             const dep = Number(p.deposit) || 0, mon = Number(p.monthly) || 0;
             const netUk = Math.round(((Number(p.valueUk) || 0) - dep) * 100) / 100;
+            const buy = Number(p.buyUk) > 0 ? Number(p.buyUk) : null; // [수익] 매수가 있으면 평가손익 표시
+            const pnl = buy != null ? Math.round(((Number(p.valueUk) || 0) - buy) * 100) / 100 : null;
+            const pnlPct = pnl != null && buy ? (pnl / buy) * 100 : null;
             const fc = findForecast(p.name);
             return (
               <div key={p.id}>
@@ -431,6 +436,9 @@ export default function RealEstateDashboard() {
                 <span className="rp-name">🏠 {p.name}{p.memo ? <span className="rp-memo"> · {p.memo}</span> : null}
                   {(dep > 0 || mon > 0) && (
                     <span className="rp-invest">순수투자금 {uk(netUk)}{dep > 0 ? ` (보증금 ${uk(dep)} 차감)` : ""}{mon > 0 ? ` · 월 ${mon.toLocaleString()}만원` : ""}</span>
+                  )}
+                  {pnl != null && (
+                    <span className={`rp-pnl ${pnl >= 0 ? "pos" : "neg"}`}>평가손익 {pnl >= 0 ? "+" : ""}{uk(pnl)}{pnlPct != null ? ` · ${pct(pnlPct)}` : ""} <em>매수 {uk(buy)}</em></span>
                   )}
                 </span>
                 <span className="rp-val">{uk(p.valueUk)}<em>평가</em></span>
@@ -446,6 +454,7 @@ export default function RealEstateDashboard() {
             <div className="rp-form">
               <input className="rp-in" placeholder="단지/부동산명" value={pName} onChange={(e) => setPName(e.target.value)} />
               <input className="rp-in num" type="number" inputMode="decimal" placeholder="평가금액(억)" value={pVal} onChange={(e) => setPVal(e.target.value)} />
+              <input className="rp-in num" type="number" inputMode="decimal" placeholder="매수가(억, 선택·손익계산)" value={pBuy} onChange={(e) => setPBuy(e.target.value)} />
               <input className="rp-in num" type="number" inputMode="decimal" placeholder="전세/월세 보증금(억, 선택)" value={pDeposit} onChange={(e) => setPDeposit(e.target.value)} />
               <input className="rp-in num" type="number" inputMode="decimal" placeholder="월수익(만원, 선택)" value={pMonthly} onChange={(e) => setPMonthly(e.target.value)} />
               <input className="rp-in" placeholder="메모(선택)" value={pMemo} onChange={(e) => setPMemo(e.target.value)} />
@@ -468,7 +477,7 @@ export default function RealEstateDashboard() {
         </section>
       )}
 
-      {/* [신규] 수익 요약 — 보유 부동산 평가손익(대표 단지 기준) + 임대수익 합계 */}
+      {/* [신규] 수익 요약 — 보유 부동산 전체 평가손익(대표 + 매수가 입력된 추가 부동산) + 임대수익 합계 */}
       {myProp && (() => {
         const _sp = myPyeongPrice();
         const _curUk = _sp.uk;
@@ -479,11 +488,24 @@ export default function RealEstateDashboard() {
         const _mon = reProps.reduce((s, p) => s + (Number(p.monthly) || 0), 0);
         const _valSum = reProps.reduce((s, p) => s + (Number(p.valueUk) || 0), 0);
         const _netUk = Math.round((_valSum - _dep) * 100) / 100;
+        // [수익] 전체 평가손익 = 대표(매수가 있고 시세 신뢰 시) + 매수가 입력된 추가 부동산.
+        //   손익률 분모는 '집계에 포함된 매수가 합'(손익을 낸 자산의 매수가만).
+        let _pnlSum = 0, _buyBasis = 0, _pnlCount = 0;
+        if (_repPnlUk != null && _buyUk) { _pnlSum += _repPnlUk; _buyBasis += _buyUk; _pnlCount++; }
+        reProps.forEach((p) => {
+          const b = Number(p.buyUk) > 0 ? Number(p.buyUk) : null;
+          if (b != null) { _pnlSum += (Number(p.valueUk) || 0) - b; _buyBasis += b; _pnlCount++; }
+        });
+        const _totalPnlUk = _pnlCount > 0 ? Math.round(_pnlSum * 100) / 100 : null;
+        const _totalPnlPct = _totalPnlUk != null && _buyBasis > 0 ? (_totalPnlUk / _buyBasis) * 100 : null;
+        // 대표만 손익이 있으면 '대표 단지 기준'으로, 추가 부동산도 있으면 '전체'로 라벨 구분.
+        const _pnlScope = _pnlCount > 1 ? "all" : (_pnlCount === 1 ? "rep" : "none");
         return (
           <ReIncomeSummaryCard
             totalEvalUk={reTotalEvalUk}
-            repPnlUk={_repPnlUk}
-            repPnlPct={_repPnlPct}
+            totalPnlUk={_totalPnlUk}
+            totalPnlPct={_totalPnlPct}
+            pnlScope={_pnlScope}
             totalDepositUk={_dep}
             totalMonthly={_mon}
             totalNetUk={_netUk}
@@ -672,6 +694,9 @@ export default function RealEstateDashboard() {
         .rp-note { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 9px; line-height: 1.55; word-break: keep-all; }
         /* [피드백] 순수투자금·월수익 표기 */
         .rp-invest { display: block; font-size: 0.66rem; font-weight: 700; color: var(--color-primary); margin-top: 3px; word-break: keep-all; }
+        .rp-pnl { display: block; font-size: 0.66rem; font-weight: 800; margin-top: 3px; word-break: keep-all; }
+        .rp-pnl.pos { color: var(--color-success); } .rp-pnl.neg { color: var(--color-danger); }
+        .rp-pnl em { font-style: normal; font-weight: 700; color: var(--color-ink-3); }
         .rp-forecast { font-size: 0.68rem; font-weight: 600; color: var(--color-ink-3); padding: 2px 0 6px; word-break: keep-all; }
         .rp-invest-total { display: flex; align-items: center; justify-content: space-between; margin-top: 7px; }
         .rp-invest-total span { font-size: 0.74rem; font-weight: 700; color: var(--color-ink-2); }

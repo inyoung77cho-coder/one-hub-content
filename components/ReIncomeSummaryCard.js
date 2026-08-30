@@ -6,8 +6,9 @@ const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)
 
 export default function ReIncomeSummaryCard({
   totalEvalUk = null,
-  repPnlUk = null,
-  repPnlPct = null,
+  totalPnlUk = null,       // 전체 평가손익(대표 + 매수가 입력된 추가 부동산)
+  totalPnlPct = null,
+  pnlScope = "none",       // "all"(대표+추가) | "rep"(대표만) | "none"
   totalDepositUk = null,
   totalMonthly = null,
   totalNetUk = null,
@@ -19,9 +20,10 @@ export default function ReIncomeSummaryCard({
     : null;
 
   // 표시할 값이 하나도 없으면 카드 자체를 숨김.
-  if (totalEvalUk == null && repPnlUk == null && totalDepositUk == null && !hasRental && totalNetUk == null) {
+  if (totalEvalUk == null && totalPnlUk == null && totalDepositUk == null && !hasRental && totalNetUk == null) {
     return null;
   }
+  const pnlLabel = pnlScope === "all" ? "전체 평가손익" : "대표 단지 평가손익";
 
   return (
     <section className="ris-card">
@@ -32,10 +34,10 @@ export default function ReIncomeSummaryCard({
         {totalEvalUk != null && (
           <div className="ris-row"><span>총 평가금액</span><b>{uk(totalEvalUk)}</b></div>
         )}
-        {repPnlUk != null && (
-          <div className={`ris-row ${repPnlUk >= 0 ? "pos" : "neg"}`}>
-            <span>대표 단지 평가손익 <em>추정</em></span>
-            <b>{repPnlUk >= 0 ? "+" : ""}{uk(repPnlUk)}{repPnlPct != null ? ` · ${pct(repPnlPct)}` : ""}</b>
+        {totalPnlUk != null && (
+          <div className={`ris-row ${totalPnlUk >= 0 ? "pos" : "neg"}`}>
+            <span>{pnlLabel} <em>추정</em></span>
+            <b>{totalPnlUk >= 0 ? "+" : ""}{uk(totalPnlUk)}{totalPnlPct != null ? ` · ${pct(totalPnlPct)}` : ""}</b>
           </div>
         )}
         {totalDepositUk != null && Number(totalDepositUk) > 0 && (
@@ -53,8 +55,8 @@ export default function ReIncomeSummaryCard({
       </div>
 
       <p className="ris-note">
-        평가손익은 <b>대표 단지 기준</b>만 집계합니다 — 추가 부동산은 매수가가 입력되지 않아
-        평가금액·임대수익만 반영합니다. 모두 <b>추정</b>이며 확정·투자자문이 아닙니다.
+        평가손익은 <b>매수가가 입력된 부동산</b>만 합산합니다(대표 + 추가). 매수가를 안 넣은 항목은
+        평가금액·임대수익에만 반영됩니다. 모두 <b>추정</b>이며 확정·투자자문이 아닙니다.
       </p>
 
       <style jsx>{`
