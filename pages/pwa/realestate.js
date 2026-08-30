@@ -7,8 +7,8 @@ import AssetMapTitle from "../../components/AssetMapTitle";
 import { dedupBy } from "../../lib/useDedup";
 import { ReForm } from "../../components/shared/AssetForms";
 import Term from "../../components/Term";
-import ReportTeaser from "../../components/ReportTeaser";
-import RePositionCard, { RegionLeadersCard, RegionForecastCard, MoveScenarioCard } from "../../components/RePositionCard";
+import RePositionCard, { RegionLeadersCard, RegionForecastCard, MoveDifficultyCard } from "../../components/RePositionCard";
+import ReIncomeSummaryCard from "../../components/ReIncomeSummaryCard";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -20,28 +20,22 @@ const jtag = (d) => (d?.includes("매수") ? "buy" : "watch");
 export default function RealEstateDashboard() {
   const [brief, setBrief] = useState(null);
   const [rank, setRank] = useState(null);
-  const [macro, setMacro] = useState(null);
-  const [weekly, setWeekly] = useState(null); // [2026-08-22] 주간 전파·예측 리포트(다음주 시나리오 + 단지별 예측)
-  const [feed, setFeed] = useState(null); // [v11 #16] 최근 실거래 피드
-  const showToday = false; // [Card5] 시황·실거래·시장예상·입력은 '오늘'(홈)으로 이동 → 이 페이지에선 렌더 안 함(링크만)
+  const [weekly, setWeekly] = useState(null); // [2026-08-22] 주간 전파·예측 리포트(단지별 예측 조회용)
+  const [feed, setFeed] = useState(null); // [v11 #16] 최근 실거래 피드(평형 옵션 폴백)
   const [err, setErr] = useState(null);
+  // [재구성] 분석 | 시나리오 2메뉴 — assets.js stockTab 패턴. localStorage 유지.
+  const [reTab, setReTabState] = useState(() => {
+    if (typeof window === "undefined") return "analysis";
+    try { return localStorage.getItem("onehub_re_tab") === "scenario" ? "scenario" : "analysis"; } catch { return "analysis"; }
+  });
+  const setReTab = (v) => { setReTabState(v); try { localStorage.setItem("onehub_re_tab", v); } catch {} };
   const [myC, setMyC] = useState("");   // [S5] 내 단지
   const [tgtC, setTgtC] = useState(""); // [S5] 갈아탈 목표 단지
   const [myProp, setMyProp] = useState(null); // [S5] 내 단지 상세(위저드 등록: 평형·동층·매수가·시점)
   const [wizOpen, setWizOpen] = useState(false); // [S5] 등록 위저드 열림
   const [wiz, setWiz] = useState({ name: "", pyeong: "", dongfloor: "", buyUk: "", buyMonth: "" });
-  const [budget, setBudget] = useState("");     // [S5] 스크리너 예산(억)
-  const [jeonseRate, setJeonseRate] = useState("60"); // [S5] 전세가율(%) 가정
-  const [moveScope, setMoveScope] = useState("region"); // [S5+] 이동 범위: complex/dong/region
   const [dbAreas, setDbAreas] = useState({}); // [S5+] 단지→평형(전용면적) 백엔드 로딩(complex-areas)
   const [dongMap, setDongMap] = useState({}); // [S5+] 단지→법정동 백엔드 로딩(complex-dongs)
-  const [gapTarget, setGapTarget] = useState(""); // [R-5] 갈아탈 목표 평형(전용㎡)
-  const [gapData, setGapData] = useState(null); // [R-5] 갭 분석 결과(gap-tracker)
-  const [gapLoading, setGapLoading] = useState(false);
-  const [gapBData, setGapBData] = useState(null); // [R-5 시나리오B] 같은 동 단지 갈아타기 갭
-  const [gapCTarget, setGapCTarget] = useState(""); // [R-5 시나리오C] 목표 지역(법정동)
-  const [gapCData, setGapCData] = useState(null); // [R-5 시나리오C] 지역 변경 갭
-  const [gapCAlert, setGapCAlert] = useState(false); // [R-5 시나리오C] 관심 갭 알림 설정(클라)
   // [#1 다수 부동산] 대표 단지 외 추가 보유 부동산 목록. 각 {id,name,valueUk(평가금액),memo}
   const [reProps, setReProps] = useState([]);
   const [addProp, setAddProp] = useState(false); // 추가 폼 열림
@@ -78,10 +72,10 @@ export default function RealEstateDashboard() {
 
   useEffect(() => {
     const g = (fn) => fetch(`/api/pwa/re/${fn}`).then((r) => r.json());
-    Promise.all([g("briefing"), g("ranking"), g("macro"), g("feed"), g("weekly")])
-      .then(([b, r, m, f, w]) => {
+    Promise.all([g("briefing"), g("ranking"), g("feed"), g("weekly")])
+      .then(([b, r, f, w]) => {
         if (b.error) setErr(b.error);
-        setBrief(b); setRank(r); setMacro(m); setFeed(f);
+        setBrief(b); setRank(r); setFeed(f);
         if (w && w.ok) setWeekly(w); // pending/error 응답이면 조용히 무시(섹션 자체를 안 그림)
       })
       .catch((e) => setErr(e.message));
@@ -95,9 +89,6 @@ export default function RealEstateDashboard() {
       setTgtC(localStorage.getItem("onehub_re_target") || "");
       const mp = localStorage.getItem("onehub_re_my_property");
       if (mp) { const o = JSON.parse(mp); setMyProp(o); if (o?.name && !localStorage.getItem("onehub_re_my")) setMyC(o.name); }
-      const bg = localStorage.getItem("onehub_re_budget"); if (bg != null) setBudget(bg);
-      const jr = localStorage.getItem("onehub_re_jeonse"); if (jr != null) setJeonseRate(jr);
-      const sc = localStorage.getItem("onehub_re_scope"); if (sc) setMoveScope(sc);
       const ua = localStorage.getItem("onehub_re_my_avm"); if (ua != null && ua !== "" && Number(ua) > 0) setUserAvm(Number(ua));
       const rp = localStorage.getItem("onehub_re_properties"); if (rp) { const arr = JSON.parse(rp); if (Array.isArray(arr)) setReProps(arr); }
     } catch (e) {}
@@ -135,50 +126,8 @@ export default function RealEstateDashboard() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wizOpen, wiz.name, myProp?.name]);
-  // [R-5] 같은 단지 평형 갈아타기 갭 분석 — 내 평형 → 목표 평형 gap-tracker 호출
-  useEffect(() => {
-    const nm = myProp?.name, fa = Number(myProp?.pyeong), ta = Number(gapTarget);
-    if (!(nm && fa > 0 && ta > 0) || fa === ta) { setGapData(null); return; }
-    let alive = true; setGapLoading(true);
-    fetch(`/api/pwa/re/gapTracker?complex=${encodeURIComponent(nm)}&from_area=${fa}&to_area=${ta}`)
-      .then((r) => r.json())
-      .then((d) => { if (alive) { setGapData(d && !d.error ? d : null); setGapLoading(false); } })
-      .catch(() => { if (alive) { setGapData(null); setGapLoading(false); } });
-    return () => { alive = false; };
-  }, [myProp?.name, myProp?.pyeong, gapTarget]);
-  // [R-5 시나리오B] 같은 동 단지 갈아타기 — 후보 단지별 갭·판정(upgrade-gap)
-  useEffect(() => {
-    const nm = myProp?.name, ar = Number(myProp?.pyeong);
-    if (moveScope !== "dong" || !(nm && ar > 0)) { setGapBData(null); return; }
-    const dg = myProp?.name ? dongOf(myProp.name) : null;
-    let alive = true;
-    fetch(`/api/pwa/re/upgradeGap?from_complex=${encodeURIComponent(nm)}${dg ? `&dong=${encodeURIComponent(dg)}` : ""}&area=${ar}`)
-      .then((r) => r.json())
-      .then((d) => { if (alive) setGapBData(d && !d.error ? d : null); })
-      .catch(() => { if (alive) setGapBData(null); });
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moveScope, myProp?.name, myProp?.pyeong]);
-  // [R-5 시나리오C] 지역 변경 — 내 동 vs 목표 동 평균단가 갭·판정(region-gap)
-  useEffect(() => {
-    const fd = myProp?.name ? dongOf(myProp.name) : null;
-    const ar = Number(myProp?.pyeong) || 84;
-    if (moveScope !== "region" || !fd || !gapCTarget || fd === gapCTarget) { setGapCData(null); return; }
-    let alive = true;
-    fetch(`/api/pwa/re/regionGap?from_dong=${encodeURIComponent(fd)}&to_dong=${encodeURIComponent(gapCTarget)}&area=${ar}`)
-      .then((r) => r.json())
-      .then((d) => { if (alive) setGapCData(d && d.ok ? d : null); })
-      .catch(() => { if (alive) setGapCData(null); });
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moveScope, myProp?.name, myProp?.pyeong, gapCTarget]);
-  useEffect(() => { try { setGapCTarget(localStorage.getItem("onehub_re_gapc_dong") || ""); setGapCAlert(localStorage.getItem("onehub_re_gapc_alert") === "1"); } catch (e) {} }, []);
-  const pickGapC = (v) => { setGapCTarget(v); try { localStorage.setItem("onehub_re_gapc_dong", v); } catch (e) {} };
-  const toggleGapCAlert = () => { setGapCAlert((a) => { const n = !a; try { localStorage.setItem("onehub_re_gapc_alert", n ? "1" : "0"); } catch (e) {} return n; }); };
   const pickMy = (v) => { setMyC(v); try { localStorage.setItem("onehub_re_my", v); } catch (e) {} };
   const pickTgt = (v) => { setTgtC(v); try { localStorage.setItem("onehub_re_target", v); } catch (e) {} };
-  const changeBudget = (v) => { setBudget(v); try { localStorage.setItem("onehub_re_budget", v); } catch (e) {} };
-  const changeJeonse = (v) => { setJeonseRate(v); try { localStorage.setItem("onehub_re_jeonse", v); } catch (e) {} };
   const openWiz = () => { setWiz(myProp ? { name: myProp.name || "", pyeong: myProp.pyeong || "", dongfloor: myProp.dongfloor || "", buyUk: myProp.buyUk || "", buyMonth: myProp.buyMonth || "" } : { name: myC || "", pyeong: "", dongfloor: "", buyUk: "", buyMonth: "" }); setWizOpen(true); };
   const [delConfirm, setDelConfirm] = useState(false); // [#8] 내 단지 삭제 2단계 확인
   // [AI-2/AI-3] 내 평형 시세 직접 입력(억) + '단지 평균으로 보기' opt-in
@@ -200,8 +149,8 @@ export default function RealEstateDashboard() {
         .forEach((k) => localStorage.removeItem(k));
       window.dispatchEvent(new Event("onehub-assets-change")); // syncManager가 삭제분을 서버에 push
     } catch (e) {}
-    setMyProp(null); setMyC(""); setTgtC(""); setGapCTarget(""); setGapCAlert(false); setUserAvm(null); setShowComplexAvm(false);
-    setDelConfirm(false); setWizOpen(false); setGapData(null); setGapBData(null); setGapCData(null);
+    setMyProp(null); setMyC(""); setTgtC(""); setUserAvm(null); setShowComplexAvm(false);
+    setDelConfirm(false); setWizOpen(false);
   };
   const saveWiz = () => {
     const name = String(wiz.name || "").trim();
@@ -211,8 +160,6 @@ export default function RealEstateDashboard() {
     try { localStorage.setItem("onehub_re_my_property", JSON.stringify(obj)); localStorage.setItem("onehub_re_my", name); } catch (e) {}
     setWizOpen(false);
   };
-
-  const mac = macro?.latest;
 
   // [S5+] DB(raw_transactions 기반 feed)에서 단지별 전용면적(㎡)·평형 옵션 로딩
   const areaMap = (() => {
@@ -242,14 +189,6 @@ export default function RealEstateDashboard() {
     if (!sparse && perUk != null) return { uk: perUk, source: "pyeong", tradeN, locked: false };
     return { uk: null, source: null, tradeN, locked: true };
   };
-  // [PI-1] 법정동 폴백(complex-dongs 미도달 시 드롭다운 공백 방지). raw_transactions 실측 기준.
-  // [2026-08-09] 수지구·영통구 13개 동(기존 수집분 노출) + 강남구·서초구 22개 동(신규 2006~2026 백필) 추가.
-  const ALL_DONGS = [
-    "정자동", "야탑동", "구미동", "서현동", "이매동", "수내동", "금곡동", "분당동", "삼평동", "판교동", "백현동", "운중동", "대장동",
-    "동천동", "상현동", "성복동", "신봉동", "죽전동", "풍덕천동", "망포동", "매탄동", "신동", "영통동", "원천동", "이의동", "하동",
-    "역삼동", "개포동", "청담동", "삼성동", "대치동", "신사동", "논현동", "압구정동", "세곡동", "자곡동", "율현동", "일원동", "수서동", "도곡동",
-    "서초동", "잠원동", "반포동", "방배동", "양재동", "우면동", "내곡동", "신원동",
-  ];
   // [#4 평가금액] 부동산 자산가치 = 대표(평형별 평가시세, 없으면 매수가) + 추가 보유 평가금액 합 → 총자산 원장(onboard)에 반영.
   //   주식·ETF와 동일하게 '평가금액' 기준으로 통일. 대표 평형 시세가 잠금이면(희소평형) 매수가로 보수적 대체.
   const repEvalUk = (() => { const p = myPyeongPrice(); return p.uk != null ? p.uk : (Number(myProp?.buyUk) || 0); })();
@@ -274,7 +213,6 @@ export default function RealEstateDashboard() {
     return row?.법정동 || row?.법정동명 || brief?.region || null;
   };
   const myDong = myProp?.name ? dongOf(myProp.name) : (brief?.region || null);
-  const changeScope = (s) => { setMoveScope(s); try { localStorage.setItem("onehub_re_scope", s); } catch (e) {} };
 
   return (
     <div className="re pwa-shell">
@@ -283,6 +221,11 @@ export default function RealEstateDashboard() {
         <AppHeader onSearch={() => setReSearchOpen(true)} />
         {/* [사용자 지시] "종합자산 자산지도"에서 direct 연결되므로 상위 메뉴바를 그대로 이어 붙인다 */}
         <AssetMapTitle current="부동산" />
+        {/* [재구성] 분석 | 시나리오 세그먼트 컨트롤 — 주식 보유/추천 패턴 */}
+        <div className="re-tabs">
+          <button type="button" className={`re-tab-btn ${reTab === "analysis" ? "on" : ""}`} onClick={() => setReTab("analysis")}>분석</button>
+          <button type="button" className={`re-tab-btn ${reTab === "scenario" ? "on" : ""}`} onClick={() => setReTab("scenario")}>시나리오</button>
+        </div>
       </div>
 
       {/* [item1] 부동산 찾기 — 단지 검색 + 대장 아파트 + 관심지역(동) */}
@@ -305,117 +248,53 @@ export default function RealEstateDashboard() {
                     <button className="resr-chip" key={i} onClick={() => pickReSearch(c.단지명)}>{c.단지명}{c.one_score != null && <em>{c.one_score}</em>}</button>
                   ))}
                 </div>
-                <div className="resr-sec">📍 관심지역 <span>동 선택 → 갈아타기 목표</span></div>
-                <div className="resr-chips">
-                  {[...new Set([...Object.values(dongMap || {}).filter(Boolean), ...ALL_DONGS])].slice(0, 14).map((d, i) => (
-                    <button className="resr-chip dong" key={i} onClick={() => { setMoveScope("region"); pickGapC(d); setReSearchOpen(false); try { document.querySelector(".scr-card")?.scrollIntoView({ behavior: "smooth" }); } catch (e) {} }}>{d}</button>
-                  ))}
-                </div>
-                <div className="resr-note">DB에 축적된 실거래 단지·관심지역을 찾습니다. <b>단지</b>=내 단지 등록, <b>동</b>=목표 지역으로 이동합니다.</div>
+                <div className="resr-note">DB에 축적된 실거래 단지를 찾습니다. <b>단지</b>를 누르면 내 단지로 등록됩니다.</div>
               </>
             )}
           </div>
         </div>
       )}
 
-      {/* [§3.7·§3.8, 2026-08-27 v2] 내 단지 포지션 — 최상단. 막대+실선(계단)으로 대장 대비 위치·
-          평형별 적정가·시점별 갭 추이를 시각화(과거엔 텍스트 두 줄뿐이었음). */}
-      {myProp?.name && brief && !brief.error && (
-        <RePositionCard brief={brief} myProp={myProp} dongOf={dongOf} userAvm={userAvm} />
-      )}
-
-      {/* [Card2] 동네별 대장 비교 — 주간 사전선정(region_leaders) 가벼운 읽기 */}
-      {myProp?.name && (
-        <RegionLeadersCard myRegion={myDong || brief?.region || "서현동"} />
-      )}
-
-      {/* [Card3] 동네별 대장 가격 추세 · 년도별 예측(시나리오 밴드) */}
-      {myProp?.name && (
-        <RegionForecastCard myRegion={myDong || brief?.region || "서현동"} />
-      )}
-
-      {/* [Card4] 갈아타기 시나리오 — 투자금 + 예상 이익률(세금 제외) */}
-      {myProp?.name && brief && !brief.error && (
-        <MoveScenarioCard brief={brief} myProp={myProp} dongOf={dongOf} userAvm={userAvm} />
-      )}
-
-      {/* [Card5] 시황·실거래·시장예상·매매입력은 '오늘'(홈)의 오늘의 부동산으로 이동. 여기선 링크만. */}
-      <a href="/pwa" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, margin: "2px 0 12px", padding: "13px 15px", border: "1px solid var(--color-line)", borderRadius: 14, background: "var(--color-card)", color: "var(--color-ink)", fontSize: "0.86rem", fontWeight: 800, textDecoration: "none" }}>
-        <span>📅 오늘의 부동산 <span style={{ fontWeight: 600, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>시황 · 최근 실거래 · 매매 입력</span></span>
-        <span style={{ color: "var(--color-primary)", fontSize: "0.8rem" }}>홈에서 보기 →</span>
-      </a>
-
-      {/* 1) HERO — 시장 브리핑 (다른 페이지와 통일된 라이트 카드) */}
-      {showToday && (
-      <section className="hero">
-        <div className="eyebrow">
-          <span className="lbl">🏢 시장 브리핑{brief?.region ? ` · ${brief.region}` : ""}</span>
-        </div>
-        {brief && !brief.error ? (
-          <>
-            <div className="big">{brief.phase}</div>
-            <div className="brief-lead">대장 단지 <b>{brief.leader}</b> · {uk(brief.leader_price)}</div>
-            <div className="brief-stats">
-              <div className="bstat"><span>분기</span><b>{pct(brief.chg_q)}</b></div>
-              <div className="bstat"><span>연간</span><b>{pct(brief.chg_yr)}</b></div>
+      {/* ══ 분석 탭 (읽기 전용) — 한 줄 결론 + 포지션 / 대장 비교 / 추세 / 갈아타기 난이도 ══ */}
+      {reTab === "analysis" && (<>
+        {/* [§3-7 피드백15] #1 결론 한 줄 — 국면 + 저평가 1위(위계 확립) */}
+        {brief && !brief.error && (() => {
+          const topU = brief.under?.[0];
+          return (
+            <div className="re-verdict">
+              <div className="rv-h"><span className="rv-lbl">📌 이 지역 한 줄 결론</span><span className={`rv-phase ${jtag(brief.phase)}`}>{String(brief.phase || "").replace(/\s*국면\s*$/, "")} 국면</span></div>
+              <div className="rv-sub">
+                대장 <b>{brief.leader}</b> {uk(brief.leader_price)}
+                <Term term="국민평형">전용 84㎡·국민평형 기준</Term> · 분기 <b>{pct(brief.chg_q)}</b>
+                {topU && <> · 저평가 1위 <b className="rv-under">{topU.단지명} +{Number(topU.gap).toFixed(1)}%</b></>}
+              </div>
             </div>
-          </>
-        ) : (
-          <div className="brief-lead">{err ? "데이터 로드 오류" : "불러오는 중…"}</div>
+          );
+        })()}
+
+        {/* [§3.7·§3.8] 내 단지 포지션 — 막대+실선(계단)으로 대장 대비 위치·평형별 적정가 */}
+        {myProp?.name && brief && !brief.error && (
+          <RePositionCard brief={brief} myProp={myProp} dongOf={dongOf} userAvm={userAvm} />
         )}
-      </section>
-      )}
 
-      {/* 카톡방 수집정보 종합 리포트 → board 유도 (미검증 참고용) */}
-      <ReportTeaser />
+        {/* [Card2] 동네별 대장 비교 — 주간 사전선정(region_leaders) 가벼운 읽기 */}
+        {myProp?.name && (
+          <RegionLeadersCard myRegion={myDong || brief?.region || "서현동"} />
+        )}
 
-      {/* [내 세금] 재산세·종부세 추정 계산기 */}
-      <a className="tax-nav" href="/pwa/tax">
-        <span className="tax-nav-ic">💰</span>
-        <span className="tax-nav-body">
-          <span className="tax-nav-t">내 세금</span>
-          <span className="tax-nav-s">공시가격으로 재산세·종부세 추정 계산</span>
-        </span>
-        <span className="tax-nav-go">→</span>
-      </a>
+        {/* [Card3] 동네별 대장 가격 추세 · 년도별 예측(시나리오 밴드) */}
+        {myProp?.name && (
+          <RegionForecastCard myRegion={myDong || brief?.region || "서현동"} />
+        )}
 
-      {/* [P1-b] 관심단지 저평가 알림 — 조건 충족 시 웹푸시 자동 발송 */}
-      <AlertSettingsCard />
+        {/* [신규] 갈아타기 난이도 — 구 "동네별 격차 변화" 재명명·재해석(점선 없음) */}
+        {myProp?.name && (
+          <MoveDifficultyCard myRegion={myDong || brief?.region || "서현동"} />
+        )}
+      </>)}
 
-      {/* [§3-7 피드백15] #1 결론 한 줄 — 국면 + 저평가 1위(위계 확립) */}
-      {brief && !brief.error && (() => {
-        const topU = brief.under?.[0];
-        return (
-          <div className="re-verdict">
-            <div className="rv-h"><span className="rv-lbl">📌 이 지역 한 줄 결론</span><span className={`rv-phase ${jtag(brief.phase)}`}>{String(brief.phase || "").replace(/\s*국면\s*$/, "")} 국면</span></div>
-            <div className="rv-sub">
-              대장 <b>{brief.leader}</b> {uk(brief.leader_price)}
-              <Term term="국민평형">전용 84㎡·국민평형 기준</Term> · 분기 <b>{pct(brief.chg_q)}</b>
-              {topU && <> · 저평가 1위 <b className="rv-under">{topU.단지명} +{Number(topU.gap).toFixed(1)}%</b></>}
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* [R-6] 개인화 브리핑 — 내 선택 → 그래서 결과 → 검토 방향(CTA). 일반 시황보다 위. */}
-      {brief && !brief.error && (myProp?.name ? (() => {
-        const cur = rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명).find((o) => o.단지명 === myProp.name) : null;
-        const fd = (feed?.feed || []).find((f) => f.단지명 === myProp.name);
-        const chg = fd?.변동률;
-        return (
-          <div className="pbrief">
-            <div className="pb-step"><span className="pb-k">① 내 선택</span><span className="pb-v">보유 <b>{myProp.name}</b>{myProp.pyeong ? ` 전용 ${myProp.pyeong}㎡` : ""}{tgtC ? <> · 목표 <b>{tgtC}</b></> : <> · 목표 지역 <em>미설정</em></>}</span></div>
-            <div className="pb-step"><span className="pb-k">② 그래서</span><span className="pb-v">{chg != null ? <>내 단지 최근 실거래가 직전 대비 <b className={chg >= 0 ? "up" : "dn"}>{chg >= 0 ? "+" : ""}{chg}%</b>. 이 지역은 <b>{String(brief.phase || "").replace(/\s*국면\s*$/, "")}</b> 국면입니다.</> : <>이 지역은 <b>{String(brief.phase || "").replace(/\s*국면\s*$/, "")}</b> 국면 · 분기 {pct(brief.chg_q)}. 내 단지 실거래는 축적 중입니다.</>}</span></div>
-            <div className="pb-step"><span className="pb-k">③ 검토 방향</span><span className="pb-v">평형·단지 갈아타기 갭이 적정 밴드의 어디인지 확인할 시점입니다. <button className="pb-cta" onClick={() => { changeScope("complex"); try { document.querySelector(".scr-card")?.scrollIntoView({ behavior: "smooth" }); } catch (e) {} }}>갭 분석 열기 →</button></span></div>
-          </div>
-        );
-      })() : (
-        <div className="pbrief pbrief-set">
-          <span>🎯 <b>목표 지역·단지</b>를 정하면 매주 <b>갭 변화</b>를 개인 브리핑으로 알려드립니다.</span>
-          <button className="pb-cta" onClick={openWiz}>내 단지·목표 설정 →</button>
-        </div>
-      ))}
-
+      {/* ══ 시나리오 탭 (입력·계산) — 자산 입력(등록/목록) + 수익 요약 ══ */}
+      {reTab === "scenario" && (<>
       {/* [S5] 내 단지 — 미등록: 위저드 CTA / 등록됨: 상세 요약(매수가 vs 현재 추정시세) */}
       {!myProp ? (
         // [R-1] 등록 전 블러 프리뷰 — 라벨은 선명, 값만 가림 + 가치 제안 카드(3개·30초 CTA)
@@ -589,442 +468,29 @@ export default function RealEstateDashboard() {
         </section>
       )}
 
-      {/* [정리] 기존 '갈아타기 갭' 카드는 아래 스크리너의 '같은 동/같은 단지'와 중복되어 제거.
-          갈아타기 소요자금은 스크리너에서 이동 범위별로 계산한다. */}
-
-      {/* [S5+] 갈아타기·투자 스크리너 — 이동 범위(같은 단지/같은 동/지역 변경)별 최적화 */}
-      {rank?.ranking?.length > 0 && (() => {
-        const opts = dedupBy(rank.ranking, (c) => c.단지ID || c.단지명);
-        const myRow = myProp?.name ? opts.find((o) => o.단지명 === myProp.name) : null;
-        const myAvm = myRow ? Number(myRow.avm_total_uk || 0) : null;
-        const needMy = (moveScope === "complex" || moveScope === "dong") && !myProp?.name;
-        const SCOPES = [
-          ["complex", "같은 단지", "평형 갈아타기"],
-          ["dong", "같은 동", myDong ? `${myDong} 내 이동` : "동 내 이동"],
-          ["region", "지역 변경", "타 지역·투자"],
-        ];
-        const gapCell = (v) => (v == null ? "-" : v > 0 ? `+${uk(v)}` : v < 0 ? `−${uk(-v)}` : "동일");
+      {/* [신규] 수익 요약 — 보유 부동산 평가손익(대표 단지 기준) + 임대수익 합계 */}
+      {myProp && (() => {
+        const _sp = myPyeongPrice();
+        const _curUk = _sp.uk;
+        const _buyUk = Number(myProp?.buyUk) || null;
+        const _repPnlUk = (_curUk != null && _buyUk) ? Math.round((_curUk - _buyUk) * 100) / 100 : null;
+        const _repPnlPct = (_repPnlUk != null && _buyUk) ? (_repPnlUk / _buyUk) * 100 : null;
+        const _dep = reProps.reduce((s, p) => s + (Number(p.deposit) || 0), 0);
+        const _mon = reProps.reduce((s, p) => s + (Number(p.monthly) || 0), 0);
+        const _valSum = reProps.reduce((s, p) => s + (Number(p.valueUk) || 0), 0);
+        const _netUk = Math.round((_valSum - _dep) * 100) / 100;
         return (
-          <section className="card scr-card">
-            <div className="label">🔎 갈아타기·투자 스크리너 <span className="sub">이동 범위별</span></div>
-            <div className="scope-chips">
-              {SCOPES.map(([k, l, d]) => (
-                <button key={k} className={`scope-chip ${moveScope === k ? "on" : ""}`} onClick={() => changeScope(k)}>
-                  <b>{l}</b><span>{d}</span>
-                </button>
-              ))}
-            </div>
-
-            {needMy ? (
-              <div className="gap-empty">이 범위는 <b>내 단지</b> 기준으로 계산됩니다. 먼저 내 단지를 등록하세요.
-                <button className="scr-reg" onClick={openWiz}>내 단지 등록 →</button>
-              </div>
-            ) : moveScope === "complex" ? (() => {
-              // [#7] 실거래 최고가 기준(대표 중앙값은 표본 적으면 역전될 수 있어, 최고가를 1차 가격으로)
-              const areas = [...areaOptsFor(myProp?.name)].sort((a, b) => a.m2 - b.m2);
-              const pOf = (a) => a?.maxUk ?? a?.priceUk ?? null;
-              const myArea = areas.find((a) => String(a.m2) === String(myProp?.pyeong));
-              const myPrice = pOf(myArea) ?? myAvm ?? null;
-              if (!areas.length) return <div className="gap-empty"><b>{myProp?.name}</b>의 평형별 실거래가 아직 부족합니다(최근 거래 축적 시 표시). ‘같은 동·지역 변경’을 이용해 보세요.</div>;
-              let runMax = -Infinity;
-              return (
-                <>
-                  <div className="scr-head"><span>평형(전용)</span><span>실거래 최고 · 대표</span><span>갈아타기 자금</span></div>
-                  {areas.map((a) => {
-                    const price = pOf(a);
-                    const diff = myPrice != null && price != null ? price - myPrice : null;
-                    const mine = String(a.m2) === String(myProp?.pyeong);
-                    // [#7 보완] 평수↑인데 최고가↓ = 대부분 '거래 건수가 적어' 생기는 이상치.
-                    //   거래 건수(n)를 함께 노출해 "왜 큰 평형이 더 싼가"를 스스로 납득하게 한다.
-                    const anomaly = price != null && runMax !== -Infinity && price < runMax;
-                    if (price != null && price > runMax) runMax = price;
-                    const thin = a.n != null && a.n < 3; // 표본 부족 기준(거래 3건 미만)
-                    // [2026-08-05] 어디를 눌러야 다음 단계(갭 분석)로 가는지 안 보인다는 피드백 —
-                    //   행 자체를 탭하면 바로 그 평형으로 갭 분석이 실행되도록. 아래 select는 그대로 두되
-                    //   행 클릭이 "1-click 진입로"가 되어 표를 다시 훑어 select에서 재선택할 필요가 없다.
-                    const goGap = () => {
-                      if (mine) return;
-                      setGapTarget(String(a.m2));
-                      try { document.querySelector(".gap5")?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {}
-                    };
-                    return (
-                      <div className={`scr-row ${!mine ? "clickable" : ""}`} key={a.m2} onClick={goGap} role={!mine ? "button" : undefined} tabIndex={!mine ? 0 : undefined}>
-                        <span className="scr-name">전용 {a.m2}㎡ <span className="scr-py">약 {m2ToPyeong(a.m2)}평</span>{mine && <span className="scr-mine">내 평형</span>}{anomaly && <span className="scr-anom" title={`평형이 큰데 실거래 최고가가 더 낮습니다. ${a.n != null ? `이 평형 거래 ${a.n}건으로 표본이 적어` : "표본이 적어"} 생기는 이상치일 수 있습니다.`}>⚠ {a.n != null ? `거래 ${a.n}건` : "표본 적음"}</span>}</span>
-                        <span className="scr-avm">{a.maxUk != null ? uk(a.maxUk) : (a.priceUk != null ? uk(a.priceUk) : "-")}{a.maxUk != null && a.priceUk != null && a.priceUk !== a.maxUk ? <span className="scr-rep"> · 대표 {uk(a.priceUk)}</span> : null}{a.n != null && !anomaly ? <span className="scr-n">{thin ? " · " : " · "}거래 {a.n}건</span> : null}</span>
-                        <span className={`scr-gap ${diff != null && diff <= 0 ? "ok" : ""}`}>{mine ? "—" : <>{gapCell(diff)}<span className="scr-go">갭 분석 →</span></>}</span>
-                      </div>
-                    );
-                  })}
-                  {/* [R-5] 갭 분석 — 위 표에서 평형을 탭하면 자동 선택됨. 직접 고르고 싶으면 아래 select도 사용 가능. */}
-                  <div className="gap5">
-                    <div className="gap5-h">📊 갈아타기 갭 분석 <span>내 평형 → 목표 평형(3년 시계열)</span></div>
-                    <select className="gap5-sel" value={gapTarget} onChange={(e) => setGapTarget(e.target.value)}>
-                      <option value="">목표 평형 선택…</option>
-                      {areas.filter((a) => String(a.m2) !== String(myProp?.pyeong)).map((a) => (
-                        <option key={a.m2} value={a.m2}>전용 {a.m2}㎡ (약 {m2ToPyeong(a.m2)}평)</option>
-                      ))}
-                    </select>
-                    {gapLoading && <div className="gap5-load">갭 시계열 분석 중…</div>}
-                    {gapData && (() => {
-                      const v = gapData.verdict;
-                      const vc = v === "추천" ? "ok" : v === "보류" ? "no" : v === "관망" ? "mid" : "na";
-                      const ic = v === "추천" ? "🟢" : v === "보류" ? "🔴" : v === "관망" ? "🟡" : "⚪";
-                      return (
-                        <div className="gap5-body">
-                          <div className={`gap5-verdict ${vc}`}>{ic} {v}</div>
-                          <div className="gap5-reason">{gapData.verdict_reason}</div>
-                          <div className="gap5-rows">
-                            <div className="g5r"><span>현재 갭</span><b>{gapData.current_gap_uk}억</b></div>
-                            {gapData.band && <div className="g5r"><span>적정 밴드(평균±1σ)</span><b>{gapData.band.low_uk}~{gapData.band.high_uk}억</b></div>}
-                            <div className="g5r"><span>표본</span><b>{gapData.deal_n}건 · {gapData.history?.length}개월</b></div>
-                          </div>
-                          {gapData.history?.length > 1 && (() => {
-                            const gs = gapData.history.map((h) => h.gap_uk);
-                            const lo = Math.min(...gs, gapData.band?.low_uk ?? Infinity), hi = Math.max(...gs, gapData.band?.high_uk ?? -Infinity);
-                            const rng = hi - lo || 1, W = 260, H = 44;
-                            const pts = gapData.history.map((h, i) => `${(i / (gapData.history.length - 1)) * W},${H - ((h.gap_uk - lo) / rng) * H}`).join(" ");
-                            const bandTop = gapData.band ? H - ((gapData.band.high_uk - lo) / rng) * H : null;
-                            const bandBot = gapData.band ? H - ((gapData.band.low_uk - lo) / rng) * H : null;
-                            return (
-                              <svg className="gap5-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-                                {bandTop != null && <rect x="0" y={bandTop} width={W} height={Math.max(1, bandBot - bandTop)} fill="var(--color-primary)" opacity="0.12" />}
-                                <polyline points={pts} fill="none" stroke="var(--color-primary)" strokeWidth="1.5" />
-                              </svg>
-                            );
-                          })()}
-                          <div className="gap5-foot">⚠ {gapData.tax_note} · {gapData.disclaimer}</div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                  <div className="note"><b>{myProp?.name}</b> 평형별 <b>실거래 최고가</b> 기준(대표=최근 중앙값 병기). 갈아타기 자금 = 목표 평형 − 내 평형. ⚠ 큰 평형인데 최고가가 더 낮다면 대개 <b>그 평형의 거래 건수가 적어서</b>입니다(옆의 ‘거래 N건’ 확인) — 이상 신호가 아니라 표본 부족입니다. 층·향·수리에 따라 실제가는 다릅니다(확정 아님).</div>
-                </>
-              );
-            })() : moveScope === "dong" ? (() => {
-              const cands = opts.filter((o) => o.단지명 !== myProp?.name && dongOf(o.단지명) === myDong)
-                .map((o) => ({ ...o, need: myAvm != null ? Number(o.avm_total_uk || 0) - myAvm : null }))
-                .sort((a, b) => (b.one_score ?? 0) - (a.one_score ?? 0)).slice(0, 8);
-              if (!cands.length) return <div className="gap-empty">{myDong ? <><b>{myDong}</b> 내 다른 단지 데이터가 부족합니다.</> : "동 정보를 불러오지 못했습니다."} ‘지역 변경’을 이용해 보세요.</div>;
-              return (
-                <>
-                  <div className="scr-head"><span>단지</span><span>매매(추정)</span><span>갈아타기 자금</span></div>
-                  {cands.map((o, i) => (
-                    <div className="scr-row" key={`${o.단지ID || o.단지명}-${i}`}>
-                      <span className="scr-name">{o.단지명} <span className={`vtag ${vtag(o.valuation)}`}>{o.valuation}</span></span>
-                      <span className="scr-avm">{uk(o.avm_total_uk)}</span>
-                      <span className={`scr-gap ${o.need != null && o.need <= 0 ? "ok" : ""}`}>{gapCell(o.need)}</span>
-                    </div>
-                  ))}
-                  {/* [R-5 시나리오B] 같은 동 단지 갈아타기 갭 분석 — 갭 저점 Top3 자동 추천 + 판정 */}
-                  {gapBData?.candidates?.length > 0 && (
-                    <div className="gap5">
-                      <div className="gap5-h">📊 같은 동 갈아타기 갭 분석 <span>갭 저점 순 Top {gapBData.candidates.length}</span></div>
-                      {gapBData.candidates.map((c) => {
-                        const v = c.verdict;
-                        const vc = v === "추천" ? "ok" : v === "보류" ? "no" : v === "관망" ? "mid" : "na";
-                        const ic = v === "추천" ? "🟢" : v === "보류" ? "🔴" : v === "관망" ? "🟡" : "⚪";
-                        return (
-                          <div className="gapb-cand" key={c.complex}>
-                            <div className="gapb-top"><b className="gapb-nm">{c.complex}</b><span className={`gap5-verdict ${vc} gapb-v`}>{ic} {v}</span></div>
-                            <div className="gap5-reason">{c.verdict_reason}</div>
-                            {c.band && (
-                              <div className="gap5-rows">
-                                <div className="g5r"><span>현재 격차</span><b>{c.current_gap_uk}억</b></div>
-                                <div className="g5r"><span>적정 밴드(평균±1σ)</span><b>{c.band.low_uk}~{c.band.high_uk}억</b></div>
-                                <div className="g5r"><span>표본</span><b>{c.deal_n}건</b></div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                      <div className="gap5-foot">⚠ {gapBData.tax_note} · {gapBData.disclaimer}</div>
-                    </div>
-                  )}
-                  <div className="note">{myDong ? <><b>{myDong}</b> 내 이동 기준. </> : null}갈아타기 자금 = 목표 매매(<Term term="AI 추정 시세">AI 추정 시세</Term>) − 내 단지 매매. 회귀 근사 · <Term term="시차">시차 없음(동시 반영)</Term> · 확정 아님.</div>
-                </>
-              );
-            })() : (() => {
-              const jr = Math.max(0, Math.min(100, Number(jeonseRate) || 0)) / 100;
-              const bg = Number(budget) || 0;
-              const scored = opts.map((o) => ({ ...o, gapInvest: Number(o.avm_total_uk || 0) * (1 - jr) })).filter((o) => o.gapInvest > 0);
-              const matched = (bg > 0 ? scored.filter((o) => o.gapInvest <= bg) : scored).sort((a, b) => (b.one_score ?? 0) - (a.one_score ?? 0)).slice(0, 6);
-              return (
-                <>
-                  <div className="scr-inputs">
-                    <label className="scr-in"><span>예산(억)</span><input type="number" inputMode="decimal" placeholder="예: 3" value={budget} onChange={(e) => changeBudget(e.target.value)} /></label>
-                    <label className="scr-in"><span>전세가율(%)</span><input type="number" inputMode="numeric" placeholder="60" value={jeonseRate} onChange={(e) => changeJeonse(e.target.value)} /></label>
-                  </div>
-                  {matched.length > 0 ? (
-                    <>
-                      <div className="scr-head"><span>단지</span><span>매매(추정)</span><span>갭투자금</span></div>
-                      {matched.map((o, i) => (
-                        <div className="scr-row" key={`${o.단지ID || o.단지명}-${i}`}>
-                          <span className="scr-name">{o.단지명} <span className={`vtag ${vtag(o.valuation)}`}>{o.valuation}</span></span>
-                          <span className="scr-avm">{uk(o.avm_total_uk)}</span>
-                          <span className={`scr-gap ${bg > 0 && o.gapInvest <= bg ? "ok" : ""}`}>{uk(o.gapInvest)}</span>
-                        </div>
-                      ))}
-                      <div className="note">갭투자금 = 매매(<Term term="AI 추정 시세">AI 추정 시세</Term>) × (1 − 전세가율{Math.round(jr * 100)}%). 전세가율은 <b>사용자 가정치</b>(상대가치·추정·확정 아님).</div>
-                    </>
-                  ) : (
-                    <div className="gap-empty">예산 범위에 맞는 단지가 없습니다. 예산·전세가율을 조정해 보세요.</div>
-                  )}
-                  {/* [R-5 시나리오C] 목표 지역 갭 추적 — 동 평균단가 기준 동일 평형 갭·판정·알림 */}
-                  {!myProp?.name ? (
-                    <div className="gap-empty" style={{ marginTop: 12 }}>목표 지역 갭 추적은 <b>내 단지</b> 등록 후 이용할 수 있습니다. <button className="scr-reg" onClick={openWiz}>내 단지 등록 →</button></div>
-                  ) : (() => {
-                    const myDongC = dongOf(myProp.name);
-                    // [PI-1] complex-dongs 전체맵 우선 + 폴백 병합 → 드롭다운이 비지 않게.
-                    const fromMap = Object.values(dongMap || {}).filter(Boolean);
-                    const dongs = [...new Set([...fromMap, ...ALL_DONGS])].filter((d) => d && d !== myDongC).sort();
-                    return (
-                      <div className="gap5">
-                        <div className="gap5-h">🎯 목표 지역 갭 추적 <span>{myDongC || "내 동"} → 목표 동 · 전용 {myProp?.pyeong || 84}㎡</span></div>
-                        <select className="gap5-sel" value={gapCTarget} onChange={(e) => pickGapC(e.target.value)}>
-                          <option value="">목표 지역(동) 선택…</option>
-                          {dongs.map((d) => <option key={d} value={d}>{d}</option>)}
-                        </select>
-                        {gapCData && (() => {
-                          const v = gapCData.verdict;
-                          const vc = v === "추천" ? "ok" : v === "보류" ? "no" : v === "관망" ? "mid" : "na";
-                          const ic = v === "추천" ? "🟢" : v === "보류" ? "🔴" : v === "관망" ? "🟡" : "⚪";
-                          return (
-                            <div className="gap5-body">
-                              <div className={`gap5-verdict ${vc}`}>{ic} {v}</div>
-                              <div className="gap5-reason">{gapCData.verdict_reason}</div>
-                              <div className="gap5-rows">
-                                <div className="g5r"><span>추가 자금(동일 평형)</span><b>{gapCData.current_gap_uk}억</b></div>
-                                {gapCData.band && <div className="g5r"><span>적정 밴드(평균±1σ)</span><b>{gapCData.band.low_uk}~{gapCData.band.high_uk}억</b></div>}
-                                <div className="g5r"><span>표본</span><b>{gapCData.deal_n}건 · {gapCData.history?.length}개월</b></div>
-                              </div>
-                              {/* [PI-2~4] 갈아타기 정밀 계산 — 내 매수가를 아는 ONE-HUB만의 화면 */}
-                              {(() => {
-                                const sp = myPyeongPrice();
-                                const buyUk = Number(myProp?.buyUk || 0) || null;
-                                const gap = gapCData.current_gap_uk;
-                                const won = (u) => u == null ? "-" : `${u >= 0 ? "" : "-"}${Math.abs(u).toFixed(2)}억`;
-                                if (sp.locked || sp.uk == null) {
-                                  return <div className="mv-locked">🔒 내 평형(전용 {myProp?.pyeong}㎡) 실거래가 부족해 <b>팔 값</b>을 확정할 수 없어 갈아타기 금액을 계산하지 않습니다. 내 단지 카드에서 <b>내 시세 직접 입력</b> 후 이용하세요.</div>;
-                                }
-                                const sellUk = sp.uk;
-                                const buyTargetUk = gap != null ? Math.round((sellUk + gap) * 100) / 100 : null;
-                                const lossUk = buyUk != null ? Math.round((sellUk - buyUk) * 100) / 100 : null;
-                                const acqTax = buyTargetUk == null ? null : (() => {
-                                  const p = buyTargetUk; let r;
-                                  if (p <= 6) r = 0.01; else if (p <= 9) r = Math.min(0.03, Math.max(0.01, (p * 2 / 3 - 3) / 100)); else r = 0.03;
-                                  return Math.round(p * r * 100) / 100;
-                                })();
-                                const isLoss = lossUk != null && lossUk < 0;
-                                const cgt = lossUk == null ? null : isLoss ? { v: 0, txt: "손실이라 양도세 없음(이월결손 가능)" } : { v: null, txt: "양도차익 발생 — 보유기간·주택수에 따라 달라 세무사 상담 필요" };
-                                const netUk = (buyTargetUk != null && acqTax != null) ? Math.round((sellUk - buyTargetUk - acqTax - (cgt?.v || 0)) * 100) / 100 : null;
-                                return (
-                                  <div className="movecalc">
-                                    <div className="mv-h">🎯 갈아타기 정밀 계산 <span className="mv-src">팔 값: {sp.source === "user" ? "직접 입력" : `전용 ${myProp?.pyeong}㎡ 실거래 ${sp.tradeN}건`}</span></div>
-                                    <div className="mv-row"><span>내 단지 팔 값</span><b>{won(sellUk)}</b></div>
-                                    <div className="mv-row"><span>목표 지역 살 값 <em>동 평균·동일 평형</em></span><b>{won(buyTargetUk)}</b></div>
-                                    <div className="mv-row hl"><span>갭(추가 자금)</span><b>{gap != null ? (gap >= 0 ? `+${won(gap)}` : won(gap)) : "-"}</b></div>
-                                    {buyUk != null && (
-                                      <div className={`mv-row ${isLoss ? "neg" : "pos"}`}><span>내 매수가({won(buyUk)}) 대비 {isLoss ? "손실 확정액" : "평가 이익"}</span><b>{lossUk >= 0 ? "+" : ""}{won(lossUk)}</b></div>
-                                    )}
-                                    <div className="mv-row"><span>취득세 <em>주택 개략</em></span><b>{acqTax != null ? won(acqTax) : "-"}</b></div>
-                                    <div className="mv-row"><span>양도세</span><b>{cgt == null ? "-" : cgt.v === 0 ? "0원" : "상담 필요"}</b></div>
-                                    {cgt && <div className="mv-note-s">※ {cgt.txt}</div>}
-                                    <div className={`mv-net ${netUk == null ? "" : netUk >= 0 ? "pos" : "neg"}`}>
-                                      <span>순 이동액{cgt && cgt.v == null ? " (양도세 미반영)" : ""}</span>
-                                      <b>{netUk == null ? "-" : netUk >= 0 ? `+${won(netUk)} 손에 남음` : `${won(netUk)} 더 필요`}</b>
-                                    </div>
-                                    <div className="mv-disc">계산기입니다 · <b>세무 자문이 아닙니다</b>. 취득세=주택 표준세율 개략(지방교육세·농특세 별도), 중개보수 미반영. 최종은 세무사·중개사 확인.</div>
-                                  </div>
-                                );
-                              })()}
-                              {/* [PI-5] 유지 vs 이동 — 상대가치 비교(점값 예측 아님) */}
-                              {(() => {
-                                const myRow = rank?.ranking ? dedupBy(rank.ranking, (c) => c.단지ID || c.단지명).find((o) => o.단지명 === myProp?.name) : null;
-                                const myVal = myRow?.valuation || null; const myScore = myRow?.one_score;
-                                const v = gapCData.verdict;
-                                const moveTxt = v === "추천" ? "지금 진입 유리(밴드 하단)" : v === "보류" ? "지금은 비쌈(밴드 상단)" : v === "관망" ? "통상 범위" : "표본 부족 — 판단 보류";
-                                return (
-                                  <div className="holdmove">
-                                    <div className="hm-h">🤔 그래도 옮기나 — 유지 vs 이동</div>
-                                    <div className="hm-cols">
-                                      <div className="hm-col"><span className="hm-k">내 단지 유지</span><span className="hm-v">{myVal || "상대가치 정보 없음"}{myScore != null ? ` · ONE ${myScore}` : ""}</span></div>
-                                      <div className="hm-col"><span className="hm-k">목표 지역 이동</span><span className="hm-v">{moveTxt}</span></div>
-                                    </div>
-                                    <div className="hm-disc">※ 미래 가격 예측이 아니라 <b>현재 상대가치</b> 비교입니다(동시 반영·lag 0). 최종 판단은 본인이 하세요.</div>
-                                  </div>
-                                );
-                              })()}
-                              <button className={`gapc-alert ${gapCAlert ? "on" : ""}`} onClick={toggleGapCAlert}>{gapCAlert ? "🔔 갭 알림 설정됨 — 밴드 하단 이탈 시 알림" : "🔕 갭 알림 설정하기"}</button>
-                              <div className="gap5-foot">⚠ {gapCData.tax_note} · {gapCData.disclaimer} · 알림은 앱 재방문 시 갱신(서버 푸시는 🔜 향후 업데이트).</div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    );
-                  })()}
-                </>
-              );
-            })()}
-          </section>
+          <ReIncomeSummaryCard
+            totalEvalUk={reTotalEvalUk}
+            repPnlUk={_repPnlUk}
+            repPnlPct={_repPnlPct}
+            totalDepositUk={_dep}
+            totalMonthly={_mon}
+            totalNetUk={_netUk}
+          />
         );
       })()}
-
-      {/* [§3-2 원칙1] 포트폴리오 합계는 홈·AI자산 2곳에만. 부동산 페이지는 부동산 슬라이스만 표시(피드백14) */}
-
-      {/* 2) ONE Score 랭킹 */}
-      {rank?.ranking?.length > 0 && (
-        <section className="card">
-          <div className="label">🏆 <Term term="ONE Score">ONE Score</Term> 랭킹 <span className="sub">단지별 종합점수</span></div>
-          {/* [§3-7] 순위 중복 버그 수정 — one_score 내림차순 정렬 + 단지명 중복 제거 후 순번 부여 */}
-          {(() => {
-            const seen = new Set();
-            const ranking = [...rank.ranking]
-              .sort((a, b) => (b.one_score ?? 0) - (a.one_score ?? 0))
-              .filter((c) => { if (seen.has(c.단지명)) return false; seen.add(c.단지명); return true; });
-            // [S7.5] 한 줄 근거용 룩업 — 저평가 gap(회귀 대비) + 최근 실거래 변동
-            const underMap = new Map((brief?.under || []).map((u) => [u.단지명, u]));
-            const feedMap = new Map();
-            (feed?.feed || []).forEach((f) => { if (!feedMap.has(f.단지명)) feedMap.set(f.단지명, f); });
-            return ranking.map((c, i) => {
-              // 카드 간 연결감: 최근 실거래 변동 · 회귀 대비 상승여력을 한 줄로
-              const fd = feedMap.get(c.단지명);
-              const ud = underMap.get(c.단지명);
-              const bits = [];
-              if (fd?.거래일 && fd?.변동률 != null) bits.push(`${String(fd.거래일).slice(5)} ${fd.변동률 > 0 ? "+" : ""}${fd.변동률}%`);
-              if (ud?.gap != null) bits.push(`회귀 대비 +${Number(ud.gap).toFixed(1)}%`);
-              return (
-              <div className="rrow" key={`${c.단지명}-${i}`}>
-                <span className="rk">{i + 1}</span>
-                <span className="rmid">
-                  <span className="rname">{c.단지명} <span className={`vtag ${vtag(c.valuation)}`}>{c.valuation}</span></span>
-                  <span className="rsub">{uk(c.avm_total_uk)}{bits.length > 0 && <span className="rreason"> · {bits.join(" · ")}</span>}</span>
-                </span>
-                <span className="rright">
-                  <span className="rscore">{c.one_score}</span>
-                  <span className={`jtag ${jtag(c.decision)}`}>{c.decision}</span>
-                </span>
-              </div>
-              );
-            });
-          })()}
-          <div className="note">⟳ {rank.ranking[0]?.updated} 기준 · <Term term="AI 추정 시세">AI 추정 시세</Term>는 실거래·흐름으로 자동 추정한 <b>참고값</b>(확정 아님)입니다. <Term term="ONE Score">단지 종합점수</Term>는 구성요소를 펼쳐 볼 수 있어요.</div>
-        </section>
-      )}
-
-      {/* 2.5) 최근 실거래 피드 (#16) — [Card5] 오늘의 부동산으로 이관 */}
-      {showToday && feed?.feed?.length > 0 && (
-        <section className="card">
-          <div className="label">📈 최근 실거래 <span className="sub">동일 단지·평형 직전 거래 대비</span></div>
-          {feed.feed.slice(0, 8).map((f, i) => (
-            <div className="frow" key={`${f.단지명}-${f.거래일}-${i}`}>
-              <div className="fmid">
-                <div className="fname">{f.단지명}</div>
-                <div className="fsub">{f.전용면적}㎡ · {f.층 ? `${f.층}층` : "-"} · {f.건축연도 ? `${f.건축연도}년` : "-"} · {f.거래일?.slice(5)}</div>
-              </div>
-              <div className="fright">
-                <div className="fprice">{f.거래금액_억}억</div>
-                {f.변동률 != null && (
-                  <div className={`fchg ${f.변동률 > 0 ? "up" : f.변동률 < 0 ? "dn" : "fl"}`}>
-                    {f.변동률 > 0 ? "▲" : f.변동률 < 0 ? "▼" : "−"}{Math.abs(f.변동률)}%
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-          <div className="note">{feed.note}{feed.updated ? ` · 업데이트 ${feed.updated}` : ""}</div>
-        </section>
-      )}
-
-      {/* 3) 저평가 후보 — [Card5] 오늘의 부동산으로 이관 */}
-      {showToday && brief?.under?.length > 0 && (
-        <section className="card">
-          <div className="label">💎 저평가 후보 <span className="sub">현재가 vs 회귀예측</span></div>
-          {brief.under.slice(0, 6).map((u) => (
-            <div className="urow" key={u.단지명}>
-              <div>
-                <div className="uname">{u.단지명}</div>
-                <div className="usub">{uk(u.cur)} → 예측 <b>{uk(u.pred)}</b> · <Term term="설명력">설명력</Term> {Math.round(Number(u.r2) * 100)}%</div>
-              </div>
-              <div className="ugap">+{Number(u.gap).toFixed(1)}%</div>
-            </div>
-          ))}
-          <div className="note">gap = 예측 대비 상승여력 · <b>회귀 근사 · <Term term="시차">시차 없음(동시 반영)</Term> 상대가치</b> · 확정 아님. <Term term="설명력">설명력</Term>=시장 흐름으로 설명되는 정도.</div>
-        </section>
-      )}
-
-      {/* 4) 거시 — [R-7] 정책 설명 + 미구현(예측·실시간) 로드맵 배지 + 기준시점 명시 */}
-      {mac && (
-        <section className="card">
-          <div className="label">🌐 거시 환경 <span className="sub">기준 {mac.연월}</span></div>
-          <div className="chips">
-            <span className="chip">KOSPI <b>{Math.round(mac.kospi).toLocaleString()}</b></span>
-            <span className="chip">기준금리 <b>{mac.base_rate}%</b></span>
-            <span className="chip"><Term term="정책 점수">정책</Term> <b>{mac.policy_stance}</b></span>
-          </div>
-          {/* [거시 해석] 금리·정책을 부동산 방향성으로 규칙 기반 해석(예측 아님) + 데이터 최신성 명시 */}
-          {(() => {
-            const baseRate = Number(mac.base_rate);
-            const stance = String(mac.policy_stance ?? "");
-            // 금리 방향(+상방/−하방) — 대출이자 부담 관점
-            let rateBias = 0, rateTxt = `기준금리 ${mac.base_rate}% · 중립 구간`;
-            if (baseRate >= 3.25) { rateBias = -1; rateTxt = `기준금리 ${mac.base_rate}% — 이자 부담이 커 매수여력을 누르는 하방 압력`; }
-            else if (baseRate > 0 && baseRate <= 2.5) { rateBias = 1; rateTxt = `기준금리 ${mac.base_rate}% — 이자 부담이 낮아 매수여력에 우호적(상방 여지)`; }
-            else if (baseRate > 0) { rateTxt = `기준금리 ${mac.base_rate}% — 중립 구간(뚜렷한 방향성 약함)`; }
-            // 정책 방향
-            let polBias = 0, polTxt = `정책 '${stance || "정보 없음"}' — 방향성 약함(중립)`;
-            if (/완화|부양|지원|공급확대|규제완화/.test(stance)) { polBias = 1; polTxt = `정책 '${stance}' — 완화·부양 기조로 수요에 우호적`; }
-            else if (/긴축|규제|억제|강화|대출제한/.test(stance)) { polBias = -1; polTxt = `정책 '${stance}' — 긴축·규제 기조로 수요를 누르는 방향`; }
-            const net = rateBias + polBias;
-            const dir = net >= 1 ? { t: "상방 우세", ic: "🟢", c: "up" } : net <= -1 ? { t: "하방 우세", ic: "🔴", c: "dn" } : { t: "중립·혼조", ic: "🟡", c: "mid" };
-            // 데이터 최신성(기준 연월 → 오늘 경과 개월)
-            const nowK = new Date(Date.now() + 9 * 3600 * 1000);
-            const ymParts = String(mac.연월 || "").split(/[-.\/]/).map((x) => Number(x));
-            const elapsed = (ymParts.length >= 2 && ymParts[0] > 1900 && ymParts[1] >= 1)
-              ? (nowK.getUTCFullYear() * 12 + nowK.getUTCMonth()) - (ymParts[0] * 12 + (ymParts[1] - 1)) : null;
-            const freshTxt = elapsed == null ? `기준 ${mac.연월}` : elapsed <= 0 ? `이번 달(${mac.연월}) 기준` : `${mac.연월} 기준 · ${elapsed}개월 전 데이터`;
-            // [사용자 지시] "이번 달 기준"이라 표시돼도 실제로는 값이 여러 달째 그대로일 수 있다 —
-            //   백엔드 macro_pipeline.py가 실시간 KOSPI/기준금리 자동수집이 아직 스텁(ECOS API키·
-            //   KOSPI 소스 미확정)이라 매달 같은 근사치를 그대로 재적재하기 때문(re_macro_scaffold의
-            //   보간값). "이번 달=최신"이라는 착시를 막기 위해, 최근 연속 월의 kospi 값이 동일한지
-            //   실제 반환된 series로 직접 확인해 알린다 — 숫자를 지어내지 않고 있는 데이터로만 판단.
-            const series = macro?.series || [];
-            let frozenMonths = 0;
-            for (let i = series.length - 1; i >= 0 && series[i]?.kospi === mac.kospi; i--) frozenMonths++;
-            const looksFrozen = frozenMonths >= 3;
-            return (
-              <div className="macro-read">
-                <div className="mr-top">
-                  <span className="mr-lbl">🧭 규칙 기반 방향성</span>
-                  <span className={`mr-dir ${dir.c}`}>{dir.ic} 부동산 {dir.t}</span>
-                </div>
-                <div className="mr-row"><span className="mr-k">금리</span><span className="mr-v">{rateTxt}</span></div>
-                <div className="mr-row"><span className="mr-k">정책</span><span className="mr-v">{polTxt}</span></div>
-                <div className={`mr-fresh ${elapsed != null && elapsed >= 2 ? "stale" : ""}`}>📅 {freshTxt}{elapsed != null && elapsed >= 2 ? " — 월 단위로 갱신되며 실시간 시세와 차이가 있을 수 있습니다." : ""}</div>
-                {looksFrozen && (
-                  <div className="mr-fresh stale">⚠️ KOSPI 값이 최근 {frozenMonths}개월째 동일합니다 — 실시간 자동수집이 아직 연결되지 않아 근사치가 반복 적재되고 있습니다(실제 시세와 다를 수 있음).</div>
-                )}
-                <div className="mr-disc">※ 금리·정책을 <b>규칙으로 해석한 방향성</b>일 뿐 <b>가격 예측이 아닙니다</b>. 실제 가격은 단지·수급에 따라 다릅니다.</div>
-              </div>
-            );
-          })()}
-          <div className="note">{mac.kospi_src || "연말 종가 기준입니다(월별 정밀치는 아니에요)."}</div>
-        </section>
-      )}
-
-      {/* [2026-08-22] 다음 주 AI 시나리오 — weekly_report.py(주간 전파·예측 리포트)에서.
-          시장 전체 방향성 3가지 확률 시나리오(단지 특정 예측 아님) — 내 단지 예측은 아래 별도 카드. */}
-      {showToday && weekly?.scenarios?.length > 0 && (
-        <section className="card">
-          <div className="label">🔮 다음 주 시장 예상 <span className="sub">{weekly.week}</span></div>
-          {weekly.scenarios.map((s, i) => (
-            <div key={i} className="mr-row">
-              <span className="mr-k">{s.prob}</span>
-              <span className="mr-v"><b>{s.type}</b> — {s.desc}</span>
-            </div>
-          ))}
-          <div className="mr-disc">※ 시장 전체 흐름에 대한 규칙 기반 시나리오이며 투자자문이 아닙니다.</div>
-        </section>
-      )}
+      </>)}
 
       {/* [S5] 내 단지 등록 위저드 — 자동완성·평형·동층·매수가·시점 */}
       {wizOpen && (
@@ -1044,11 +510,6 @@ export default function RealEstateDashboard() {
         </div>
       )}
 
-      <a href="/partners/realestate" className="partner-cta">
-        <span className="pc-l"><span className="pc-ic">🤝</span><span><b>협력업체 매물 등록</b><span className="pc-sub">중개·시행사이신가요? 매물 정보를 등록하세요</span></span></span>
-        <span className="pc-arrow">→</span>
-      </a>
-
       <div className="foot">📍 현재 <b>분당구·수지구·광교(수원 영통) 주요 동 단지</b> 실거래 기준입니다(전국·전 지역이 아닙니다). 지역·단지마다 모델 <Term term="설명력">설명력(R²)</Term>이 다르며 낮은 곳은 정직하게 표시합니다. 실거래 기반 확정 지표 + 회귀 예측(근사) · 예측치는 참고용이며 투자판단은 본인 책임.</div>
 
       <BottomNav active="assets" />
@@ -1057,6 +518,10 @@ export default function RealEstateDashboard() {
         .re { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 84px); font-family: var(--font-sans); color: var(--color-ink); }
         /* [사용자 지시] 상위 메뉴 고정 */
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
+        /* [재구성] 분석 | 시나리오 세그먼트 — assets.js .as-stocktabs 패턴 */
+        .re-tabs { display: flex; gap: 6px; margin: 0 2px 12px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 4px; box-shadow: var(--shadow-card); }
+        .re-tab-btn { flex: 1; min-height: 36px; border: none; background: none; border-radius: 9px; color: var(--color-ink-2); font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .re-tab-btn.on { background: var(--color-primary); color: #fff; }
         .partner-cta { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-decoration: none; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 14px 16px; margin: 4px 0 14px; box-shadow: var(--shadow-card); }
         .partner-cta .pc-l { display: flex; align-items: center; gap: 10px; }
         .partner-cta .pc-ic { font-size: 20px; }
@@ -1389,133 +854,5 @@ export default function RealEstateDashboard() {
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>
-  );
-}
-
-// [P1-b] 관심단지 저평가 알림 설정·이력 — 서버(prefs/history) 연동.
-//   임계(저평가율) 충족 시 매 평일 아침 cron 이 웹푸시 발송. 발송 수신은 '설정'에서 웹푸시 알림을 켜야 함.
-function AlertSettingsCard() {
-  const [enabled, setEnabled] = useState(true);
-  const [threshold, setThreshold] = useState(5);
-  const [history, setHistory] = useState([]);
-  const [loaded, setLoaded] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [toast, setToast] = useState("");
-
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      try {
-        const [p, h] = await Promise.all([
-          fetch("/api/pwa-alert-prefs").then((r) => r.json()).catch(() => ({})),
-          fetch("/api/pwa-alert-history").then((r) => r.json()).catch(() => ({ items: [] })),
-        ]);
-        if (!alive) return;
-        if (p && p.gap_threshold != null) { setEnabled(p.gap_enabled !== false); setThreshold(p.gap_threshold); }
-        setHistory(Array.isArray(h.items) ? h.items : []);
-      } catch (e) {} finally { if (alive) setLoaded(true); }
-    })();
-    return () => { alive = false; };
-  }, []);
-
-  const flash = (m) => { setToast(m); setTimeout(() => setToast(""), 2200); };
-
-  async function save(nextEnabled, nextThreshold) {
-    setSaving(true);
-    try {
-      const r = await fetch("/api/pwa-alert-prefs", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ gap_enabled: nextEnabled, gap_threshold: nextThreshold }),
-      });
-      const d = await r.json();
-      if (d.ok) flash("저장됐습니다"); else flash("저장 실패");
-    } catch (e) { flash("네트워크 오류"); } finally { setSaving(false); }
-  }
-
-  const onToggle = () => { const n = !enabled; setEnabled(n); save(n, threshold); };
-  const onThreshold = (v) => {
-    const n = Math.max(1, Math.min(50, Number(v) || 5));
-    setThreshold(n);
-  };
-
-  return (
-    <section className="alert-card">
-      <div className="ac-head">
-        <div className="ac-title">🔔 관심단지 저평가 알림</div>
-        <button className={`ac-sw ${enabled ? "on" : ""}`} onClick={onToggle} aria-pressed={enabled} disabled={saving}>
-          <span className="ac-knob" />
-        </button>
-      </div>
-      <p className="ac-desc">
-        관심단지의 <b>저평가율</b>이 아래 기준을 넘으면 <b>웹푸시로 먼저 알려드립니다</b>.
-        국토부 실거래 예측가 대비 현재 시세가 낮을 때 발화합니다. (미검증 참고 · 투자판단은 본인)
-      </p>
-
-      <div className="ac-thr" style={{ opacity: enabled ? 1 : 0.45 }}>
-        <span className="ac-thr-l">저평가율 기준</span>
-        <div className="ac-thr-c">
-          <input type="range" min="1" max="30" step="1" value={threshold} disabled={!enabled}
-            onChange={(e) => onThreshold(e.target.value)} onMouseUp={() => save(enabled, threshold)}
-            onTouchEnd={() => save(enabled, threshold)} />
-          <span className="ac-thr-v">{threshold}% 이상</span>
-        </div>
-      </div>
-
-      <div className="ac-hist">
-        <div className="ac-hist-h">최근 알림</div>
-        {!loaded ? <div className="ac-empty">불러오는 중…</div>
-          : history.length === 0 ? <div className="ac-empty">아직 발송된 알림이 없습니다. 기준을 넘는 관심단지가 생기면 여기에 쌓입니다.</div>
-          : (
-            <ul>
-              {history.slice(0, 6).map((it, i) => (
-                <li key={i}>
-                  <span className="ac-h-danji">{it.danji}</span>
-                  {it.gap != null && <span className="ac-h-gap">저평가 {Math.round(it.gap)}%</span>}
-                  <span className="ac-h-date">{(it.created_at || "").slice(5, 16)}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-      </div>
-
-      <p className="ac-foot">※ 알림을 받으려면 <b>설정 → 알림</b>에서 웹푸시 알림을 켜 주세요. 급매 알림(OneHub 호가 기반)은 준비 중입니다.</p>
-      {toast && <div className="ac-toast">{toast}</div>}
-
-      <style jsx>{`
-        .alert-card { position: relative; background: var(--color-surface, #fff); border: 1px solid var(--color-line, #E1E9F5);
-          border-radius: 16px; padding: 18px; margin: 14px 0; box-shadow: 0 6px 20px rgba(31,63,120,.06); }
-        .ac-head { display: flex; align-items: center; justify-content: space-between; }
-        .ac-title { font-size: 1.02rem; font-weight: 800; color: var(--color-ink, #12213B); letter-spacing: -.3px; }
-        .ac-sw { width: 46px; height: 26px; border-radius: 999px; border: none; background: var(--color-line, #D7E0EF);
-          position: relative; cursor: pointer; transition: background .15s; flex-shrink: 0; }
-        .ac-sw.on { background: var(--color-accent, #2F6BFF); }
-        .ac-knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff;
-          transition: transform .15s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
-        .ac-sw.on .ac-knob { transform: translateX(20px); }
-        .ac-desc { font-size: 0.82rem; color: var(--color-ink-2, #46566E); line-height: 1.6; margin: 8px 0 14px; }
-        .ac-thr { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-        .ac-thr-l { font-size: 0.82rem; font-weight: 700; color: var(--color-ink-2, #46566E); flex-shrink: 0; }
-        .ac-thr-c { display: flex; align-items: center; gap: 10px; flex: 1; justify-content: flex-end; }
-        .ac-thr-c input[type=range] { flex: 1; max-width: 160px; accent-color: var(--color-accent, #2F6BFF); }
-        .ac-thr-v { font-size: 0.86rem; font-weight: 800; color: var(--color-accent, #2F6BFF); min-width: 62px; text-align: right; font-variant-numeric: tabular-nums; }
-        .ac-hist { border-top: 1px solid var(--color-line, #EEF2F8); padding-top: 12px; }
-        .ac-hist-h { font-size: 0.76rem; font-weight: 800; color: var(--color-ink-3, #8A99B0); margin-bottom: 8px; letter-spacing: .3px; }
-        .ac-empty { font-size: 0.8rem; color: var(--color-ink-3, #8A99B0); line-height: 1.55; }
-        .ac-hist ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-        .ac-hist li { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; }
-        .ac-h-danji { font-weight: 700; color: var(--color-ink, #12213B); }
-        .ac-h-gap { font-size: 0.72rem; font-weight: 800; color: var(--color-undervalued, #0E9E6A); background: var(--color-undervalued-soft, #E7FAF2); padding: 2px 7px; border-radius: 6px; }
-        .ac-h-date { margin-left: auto; font-size: 0.72rem; color: var(--color-ink-3, #A3AFC2); font-variant-numeric: tabular-nums; }
-        .ac-foot { font-size: 0.72rem; color: var(--color-ink-3, #8A99B0); line-height: 1.55; margin: 12px 0 0; }
-        .ac-toast { position: absolute; left: 50%; bottom: -10px; transform: translateX(-50%); background: var(--color-ink, #12213B);
-          color: #fff; padding: 8px 16px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
-        .tax-nav { display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg, var(--color-primary-soft, #EAF1FF), var(--color-card, #fff)); border: 1px solid var(--color-line, #E8EEF7); border-radius: var(--radius-card, 14px); box-shadow: var(--shadow-card); padding: 20px; margin-bottom: 12px; text-decoration: none; }
-        .tax-nav-ic { font-size: 30px; flex: none; }
-        .tax-nav-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-        .tax-nav-t { font-size: 1.05rem; font-weight: 800; color: var(--color-ink, #12213B); }
-        .tax-nav-s { font-size: 0.82rem; color: var(--color-ink-2, #64748B); }
-        .tax-nav-go { font-size: 1.3rem; font-weight: 800; color: var(--color-primary, #2F6BFF); flex: none; }
-      `}</style>
-    </section>
   );
 }

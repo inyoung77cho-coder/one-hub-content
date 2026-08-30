@@ -9,6 +9,8 @@ import { dedupBy } from "../../lib/useDedup";
 import { getLedger as getAssetLedger } from "../../lib/ledger";
 import HoldingsNews from "../../components/HoldingsNews";
 import ReportTeaser from "../../components/ReportTeaser";
+import ReExplore from "../../components/ReExplore";
+import AlertSettingsCard from "../../components/AlertSettingsCard";
 import { getStoryRegionOverride, REGIONS, getNewRegions, ackNewRegions } from "../../lib/storyRegion";
 import { recordSnapshot as recordRegionSnapshot, getRegionDelta } from "../../lib/storyRegionHistory";
 import { getHoldings as getEtfHoldings } from "../../lib/etfHoldings";
@@ -79,6 +81,7 @@ export default function TodayPage({ announcements = [] }) {
   const [feed, setFeed] = useState(null);
   const [ledger, setLedger] = useState(null);
   const [myComplex, setMyComplex] = useState("");
+  const [reMyProp, setReMyProp] = useState(null); // [이관] 오늘의 부동산 스크리너용 내 단지 상세(전체 객체)
   const [status, setStatus] = useState("loading");
   const [at, setAt] = useState(null);
   const [notis, setNotis] = useState([]); // [알림] 텔레그램/리포트 알림 피드
@@ -110,7 +113,7 @@ export default function TodayPage({ announcements = [] }) {
     const tr = getTrader();
     setStatus((s) => (dash ? "stale" : "loading"));
     let myProp = null;
-    try { myProp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); setMyComplex(myProp?.name || ""); } catch (e) {}
+    try { myProp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); setMyComplex(myProp?.name || ""); setReMyProp(myProp || null); } catch (e) {}
     Promise.all([
       fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => null),
       fetch(`/api/pwa-pending?trader=${tr}`).then((r) => r.json()).catch(() => null),
@@ -559,6 +562,28 @@ export default function TodayPage({ announcements = [] }) {
               <div className="sc-empty">오늘은 새로 확인할 관심 단지 정보가 없어요.</div>
             )}
           </section>
+
+          {/* [이관] 투자 스크리너 + ONE Score 랭킹 + 거시 환경(부동산 페이지 → 오늘) */}
+          <ReExplore myProp={reMyProp} onRegister={() => router.push("/pwa/realestate")} />
+
+          {/* [이관] 관심단지 저평가 알림 */}
+          <AlertSettingsCard />
+
+          {/* [이관] 내 세금 계산기 링크 */}
+          <a className="re-tax-nav" href="/pwa/tax">
+            <span className="re-tax-ic">💰</span>
+            <span className="re-tax-body">
+              <span className="re-tax-t">내 세금</span>
+              <span className="re-tax-s">공시가격으로 재산세·종부세 추정 계산</span>
+            </span>
+            <span className="re-tax-go">→</span>
+          </a>
+
+          {/* [이관] 협력업체 매물 등록 */}
+          <a href="/partners/realestate" className="re-partner-cta">
+            <span className="rpc-l"><span className="rpc-ic">🤝</span><span><b>협력업체 매물 등록</b><span className="rpc-sub">중개·시행사이신가요? 매물 정보를 등록하세요</span></span></span>
+            <span className="rpc-arrow">→</span>
+          </a>
         </>)}
 
         {/* ══ "오늘의 ETF" — 글로벌·거시·정책 뉴스 + 관련 할일 ══ */}
@@ -833,6 +858,21 @@ export default function TodayPage({ announcements = [] }) {
         .tile-news-t { font-size: 0.78rem; color: var(--color-ink); line-height: 1.4; word-break: keep-all; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; }
         .tile-news-date { flex: none; font-size: 0.64rem; color: var(--color-ink-3); }
         .tile-more { width: 100%; margin-top: 4px; border: none; background: none; color: var(--color-primary); font-size: 0.74rem; font-weight: 800; cursor: pointer; padding: 4px 2px; text-align: left; font-family: var(--font-sans); }
+
+        /* [이관] 내 세금 링크 */
+        .re-tax-nav { display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg, var(--color-primary-soft, #EAF1FF), var(--color-card, #fff)); border: 1px solid var(--color-line, #E8EEF7); border-radius: var(--radius-card, 14px); box-shadow: var(--shadow-card); padding: 20px; margin-bottom: 12px; text-decoration: none; }
+        .re-tax-ic { font-size: 30px; flex: none; }
+        .re-tax-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+        .re-tax-t { font-size: 1.05rem; font-weight: 800; color: var(--color-ink, #12213B); }
+        .re-tax-s { font-size: 0.82rem; color: var(--color-ink-2, #64748B); }
+        .re-tax-go { font-size: 1.3rem; font-weight: 800; color: var(--color-primary, #2F6BFF); flex: none; }
+        /* [이관] 협력업체 매물 CTA */
+        .re-partner-cta { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-decoration: none; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 14px 16px; margin: 4px 0 14px; box-shadow: var(--shadow-card); }
+        .re-partner-cta .rpc-l { display: flex; align-items: center; gap: 10px; }
+        .re-partner-cta .rpc-ic { font-size: 20px; }
+        .re-partner-cta b { display: block; color: var(--color-ink); font-size: 0.92rem; }
+        .re-partner-cta .rpc-sub { display: block; color: var(--color-muted); font-size: 0.76rem; margin-top: 2px; }
+        .re-partner-cta .rpc-arrow { color: var(--color-primary); font-weight: 700; }
 
         /* ══ 종합자산 · 할일 ══ */
       `}</style>

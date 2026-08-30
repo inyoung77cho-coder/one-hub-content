@@ -696,7 +696,7 @@ function GapDeltaChart({ items, mineDong, H }) {
   const scale = (v) => midX + (v / maxAbs) * ((w - padL - padR) / 2) * 0.92;
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="gd-svg">
-      <line x1={midX} x2={midX} y1={4} y2={h - 4} stroke="var(--color-line)" strokeWidth="1" strokeDasharray="2,2" />
+      <line x1={midX} x2={midX} y1={4} y2={h - 4} stroke="var(--color-line)" strokeWidth="0.75" />
       <text x={midX} y={h - 1} textAnchor="middle" fontSize="6.5" fill="var(--color-ink-3)">동일</text>
       {rows.map((r, i) => {
         const y = 8 + i * rowH + rowH / 2;
@@ -754,10 +754,6 @@ export function RegionForecastCard({ myRegion = "서현동" }) {
       </div>
       <p className="fc-note">단위 억 · CAGR {pct(mine.cagr5)} 기반 · 예측 아님(참고)</p>
 
-      <h3 className="fc-h3">동네별 격차 변화 <span className="fc-mini">5년 후</span></h3>
-      <GapDeltaChart items={items} mineDong={myRegion} H={H} />
-      <p className="fc-note">회색=현재 격차 · 색점=5년 후(억) · <b className="nar">초록 좁아짐</b>/<b className="wid">빨강 벌어짐</b></p>
-
       <style jsx>{`
         .fc-card { background: var(--color-card); border-radius: var(--radius-card, 16px); padding: 16px 15px 15px; box-shadow: var(--shadow-card); margin-bottom: 12px; }
         .fc-label { display: block; font-size: 0.68rem; font-weight: 800; color: var(--color-ink-3); letter-spacing: .3px; text-transform: uppercase; margin-bottom: 2px; }
@@ -789,6 +785,74 @@ export function RegionForecastCard({ myRegion = "서현동" }) {
         .fc-gap.nar { color: var(--color-success); }
         .fc-gap.wid { color: var(--color-danger); }
         .fc-gap.base { color: var(--color-primary); }
+      `}</style>
+    </section>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  MoveDifficultyCard — 🪜 갈아타기 난이도 (구 "동네별 격차 변화" 재명명·재해석)
+//    각 동네 대장의 서현 대비 격차가 5년 후 좁혀지면 → 상급지 갈아타기가 "쉬워지는 중"(난이도↓·초록),
+//    벌어지면 "어려워지는 중"(난이도↑·빨강). 예측이 아니라 참고. 점선 없음(프로젝트 규칙).
+// ══════════════════════════════════════════════════════════════════
+export function MoveDifficultyCard({ myRegion = "서현동" }) {
+  const [items, setItems] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/pwa/re/regionLeaders`).then((r) => r.json())
+      .then((d) => { if (alive) setItems(Array.isArray(d?.items) ? d.items : []); })
+      .catch(() => { if (alive) setItems([]); });
+    return () => { alive = false; };
+  }, []);
+  if (items == null) return null;                 // 로딩 중
+  if (!items.length) return null;                 // 배치 미실행/데이터 없음 → 조용히 숨김
+
+  const H = 5; // 5년 시나리오
+  const mine = items.find((x) => x.dong === myRegion) || items.find((x) => x.tier === "기준");
+  if (!mine) return null;
+  const mineF = buildForecast(mine, H);
+  // GapDeltaChart와 동일 로직: now=현재 격차, fut=5년 후 격차. narrow=|fut|<|now| → 좁혀짐(쉬워짐).
+  const rows = items.filter((x) => x.dong !== myRegion).map((x) => {
+    const f = buildForecast(x, H);
+    const now = x.price84_uk - mine.price84_uk;
+    const fut = f.fc[H - 1].mid - mineF.fc[H - 1].mid;
+    const narrow = Math.abs(fut) < Math.abs(now);
+    return { dong: x.dong, now, fut, narrow };
+  });
+  if (!rows.length) return null;
+
+  return (
+    <section className="card md-card">
+      <span className="md-label">갈아타기 난이도</span>
+      <h2 className="md-title">🪜 갈아타기 난이도 <span className="md-mini">5년 후 격차 추세</span></h2>
+      <GapDeltaChart items={items} mineDong={myRegion} H={H} />
+      <div className="md-rows">
+        {rows.map((r) => (
+          <div className={`md-row ${r.narrow ? "easy" : "hard"}`} key={r.dong}>
+            <span className="md-arrow">{r.narrow ? "↓" : "↑"}</span>
+            <span className="md-dong">{r.dong}</span>
+            <span className="md-mean">{r.narrow ? "갈아타기 쉬워지는 중 (난이도 ↓)" : "갈아타기 어려워지는 중 (난이도 ↑)"}</span>
+          </div>
+        ))}
+      </div>
+      <p className="md-note">
+        내 동네 대비 격차가 <b>벌어지면</b> 상급지로 갈아타기가 <b>어려워지고</b>, <b>좁혀지면</b> <b>쉬워집니다</b>.
+        미래 가격 예측이 아니라 최근 추세로 본 <b>참고</b> 지표입니다.
+      </p>
+      <style jsx>{`
+        .md-card { background: var(--color-card); border-radius: var(--radius-card, 16px); padding: 16px 15px 15px; box-shadow: var(--shadow-card); margin-bottom: 12px; }
+        .md-label { display: block; font-size: 0.68rem; font-weight: 800; color: var(--color-ink-3); letter-spacing: .3px; text-transform: uppercase; margin-bottom: 2px; }
+        .md-title { font-size: 0.98rem; font-weight: 800; color: var(--color-ink); margin: 0 0 10px; }
+        .md-mini { font-size: 0.62rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 7px; margin-left: 5px; vertical-align: middle; }
+        .md-rows { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
+        .md-row { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border-radius: 10px; background: var(--color-card-soft); }
+        .md-arrow { font-size: 1rem; font-weight: 900; width: 16px; text-align: center; flex-shrink: 0; }
+        .md-row.easy .md-arrow, .md-row.easy .md-mean { color: var(--color-success); }
+        .md-row.hard .md-arrow, .md-row.hard .md-mean { color: var(--color-danger); }
+        .md-dong { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); min-width: 62px; flex-shrink: 0; }
+        .md-mean { font-size: 0.74rem; font-weight: 700; word-break: keep-all; }
+        .md-note { font-size: 0.64rem; color: var(--color-ink-3); margin: 11px 0 0; line-height: 1.55; word-break: keep-all; }
+        .md-note b { color: var(--color-ink-2); font-weight: 700; }
       `}</style>
     </section>
   );
