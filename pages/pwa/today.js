@@ -14,6 +14,7 @@ import AlertSettingsCard from "../../components/AlertSettingsCard";
 import { getStoryRegionOverride, REGIONS, getNewRegions, ackNewRegions } from "../../lib/storyRegion";
 import { recordSnapshot as recordRegionSnapshot, getRegionDelta } from "../../lib/storyRegionHistory";
 import { getHoldings as getEtfHoldings } from "../../lib/etfHoldings";
+import { recommendEtfs } from "../../lib/etfRecommend";
 import PortfolioDuelCard from "../../components/PortfolioDuelCard";
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
@@ -621,6 +622,41 @@ export default function TodayPage({ announcements = [] }) {
           </section>
         )}
 
+        {/* 카드1.5 — [ETF Phase3] 오늘의 ETF 한 수: 하루 한 종목 추천(규칙기반 회전) + 절세 팁 */}
+        {view === 2 && (() => {
+          const DAY = Math.floor(Date.now() / 86400000);
+          let pick = null;
+          try {
+            const target = JSON.parse(localStorage.getItem("onehub_target_alloc") || "null");
+            const recs = recommendEtfs({ holdings: getEtfHoldings(), positions: [], target, overlap: null });
+            if (recs.length) pick = recs[DAY % recs.length];
+          } catch (e) {}
+          const TAX_TIPS = [
+            "일반계좌 해외 ETF 양도차익은 연 250만원까지 비과세 — 연말 전 실현손익을 점검하세요.",
+            "손실 종목을 같은 해에 실현하면 이익과 상계(손익통산)돼 양도세가 줄어듭니다.",
+            "연금저축·IRP 납입은 연 최대 900만원까지 세액공제(13.2~16.5%) — 납입 여력을 확인하세요.",
+            "국내상장 해외 ETF는 배당소득세(15.4%)·금융소득종합과세 대상 — 계좌 배치를 점검하세요.",
+            "ISA 만기 자금을 연금계좌로 옮기면 추가 세액공제 한도가 생깁니다.",
+          ];
+          const tip = TAX_TIPS[DAY % TAX_TIPS.length];
+          return (
+            <section className="card sc">
+              <div className="sc-h">🎯 오늘의 ETF 한 수</div>
+              {pick ? (
+                <div className="etf1-reco">
+                  <div className="etf1-nm">📌 {pick.name}</div>
+                  <div className="etf1-why">{pick.reasonRule}</div>
+                </div>
+              ) : (
+                <div className="sc-empty">보유·목표배분을 입력하면 오늘의 추천 한 종목이 표시돼요.</div>
+              )}
+              <div className="etf1-tax">💡 <b>오늘의 절세</b> · {tip}</div>
+              <button className="tile-more" onClick={() => router.push("/pwa/etf?etf=rec")}>추천·절세 자세히 보기 →</button>
+              <div className="etf1-disc">규칙기반 참고 정보 · 투자자문/특정종목 권유 아님.</div>
+            </section>
+          );
+        })()}
+
         {/* 카드2 — [사용자 지시] 오늘의 할 일 · ETF (체크박스로 확인 후 취소선) */}
         {view === 2 && (() => {
           const todo = [myEtfNews, ...etfNews].filter(Boolean).filter((n, i, arr) => arr.findIndex((x) => x.id === n.id) === i).slice(0, 3);
@@ -812,6 +848,12 @@ export default function TodayPage({ announcements = [] }) {
         /* ══ 카드3: 오늘의 할 일 · 주식(체크리스트, 매일 자정 초기화) ══ */
         .sc-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 10px; }
         .sc-empty { font-size: 0.82rem; color: var(--color-ink-2); padding: 6px 2px; }
+        .etf1-reco { background: var(--color-primary-soft); border-radius: 11px; padding: 12px 13px; margin-bottom: 10px; }
+        .etf1-nm { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); }
+        .etf1-why { font-size: 0.78rem; color: var(--color-ink-2); line-height: 1.5; margin-top: 5px; word-break: keep-all; }
+        .etf1-tax { font-size: 0.78rem; color: var(--color-ink-2); line-height: 1.55; padding: 10px 12px; background: var(--color-card-soft); border-radius: 10px; word-break: keep-all; }
+        .etf1-tax b { color: var(--color-primary); }
+        .etf1-disc { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 6px; }
         .sc-list { display: flex; flex-direction: column; }
         .sc-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--color-line); }
         .sc-row:last-child { border-bottom: none; }
