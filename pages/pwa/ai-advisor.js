@@ -10,6 +10,8 @@ import { getTrader } from "../../lib/trader";
 import { getLedger } from "../../lib/ledger";
 import { acctRule } from "../../lib/taxRules";
 import { getStockHoldings } from "../../lib/stockHoldings";
+import EtfDataStatus from "../../components/EtfDataStatus";
+import EtfMarketNews from "../../components/EtfMarketNews";
 import { getHoldings as getEtfHoldings } from "../../lib/etfHoldings";
 
 const UK = 1e8; // 억 → 원
@@ -425,6 +427,10 @@ export default function AIAdvisor() {
           </div>
         </div>
       )}
+
+      {/* [ETF Phase4] 데이터 갱신현황 + 영어 ETF·마켓 뉴스/리서치 */}
+      <EtfDataStatus />
+      <EtfMarketNews />
 
       <div className="cta-row">
         <Link href="/pwa/assets" className="cta">💼 통합 포트폴리오</Link>

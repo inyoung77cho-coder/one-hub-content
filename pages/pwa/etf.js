@@ -6,6 +6,7 @@ import { useRouter } from "next/router";
 import BottomNav from "../../components/BottomNav";
 import AppHeader from "../../components/AppHeader";
 import AssetMapTitle from "../../components/AssetMapTitle";
+import EtfDataStatus from "../../components/EtfDataStatus";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS, getOtherAssets, addOtherAsset, removeOtherAsset, updateOtherAsset, sellOtherAsset, OTHER_KINDS } from "../../lib/etfHoldings";
 import { classifyEtf } from "../../lib/etfClassify";
@@ -1637,6 +1638,8 @@ export default function EtfDashboard() {
           <div className="other-note">시세 자동 갱신이 안 되는 자산입니다 — 평가금액이 바뀌면 <b>수정</b>으로 갱신하거나 <b>매도/인출</b>로 차감하세요. 변경은 총자산(원장)에 즉시 반영됩니다.</div>
         </section>
       )}
+
+      {etfTab === "hold" && <EtfDataStatus />}
 
       <div className="foot">확정 계산(수익·세금·중복도)은 입력값 기반. 예측(Forecast)은 통계적 시나리오(참고용·확정 아님). · 세무자문 아님</div>
 
