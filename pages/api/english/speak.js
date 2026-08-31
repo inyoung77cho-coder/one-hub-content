@@ -12,11 +12,25 @@ export default async function handler(req, res) {
   const text = String(req.query.text || "").trim().slice(0, 200);
   if (!text) return res.status(400).json({ error: "text required" });
   const language = req.query.language === "zh" ? "zh" : "en";
+  // [사용자 지시 2026-08-30] 중국어 나레이터를 남성으로. 실제 음성 선택은 백엔드(:5005 edge-tts)가
+  //   하므로 여기서는 voice 를 그대로 넘겨만 준다(허용 목록으로 제한 — 임의 문자열 전달 금지).
+  //   백엔드가 voice 를 아직 모르면 무시하고 기본 음성을 쓰므로 이 변경만으로는 깨지지 않는다.
+  //   ※ 지문 오디오(/api/english/audio/[id])는 백엔드가 미리 생성해 둔 파일이라, 음성을 바꾸려면
+  //     백엔드에서 기본 중국어 음성을 남성으로 바꾸고 재생성해야 한다.
+  const VOICE_ALLOW = {
+    "zh-male": "zh-CN-YunxiNeural",
+    "zh-female": "zh-CN-XiaoxiaoNeural",
+    "en-male": "en-US-GuyNeural",
+    "en-female": "en-US-AriaNeural",
+  };
+  // 중국어 기본값을 남성으로 고정한다(요청이 없어도 남성으로 나가게).
+  const voice = VOICE_ALLOW[req.query.voice] || (language === "zh" ? VOICE_ALLOW["zh-male"] : null);
 
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 15000);
   try {
-    const url = `${ENGLISH_API}/english/speak?text=${encodeURIComponent(text)}&language=${language}`;
+    const url = `${ENGLISH_API}/english/speak?text=${encodeURIComponent(text)}&language=${language}`
+      + (voice ? `&voice=${encodeURIComponent(voice)}` : "");
     const r = await fetch(url, { signal: ctrl.signal });
     if (!r.ok) return res.status(r.status).json({ error: "speak failed" });
     const buf = Buffer.from(await r.arrayBuffer());

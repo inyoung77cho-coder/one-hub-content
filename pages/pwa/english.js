@@ -419,13 +419,40 @@ function BbcKaraoke() {
   );
 }
 
+// [사용자 지적 2026-08-30] "셀럽/BBC 짧은 영상이 업데이트 안 된다" — 실제로는 백엔드가 매일
+//   갱신하고 있었다(당일자 영상 존재). 문제는 프론트가 받은 순서 그대로 videos[0] 을 띄우는데
+//   그 순서가 발행일순이 아니라, 첫 화면에 늘 같은 옛 영상이 걸리고 목록에 1년 가까이 된 영상
+//   (2025-10-27)까지 섞여 있었다는 점이다. 게다가 어디에도 날짜가 없어 '안 바뀐다'로만 보였다.
+//   → ① 발행일 내림차순 정렬 ② 너무 오래된 영상 제외 ③ 날짜를 화면에 표시.
+const LIVE_MAX_AGE_DAYS = 90;
+function vidTs(x) { const t = Date.parse(x?.published_at || ""); return Number.isFinite(t) ? t : 0; }
+function vidAgeLabel(x) {
+  const t = vidTs(x);
+  if (!t) return null;
+  const days = Math.floor((Date.now() - t) / 86400000);
+  if (days <= 0) return "오늘";
+  if (days === 1) return "어제";
+  if (days < 7) return `${days}일 전`;
+  const d = new Date(t);
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
 function LiveEnglish() {
   const [videos, setVideos] = useState(null);
   const [vidIdx, setVidIdx] = useState(0);
   useEffect(() => {
     let alive = true;
     fetch(`/api/english/live-videos`).then((r) => r.json())
-      .then((d) => { if (alive) setVideos((d.items || []).filter((x) => x.video_id)); })
+      .then((d) => {
+        if (!alive) return;
+        const cutoff = Date.now() - LIVE_MAX_AGE_DAYS * 86400000;
+        const all = (d.items || []).filter((x) => x.video_id);
+        const fresh = all.filter((x) => vidTs(x) >= cutoff);
+        // 전부 오래됐으면(수집이 실제로 멈춘 경우) 빈 화면 대신 가진 걸 보여주되 날짜로 드러낸다.
+        const use = fresh.length ? fresh : all;
+        setVideos([...use].sort((a, b) => vidTs(b) - vidTs(a)));
+        setVidIdx(0);
+      })
       .catch(() => alive && setVideos([]));
     return () => { alive = false; };
   }, []);
@@ -440,13 +467,14 @@ function LiveEnglish() {
   return (
     <div className="live">
       <BbcKaraoke />
-      <div className="live-vhd">🎬 셀럽·BBC 짧은 영상 <span>자막(CC) ON</span></div>
+      <div className="live-vhd">🎬 셀럽·BBC 짧은 영상 <span>자막(CC) ON{videos[0] && vidAgeLabel(videos[0]) ? ` · 최신 ${vidAgeLabel(videos[0])}` : ""}</span></div>
       <div className="live-vid">
         <iframe key={v.video_id} src={src} title={v.title || "video"}
           allow="accelerometer; encrypted-media; picture-in-picture; fullscreen" allowFullScreen loading="lazy" />
       </div>
       <div className="live-vcap">
         <span className="live-vtitle">{v.is_short ? "⚡" : "▶"} {v.channel} · {v.title}</span>
+        {vidAgeLabel(v) && <span className="live-vdate">{vidAgeLabel(v)}</span>}
         {videos.length > 1 && (
           <button type="button" className="live-next" onClick={() => setVidIdx((i) => (i + 1) % videos.length)}>다른 영상 →</button>
         )}
@@ -454,7 +482,7 @@ function LiveEnglish() {
       <div className="live-chips">
         {videos.map((x, i) => (
           <button key={i} type="button" className={`live-chip${i === vidIdx ? " on" : ""}`} onClick={() => setVidIdx(i)}>
-            {x.is_short ? "⚡ " : ""}{shortCh(x.channel)}
+            {x.is_short ? "⚡ " : ""}{shortCh(x.channel)}{vidAgeLabel(x) ? <em className="live-chip-d">{vidAgeLabel(x)}</em> : null}
           </button>
         ))}
       </div>
@@ -467,6 +495,9 @@ function LiveEnglish() {
         .live-vid iframe { width: 100%; aspect-ratio: 16/9; border: 0; display: block; }
         .live-vcap { display: flex; align-items: center; gap: 8px; font-size: .76rem; font-weight: 700; color: var(--color-ink); padding: 9px 12px; background: var(--color-card); border-radius: 10px; }
         .live-vtitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* [사용자 지적] 날짜가 없으면 매일 새로 와도 '안 바뀐다'로 읽힌다 — 발행일을 항상 표시. */
+        .live-vdate { flex-shrink: 0; font-size: .66rem; font-weight: 700; color: var(--color-ink-3); }
+        .live-chip-d { font-style: normal; margin-left: 4px; font-size: .62rem; font-weight: 600; opacity: .72; }
         .live-next { flex-shrink: 0; border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-primary); border-radius: 8px; padding: 5px 9px; font-size: .7rem; font-weight: 800; cursor: pointer; font-family: inherit; }
         .live-chips { display: flex; gap: 6px; flex-wrap: wrap; }
         .live-chip { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); border-radius: 999px; padding: 6px 11px; font-size: .72rem; font-weight: 700; cursor: pointer; font-family: inherit; }

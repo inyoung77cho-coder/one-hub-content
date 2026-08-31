@@ -14,6 +14,10 @@ export default function Comments({ date }) {
   const [category, setCategory] = useState("전체");
   const [filter, setFilter] = useState("전체");
   const [error, setError] = useState("");
+  // [S19-3 2026-08-30] 불러오기 실패를 '글 없음'으로 위장하지 않는다.
+  //   실측: GET /api/comments?date=서현동 → {"error":"GitHub API 401"} 인데 화면은
+  //   "아직 댓글이 없습니다"를 띄웠다. 게시판이 비어 있는 것과 고장 난 것은 다른 상태다.
+  const [loadError, setLoadError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
 
@@ -25,11 +29,23 @@ export default function Comments({ date }) {
 
   async function fetchComments() {
     setLoading(true);
+    setLoadError("");
     try {
-      const r = await fetch("/api/comments?date=" + date);
-      const d = await r.json();
-      setComments(d.comments || []);
-    } catch (e) { setComments([]); }
+      const r = await fetch("/api/comments?date=" + encodeURIComponent(date));
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !Array.isArray(d.comments)) {
+        // 인증 만료(401/403 → 503)인지 일시 장애인지 사용자 문장으로 구분해 준다.
+        setLoadError(d.reason === "upstream_auth"
+          ? "이야기 저장소 연결이 만료됐습니다 — 운영자 확인이 필요합니다."
+          : "지금 이야기를 불러올 수 없습니다.");
+        setComments([]);
+        return;
+      }
+      setComments(d.comments);
+    } catch (e) {
+      setLoadError("네트워크 문제로 이야기를 불러오지 못했습니다.");
+      setComments([]);
+    }
     finally { setLoading(false); }
   }
 
@@ -93,6 +109,11 @@ export default function Comments({ date }) {
       <div className="comments-list">
         {loading ? (
           <div className="comments-empty">불러오는 중...</div>
+        ) : loadError ? (
+          <div className="comments-error">
+            <span>⚠ {loadError}</span>
+            <button type="button" className="comments-retry" onClick={fetchComments}>다시 시도</button>
+          </div>
         ) : visible.length === 0 ? (
           <div className="comments-empty">{filter === "전체" ? "아직 댓글이 없습니다. 첫 이야기를 남겨보세요!" : `${filter} 카테고리 글이 아직 없습니다.`}</div>
         ) : (
@@ -153,6 +174,9 @@ export default function Comments({ date }) {
         .cf-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
         .comments-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
         .comments-empty { text-align: center; color: var(--color-ink-3); font-size: 13px; padding: 24px 0; }
+        /* [S19-3] 고장은 고장이라고 말한다 — '글 없음'과 시각적으로 구분되게 */
+        .comments-error { display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; color: var(--color-warning); font-size: 13px; line-height: 1.6; padding: 22px 12px; word-break: keep-all; }
+        .comments-retry { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 999px; cursor: pointer; font-family: var(--font-sans); }
         .comment-item { background: var(--color-card-soft); border-radius: 10px; padding: 10px 12px; }
         .comment-header { display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
         .comment-cat { font-size: 10px; font-weight: 800; color: var(--color-primary); background: var(--color-card); border-radius: 6px; padding: 1px 6px; flex-shrink: 0; }

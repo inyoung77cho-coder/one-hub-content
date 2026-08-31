@@ -240,6 +240,36 @@ export default function PortfolioDuelCard() {
   const newsFor = (name) => name ? news.find((n) => `${n.headline || ""} ${n.summary_md || ""}`.includes(name)) : null;
   const recentDecisions = [...duel.decisions].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 8);
 
+  // [S19-2 2026-08-30] 누적 성적표. 이 기능의 목적이 '누적된 정보로 자산 변화를 확인'인데
+  //   지금까지 누적을 보여주는 화면이 하나도 없었다(원시 목록만 있었다). 새 저장소를 만들지 않고
+  //   이미 있는 결정 로그 + getDecisionAnalysis 로만 계산한다.
+  const record = (() => {
+    const all = duel.decisions || [];
+    if (!all.length) return null;
+    const accepted = all.filter((d) => d.accepted).length;
+    const rejected = all.length - accepted;
+    // 채점된 창(단기 우선 → 중기)만 모아 평균을 낸다. '내 선택'과 'AI 선택'의 부호가 반대다:
+    //   수용 = 내가 AI와 같이 감(수익률 그대로), 거부 = 내가 반대로 감(AI 수익률의 반대가 내 성과).
+    let scored = 0, mySum = 0, aiSum = 0, myWin = 0;
+    all.forEach((d) => {
+      const a = analysisById[d.id];
+      const w = a && (a.windows.short?.ready ? a.windows.short : a.windows.mid?.ready ? a.windows.mid : null);
+      if (!w || w.pct == null) return;
+      scored += 1;
+      const aiPct = w.pct;                       // AI 판단대로 갔을 때의 수익률
+      const myPct = d.accepted ? aiPct : 0;      // 거부 = 내 포트폴리오엔 없음 → 0
+      aiSum += aiPct; mySum += myPct;
+      if (myPct > aiPct + 0.05) myWin += 1;
+    });
+    return {
+      total: all.length, accepted, rejected, scored,
+      passRate: Math.round((rejected / all.length) * 1000) / 10,
+      myAvg: scored ? Math.round((mySum / scored) * 10) / 10 : null,
+      aiAvg: scored ? Math.round((aiSum / scored) * 10) / 10 : null,
+      winRate: scored ? Math.round((myWin / scored) * 1000) / 10 : null,
+    };
+  })();
+
   return (
     <section className="pd-card">
       <div className="pd-title">🥊 포트폴리오 대결 <span className="pd-sub">{duel.base.startDate}부터 · {duel.base.seedType === "kis" ? "실보유 기준" : "가상현금 기준"}</span></div>
@@ -268,6 +298,15 @@ export default function PortfolioDuelCard() {
             <span className="pd-vs-break">현금 {wonFmt(aiPortfolio.cash)} + 주식 {wonFmt(sideStockVal(aiPortfolio))}</span>
           </div>
         </div>
+        {/* [S19-4] AI가 예수금이 모자라 못 산 추천이 있으면 밝힌다 — 예전엔 현금을 음수로 만들어
+            (실측 -6,686,793원) 무한 신용으로 산 것처럼 총액이 잡혔다. 이제 못 산 건 못 샀다고 말한다. */}
+        {(aiPortfolio.skipped || []).length > 0 && (
+          <div className="pd-vs-skip">
+            ⓘ AI가 예수금 한도로 {(aiPortfolio.skipped || []).length}건을 다 사지 못했습니다 —
+            {" "}{(aiPortfolio.skipped || []).slice(0, 3).map((s) => s.name || s.code).join(" · ")}
+            {(aiPortfolio.skipped || []).length > 3 ? ` 외 ${(aiPortfolio.skipped || []).length - 3}건` : ""}
+          </div>
+        )}
         <div className={`pd-vs-diff ${diff > 0 ? "pos" : diff < 0 ? "neg" : ""}`}>
           총액 차이 {diff > 0 ? "+" : ""}{wonFmt(diff)} ({diffPct > 0 ? "+" : ""}{diffPct.toFixed(2)}%)
         </div>
@@ -330,7 +369,9 @@ export default function PortfolioDuelCard() {
         </div>
       )}
       {buyCands.length === 0 && sellCands.length === 0 && (
-        <div className="pd-todo-empty">오늘은 새로운 추천이 없습니다 — 스캔·보유종목 상황에 따라 매일 달라집니다.</div>
+        // [S19-4] 같은 날 자기검증은 "매수 5·차단 0"인데 여기는 "추천 없음"이라 모순으로 읽혔다.
+        //   두 문장의 소스가 다르다는 사실을 문장 안에서 밝힌다(대결용 추천 ≠ 오늘 스캔 결과).
+        <div className="pd-todo-empty">오늘 <b>대결에 반영할</b> 새 추천이 없습니다 — 오늘 스캔 결과(매수·차단)는 AI › 자기검증에서 확인하세요.</div>
       )}
 
       {snapshots.length > 0 && (
@@ -358,6 +399,31 @@ export default function PortfolioDuelCard() {
       </button>
       {showHistory && (
         <div className="pd-history">
+          {/* [S19-2] 목록보다 먼저 '지금까지 어땠나' — 누적이 목적인 기능의 답. */}
+          {record && (
+            <div className="pd-record">
+              <div className="pd-record-row">
+                <span className="pd-rec-k">판단</span><b>{record.total}건</b>
+                <span className="pd-rec-k">수용</span><b>{record.accepted}</b>
+                <span className="pd-rec-k">거부</span><b>{record.rejected}</b>
+                <span className="pd-rec-k">채점 완료</span><b>{record.scored}건</b>
+              </div>
+              {record.scored > 0 ? (
+                <div className="pd-record-row">
+                  <span className="pd-rec-k">내 평균</span>
+                  <b className={record.myAvg > 0 ? "pos" : record.myAvg < 0 ? "neg" : ""}>{record.myAvg > 0 ? "+" : ""}{record.myAvg}%</b>
+                  <span className="pd-rec-k">AI 평균</span>
+                  <b className={record.aiAvg > 0 ? "pos" : record.aiAvg < 0 ? "neg" : ""}>{record.aiAvg > 0 ? "+" : ""}{record.aiAvg}%</b>
+                  <span className="pd-rec-k">내가 앞선 판</span><b>{record.winRate}%</b>
+                </div>
+              ) : (
+                <div className="pd-record-note">아직 채점된 판단이 없습니다 — 3거래일이 지나야 첫 결과가 나옵니다.</div>
+              )}
+              {record.passRate >= 80 && (
+                <div className="pd-record-note">거부(관망)가 {record.passRate}%입니다. 관망은 하락은 피하지만 상승 종목에서는 기회손실로 잡힙니다.</div>
+              )}
+            </div>
+          )}
           {recentDecisions.length === 0 && <div className="pd-todo-empty">아직 판단 기록이 없습니다.</div>}
           {recentDecisions.map((d) => {
             const a = analysisById[d.id];
@@ -375,7 +441,11 @@ export default function PortfolioDuelCard() {
                       const w = a.windows[k];
                       return (
                         <span className="pd-hist-w" key={k}>
-                          {w.label} {w.ready ? <b className={w.pct > 0 ? "pos" : w.pct < 0 ? "neg" : ""}>{w.pct > 0 ? "+" : ""}{w.pct.toFixed(1)}%</b> : <i>집계 전</i>}
+                          {w.label} {w.ready
+                            ? <b className={w.pct > 0 ? "pos" : w.pct < 0 ? "neg" : ""}>{w.pct > 0 ? "+" : ""}{w.pct.toFixed(1)}%</b>
+                            : w.reason === "no_price"
+                              ? <i className="nogr" title="이 기간의 가격 기록이 없어 채점할 수 없습니다 — 앱에 며칠 접속하지 않으면 스냅샷이 비게 됩니다">기록 없음</i>
+                              : <i>집계 전</i>}
                         </span>
                       );
                     })}
@@ -420,6 +490,8 @@ export default function PortfolioDuelCard() {
         .pd-vs-val { font-size: 1.05rem; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; word-break: break-word; }
         .pd-vs-break { font-size: 0.62rem; color: var(--color-ink-3); font-family: ui-monospace, monospace; white-space: normal; word-break: break-word; max-width: 100%; }
         .pd-vs-diff { font-size: 0.86rem; font-weight: 800; text-align: center; word-break: break-word; }
+        /* [S19-4] AI 예수금 한도로 못 산 추천 고지 */
+        .pd-vs-skip { margin-top: 6px; font-size: 0.68rem; line-height: 1.5; color: var(--color-ink-3); text-align: center; word-break: keep-all; }
         .pd-vs-diff.pos { color: var(--color-success); } .pd-vs-diff.neg { color: var(--color-danger); }
         .pd-chart-empty { font-size: 0.76rem; color: var(--color-ink-3); text-align: center; padding: 20px 8px; }
         .pd-todo { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
@@ -447,6 +519,16 @@ export default function PortfolioDuelCard() {
         .pd-hist-windows { display: flex; gap: 10px; flex-wrap: wrap; }
         .pd-hist-w { font-size: 0.68rem; color: var(--color-ink-3); display: flex; align-items: center; gap: 3px; }
         .pd-hist-w b { font-family: ui-monospace, monospace; }
+        /* [S19-2] 누적 성적표 */
+        .pd-record { border: 1px solid var(--color-line); background: var(--color-card-soft, rgba(0,0,0,.02)); border-radius: 10px; padding: 9px 11px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 5px; }
+        .pd-record-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 3px 10px; font-size: 0.72rem; }
+        .pd-rec-k { color: var(--color-ink-3); font-weight: 600; }
+        .pd-record-row b { font-weight: 800; font-variant-numeric: tabular-nums; margin-right: 4px; }
+        .pd-record-row b.pos { color: var(--color-success); }
+        .pd-record-row b.neg { color: var(--color-danger); }
+        .pd-record-note { font-size: 0.68rem; color: var(--color-ink-3); line-height: 1.5; word-break: keep-all; }
+        /* [S19-2] 기간은 지났는데 가격 기록이 없어 채점 불가 — '집계 전'과 구분되는 표시 */
+        .pd-hist-w i.nogr { font-style: normal; color: var(--color-warning); cursor: help; border-bottom: 1px dotted var(--color-warning); }
         .pd-hist-w b.pos { color: var(--color-success); } .pd-hist-w b.neg { color: var(--color-danger); }
         .pd-hist-w i { font-style: normal; color: var(--color-ink-3); }
         .pd-hist-news { align-self: flex-start; max-width: 100%; text-align: left; font-size: 0.7rem; color: var(--color-ink-2); background: var(--color-card-soft); border: none; border-radius: 7px; padding: 5px 8px; cursor: pointer; font-family: var(--font-sans); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

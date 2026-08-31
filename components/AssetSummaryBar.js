@@ -62,6 +62,10 @@ export default function AssetSummaryBar() {
         {(d?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && (
           <span className="asb-warn" title="증권사 연동 자산을 불러오지 못해 실제보다 적습니다">⚠ 일부 누락</span>
         )}
+        {/* [S19-1] 동기화 전 확정된 총자산 — 좁은 바에서도 사실은 숨기지 않는다. */}
+        {(d?.warnings || []).some((w) => w.code === "SYNC_PENDING") && (
+          <span className="asb-warn" title="다른 기기에서 입력한 자산을 아직 불러오는 중입니다">⏳ 동기화 중</span>
+        )}
       </div>
       <div className="asb-chips">
         {chips.map(([label, key, val, href]) => {

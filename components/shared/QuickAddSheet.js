@@ -29,6 +29,9 @@ export default function QuickAddSheet({ initialAsset = "stock", onClose, onSaved
   const [msg, setMsg] = useState("");
   // [I1] 2단 구조 — ① 현재 등록 상태 확인 ② 추가/수정. write-only 폼 위에 현재값을 먼저 보여준다.
   const [cur, setCur] = useState({ stock: null, etf: null, realestate: null, cash: null, reName: "" });
+  // [S19-1] 원장이 돌아오기 전에는 '미등록'이라고 단정하지 않는다 — 시트와 자산 지도가 다른 말을
+  //   하던 원인(로그인 직후 한쪽은 '부동산 미입력', 다른 쪽은 '시범삼성 28.80억')이 여기였다.
+  const [curReady, setCurReady] = useState(false);
   useEffect(() => {
     // [N1] '현재 등록'도 단일 원장에서 읽는다 — 시트와 자산 지도의 숫자가 어긋나지 않게.
     //   (과거엔 onboard만 읽어 직접입력 주식이 '미등록'으로 보였다.)
@@ -46,14 +49,15 @@ export default function QuickAddSheet({ initialAsset = "stock", onClose, onSaved
           cash: b.cash_uk ?? null,
           reName,
         });
+        setCurReady(true);
         // 현금 탭 진입 시 현재값 프리필(수정 맥락 제공)
         if (initialAsset === "cash" && b.cash_uk != null) setAmount(String(b.cash_uk));
       })
-      .catch(() => { if (alive) setCur((c) => ({ ...c, reName })); });
+      .catch(() => { if (alive) { setCur((c) => ({ ...c, reName })); setCurReady(true); } });
     return () => { alive = false; };
   }, [initialAsset]);
 
-  const ukTxt = (v) => (v == null ? "미등록" : `${Number(v).toFixed(2)}억`);
+  const ukTxt = (v) => (!curReady ? "…" : v == null ? "미등록" : `${Number(v).toFixed(2)}억`);
 
   const done = (key) => { if (onSaved) onSaved(key); if (onClose) onClose(); };
 

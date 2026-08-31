@@ -13,10 +13,11 @@ import DataState from "../../components/DataState";
 import LastUpdated from "../../components/LastUpdated";
 import QuickAddSheet from "../../components/shared/QuickAddSheet";
 import AssetMapTitle from "../../components/AssetMapTitle";
+import KisHoldingsCard, { deriveUrgency } from "../../components/shared/KisHoldingsCard";
+import ManualHoldingsCard from "../../components/shared/ManualHoldingsCard";
 import FeedbackButton from "../../components/FeedbackButton";
 
 const uk = (v) => (v == null ? "-" : `${Number(v).toFixed(2)}억`);
-const pctTxt = (v) => `${Number(v) >= 0 ? "+" : ""}${Number(v).toFixed(2)}%`;
 // 백엔드가 positions를 문자열로 주는 경우가 있어 방어적으로 파싱(today.js와 동일 로직)
 function parsePositions(dash) {
   let p = dash?.balance?.positions;
@@ -103,7 +104,7 @@ export default function AssetsMapPage() {
       setMyComplex(mp?.name || "");
     } catch (e) { setInvProps([]); }
     Promise.all([
-      getLedger(tr).catch(() => ({ ok: false })),
+      getLedger(tr, { awaitSync: !assets }).catch(() => ({ ok: false })),
       fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => ({ ok: false })),
     ]).then(([a, d]) => {
       setAssets(a); setDash(d); setAt(new Date());
@@ -126,6 +127,7 @@ export default function AssetsMapPage() {
     // [ⓖ] KIS 외 증권사(직접입력) 종목도 실시간에 가깝게 — getLedger()가 내부적으로 lib/stockLive를
     //   호출해 매번 최신 시세를 반영하므로, 화면을 오래 켜둬도 낡지 않게 1분 주기로 재조회한다.
     //   백그라운드 탭은 건너뛰고, 탭이 다시 보이면 즉시 갱신.
+    // [S19-1] 주기 재조회는 동기화를 다시 기다릴 이유가 없다(이미 확정됐거나 offline).
     const id = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       load();
@@ -167,9 +169,31 @@ export default function AssetsMapPage() {
     : rows
   ).filter((r) => !(useEx && r.k === "realestate" && !(invRealtyUk > 0.005)));
   const pctOf = (v) => (mapDenom > 0 && v != null ? (v / mapDenom) * 100 : 0);
+  // [S19-1] 값이 없다고 다 '미입력'이 아니다. 실거주만 있고 투자용 부동산이 없으면 '미입력'이 아니라
+  //   설계상 운용자산에서 뺀 것이다 — 그 차이를 라벨로 구분한다(사용자 지적: 실거주는 투자자산 제외).
+  const emptyLabel = (k) => {
+    if (k === "realestate" && hasResidence) return "실거주만 · 운용 제외";
+    return "미입력";
+  };
 
   // [사용자 지시] "주식" 뷰 — 주식 페이지(보유·추천)와 연결되는 계좌현황 요약 카드용 데이터.
   const positions = parsePositions(dash);
+  // [사용자 지적] 탭 전환이 눈에 보이도록 '보유' 탭에서만 나오는 한 줄 요약용 값.
+  //   직접입력 건수는 원장이 이미 세어둔 값이 없어 localStorage 를 직접 세지 않고 목록 길이만 쓴다.
+  const holdActionCnt = positions.filter((p) => deriveUrgency(p).rank <= 2).length;
+  const [manualCount, setManualCount] = useState(0);
+  useEffect(() => {
+    const count = () => {
+      try {
+        const raw = JSON.parse(localStorage.getItem("onehub_stock_holdings") || "[]");
+        const tr = getTrader();
+        setManualCount(Array.isArray(raw) ? raw.filter((h) => (h.trader || "A") === tr).length : 0);
+      } catch (e) { setManualCount(0); }
+    };
+    count();
+    window.addEventListener("onehub-assets-change", count);
+    return () => window.removeEventListener("onehub-assets-change", count);
+  }, []);
 
   // 도넛(stroke-dasharray) — 뷰 분모(mapDenom) 기준
   const donut = (() => {
@@ -202,10 +226,19 @@ export default function AssetsMapPage() {
 
         {/* [사용자 지시] 주식 페이지의 보유/추천을 상위 메뉴바 바로 아래 탭으로 — "주식" 뷰에서만 노출 */}
         {view === 0 && (
+          <>
           <div className="as-stocktabs">
             <button type="button" className={`as-st-btn ${stockTab === "hold" ? "on" : ""}`} onClick={() => setStockTab("hold")}>보유</button>
             <button type="button" className={`as-st-btn ${stockTab === "recommend" ? "on" : ""}`} onClick={() => setStockTab("recommend")}>추천</button>
           </div>
+          {/* [사용자 지적] 보유↔추천을 눌러도 첫 화면(자산 지도 카드)이 똑같아 '탭이 바뀌었나'를
+              알 수 없었다. 탭 바로 아래에 그 탭에서만 달라지는 한 줄을 둬 전환을 눈으로 확인시킨다. */}
+          <div className={`as-tabnote ${stockTab}`}>
+            {stockTab === "hold"
+              ? <>📊 <b>보유</b> · KIS {positions.length}종목{manualCount > 0 ? ` + 직접입력 ${manualCount}종목` : ""}{holdActionCnt > 0 ? ` · 오늘 조치 ${holdActionCnt}건` : " · 오늘 조치 없음"}</>
+              : <>🔍 <b>추천</b> · AI 추천 종목과 매수 판단(샀어요·관망)을 이 탭에서 기록합니다</>}
+          </div>
+          </>
         )}
       </div>
 
@@ -248,7 +281,7 @@ export default function AssetsMapPage() {
                   <span className="as-dotc" style={{ background: r.color }} />
                   <span className="as-rl">{r.label}</span>
                   <span className="as-rv">
-                    {r.val != null ? uk(r.val) : <em>미입력</em>}
+                    {r.val != null ? uk(r.val) : <em>{emptyLabel(r.k)}</em>}
                     {(() => {
                       // CLASSES 키(stock/realestate/etf/cash) → delta 키(stock/realty/etf/cash)
                       const dk = r.k === "realestate" ? "realty" : r.k;
@@ -295,6 +328,11 @@ export default function AssetsMapPage() {
           {(assets?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && (
             <p className="as-incomplete">⚠ 증권사 연동 자산을 불러오지 못했습니다 — 이 총자산은 <b>실제보다 적습니다</b>. 잠시 후 다시 시도해 주세요.</p>
           )}
+          {/* [S19-1] 기기 동기화가 아직 안 끝난 채로 확정된 총자산이면 숫자 옆에서 바로 말한다.
+              (이 경고가 뜨는 상태에서는 다른 기기 입력분이 빠져 있을 수 있다.) */}
+          {(assets?.warnings || []).some((w) => w.code === "SYNC_PENDING") && (
+            <p className="as-incomplete">⏳ 다른 기기에서 입력한 자산을 아직 불러오는 중입니다 — 이 총자산은 <b>실제보다 적을 수 있습니다</b>. <button className="as-sync-retry" onClick={load}>다시 불러오기</button></p>
+          )}
           {/* [버그 수정 후 투명성] 증권사 연동과 동일 계좌로 판단해 직접입력분을 총자산에서
               제외한 종목이 있으면 그 사실을 여기서 바로 알린다 — "왜 총액이 예상보다 적지?"를
               사용자가 스스로 추적하지 않아도 되게. 실제로 다른 증권사 보유라면 입력 시 해당
@@ -340,31 +378,23 @@ export default function AssetsMapPage() {
         {/* ── 뷰별 전용 카드 ── */}
         {/* [사용자 지시] "주식" 뷰 — 상단 탭(보유/추천) 선택에 따라 실제 목록을 보여준다.
             핵심 정보만 간결하게(종목명·수익률/점수) — 승인·거절 등 실제 조작은 자식 페이지로 위임. */}
-        {view === 0 && (
+        {/* [사용자 지시 2026-08-30] 보유 탭은 페이지를 옮기지 않고 여기서 끝난다.
+            ① KIS 보유 종목 — 이름을 'KIS 보유 종목'으로 명확히 하고, 기존 '보유 자세히·매도 →'가
+               열던 상세(매수가·현재가·목표가·손절가·AI 스탠스·다음 트리거·매도)를 카드 안에서 편다.
+            ② 그 아래 '직접 입력 보유 · KIS 외 증권사' 카드 — 추가·확인·삭제를 이 자리에서.
+            두 카드는 index.js(portfolio 탭)와 같은 공용 컴포넌트라 두 화면이 갈라지지 않는다. */}
+        {view === 0 && stockTab === "hold" && (<>
+          <KisHoldingsCard positions={positions} trader={trader} onSold={load} />
+          <ManualHoldingsCard trader={trader} onChanged={load} />
+        </>)}
+        {view === 0 && stockTab === "recommend" && (
           <section className="card as-stocklist">
-            <div className="as-h">{stockTab === "hold" ? "보유 종목" : "추천 종목"}</div>
-            {stockTab === "hold" ? (
-              positions.length === 0 ? (
-                <div className="as-vc-empty">보유 종목이 없어요</div>
-              ) : (
-                <div className="as-sl-list">
-                  {positions.map((p) => (
-                    <div className="as-sl-row" key={p.code}>
-                      <span className="as-sl-name">{p.name}</span>
-                      <span className="as-sl-mid">{Number(p.current_price || 0).toLocaleString()}원 · {p.qty}주</span>
-                      <span className={p.pnl_rate >= 0 ? "up" : "dn"}>{pctTxt(p.pnl_rate)}</span>
-                    </div>
-                  ))}
-                </div>
-              )
-            ) : (
-              // [버그 수정] 존재하지 않는 dash.recommend_stocks 필드를 읽고 있어 항상
-              // "추천 종목이 없어요"로 보였다. 자산지도는 읽기 전용 요약이라 이 카드에서
-              // 목록을 다시 그리는 대신(주식 › 추천 탭과 내용이 겹치는 게 사용자 리포트의
-              // 핵심 불만이었음), 바로 그 탭으로 안내만 한다.
-              <div className="as-vc-empty">오늘의 추천은 주식 › 추천 탭에서 확인하세요</div>
-            )}
-            <button className="as-vc-cta" onClick={() => router.push(stockTab === "hold" ? "/pwa?tab=portfolio" : "/pwa?tab=recommend")}>{stockTab === "hold" ? "보유 자세히 · 매도 →" : "추천 자세히 · 승인 →"}</button>
+            <div className="as-h">추천 종목</div>
+            {/* 추천 목록은 판단 기록(샀어요·관망)·기술 분석까지 딸린 큰 화면이라 자산지도에서
+                다시 그리지 않는다. 다만 예전 안내문은 지금 보고 있는 탭을 그대로 다시 가리켰다
+                (자기참조). 무엇이 있는지 말해 주고 곧장 그 화면으로 보낸다. */}
+            <div className="as-vc-empty">AI 추천 종목·기술 분석·매수 판단(샀어요·관망) 기록은 추천 화면에서 이어집니다.</div>
+            <button className="as-vc-cta" onClick={() => router.push("/pwa?tab=recommend")}>추천 종목 보기 · 판단 남기기 →</button>
           </section>
         )}
         {/* [사용자 지시] ETF·부동산은 이제 탭 선택 즉시 해당 페이지로 이동하므로(RotatingPageTitle onChange
@@ -399,6 +429,9 @@ export default function AssetsMapPage() {
         .as-stocktabs { display: flex; gap: 6px; margin: 0 2px 12px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 4px; box-shadow: var(--shadow-card); }
         .as-st-btn { flex: 1; min-height: 36px; border: none; background: none; border-radius: 9px; color: var(--color-ink-2); font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .as-st-btn.on { background: var(--color-primary); color: #fff; }
+        /* [사용자 지적] 탭 전용 한 줄 — 탭을 눌렀을 때 첫 화면에서 무엇이 달라졌는지 보여주는 유일한 줄 */
+        .as-tabnote { margin: -6px 4px 12px; font-size: 0.72rem; line-height: 1.5; color: var(--color-ink-2); word-break: keep-all; }
+        .as-tabnote b { color: var(--color-ink); font-weight: 800; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .as-total { display: flex; align-items: baseline; gap: 8px; }
         .as-total span { font-size: 0.78rem; font-weight: 600; color: var(--color-ink-3); }
@@ -444,6 +477,8 @@ export default function AssetsMapPage() {
         .as-add { width: 100%; margin-top: 14px; min-height: 44px; border: 1px dashed var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-ink-2); border-radius: 11px; font-size: 0.84rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         /* [N1] 총자산 불완전 고지 — 숫자 바로 아래. 눈에 띄되 공포를 팔지 않는다. */
         .as-incomplete { margin: 8px 0 0; font-size: 0.74rem; line-height: 1.5; color: var(--color-warning); word-break: keep-all; }
+        /* [S19-1] 동기화 대기 안내 안의 재시도 — 문장 흐름을 끊지 않는 인라인 버튼 */
+        .as-sync-retry { border: none; background: none; padding: 0; margin-left: 4px; color: var(--color-primary); font-size: 0.74rem; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-family: var(--font-sans); }
         /* [N6] 이상 평단 확인 — 경고색(빨강) 아님. 사용자 잘못이라 단정하지 않는다. */
         .as-fix-q { font-size: 0.8rem; line-height: 1.55; color: var(--color-ink-2); margin: 0 0 10px; word-break: keep-all; }
         .as-fix-cta, .as-fix-edit { display: flex; gap: 8px; align-items: center; }

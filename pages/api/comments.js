@@ -27,7 +27,17 @@ async function ghFetch(path, options = {}) {
 
   });
 
-  if (!res.ok) throw new Error(`GitHub API ${res.status}`);
+  if (!res.ok) {
+
+    // [S19-3] 상태코드를 살려 올린다 — 인증 만료(401/403)와 일시 장애를 화면이 구분해야 한다.
+
+    const err = new Error(`GitHub API ${res.status}`);
+
+    err.status = res.status;
+
+    throw err;
+
+  }
 
   return res.json();
 
@@ -101,7 +111,13 @@ export default async function handler(req, res) {
 
     } catch (e) {
 
-      return res.status(500).json({ error: e.message });
+      // [S19-3] 401/403 은 '서버 오류'가 아니라 '저장소 연결이 끊긴 상태'다 — 503 + reason 으로 구분.
+
+      //   토큰 값은 절대 응답에 싣지 않는다.
+
+      const auth = e.status === 401 || e.status === 403;
+
+      return res.status(auth ? 503 : 500).json({ ok: false, reason: auth ? 'upstream_auth' : 'upstream_error', error: e.message });
 
     }
 
@@ -137,7 +153,9 @@ export default async function handler(req, res) {
 
     } catch (e) {
 
-      return res.status(500).json({ error: e.message });
+      const auth = e.status === 401 || e.status === 403;
+
+      return res.status(auth ? 503 : 500).json({ ok: false, reason: auth ? 'upstream_auth' : 'upstream_error', error: auth ? '이야기 저장소 연결이 만료됐습니다 — 운영자 확인이 필요합니다.' : e.message });
 
     }
 

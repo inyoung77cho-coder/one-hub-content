@@ -21,8 +21,8 @@ import AppHeader from '../../components/AppHeader';
 import TraderBadge from '../../components/shared/TraderBadge';
 import BottomNav from '../../components/BottomNav';
 import ReTodaySection from '../../components/ReTodaySection';
-import { getStockHoldings, removeStock, buyStock } from '../../lib/stockHoldings';
-import { fetchStockQuotes, fetchStockQuote } from '../../lib/stockLive';
+import { getStockHoldings, buyStock } from '../../lib/stockHoldings';
+import { fetchStockQuote } from '../../lib/stockLive';
 import { getKrxSession } from '../../lib/marketHours';
 import ShareButton from '../../components/ShareButton';
 import RotatingPageTitle from '../../components/RotatingPageTitle';
@@ -30,7 +30,8 @@ import AssetMapTitle from '../../components/AssetMapTitle';
 import { recordAccuracySnapshot, getAccuracyHistory } from '../../lib/aiAccuracyHistory';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
-import { StockForm } from '../../components/shared/AssetForms';
+import KisHoldingsCard from '../../components/shared/KisHoldingsCard';
+import ManualHoldingsCard from '../../components/shared/ManualHoldingsCard';
 
 // [v9.0] 안전 숫자 포맷 — INVALID_PRICE/STOP/NaN/undefined → '-'
 function safeLocale(v, suffix = '') {
@@ -122,12 +123,22 @@ function deriveRecMeta(s) {
   if (v) {
     const upside = v.price > 0 && v.target > 0 ? Math.round(((v.target / v.price - 1) * 100) * 10) / 10 : null;
     const conv = Math.round(Math.min(99, Math.max(1, v.final_score ?? 0)));
+    // [S19-4 2026-08-30] 같은 응답 안에서 action=BUY 인데 ml_signal=SELL/STRONG_SELL 인 종목이 있다
+    //   (실측: 한화엔진 STRONG_SELL, HanwhaAero·솔브레인 SELL). 지금까지는 _valid 매칭만 보고
+    //   무조건 '검증 완료' 매수 배지를 달아, AI가 화면에서 하는 말과 내부 계산이 정반대였다.
+    //   ml_signal 은 이미 이 객체에 있고 상세 시트에서도 쓰고 있다 — 배지도 그 값을 본다.
+    const sig = String(v.ml_signal || '').toUpperCase();
+    const mlConflict = sig === 'SELL' || sig === 'STRONG_SELL';
     return {
       reason: v.reason || `AI 확신도 ${conv}% · 실거래 검증 통과`,
       upside: upside ?? 8,
-      stance: { label: '검증 통과', color: 'var(--color-success)' },
-      score, real: true, conv,
-      verdict: { label: '✅ AI 판단: 매수(검증 완료)', short: '매수', color: 'var(--color-success)', bg: 'var(--color-success-soft)' },
+      stance: mlConflict
+        ? { label: '신호 상충', color: 'var(--color-warning)' }
+        : { label: '검증 통과', color: 'var(--color-success)' },
+      score, real: true, conv, mlSignal: sig || null, mlConflict,
+      verdict: mlConflict
+        ? { label: `⚠ 신호 상충 · 실거래 검증은 통과했으나 ML은 ${sig === 'STRONG_SELL' ? '강한 매도' : '매도'}`, short: '상충', color: 'var(--color-warning)', bg: 'var(--color-warning-soft)' }
+        : { label: '✅ AI 판단: 매수(검증 완료)', short: '매수', color: 'var(--color-success)', bg: 'var(--color-success-soft)' },
     };
   }
   // 근거 1줄: 가장 두드러진 신호 우선
@@ -151,39 +162,8 @@ function deriveRecMeta(s) {
   return { reason, upside, stance, score, real: false, verdict };
 }
 
-// [§3-4 피드백8] 보유 종목 AI 스탠스(유지/추가/축소/매도) + 근거 1줄 — 목표가/손절가 기반.
-function deriveStance(p) {
-  const n = (x) => (x == null || isNaN(Number(x)) ? null : Number(x));
-  const cur = n(p.current_price) ?? 0, avg = n(p.avg_price) ?? 0, tgt = n(p.target) ?? 0, stp = n(p.stop_loss) ?? 0;
-  const pnl = p.pnl_rate ?? 0;
-  const won = (v) => `${Math.round(v).toLocaleString()}원`;
-  const upside = (tgt > 0 && cur > 0) ? (tgt / cur - 1) * 100 : null;
-  if (tgt > 0 && cur >= tgt)
-    return { label: "축소", color: "var(--color-success)", reason: `목표가 ${won(tgt)} 도달 — 차익 실현(익절) 검토` };
-  if (stp > 0 && cur > 0 && cur <= stp)
-    return { label: "매도", color: "var(--color-danger)", reason: `손절선 ${won(stp)} 도달 — 리스크 관리 매도 검토` };
-  if (pnl >= 5 && (upside == null || upside > 3))
-    return { label: "추가", color: "var(--color-primary)", reason: `추세 양호${upside != null ? ` · 목표가까지 +${upside.toFixed(0)}% 여력` : ""}${stp > 0 ? `, 손절선 ${won(stp)} 미접촉` : ""}` };
-  if (avg > 0 && cur > 0 && cur < avg * 0.95)
-    return { label: "유지", color: "var(--color-warning)", reason: `평단 대비 하락 · ${stp > 0 ? `손절선 ${won(stp)}까지 관찰` : "추세 관찰"}` };
-  return { label: "유지", color: "var(--color-ink-2)", reason: `${upside != null ? `목표가 ${won(tgt)}까지 +${upside.toFixed(0)}% 여력` : "추세 관찰 중"}${stp > 0 ? `, 손절선 ${won(stp)} 미접촉` : ""}` };
-}
-
-// [S-2] 보유 액션 긴급도 4단계 — 임계치는 설정값(하드코딩 금지).
-const HOLD_URG_CFG = { nearPct: 3, spikePct: 7 };
-function deriveUrgency(p, cfg = HOLD_URG_CFG) {
-  const n = (x) => (x == null || isNaN(Number(x)) ? null : Number(x));
-  const cur = n(p.current_price) ?? 0, tgt = n(p.target) ?? 0, stp = n(p.stop_loss) ?? 0;
-  const near = cfg.nearPct / 100;
-  const day = n(p.change_1d);
-  if (stp > 0 && cur > 0 && cur <= stp * (1 + near))
-    return { level: "urgent", rank: 0, badge: "손절 임박", color: "var(--color-danger)", bar: "var(--color-danger)" };
-  if (tgt > 0 && cur > 0 && cur >= tgt * (1 - near))
-    return { level: "chance", rank: 1, badge: "익절 검토", color: "var(--color-success)", bar: "var(--color-success)" };
-  if (day != null && Math.abs(day) >= cfg.spikePct)
-    return { level: "watch", rank: 2, badge: "점검 필요", color: "var(--color-warning-ink, var(--color-warning))", bar: "var(--color-warning)" };
-  return { level: "normal", rank: 3, badge: "유지", color: "var(--color-ink-3)", bar: null };
-}
+// [S19 2026-08-30] deriveStance / deriveUrgency 는 components/shared/KisHoldingsCard.js 로 이관했다.
+//   보유 카드가 종합자산·주식 두 화면에서 같은 컴포넌트를 쓰므로, 판정 규칙도 한 곳에만 둔다.
 
 // [§3-4] 차단 사유 → 해제 조건(그래서 어떻게 되면 풀리나) 1줄
 function unblockCondition(reason, signal) {
@@ -294,11 +274,9 @@ export default function PWADashboard({ latestReport }) {
   const TRUST_TABS = ['vs', 'verify', 'archive']; // [OS-2] RotatingPageTitle 순환 순서 = 탭 순서
   const [trustSec, setTrustSec] = useTabState('sec', TRUST_TABS, 'vs');
   const [recSort, setRecSort] = useState('interest'); // [S7.2] 추천 정렬(interest/upside)
-  const [holdSort, setHoldSort] = useState('urgency'); // [S-2] 보유 정렬(urgency/value)
   const [autoWatchNote, setAutoWatchNote] = useState([]); // [S-6] 추천해제→자동 관망 편입 알림
   const [buyNotice, setBuyNotice] = useState(null); // [S-6] 바로매수 핸드오프 { name, code }
   const [decFeedback, setDecFeedback] = useState(null); // [S-5] 판단 기록 직후 즉시 피드백 { name, decision, date }
-  const [manualPx, setManualPx] = useState({}); // [라이브] 직접입력 보유 현재가맵(id→{price,currency,krw,date}) · 평가/이상치용
   const [companyInfo, setCompanyInfo] = useState({}); // [S-7] 기업개요 캐시(code→summary)
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
   const [opNotes, setOpNotes] = useState([]); // [알림카드] 운영자 신고가(spot_price) — 내 단지
@@ -310,7 +288,6 @@ export default function PWADashboard({ latestReport }) {
   const [aiRec, setAiRec] = useState(null); // [v11 2-A] 오늘 AI 자산 권고(ai-summary)
   const [reFeed, setReFeed] = useState(null); // [브리핑] 부동산 최근 실거래(신고가) 피드
   const [fxRate, setFxRate] = useState(null); // [브리핑] 오늘 USD/KRW 환율(경제 지표용)
-  const [stFormOpen, setStFormOpen] = useState(false); // [주식 직접입력] 폼 열림
   const [stManualTick, setStManualTick] = useState(0); // [주식 직접입력] 보유 목록 재조회 트리거
   const [benchPerf, setBenchPerf] = useState(null); // [성과비교] 시장지수 구간 수익률 { ok, label, pct, startDate, symbol }
   const [expandedRec, setExpandedRec] = useState({}); // [v9.0] 추천 탭 왜 추천? 펼침
@@ -323,8 +300,6 @@ export default function PWADashboard({ latestReport }) {
   const [basisOpen, setBasisOpen] = useState(false); // [v10 UI] 홈 'AI 판단 근거' 접기
   const [heroWhyOpen, setHeroWhyOpen] = useState(false); // [v11-ux] 홈 통합 판단 '왜?' 인라인 펼치기(근거 버튼 제거)
   const [logOpen, setLogOpen] = useState(false);     // [v10 UI] 홈 '최근 활동' 접기
-  const [sellConfirm, setSellConfirm] = useState({}); // [v8.7] 매도 1단계 확인 상태: { [code]: true }
-  const [sellLoading, setSellLoading] = useState({}); // [v8.7] 매도 처리 중 상태
 
   // [v9.0] 투자성향 프로필
   const [profile, setProfile] = useState({
@@ -629,31 +604,8 @@ export default function PWADashboard({ latestReport }) {
     return () => { alive = false; };
   }, [bottomSheet?.code]);
 
-  // [라이브 시세][ⓖ] 직접입력(KIS 외 증권사) 보유의 현재가를 자동 갱신 → 평가액이 실시간에 가깝게 반영.
-  //   manualPx: id → { price, currency, krw, date }. 원장(getLedger)과 동일 소스(/api/etf/quote)로 일관.
-  //   KIS는 서버가 1분 주기로 잔고를 갱신하므로, 수동입력 종목도 같은 주기로 자동 재조회해 격차를 없앤다
-  //   (기존엔 접속 시 1회뿐이라 화면을 오래 켜두면 시세가 낡아졌음). 백그라운드 탭은 폴링을 건너뛰고,
-  //   탭이 다시 보이면 즉시 재조회한다.
-  useEffect(() => {
-    if (!mounted) return;
-    let alive = true;
-    const refresh = async () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
-      const list = getStockHoldings(trader);
-      if (!list.length) { if (alive) setManualPx({}); return; }
-      const { quotes } = await fetchStockQuotes(list);
-      if (alive) setManualPx(quotes);
-    };
-    refresh();
-    const id = setInterval(refresh, 60000);
-    const onVisible = () => { if (document.visibilityState === 'visible') refresh(); };
-    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      alive = false;
-      clearInterval(id);
-      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible);
-    };
-  }, [mounted, trader, stManualTick]);
+  // [S19 2026-08-30] 직접입력 보유의 라이브 시세 폴링은 ManualHoldingsCard 안으로 옮겼다 —
+  //   카드가 자기 시세를 직접 조회하므로, 이 페이지와 종합자산 페이지가 서로 다른 값을 보일 수 없다.
 
   // [S-6] 추천 리스트가 갱신될 때, 직전에 노출됐다가 사라진(해제된) 무액션 종목을
   //   자동 '관망'(auto_watch)으로 편입 → 추천 종목의 '나 vs AI' 편입률 100%(데이터 유실 0).
@@ -740,21 +692,26 @@ export default function PWADashboard({ latestReport }) {
 
   // [나 vs AI] 추천 카드에서 직접 판단 기록 — 후보엔 가격 필드가 없으므로 현재가를 조회해 진입가로 저장
   const logDecision = useCallback(async (code, name, decision, priceHint) => {
-    // 즉시 기록(버튼 상태 바로 반영) → 진입가는 조회 후 백필
-    recordDecision({ code, name, entry: Number(priceHint) || null, decision, trader });
+    // [S19-2 2026-08-30] 예전엔 entry=null 로 먼저 기록하고 시세를 뒤에서 백필했는데, 백필이
+    //   조용히 실패하면 그 판단은 matureLedger 의 entry>0 필터에 걸려 영원히 채점되지 않았다
+    //   (실측: '샀어요' 2건이 entry=null·snaps=[]). 이제 시세를 먼저 시도하고, 실패해도
+    //   pending_entry 로 남겨 다음 접속 때 matureLedger 가 백필한다.
     setDecTick((t) => t + 1);
-    // [S-5] 즉시 피드백 — 결과 확인일(3일 뒤) 명시
+    // [S-5] 즉시 피드백 — 결과 확인일(3일 뒤) 명시. 저장 확정 전에 눌린 느낌부터 준다.
     const _rd = new Date(Date.now() + 3 * 86400000);
     setDecFeedback({ name, decision, date: `${_rd.getMonth() + 1}/${_rd.getDate()}` });
     clearTimeout(logDecision._t); logDecision._t = setTimeout(() => setDecFeedback(null), 5000);
-    if (!Number(priceHint)) {
-      // [2026-08-21 WI-03/04] 가격만 필요한데 전체 AI 분석을 호출하던 지점 — 시세 전용으로 교체.
+
+    let entry = Number(priceHint) || null;
+    if (!entry) {
+      // [2026-08-21 WI-03/04] 가격만 필요한데 전체 AI 분석을 호출하던 지점 — 시세 전용.
       try {
         const q = await fetchStockQuote(code);
-        const entry = q?.price || null;
-        if (entry) { recordDecision({ code, name, entry, decision, trader }); setDecTick((t) => t + 1); }
+        entry = q?.price || null;
       } catch {}
     }
+    recordDecision({ code, name, entry, decision, trader });
+    setDecTick((t) => t + 1);
   }, [trader]);
 
   const searchStocks = useCallback(async (q) => {
@@ -890,6 +847,29 @@ export default function PWADashboard({ latestReport }) {
   // Mission stats 계산
   const buyCount = data?.today_buys?.length ?? 0;
   const blockCount = data?.market?.block_count ?? 0;
+
+  // [사용자 지시 2026-08-30] "AI 페이지는 갱신 여부를 먼저 화면에 띄운다."
+  //   지금까지 이 정보(오늘 판단·전일 대비 변화·분석 시각)는 자기검증 섹션 안에만 있어,
+  //   AI 탭 기본 화면(vs 나 대결)에서는 두 번 더 눌러야 닿았다. 세 섹션 공통 최상단으로 올린다.
+  //   ★ 새 API 를 부르지 않는다 — 이미 받아둔 data(today_buys/block_count)와 aiDaily 만 쓴다.
+  const aiFreshness = (() => {
+    const realToday = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
+    const analysisDate = aiDaily?.today_date || null;
+    const stale = !analysisDate || analysisDate !== realToday;
+    const chg = aiDaily?.changes || [];
+    const cnt = {
+      neo: chg.filter(c => c.type === 'new').length,
+      act: chg.filter(c => c.type === 'action').length,
+      sc: chg.filter(c => c.type === 'score').length,
+      gone: chg.filter(c => c.type === 'gone').length,
+    };
+    const diffs = [];
+    if (cnt.neo) diffs.push(`신규 ${cnt.neo}`);
+    if (cnt.act) diffs.push(`판단전환 ${cnt.act}`);
+    if (cnt.sc) diffs.push(`점수변경 ${cnt.sc}`);
+    if (cnt.gone) diffs.push(`제외 ${cnt.gone}`);
+    return { realToday, analysisDate, stale, diffs, hasData: !!data || !!aiDaily };
+  })();
   const watchCount = data?.recent_decisions?.filter(e => e.event_type === 'ANALYZE').length ?? 0;
   const sellCount = data?.today_sells?.length ?? 0;
   const passCount = blockCount; // PASS = AI가 차단한 종목 수
@@ -1755,8 +1735,16 @@ export default function PWADashboard({ latestReport }) {
                   if (s.net_buy != null || s.supply != null) return '동점 中 수급 우위';
                   return '동점 中 기술점수 상위';
                 };
-                const top3 = sorted.slice(0, 3);
-                const rest = sorted.slice(3);
+                // [S19-4] ML 신호가 매도인 종목은 상위 3에 올리지 않는다 — '오늘의 1위'가 내부적으로
+                //   매도 신호인 상태를 만들지 않기 위해서다. 목록에서 지우지는 않고 아래로 내린다.
+                const _isMlConflict = (s) => {
+                  const sig = String(s?._valid?.ml_signal || '').toUpperCase();
+                  return sig === 'SELL' || sig === 'STRONG_SELL';
+                };
+                const _clean = sorted.filter((s) => !_isMlConflict(s));
+                const _conflict = sorted.filter(_isMlConflict);
+                const top3 = _clean.slice(0, 3);
+                const rest = [..._clean.slice(3), ..._conflict];
                 // [R2/G10] 금·은·동 메달 제거 — 순위는 숫자(1·2·3)로 표시(과장·이모지 남발 완화)
                 const openSheet = (s) => {
                   const sc = deriveScores(s); // 종목별 실제 신호로 서브점수 재계산(상수 표기 방지)
@@ -2245,201 +2233,11 @@ export default function PWADashboard({ latestReport }) {
                   <div className="acc-chip"><span>실현손익</span><b>{data.balance?.realized_pnl?.toLocaleString() ?? '-'}원</b></div>
                 </div>
               </section>
-              <section className="pwa-card">
-                <span className="pwa-card-label">보유 종목</span>
-                {positions.length === 0
-                  ? <div className="pwa-empty">아직 보유 종목이 없어요 — 추가하면 여기에 표시됩니다</div>
-                  : (() => {
-                    const _u = (q) => deriveUrgency(q);
-                    const _sorted = holdSort === 'value' ? positions : [...positions].sort((a, b) => _u(a).rank - _u(b).rank);
-                    const _actionCnt = positions.filter((q) => _u(q).rank <= 2).length;
-                    return (<>
-                      <div className="hold-summary">
-                        <span>{_actionCnt > 0 ? <>오늘 조치가 필요한 종목 <b>{_actionCnt}개</b></> : '오늘은 조치할 종목이 없습니다'}</span>
-                        <button className="hold-sort-btn" onClick={() => setHoldSort((s) => (s === 'urgency' ? 'value' : 'urgency'))}>{holdSort === 'urgency' ? '긴급도순' : '기본순'} ⇅</button>
-                      </div>
-                      <div className="position-cards">{_sorted.map((p, i) => { const u = _u(p); return (
-                      <div key={p.code || i} className={`position-card u-${u.level}`} style={u.bar ? { borderLeft: `3px solid ${u.bar}` } : undefined}>
-                        <div className="position-card-top">
-                          <span className="position-card-name" title={p.name}>{p.name}</span>
-                          <span className="hold-urg-badge" style={{ color: u.color, borderColor: u.color, opacity: u.level === 'normal' ? 0.55 : 1 }}>{u.badge}</span>
-                          <span className={`position-card-badge mono ${p.pnl_rate>=0?'bull':'bear'}`}>
-                            {p.pnl_rate>=0?'+':''}{p.pnl_rate}%
-                          </span>
-                        </div>
-                        {/* [FB-8 이슈2] 조치 필요 종목: '지금 뭘 하라'를 카드 최상단에 명령형으로 */}
-                        {u.rank <= 2 && (() => { const st = deriveStance(p); const doText = u.level === 'urgent' ? '손절가에 근접했어요 — 매도할지 지금 결정하세요.' : `${st.label} 시점이에요 — 오늘 한 번 확인하세요.`; return (
-                          <div className="pos-todo" style={{ borderLeft: `3px solid ${u.color}` }}>
-                            <span className="pos-todo-k" style={{ color: u.color }}>👉 지금 할 일</span>
-                            <span className="pos-todo-v">{doText} <span className="pos-todo-hint">아래 <b>매도</b> · <b>AI 분석 보기</b>에서 실행</span></span>
-                          </div>
-                        ); })()}
-                        <div className="position-card-grid mono">
-                          <div className="position-card-cell">
-                            <span className="dim">매수가</span>
-                            {/* [S1] 국내주식 원 단위 정수 통일(정확 평단은 title 툴팁) */}
-                            <span title={`정확 평단 ${Number(p.avg_price||0).toLocaleString()}원`}>{Math.round(Number(p.avg_price||0)).toLocaleString()}원</span>
-                          </div>
-                          <div className="position-card-cell">
-                            <span className="dim">현재가</span>
-                            <span>{Number(p.current_price||0).toLocaleString()}원</span>
-                          </div>
-                          <div className="position-card-cell">
-                            <span className="dim">수량</span>
-                            <span>{p.qty}주</span>
-                          </div>
-                          <div className="position-card-cell">
-                            <span className="dim">평가손익</span>
-                            <span className={p.pnl_amount>=0?'bull':'bear'}>
-                              {p.pnl_amount>=0?'+':''}{Number(p.pnl_amount||0).toLocaleString()}원
-                            </span>
-                          </div>
-                          {safeNum(p.target) > 0 && (
-                            <div className="position-card-cell">
-                              <span className="dim">목표가</span>
-                              <span className="bull">
-                                {safeLocale(p.target, '원')}
-                                {/* [v9.0][15] 목표가 대비 남은 상승여력 */}
-                                {safeNum(p.current_price) > 0 && (
-                                  <span style={{ fontSize: '0.7rem', marginLeft: 4 }}>
-                                    (+{((p.target / p.current_price - 1) * 100).toFixed(1)}% 남음)
-                                  </span>
-                                )}
-                              </span>
-                            </div>
-                          )}
-                          {safeNum(p.stop_loss) > 0 && (
-                            <div className="position-card-cell">
-                              <span className="dim">손절가</span>
-                              <span className="bear">{safeLocale(p.stop_loss, '원')}</span>
-                            </div>
-                          )}
-                        </div>
-                        {/* [v8.7] 지표 한줄 요약 */}
-                        {(p.rsi != null || p.macd != null || p.atr != null || p.ml_score != null) && (
-                          <div className="position-indicator-row">
-                            {p.rsi != null && <span>RSI {p.rsi}</span>}
-                            {p.macd != null && <span>MACD {p.macd > 0 ? '+' : ''}{p.macd}</span>}
-                            {p.atr != null && <span>ATR {p.atr}</span>}
-                            {p.ml_score != null && <span style={{ fontWeight: 700, color: 'var(--color-primary)' }}>AI {p.ml_score}</span>}
-                          </div>
-                        )}
-                        {/* [§3-4 피드백8] AI 스탠스 + 근거 1줄 인라인 */}
-                        {(() => { const st = deriveStance(p); return (
-                          <div className="pos-stance">
-                            <span className="pos-stance-badge" style={{ color: st.color, borderColor: st.color }}>🤖 {st.label}</span>
-                            <span className="pos-stance-reason">{st.reason}</span>
-                          </div>
-                        ); })()}
-                        {/* [S7.1] 종목별 다음 트리거 — 조건부 다음 행동 1줄(손절·익절 레벨) */}
-                        {(() => {
-                          const avg = Number(p.avg_price || 0), cur = Number(p.current_price || 0);
-                          if (!(avg > 0)) return null;
-                          const stop = safeNum(p.stop_loss) > 0 ? Number(p.stop_loss) : Math.round(avg * 0.92);
-                          const tgt = safeNum(p.target) > 0 ? Number(p.target) : Math.round(avg * 1.15);
-                          const toStop = cur > 0 ? ((stop / cur - 1) * 100) : null;
-                          const parts = [];
-                          parts.push(`손절 ${stop.toLocaleString()}${toStop != null ? ` (${toStop >= 0 ? '+' : ''}${toStop.toFixed(1)}%)` : ''}`);
-                          parts.push(`목표 ${tgt.toLocaleString()} 도달 시 절반 익절 제안`);
-                          return (
-                            <div className="pos-trigger">⏭ <b>다음 트리거</b> · <span style={{ color: u.color, fontWeight: 700 }}>{u.badge}</span> · {parts.join(' · ')}
-                              {!(safeNum(p.stop_loss) > 0 && safeNum(p.target) > 0) && <span className="pt-est">추정 레벨</span>}
-                            </div>
-                          );
-                        })()}
-                        {(() => {
-                          // [§3-4] 상태 배지는 위 AI 스탠스로 통합(중복 제거) — 여기선 액션 버튼만
-                          const posKey = p.code || i;
-                          return (
-                            <div>
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', marginTop: 8, gap: 5 }}>
-                                {/* [2026-08-25] "AI 분석 보기"(상세 팝업) 제거 — 매수가/현재가/목표가/손절가/
-                                    RSI·MACD·ATR·AI점수/AI 스탠스+근거/다음 트리거가 이미 카드 위에 전부
-                                    있어 클릭해서 열어봐도 대부분 반복이었고, 유일하게 새로 보여주던 4점수
-                                    차트는 백엔드 실값이 아니라 프론트에서 지어낸 추정치였다(사용자 리포트:
-                                    "보유 상세가 한번 더 나오는데 굳이 그럴 필요 없이 카드로"). */}
-                                <div style={{ display: 'flex', gap: 5, flexShrink: 0 }}>
-                                  <button
-                                    className={`sell-btn${sellConfirm[posKey] ? ' confirm' : ''}`}
-                                    disabled={sellLoading[posKey]}
-                                    style={{ fontSize: '0.68rem', padding: '3px 9px', borderRadius: 8, border: 'none', cursor: sellLoading[posKey] ? 'default' : 'pointer', fontFamily: 'var(--font-body)', fontWeight: 700, background: sellConfirm[posKey] ? 'var(--color-danger)' : 'var(--color-danger-soft)', color: sellConfirm[posKey] ? '#fff' : 'var(--color-danger)', opacity: sellLoading[posKey] ? 0.6 : 1 }}
-                                    onClick={async () => {
-                                      if (!sellConfirm[posKey]) {
-                                        setSellConfirm(prev => ({ ...prev, [posKey]: true }));
-                                        setTimeout(() => setSellConfirm(prev => { const n = { ...prev }; delete n[posKey]; return n; }), 4000);
-                                        return;
-                                      }
-                                      setSellLoading(prev => ({ ...prev, [posKey]: true }));
-                                      setSellConfirm(prev => { const n = { ...prev }; delete n[posKey]; return n; });
-                                      try {
-                                        const res = await fetch('/api/pwa/sell', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: p.code, trader: trader }) });
-                                        const d = await res.json();
-                                        alert(d.ok ? `${p.name} 매도 주문을 자동매매 엔진에 전송했습니다.` : `매도 실패: ${d.error}`);
-                                      } catch(e) { alert('매도 요청 중 오류: ' + e.message); }
-                                      setSellLoading(prev => { const n = { ...prev }; delete n[posKey]; return n; });
-                                    }}
-                                  >
-                                    {sellLoading[posKey] ? '처리 중...' : sellConfirm[posKey] ? '⚠ 실제 매도주문 실행' : '매도'}
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                        {p.entry_hypothesis && (
-                          <div className="position-card-ai">
-                            <span className="position-card-ai-label">🤖 AI 가설</span>
-                            <p className="position-card-ai-text">{p.entry_hypothesis}</p>
-                          </div>
-                        )}
-                      </div>); })}
-                    </div>
-                    </>);
-                  })()}
-              </section>
-
-              {/* [주식 직접입력] KIS 외 증권사 보유 — 빠른입력과 동일한 공용 StockForm */}
-              <section className="pwa-card">
-                <div className="mh-head">
-                  <span className="pwa-card-label" style={{ margin: 0 }}>🧾 직접 입력 보유 <span className="mh-sub">KIS 외 증권사</span></span>
-                  <button className="mh-add" onClick={() => setStFormOpen(o => !o)}>{stFormOpen ? '닫기' : '＋ 추가'}</button>
-                </div>
-                {stFormOpen && <div className="mh-form"><StockForm onSaved={() => { setStManualTick(t => t + 1); setStFormOpen(false); }} /></div>}
-                {(() => {
-                  const _tick = stManualTick; // 저장/삭제 후 재조회 트리거
-                  const list = mounted ? getStockHoldings(trader) : [];
-                  if (!list.length) return <div className="pwa-empty">미래에셋·삼성 등 KIS 외 증권사 보유를 <b>＋ 추가</b>로 입력하면 여기에 표시됩니다.</div>;
-                  return (
-                    <div className="mh-list">
-                      {list.map((h) => {
-                        const q = manualPx[h.id];
-                        const cp = q?.price;                 // 현재가(해당 통화, 라이브)
-                        const isUsd = h.ccy === 'USD';
-                        const anomaly = cp && h.avgPrice && !isUsd && (h.avgPrice > cp * 10 || h.avgPrice < cp / 10);
-                        const fmt = (v) => `${isUsd ? '$' : ''}${isUsd ? Number(v).toLocaleString() : Math.round(Number(v)).toLocaleString()}${isUsd ? '' : '원'}`;
-                        const pnl = cp && Number(h.avgPrice) > 0 ? (cp / Number(h.avgPrice) - 1) * 100 : null;
-                        const basisLabel = h.priceBasis === 'current' ? '현재가' : '평단';
-                        return (
-                        <div className={`mh-row ${anomaly ? 'mh-anomaly' : ''}`} key={h.id}>
-                          <div className="mh-l">
-                            <b className="mh-name">{h.name}{anomaly && <span className="mh-warn" title={`평단 ${Number(h.avgPrice).toLocaleString()}원이 현재가 ${Number(cp).toLocaleString()}원과 크게 차이납니다. 총매수금액을 평단에 넣었는지 확인 후 다시 입력하세요.`}>⚠ 데이터 확인 필요</span>}</b>
-                            <span className="mh-meta">{h.broker} · {h.account} · {h.market === 'us' ? '🇺🇸 해외' : '🇰🇷 국내'}{q?.date ? ` · 시세 ${q.date.slice(5)}` : ''}</span>
-                          </div>
-                          {/* [라이브] 현재가(굵게) + 매수기준 대비 손익. 현재가 없으면 저장값 표시. 국내는 원 단위 정수. */}
-                          <div className="mh-r" title={h.ccy === 'KRW' ? `정확 ${basisLabel} ${Number(h.avgPrice).toLocaleString()}원` : undefined}>
-                            {h.shares}주 · 지금 {fmt(cp != null ? cp : h.avgPrice)}
-                            <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--color-ink-3)' }}>
-                              {basisLabel} {fmt(h.avgPrice)}{pnl != null ? <em style={{ fontStyle: 'normal', marginLeft: 6, color: pnl >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>{pnl >= 0 ? '+' : ''}{pnl.toFixed(1)}%</em> : ''}
-                            </span>
-                          </div>
-                          <button className="mh-del" onClick={() => { removeStock({ id: h.id, trader }); setStManualTick(t => t + 1); }} aria-label={`${h.name} 삭제`}>✕</button>
-                        </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
-              </section>
+              {/* [사용자 지시 2026-08-30] 보유 카드 2종을 공용 컴포넌트로 이관 —
+                  종합자산 › 주식 › 보유 탭(pages/pwa/assets.js)과 같은 파일을 쓴다.
+                  같은 UI를 두 화면에 손으로 복제하면 반드시 어긋나기 때문이다. */}
+              <KisHoldingsCard positions={positions} trader={trader} onSold={() => setStManualTick(t => t + 1)} />
+              <ManualHoldingsCard trader={trader} onChanged={() => setStManualTick(t => t + 1)} />
 
               <section className="pwa-card">
                 <span className="pwa-card-label">🤖 AI 판단 — 매수 차단 종목</span>
@@ -2466,6 +2264,23 @@ export default function PWADashboard({ latestReport }) {
         {/* ── Report Tab = [S2 IA] 트러스트 허브 ── */}
         {tab === 'report' && (
           <main className="pwa-main">
+
+            {/* [사용자 지시 2026-08-30] 갱신 여부를 가장 먼저 — 세 섹션(대결·자기검증·리포트) 공통 최상단.
+                "오늘 AI가 돌긴 했나"가 매일 첫 질문인데, 그 답이 자기검증 안에만 있었다. */}
+            {aiFreshness.hasData && (
+              <div className={`ai-fresh ${aiFreshness.stale ? 'stale' : 'ok'}`}>
+                <span className="ai-fresh-dot" aria-hidden="true" />
+                <span className="ai-fresh-main">
+                  {aiFreshness.stale
+                    ? <>오늘({aiFreshness.realToday}) 새 매수 판단 없음{aiFreshness.analysisDate ? <> · 최근 분석 <b>{aiFreshness.analysisDate}</b></> : null}</>
+                    : <>오늘 분석 완료 · 매수 <b>{buyCount}</b> · 차단 <b>{blockCount}</b></>}
+                </span>
+                {aiFreshness.diffs.length > 0 && (
+                  <span className="ai-fresh-diff">어제 대비 {aiFreshness.diffs.join(' · ')}</span>
+                )}
+                <button className="ai-fresh-more" onClick={() => setTrustSec('verify')}>자기검증 →</button>
+              </div>
+            )}
 
             {/* [나 vs AI 대결] — 2026-08-23 완전 재설계. today.js와 동일한 components/PortfolioDuelCard.js 로 통합. */}
             {trustSec === 'vs' && <PortfolioDuelCard />}
@@ -4351,6 +4166,15 @@ export default function PWADashboard({ latestReport }) {
         /* [나 vs AI 대결] */
         /* [사용자 피드백] 오늘·자산·이야기와 동일하게 카드 없이 — 위치/여백을 td-titlewrap과 픽셀 단위로 통일 */
         .trust-nav { display: flex; align-items: center; gap: 8px; margin: 6px 2px 6px; }
+        /* [사용자 지시 2026-08-30] AI 갱신 스탬프 — 세 섹션 공통 최상단. 상태를 색이 아니라 문장으로 말한다. */
+        .ai-fresh { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0 0 10px; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--color-line); background: var(--color-card); box-shadow: var(--shadow-card); font-size: 0.74rem; color: var(--color-ink-2); line-height: 1.5; }
+        .ai-fresh b { color: var(--color-ink); font-weight: 800; }
+        .ai-fresh-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+        .ai-fresh.ok .ai-fresh-dot { background: var(--color-success); }
+        .ai-fresh.stale .ai-fresh-dot { background: var(--color-ink-3); }
+        .ai-fresh-main { font-weight: 600; }
+        .ai-fresh-diff { font-size: 0.7rem; color: var(--color-ink-3); }
+        .ai-fresh-more { margin-left: auto; flex-shrink: 0; border: none; background: none; padding: 0; color: var(--color-primary); font-size: 0.7rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .aid-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         .aid-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
         .aid-date { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); }
