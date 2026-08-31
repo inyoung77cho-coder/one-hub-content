@@ -13,6 +13,7 @@ import PortfolioDuelCard from '../../components/PortfolioDuelCard';
 // [N1] 자산 원장. lib/verdictLedger 의 getLedger(판단 기록)와 이름이 겹쳐 별칭으로 구분한다.
 import { getLedger as getAssetLedger } from '../../lib/ledger';
 import { cachedJson } from '../../lib/quoteCache'; // [S20-1] 중복 GET 30초 캐시·동시요청 dedup
+import { computeAiFreshness } from '../../lib/aiFreshness'; // [S20-3] AI 갱신 상태(오늘 탭과 공유)
 import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta } from '../../lib/assetHistory';
 import { dedupBy } from '../../lib/useDedup';
 import { useTabState } from '../../lib/pwa/useTabState';
@@ -883,24 +884,8 @@ export default function PWADashboard({ latestReport }) {
   //   지금까지 이 정보(오늘 판단·전일 대비 변화·분석 시각)는 자기검증 섹션 안에만 있어,
   //   AI 탭 기본 화면(vs 나 대결)에서는 두 번 더 눌러야 닿았다. 세 섹션 공통 최상단으로 올린다.
   //   ★ 새 API 를 부르지 않는다 — 이미 받아둔 data(today_buys/block_count)와 aiDaily 만 쓴다.
-  const aiFreshness = (() => {
-    const realToday = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
-    const analysisDate = aiDaily?.today_date || null;
-    const stale = !analysisDate || analysisDate !== realToday;
-    const chg = aiDaily?.changes || [];
-    const cnt = {
-      neo: chg.filter(c => c.type === 'new').length,
-      act: chg.filter(c => c.type === 'action').length,
-      sc: chg.filter(c => c.type === 'score').length,
-      gone: chg.filter(c => c.type === 'gone').length,
-    };
-    const diffs = [];
-    if (cnt.neo) diffs.push(`신규 ${cnt.neo}`);
-    if (cnt.act) diffs.push(`판단전환 ${cnt.act}`);
-    if (cnt.sc) diffs.push(`점수변경 ${cnt.sc}`);
-    if (cnt.gone) diffs.push(`제외 ${cnt.gone}`);
-    return { realToday, analysisDate, stale, diffs, hasData: !!data || !!aiDaily };
-  })();
+  //   [S20-3] 계산 로직은 lib/aiFreshness.js 로 추출 — today.js(오늘 탭)와 규칙을 공유한다.
+  const aiFreshness = computeAiFreshness(aiDaily, data);
   const watchCount = data?.recent_decisions?.filter(e => e.event_type === 'ANALYZE').length ?? 0;
   const sellCount = data?.today_sells?.length ?? 0;
   const passCount = blockCount; // PASS = AI가 차단한 종목 수

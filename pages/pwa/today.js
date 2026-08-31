@@ -15,7 +15,11 @@ import { getStoryRegionOverride, REGIONS, getNewRegions, ackNewRegions } from ".
 import { recordSnapshot as recordRegionSnapshot, getRegionDelta } from "../../lib/storyRegionHistory";
 import { getHoldings as getEtfHoldings } from "../../lib/etfHoldings";
 import { recommendEtfs } from "../../lib/etfRecommend";
-import PortfolioDuelCard from "../../components/PortfolioDuelCard";
+import { deriveUrgency, deriveStance } from "../../components/shared/KisHoldingsCard"; // [S20-3] 조치 판정 규칙 재사용(복제 금지)
+import { computeAiFreshness } from "../../lib/aiFreshness"; // [S20-3] AI 갱신 상태(AI 탭과 공유)
+import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta } from "../../lib/assetHistory"; // [S20-3] 총자산 전일 대비
+import { getSnapshots as getDuelSnapshots } from "../../lib/portfolioDuel"; // [S20-3] 대결 결과 배너 판정용
+import { cachedJson } from "../../lib/quoteCache"; // [S20-3] /api/pwa-ai-daily 중복 GET dedup
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
@@ -85,6 +89,8 @@ export default function TodayPage({ announcements = [] }) {
   const [reMyProp, setReMyProp] = useState(null); // [이관] 오늘의 부동산 스크리너용 내 단지 상세(전체 객체)
   const [status, setStatus] = useState("loading");
   const [at, setAt] = useState(null);
+  const [aiDaily, setAiDaily] = useState(null); // [S20-3] 오늘 vs 전일 AI 판단 diff(AI 탭과 동일 소스)
+  const [assetDelta, setAssetDelta] = useState(null); // [S20-3] 총자산 전일 대비(lib/assetHistory)
   const [notis, setNotis] = useState([]); // [알림] 텔레그램/리포트 알림 피드
   const [opNotes, setOpNotes] = useState([]); // [알림] OneHub 신고가(spot_price)
   const [reBrief, setReBrief] = useState(null); // [사용자 지시] 내 부동산 vs 지역 대장단지 가격 비교(re/briefing 재사용)
@@ -134,7 +140,11 @@ export default function TodayPage({ announcements = [] }) {
     ]).then(([d, p, f, L]) => {
       setDash(d); setPend(p); setFeed(f); setLedger(L); setAt(new Date());
       setStatus(d || L ? "ok" : "error");
+      // [S20-3] 총자산이 유효할 때만 오늘치 스냅샷 적립 후 전일 대비 계산(assets.js 와 동일 규칙).
+      if (L && L.ok && L.total_uk != null) { recordAssetSnapshot(tr, L); setAssetDelta(getAssetDelta(tr)); }
     });
+    // [S20-3] 상단 3행 요약 중 'AI 변화 한 줄' — AI 탭(index.js)과 같은 URL이라 캐시를 공유한다.
+    cachedJson(`/api/pwa-ai-daily?trader=${tr}`).then((d) => { if (d && d.ok) setAiDaily(d); }).catch(() => {});
     fetch(`/api/notifications?trader=${tr}`).then((r) => r.json())
       .then((n) => { if (n?.ok && Array.isArray(n.items)) setNotis(dedupBy(n.items, (x) => x.id ?? `${x.title || ""}|${x.body || ""}|${x.sent_at || x.created_at || ""}`)); }).catch(() => {});
     fetch(`/api/today/news`).then((r) => r.json())
@@ -220,6 +230,49 @@ export default function TodayPage({ announcements = [] }) {
   // ── 오늘(KST) 날짜 문자열 — 아래 헤드라인 계산과 criticalNotis 필터 둘 다에서 씀.
   const kd = new Date(Date.now() + 9 * 3600 * 1000);
   const todayStr = `${kd.getUTCFullYear()}-${String(kd.getUTCMonth() + 1).padStart(2, "0")}-${String(kd.getUTCDate()).padStart(2, "0")}`;
+
+  // ══ [S20-3] 오늘 탭 상단 3행 요약 — ①총자산 ②오늘 조치할 종목 ③AI 변화 한 줄 ══
+  //   설계 목적(사용자 정의): "자산의 처분 유무를 확인하고 현재 자산을 이해하는 관문."
+  // ── 행1: 총자산 전일 대비(assets.js 와 같은 표기 규칙을 로컬에 소량 복제 — import 금지 지시)
+  const dvUk = (v) => (v == null ? null : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}억`);
+  const dCls = (v) => (v == null ? "" : v > 0.004 ? "up" : v < -0.004 ? "dn" : "flat");
+  const totalUk = ledger?.total_uk != null && Number.isFinite(Number(ledger.total_uk)) ? Number(ledger.total_uk) : null;
+  // ── 행2: 오늘 조치할 종목 — 목표가 도달/손절 근접만(deriveUrgency rank<=2), 최대 3개
+  const actionStocks = positions
+    .filter((p) => deriveUrgency(p).rank <= 2)
+    .sort((a, b) => deriveUrgency(a).rank - deriveUrgency(b).rank)
+    .slice(0, 3);
+  // 조치 근거 1줄 — KisHoldingsCard 와 동일한 목표가 잔여/손절 근접 계산.
+  const actionReason = (p) => {
+    const cur = Number(p.current_price) || 0, tgt = Number(p.target) || 0, sl = Number(p.stop_loss) || 0;
+    const u = deriveUrgency(p);
+    if (u.rank === 0 && sl > 0 && cur > 0) return `손절선까지 ${((sl / cur - 1) * 100).toFixed(1)}%`;
+    if (u.rank === 1 && tgt > 0 && cur > 0) return `목표가까지 +${((tgt / cur - 1) * 100).toFixed(1)}%`;
+    if (p.change_1d != null) return `당일 ${Number(p.change_1d) >= 0 ? "+" : ""}${Number(p.change_1d)}% 급변`;
+    return deriveStance(p).reason;
+  };
+  // 조치가 없을 때도 근거와 함께 — '손절선 최근접 −X.X%'(KisHoldingsCard toStop 과 동일 부호).
+  const toStops = positions
+    .map((p) => { const sl = Number(p.stop_loss) || 0, cur = Number(p.current_price) || 0; return sl > 0 && cur > 0 ? (sl / cur - 1) * 100 : null; })
+    .filter((x) => x != null);
+  const nearestToStop = toStops.length ? Math.max(...toStops) : null;
+  // 자산군 확장 — ETF 리밸런싱 이탈(보유가 있고 규칙기반 갭이 잡힐 때만), 부동산 대장 대비 포지션.
+  const etfHoldingsCnt = getEtfHoldings(trader).length;
+  let etfRebalMsg = null;
+  try {
+    if (etfHoldingsCnt > 0) {
+      const target = JSON.parse(localStorage.getItem("onehub_target_alloc") || "null");
+      const recs = recommendEtfs({ holdings: getEtfHoldings(trader), positions: [], target, overlap: null });
+      if (recs.length && recs[0].axis === "region") etfRebalMsg = recs[0].reasonRule;
+    }
+  } catch (e) {}
+  // ── 행3: AI 변화 한 줄(AI 탭과 동일 규칙 — lib/aiFreshness)
+  const aiFreshness = computeAiFreshness(aiDaily, dash);
+  // ── 대결 결과 배너 — 오늘 스냅샷이 찍힌 날에만 노출(없으면 렌더 안 함).
+  const duelSnaps = getDuelSnapshots(trader);
+  const duelResultToday = duelSnaps.length > 0 && duelSnaps[duelSnaps.length - 1].date === todayStr;
+  // ── '봇이 보낸 뉴스' 정직한 날짜 — 배치 날짜가 오늘이 아니면 '오늘 신규 없음 · 최근 {날짜}'.
+  const botNewsStale = newsBrief?.date && newsBrief.date !== todayStr;
 
   // [사용자 지시] 대결 탭 이외 탭들도 맨 위 카드가 비어 보이지 않도록 — 그날 가장 중요한 항목 한 줄
   //   요약. 우선순위 폭포: 내 보유 관련 실제 변동 → 그 외 실제 이벤트(신고가·저평가) → 배경 정보(지역
@@ -357,9 +410,90 @@ export default function TodayPage({ announcements = [] }) {
 
         {/* ══ "오늘의 대결" — 카드1(대결) · 카드2(주식 뉴스) · 카드3(주식 할일) 3장으로 통일 ══ */}
         {view === 0 && (<>
-        {/* 카드1 — 포트폴리오 대결(2026-08-23 완전 재설계). today.js·index.js 중복 구현을
-            components/PortfolioDuelCard.js 단일 컴포넌트로 통합. */}
-        <PortfolioDuelCard />
+        {/* [S20-3] 카드0 — 오늘 1화면 요약 3행: ①총자산 ②오늘 조치할 종목 ③AI 변화. 최상단 고정. */}
+        <section className="card td-sum">
+          {/* 행1 — 총자산 + 전일 대비 + 마지막 갱신 */}
+          <div className="tds-row tds-asset">
+            <span className="tds-k">총자산</span>
+            {totalUk != null ? (
+              <b className="tds-total">{totalUk.toFixed(2)}억</b>
+            ) : (
+              <b className="tds-total tds-muted">불러오는 중…</b>
+            )}
+            {assetDelta && assetDelta.total != null ? (
+              <span className={`tds-dchip ${dCls(assetDelta.total)}`}>{assetDelta.total >= 0 ? "▲" : "▼"} {dvUk(assetDelta.total)} <i>{assetDelta.prevDate} 대비</i></span>
+            ) : totalUk != null ? (
+              <span className="tds-dnew">오늘부터 기록 — 내일부터 전일 대비 표시</span>
+            ) : null}
+            {at && <span className="tds-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
+          </div>
+
+          {/* 행2 — 오늘 조치할 종목(목표가 도달/손절 근접) */}
+          <div className="tds-row tds-act">
+            <span className="tds-k">오늘 조치</span>
+            <div className="tds-actbody">
+              {actionStocks.length > 0 ? (
+                actionStocks.map((p, i) => {
+                  const u = deriveUrgency(p), st = deriveStance(p);
+                  return (
+                    <button type="button" className="tds-actrow" key={p.code || i} onClick={() => router.push("/pwa?tab=portfolio")}>
+                      <span className="tds-badge" style={{ color: u.color, borderColor: u.color }}>{u.badge}</span>
+                      <span className="tds-nm">{p.name}</span>
+                      <span className="tds-stance" style={{ color: st.color }}>{st.label}</span>
+                      <span className="tds-reason">{actionReason(p)}</span>
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="tds-none">
+                  {positions.length > 0
+                    ? `${positions.length}종목 모두 유지 구간${nearestToStop != null ? ` · 손절선 최근접 ${nearestToStop.toFixed(1)}%` : ""}`
+                    : "증권사 연동 보유 종목이 없어요 — 조치할 주식이 없습니다."}
+                </div>
+              )}
+              {/* 자산군 확장 — ETF 리밸런싱 · 부동산 대장 대비(주식만이 아닌 3축 통합) */}
+              <div className="tds-more">
+                {etfRebalMsg ? (
+                  <button type="button" className="tds-morerow" onClick={() => router.push("/pwa/etf?etf=rec")}>
+                    <span className="tds-mk">📊 ETF</span><span className="tds-mv">{etfRebalMsg}</span>
+                  </button>
+                ) : (
+                  <button type="button" className="tds-morerow" onClick={() => router.push("/pwa/etf?etf=rec")}>
+                    <span className="tds-mk">📊 ETF</span><span className="tds-mv tds-link">리밸런싱 확인 →</span>
+                  </button>
+                )}
+                {myFeedEntry && myLeaderGapPct != null ? (
+                  <button type="button" className="tds-morerow" onClick={() => router.push("/pwa/realestate")}>
+                    <span className="tds-mk">🏠 부동산</span><span className="tds-mv">{myComplex} 대장 대비 {myLeaderGapPct.toFixed(1)}% 수준</span>
+                  </button>
+                ) : (
+                  <button type="button" className="tds-morerow" onClick={() => router.push("/pwa/realestate")}>
+                    <span className="tds-mk">🏠 부동산</span><span className="tds-mv tds-link">내 단지 포지션 →</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 행3 — 어제 대비 AI 변화 한 줄 */}
+          {aiFreshness.hasData && (
+            <div className={`tds-row tds-ai ${aiFreshness.stale ? "stale" : "ok"}`}>
+              <span className="tds-k">AI 변화</span>
+              <span className="tds-aitext">
+                {aiFreshness.stale
+                  ? <>오늘 새 매수 판단 없음{aiFreshness.analysisDate ? <> · 최근 분석 <b>{aiFreshness.analysisDate}</b></> : null}</>
+                  : <>오늘 분석 완료{aiFreshness.diffs.length > 0 ? <> · {aiFreshness.diffs.join(" · ")}</> : null}</>}
+              </span>
+            </div>
+          )}
+        </section>
+
+        {/* [S20-3] 대결 카드는 AI 탭으로 이동. 결과가 나온 날만 배너 한 줄로 안내. */}
+        {duelResultToday && (
+          <button type="button" className="td-duel-banner" onClick={() => router.push("/pwa?tab=report&sec=vs")}>
+            🏆 오늘의 <b>나 vs AI</b> 대결 결과가 나왔어요 · AI 탭에서 보기 →
+          </button>
+        )}
 
         {/* 카드1.5 — 시황 브리핑. 텔레그램 "ONE-HUB Market Brief"와 같은 스냅샷을
             /api/pwa-market-brief로 받아 압축 요약. 데이터가 아직 없으면(신규 배포 직후 등)
@@ -419,7 +553,8 @@ export default function TodayPage({ announcements = [] }) {
             아래 카드2(주식 뉴스)와는 다른 소스(onehub-news 서비스)라 헷갈리지 않도록 별도 카드로 분리. */}
         {newsBrief && (parseThemedNews(newsBrief.news_msg).length > 0 || parsePortfolioNews(newsBrief.portfolio_news_msg).length > 0) && (
           <section className="card mb">
-            <div className="sn-h">🗞 봇이 오늘 보낸 뉴스{newsBrief.date ? ` · ${newsBrief.date}` : ""}</div>
+            {/* [S20-3] 항목이 실제로는 며칠 전 것일 수 있어, 배치 날짜가 오늘이 아니면 정직하게 표기. */}
+            <div className="sn-h">🗞 봇이 보낸 뉴스{newsBrief.date ? (botNewsStale ? ` · 오늘 신규 없음 · 최근 ${newsBrief.date}` : ` · 오늘(${newsBrief.date})`) : ""}</div>
             {parsePortfolioNews(newsBrief.portfolio_news_msg).length > 0 && (
               <div className="mb-news-block">
                 <div className="sn-sub-h">보유 종목 관련</div>
@@ -844,6 +979,44 @@ export default function TodayPage({ announcements = [] }) {
         .td-market { display: flex; align-items: center; gap: 10px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 8px 12px; margin: 0 2px 14px; box-shadow: var(--shadow-card); }
         .td-fresh3 { margin-left: auto; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
+
+        /* ══ [S20-3] 카드0: 오늘 1화면 요약 3행 ══ */
+        .td-sum { padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 10px; }
+        .tds-row { display: flex; align-items: flex-start; gap: 8px; }
+        .tds-row + .tds-row { padding-top: 10px; border-top: 1px solid var(--color-line); }
+        .tds-k { flex-shrink: 0; width: 52px; font-size: 0.66rem; font-weight: 800; color: var(--color-ink-3); padding-top: 3px; letter-spacing: -.2px; }
+        .tds-asset { align-items: baseline; flex-wrap: wrap; }
+        .tds-total { font-size: 1.32rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; letter-spacing: -.5px; }
+        .tds-total.tds-muted { font-size: 0.9rem; color: var(--color-ink-3); font-weight: 700; }
+        .tds-dchip { font-size: 0.72rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+        .tds-dchip i { font-style: normal; font-weight: 600; opacity: .8; }
+        .tds-dchip.up { background: var(--color-success-soft, rgba(14,158,106,.12)); color: var(--color-success); }
+        .tds-dchip.dn { background: var(--color-danger-soft, rgba(229,72,77,.12)); color: var(--color-danger); }
+        .tds-dchip.flat { background: var(--color-card-soft, rgba(0,0,0,.04)); color: var(--color-ink-3); }
+        .tds-dnew { font-size: 0.7rem; color: var(--color-ink-3); }
+        .tds-fresh { margin-left: auto; font-size: 0.68rem; }
+        .tds-actbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+        .tds-actrow { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); text-align: left; }
+        .tds-badge { flex-shrink: 0; font-size: 0.6rem; font-weight: 800; border: 1px solid; border-radius: 999px; padding: 1px 6px; }
+        .tds-nm { flex-shrink: 0; font-size: 0.8rem; font-weight: 800; color: var(--color-ink); max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .tds-stance { flex-shrink: 0; font-size: 0.72rem; font-weight: 700; }
+        .tds-reason { margin-left: auto; font-size: 0.68rem; color: var(--color-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .tds-none { font-size: 0.78rem; color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; }
+        .tds-more { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; padding-top: 8px; border-top: 1px dashed var(--color-line); }
+        .tds-morerow { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); text-align: left; }
+        .tds-mk { flex-shrink: 0; font-size: 0.7rem; font-weight: 800; color: var(--color-ink-2); width: 62px; }
+        .tds-mv { font-size: 0.72rem; color: var(--color-ink-2); line-height: 1.45; word-break: keep-all; }
+        .tds-mv.tds-link { color: var(--color-primary); font-weight: 700; }
+        .tds-ai .tds-aitext { font-size: 0.78rem; color: var(--color-ink); line-height: 1.5; word-break: keep-all; }
+        .tds-ai .tds-aitext b { color: var(--color-ink); }
+        .tds-ai.stale .tds-aitext { color: var(--color-ink-2); }
+        .tds-ai .tds-k::before { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-success); margin-right: 4px; vertical-align: middle; }
+        .tds-ai.stale .tds-k::before { background: var(--color-ink-3); }
+
+        /* [S20-3] 대결 결과 배너(결과 나온 날만) */
+        .td-duel-banner { display: block; width: 100%; text-align: left; background: var(--color-primary-soft, rgba(60,110,240,.1)); color: var(--color-primary); border: 1px solid var(--color-primary-soft, transparent); border-radius: 12px; padding: 11px 14px; margin-bottom: 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer; font-family: var(--font-sans); }
+        .td-duel-banner b { font-weight: 800; }
+
         .td-modal-bg { position: fixed; inset: 0; z-index: 300; background: rgba(10,15,25,.5); display: flex; align-items: flex-end; justify-content: center; }
         .td-modal { position: relative; width: 100%; max-width: 480px; max-height: 78vh; overflow-y: auto; background: var(--color-card); border-radius: 18px 18px 0 0; padding: 22px 20px calc(env(safe-area-inset-bottom, 0px) + 22px); }
         .td-modal-close { position: absolute; top: 14px; right: 14px; width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--color-card-soft, var(--color-line)); color: var(--color-ink-2); font-size: 14px; cursor: pointer; }
