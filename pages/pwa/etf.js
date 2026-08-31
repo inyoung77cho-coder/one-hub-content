@@ -581,6 +581,19 @@ export default function EtfDashboard() {
   const pieItems = [...positions, ...holdings]
     .map((x) => ({ ticker: x.ticker, valueKrw: x.value_krw ?? x.eval_krw ?? (holdingMetrics(x).valueKrw || 0) }))
     .filter((x) => x.ticker && x.valueKrw > 0);
+  // [ETF 분석] 보유 종목별 성과(평가액+수익률) — 등록 포지션 + 내 보유를 티커로 합산.
+  const perfItems = (() => {
+    const m = {};
+    const push = (ticker, name, valueKrw, pnlPct) => {
+      if (!ticker || !(valueKrw > 0)) return;
+      const k = String(ticker).toUpperCase();
+      if (!m[k]) m[k] = { ticker, name: name || ticker, valueKrw, pnlPct: pnlPct != null ? pnlPct : null };
+      else { m[k].valueKrw += valueKrw; if (m[k].pnlPct == null && pnlPct != null) m[k].pnlPct = pnlPct; }
+    };
+    positions.forEach((p) => { const l = posLive(p); push(p.ticker, p.name, l.valueKrw != null ? l.valueKrw : (p.value_krw ?? null), l.pnlPct != null ? l.pnlPct : (p.pnl_pct ?? null)); });
+    holdings.forEach((h) => { const mm = holdingMetrics(h); push(h.ticker, h.name, mm.valueKrw, mm.pnlPct); });
+    return Object.values(m);
+  })();
   // [ETF 재구성 Phase1] 규칙기반 추천 후보(순수함수).
   const etfRecs = recommendEtfs({ holdings, positions: pieItems, target: targetAlloc, overlap });
   // [ETF Phase2] 후보 '이유'를 Claude로 다듬어 채운다(추천 탭 진입 시 1회, 실패 시 규칙문구 폴백).
@@ -836,7 +849,7 @@ export default function EtfDashboard() {
       </div>
 
       {/* [ETF 재구성 Phase1] 보유 탭 상단 — 테마별 분배 도넛(지역/섹터) */}
-      {etfTab === "hold" && <EtfAllocationPie positions={pieItems} overlap={overlap} />}
+      {etfTab === "hold" && <EtfAllocationPie items={perfItems} overlap={overlap} />}
 
       {/* [ETF 재구성 Phase1] 추천 탭 상단 — 규칙기반 ETF 종목 추천 + 이유 */}
       {etfTab === "rec" && (
