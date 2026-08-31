@@ -1,0 +1,5 @@
+# [S19 2026-08-30] 셸 스크립트는 항상 LF 로 체크아웃한다.
+#   Windows 로컬(core.autocrlf=true)에서 git 이 .sh 를 CRLF 로 바꾸면 Git Bash·Lightsail 에서
+#   "syntax error: unexpected end of file" 로 죽는다(실제로 verify_s19.sh / health.sh 가 그랬다).
+#   .js 등 다른 파일은 건드리지 않는다 — 지금 상태 그대로 두기 위해 규칙을 .sh 에만 건다.
+*.sh text eol=lf

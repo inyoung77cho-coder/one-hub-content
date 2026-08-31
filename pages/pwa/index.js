@@ -1784,7 +1784,9 @@ export default function PWADashboard({ latestReport }) {
                 return (
                   <>
                     {/* [§3-3] 관심도 정의 — 숫자가 뭘 뜻하는지 1줄 */}
-                    <div className="rec-def">💡 <b>관심도</b> = MA·RSI·볼린저·거래량·수급 기술점수 합산 <b>(0~15)</b> · 매수 선별 <b>전</b> 후보</div>
+                    {/* [사용자 지적] 안내는 '0~15'인데 실제로 16이 찍혔다(백엔드 가중치 합산이 15를 넘을 수 있음).
+                        틀린 상한을 적느니 상한을 말하지 않는 편이 정확하다 — 순위 해석에 필요한 건 '높을수록 상위'뿐이다. */}
+                    <div className="rec-def">💡 <b>관심도</b> = MA·RSI·볼린저·거래량·수급 기술점수 합산(높을수록 상위) · 매수 선별 <b>전</b> 후보</div>
                     {/* [S7.2] 정렬 칩 */}
                     <div className="rec-sort">
                       {[['interest','관심도순'],['upside','기대수익순']].map(([k,l]) => (

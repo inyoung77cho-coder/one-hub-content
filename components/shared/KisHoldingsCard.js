@@ -212,7 +212,8 @@ export default function KisHoldingsCard({ positions = [], trader = "A", title = 
         .kh-cell { display: flex; flex-direction: column; gap: 1px; }
         .kh-cell span { font-size: 0.64rem; color: var(--color-ink-3); font-weight: 600; }
         .kh-cell b { font-size: 0.8rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--color-ink); }
-        .kh-cell b em { font-style: normal; font-size: 0.68rem; font-weight: 600; margin-left: 3px; }
+        /* 목표가 옆 '(+23.9% 남음)'은 2열 그리드 안에서 줄이 어색하게 끊긴다 — 아예 아랫줄로 내린다. */
+        .kh-cell b em { display: block; font-style: normal; font-size: 0.68rem; font-weight: 600; color: var(--color-ink-3); }
         .kh-ind { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 9px; font-size: 0.68rem; color: var(--color-ink-3); font-variant-numeric: tabular-nums; }
         .kh-ml { font-weight: 700; color: var(--color-primary); }
         .kh-stance { display: flex; align-items: flex-start; gap: 7px; margin-top: 9px; }
@@ -223,7 +224,9 @@ export default function KisHoldingsCard({ positions = [], trader = "A", title = 
         .kh-ai { margin-top: 9px; padding-top: 8px; border-top: 1px dashed var(--color-line); }
         .kh-ai-k { font-size: 0.64rem; font-weight: 800; color: var(--color-primary); }
         .kh-ai-t { margin: 3px 0 0; font-size: 0.72rem; color: var(--color-ink-2); line-height: 1.55; }
-        .kh-act { display: flex; align-items: center; justify-content: flex-end; gap: 6px; margin-top: 9px; }
+        /* [실측] 버튼을 오른쪽 끝에 두면 우하단 FAB(＋ 빠른입력)와 정확히 겹쳐 오탭이 난다.
+           왼쪽 정렬이면 겹치지 않고 엄지 도달도 더 낫다. */
+        .kh-act { display: flex; align-items: center; justify-content: flex-start; gap: 6px; margin-top: 9px; }
         .kh-more { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: 0.68rem; font-weight: 700; padding: 4px 10px; border-radius: 8px; cursor: pointer; font-family: var(--font-sans); }
         .kh-sell { border: none; background: var(--color-danger-soft); color: var(--color-danger); font-size: 0.68rem; font-weight: 700; padding: 4px 11px; border-radius: 8px; cursor: pointer; font-family: var(--font-sans); }
         .kh-sell.confirm { background: var(--color-danger); color: #fff; }
