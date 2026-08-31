@@ -384,6 +384,57 @@ export default function AssetsMapPage() {
             ② 그 아래 '직접 입력 보유 · KIS 외 증권사' 카드 — 추가·확인·삭제를 이 자리에서.
             두 카드는 index.js(portfolio 탭)와 같은 공용 컴포넌트라 두 화면이 갈라지지 않는다. */}
         {view === 0 && stockTab === "hold" && (<>
+          {/* [사용자 지시] KIS 투자 현황 요약 — 현금+보유주식 총액·평가손익·전일 대비 변화(lively) */}
+          {(() => {
+            const bal = dash?.balance || {};
+            const cash = Number(bal.cash) || 0;
+            let kisTotal = Number(bal.total_asset) || 0;
+            const stockEval = positions.reduce((s, p) => s + ((Number(p.current_price) || 0) * (Number(p.qty) || 0)), 0);
+            let stockVal = kisTotal > 0 ? Math.max(0, kisTotal - cash) : stockEval;
+            if (!(kisTotal > 0)) kisTotal = stockVal + cash;
+            if (!(kisTotal > 0) && positions.length === 0) return null;
+            const upnl = bal.unrealized_pnl != null ? Number(bal.unrealized_pnl) : (positions.length ? positions.reduce((s, p) => s + (Number(p.pnl_amount) || 0), 0) : null);
+            const cost = upnl != null ? stockVal - upnl : null;
+            const upnlPct = (upnl != null && cost > 0) ? (upnl / cost) * 100 : null;
+            const dStock = delta ? delta.stock : null; // 억 단위 전일 대비 주식 변화
+            const sPct = kisTotal > 0 ? (stockVal / kisTotal) * 100 : 0;
+            const winners = positions.filter((p) => (Number(p.pnl_rate) || 0) > 0).length;
+            const losers = positions.filter((p) => (Number(p.pnl_rate) || 0) < 0).length;
+            return (
+              <section className="card kis-sum">
+                <div className="ks-h">💳 KIS 투자 현황 <span className="ks-sub">주식 + 현금</span>
+                  {at && <span className="ks-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
+                </div>
+                <div className="ks-total">{Math.round(kisTotal).toLocaleString()}<em>원</em></div>
+                <div className="ks-chips">
+                  {dStock != null && Math.abs(dStock) >= 0.005 && (
+                    <span className={`ks-dchip ${dCls(dStock)}`}>{dStock >= 0 ? "▲" : "▼"} {dvUk(dStock)} <i>전일 대비 주식</i></span>
+                  )}
+                  {upnl != null && (
+                    <span className={`ks-dchip ${upnl >= 0 ? "up" : "down"}`}>평가손익 {upnl >= 0 ? "+" : ""}{Math.round(upnl).toLocaleString()}원{upnlPct != null ? ` (${upnlPct >= 0 ? "+" : ""}${upnlPct.toFixed(1)}%)` : ""}</span>
+                  )}
+                </div>
+                {/* 주식/현금 split 바 */}
+                <div className="ks-split" role="img" aria-label={`주식 ${sPct.toFixed(0)}% 현금 ${(100 - sPct).toFixed(0)}%`}>
+                  <i className="stk" style={{ width: `${sPct}%` }} />
+                  <i className="csh" style={{ width: `${100 - sPct}%` }} />
+                </div>
+                <div className="ks-cells">
+                  <div className="ks-cell">
+                    <span className="ks-ck">📈 보유 주식</span>
+                    <b>{Math.round(stockVal).toLocaleString()}원</b>
+                    <span className="ks-cs">{positions.length}종목{winners + losers > 0 ? ` · 수익 ${winners}·손실 ${losers}` : ""}</span>
+                  </div>
+                  <div className="ks-cell">
+                    <span className="ks-ck">💵 현금(예수금)</span>
+                    <b>{Math.round(cash).toLocaleString()}원</b>
+                    <span className="ks-cs">{sPct < 100 ? `비중 ${(100 - sPct).toFixed(0)}%` : "—"}</span>
+                  </div>
+                </div>
+                <div className="ks-note">증권사(KIS) 연동 계좌 기준입니다. 종목별 상세는 아래 목록에서, 직접입력 보유는 그 아래 카드에서 확인하세요.</div>
+              </section>
+            );
+          })()}
           <KisHoldingsCard positions={positions} trader={trader} onSold={load} />
           <ManualHoldingsCard trader={trader} onChanged={load} />
         </>)}
@@ -444,6 +495,27 @@ export default function AssetsMapPage() {
         .as-trend .as-dlabel { font-size: 0.7rem; color: var(--color-ink-3); font-weight: 600; }
         .as-spark { width: 84px; height: 26px; flex: 0 0 auto; margin-left: auto; }
         .as-dnew { font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; margin: 6px 0 0; word-break: keep-all; }
+        /* [KIS 투자 현황] */
+        .kis-sum { border-left: 4px solid var(--color-primary); }
+        .ks-h { display: flex; align-items: center; gap: 8px; font-size: 0.86rem; font-weight: 800; color: var(--color-ink); }
+        .ks-sub { font-size: 0.66rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 8px; }
+        .ks-fresh { margin-left: auto; font-size: 0.66rem; }
+        .ks-total { font-size: 1.7rem; font-weight: 800; color: var(--color-ink); letter-spacing: -.5px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+        .ks-total em { font-style: normal; font-size: 0.9rem; font-weight: 700; color: var(--color-ink-3); margin-left: 2px; }
+        .ks-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .ks-dchip { font-size: 0.74rem; font-weight: 800; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 4px; background: var(--color-card-soft); border-radius: 8px; padding: 4px 9px; }
+        .ks-dchip i { font-style: normal; font-size: 0.62rem; font-weight: 600; color: var(--color-ink-3); }
+        .ks-dchip.up { color: var(--color-success, #0E9E6A); } .ks-dchip.down { color: var(--color-danger, #E5484D); } .ks-dchip.flat { color: var(--color-ink-3); }
+        .ks-split { display: flex; height: 10px; border-radius: 999px; overflow: hidden; margin-top: 14px; background: var(--color-card-soft); }
+        .ks-split i { display: block; height: 100%; }
+        .ks-split i.stk { background: var(--color-primary); }
+        .ks-split i.csh { background: var(--color-warning, #E8A33D); }
+        .ks-cells { display: flex; gap: 10px; margin-top: 12px; }
+        .ks-cell { flex: 1; background: var(--color-card-soft); border-radius: 12px; padding: 11px 12px; }
+        .ks-ck { display: block; font-size: 0.68rem; font-weight: 700; color: var(--color-ink-2); }
+        .ks-cell b { display: block; font-size: 1.02rem; font-weight: 800; color: var(--color-ink); margin-top: 4px; font-variant-numeric: tabular-nums; }
+        .ks-cs { display: block; font-size: 0.64rem; color: var(--color-ink-3); margin-top: 3px; }
+        .ks-note { font-size: 0.66rem; color: var(--color-ink-3); line-height: 1.5; margin-top: 12px; word-break: keep-all; }
         .as-rd { font-size: 0.66rem; font-weight: 700; font-variant-numeric: tabular-nums; }
         .as-rd.up { color: var(--color-success, #0E9E6A); }
         .as-rd.down { color: var(--color-danger, #E5484D); }

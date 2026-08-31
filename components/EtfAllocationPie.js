@@ -62,23 +62,39 @@ export default function EtfAllocationPie({ items = [], overlap = null, perfMap =
           <div className="an-empty">보유 ETF를 입력하면 종목별 성과·비중이 표시됩니다.</div>
         ) : (
           <>
+            {/* 세로 막대 그래프 — 높이=비중, 색=수익률(상승 빨강/하락 파랑) */}
+            <div className="an-vwrap">
+              <div className="an-vbars" style={{ minWidth: `${Math.max(rows.length, 3) * 46}px` }}>
+                {rows.map((r) => {
+                  const h = topHold && topHold.pct > 0 ? Math.max(8, (r.pct / topHold.pct) * 100) : 8;
+                  const cls = r.pnlPct == null ? "flat" : r.pnlPct >= 0 ? "up" : "dn";
+                  return (
+                    <div className="an-vb" key={r.ticker}>
+                      <span className="an-vb-top">{r.pct.toFixed(0)}%</span>
+                      <div className="an-vb-track"><i className={cls} style={{ height: `${h}%` }} title={`${r.name} · 비중 ${r.pct.toFixed(1)}% · 평가 ${won(r.valueKrw)}원`} /></div>
+                      {r.pnlPct != null && <span className={`an-vb-pnl ${r.pnlPct >= 0 ? "up" : "dn"}`}>{r.pnlPct >= 0 ? "+" : ""}{r.pnlPct.toFixed(0)}%</span>}
+                      <span className="an-vb-nm" title={r.name}>{r.ticker}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="an-vlegend">막대 높이 = 비중 · 색 = 매수가 대비 손익(<b className="up">상승</b>/<b className="dn">하락</b>)</div>
+
+            {/* 상세 — 매수금액→평가·손익·기간등락 */}
             <div className="an-list">
               {rows.map((r, i) => {
                 const pf = perfMap[String(r.ticker).toUpperCase()] || {};
                 return (
                   <div className="an-row" key={r.ticker || i}>
                     <div className="an-r1">
-                      <span className="an-nm" title={r.name}>{r.name}</span>
+                      <span className="an-nm" title={r.name}>{r.name} <span className="an-wt">{r.pct.toFixed(1)}%</span></span>
                       {r.pnlPct != null && <span className={`an-pnl ${r.pnlPct >= 0 ? "up" : "dn"}`}>{r.pnlPct >= 0 ? "+" : ""}{r.pnlPct.toFixed(1)}%</span>}
                     </div>
                     <div className="an-money">
                       {r.costKrw != null && <><span className="an-mk">매수</span> {won(r.costKrw)}원 <span className="an-arrow">→</span> </>}
                       <span className="an-mk">평가</span> {won(r.valueKrw)}원
                       {r.pnlKrw != null && <span className={`an-diff ${r.pnlKrw >= 0 ? "up" : "dn"}`}> · 손익 {r.pnlKrw >= 0 ? "+" : ""}{won(r.pnlKrw)}원</span>}
-                    </div>
-                    <div className="an-r2">
-                      <span className="an-bar"><i style={{ width: `${Math.min(100, r.pct)}%` }} /></span>
-                      <span className="an-pct">비중 {r.pct.toFixed(1)}%</span>
                     </div>
                     {(pf.w1 != null || pf.m1 != null) && (
                       <div className="an-periods">
@@ -141,6 +157,21 @@ export default function EtfAllocationPie({ items = [], overlap = null, perfMap =
         .an-toggle button { border: none; background: none; padding: 6px 12px; border-radius: 8px; font-family: var(--font-sans); font-size: 0.74rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
         .an-toggle button.on { background: var(--color-primary); color: #fff; }
         .an-empty { font-size: 0.78rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 11px; padding: 16px 14px; text-align: center; line-height: 1.55; }
+        .an-vwrap { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; margin-bottom: 6px; }
+        .an-vbars { display: flex; align-items: flex-end; justify-content: space-around; gap: 6px; height: 150px; }
+        .an-vb { display: flex; flex-direction: column; align-items: center; gap: 3px; flex: 1 1 0; min-width: 38px; }
+        .an-vb-top { font-size: 0.62rem; font-weight: 800; color: var(--color-ink-2); font-family: ui-monospace, monospace; }
+        .an-vb-track { width: 26px; height: 92px; display: flex; align-items: flex-end; }
+        .an-vb-track i { display: block; width: 100%; border-radius: 6px 6px 0 0; min-height: 4px; transition: height .3s; }
+        .an-vb-track i.up { background: linear-gradient(180deg, var(--color-danger), color-mix(in srgb, var(--color-danger) 55%, transparent)); }
+        .an-vb-track i.dn { background: linear-gradient(180deg, var(--color-primary), color-mix(in srgb, var(--color-primary) 55%, transparent)); }
+        .an-vb-track i.flat { background: var(--color-ink-3); }
+        .an-vb-pnl { font-size: 0.58rem; font-weight: 800; font-family: ui-monospace, monospace; }
+        .an-vb-pnl.up { color: var(--color-danger); } .an-vb-pnl.dn { color: var(--color-primary); }
+        .an-vb-nm { font-size: 0.6rem; font-weight: 700; color: var(--color-ink-3); max-width: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .an-vlegend { font-size: 0.64rem; color: var(--color-ink-3); margin-bottom: 12px; }
+        .an-vlegend b { font-weight: 800; } .an-vlegend b.up { color: var(--color-danger); } .an-vlegend b.dn { color: var(--color-primary); }
+        .an-wt { font-size: 0.66rem; font-weight: 700; color: var(--color-ink-3); font-family: ui-monospace, monospace; }
         .an-list { display: flex; flex-direction: column; gap: 11px; }
         .an-row { display: flex; flex-direction: column; gap: 5px; padding-bottom: 11px; border-bottom: 1px solid var(--color-line); }
         .an-row:last-child { border-bottom: none; padding-bottom: 0; }
