@@ -77,8 +77,13 @@ export default function ManualHoldingsCard({ trader = "A", onChanged }) {
             const pnl = cp && buy > 0 ? (cp / buy - 1) * 100 : null;
             // [사용자 지적] '지금'과 '현재가'가 한 카드에서 서로 다른 값으로 보이던 라벨 혼선 정정.
             //   왼쪽 큰 값 = 현재가(라이브), 아래 작은 값 = 매수 기준(평단).
-            const basisLabel = h.priceBasis === "current" ? "매수 기준(현재가로 입력)" : "매수 평단";
+            // [모바일 수정] 라벨이 길수록 오른쪽 칸이 넓어지고 왼쪽 종목명 칸이 짓눌린다 — 짧게.
+            const basisLabel = h.priceBasis === "current" ? "매수기준" : "평단";
             const evalWon = cp != null && !isUsd ? cp * (Number(h.shares) || 0) : null;
+            // 평가액은 원 단위로 다 적으면 한 줄을 통째로 먹는다 — 만원/억 단위로 줄여 표기.
+            const evalTxt = evalWon == null ? null
+              : evalWon >= 1e8 ? `${(evalWon / 1e8).toFixed(2)}억`
+              : `${Math.round(evalWon / 1e4).toLocaleString()}만원`;
             return (
               <div className={`mhc-row ${anomaly ? "anom" : ""}`} key={h.id}>
                 <div className="mhc-l">
@@ -91,13 +96,17 @@ export default function ManualHoldingsCard({ trader = "A", onChanged }) {
                     {q?.date ? ` · 시세 ${String(q.date).slice(5)}` : ""}
                   </span>
                 </div>
+                {/* [모바일 수정] 좌우 2열로 붙여 두면 좁은 폭에서 오른쪽이 안 줄어 왼쪽 종목명이
+                    글자 단위로 쪼개진다(실측 375px에서 종목명 칸 24px·행 높이 178px).
+                    숫자는 아래 줄 전체 폭을 쓰는 한 줄로 내리고, 넘치면 자연스럽게 접히게 한다. */}
                 <div className="mhc-r">
-                  <span className="mhc-cur">{h.shares}주 · 현재가 {fmt(cp != null ? cp : buy)}</span>
-                  <span className="mhc-basis">
+                  <span className="mhc-num">{h.shares}주</span>
+                  <span className="mhc-num">현재가 <b>{fmt(cp != null ? cp : buy)}</b></span>
+                  <span className="mhc-num">
                     {basisLabel} {fmt(buy)}
                     {pnl != null && <em className={pnl >= 0 ? "up" : "dn"}>{pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%</em>}
                   </span>
-                  {evalWon != null && <span className="mhc-eval">평가 {Math.round(evalWon).toLocaleString()}원</span>}
+                  {evalTxt && <span className="mhc-num">평가 <b>{evalTxt}</b></span>}
                 </div>
                 <button
                   className={`mhc-del${confirmId === h.id ? " confirm" : ""}`}
@@ -121,20 +130,21 @@ export default function ManualHoldingsCard({ trader = "A", onChanged }) {
         .mhc-form { margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px dashed var(--color-line); }
         .mhc-empty { font-size: 0.76rem; color: var(--color-ink-3); line-height: 1.6; }
         .mhc-list { display: flex; flex-direction: column; gap: 8px; }
-        .mhc-row { display: flex; align-items: flex-start; gap: 8px; background: var(--color-card-soft, var(--inset-bg, rgba(0,0,0,.02))); border: 1px solid var(--color-line); border-radius: 12px; padding: 9px 11px; }
+        /* 2행 그리드: 1행 = 종목명 + 삭제, 2행 = 숫자(전체 폭). 좁은 폭에서도 칸이 짓눌리지 않는다. */
+        .mhc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name del" "nums nums"; align-items: center; column-gap: 8px; row-gap: 6px; background: var(--color-card-soft, var(--inset-bg, rgba(0,0,0,.02))); border: 1px solid var(--color-line); border-radius: 12px; padding: 9px 11px; }
         .mhc-row.anom { border-color: var(--color-warning); }
-        .mhc-l { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+        .mhc-l { grid-area: name; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
         .mhc-name { font-size: 0.82rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .mhc-warn { margin-left: 5px; font-size: 0.62rem; font-weight: 700; color: var(--color-warning); }
-        .mhc-meta { font-size: 0.66rem; color: var(--color-ink-3); }
-        .mhc-r { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; flex-shrink: 0; text-align: right; }
-        .mhc-cur { font-size: 0.78rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-        .mhc-basis { font-size: 0.68rem; font-weight: 600; color: var(--color-ink-3); font-variant-numeric: tabular-nums; }
-        .mhc-basis em { font-style: normal; margin-left: 5px; font-weight: 700; }
-        .mhc-eval { font-size: 0.66rem; color: var(--color-ink-3); font-variant-numeric: tabular-nums; }
+        .mhc-meta { font-size: 0.66rem; color: var(--color-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* 숫자 줄 — 넘치면 다음 줄로 접힌다(잘리거나 칸을 밀지 않는다). */
+        .mhc-r { grid-area: nums; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+        .mhc-num { font-size: 0.7rem; font-weight: 600; color: var(--color-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .mhc-num b { font-weight: 800; color: var(--color-ink); }
+        .mhc-num em { font-style: normal; margin-left: 4px; font-weight: 800; }
         .up { color: var(--color-success, #0E9E6A); }
         .dn { color: var(--color-danger, #E5484D); }
-        .mhc-del { flex-shrink: 0; align-self: center; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); font-size: 0.7rem; font-weight: 700; min-width: 28px; height: 26px; padding: 0 7px; border-radius: 8px; cursor: pointer; font-family: var(--font-sans); }
+        .mhc-del { grid-area: del; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); font-size: 0.7rem; font-weight: 700; min-width: 28px; height: 26px; padding: 0 7px; border-radius: 8px; cursor: pointer; font-family: var(--font-sans); }
         .mhc-del.confirm { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
       `}</style>
     </section>
