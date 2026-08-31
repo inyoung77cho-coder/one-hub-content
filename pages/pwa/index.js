@@ -12,6 +12,7 @@ import { initGameSync } from '../../lib/gameSync';
 import PortfolioDuelCard from '../../components/PortfolioDuelCard';
 // [N1] 자산 원장. lib/verdictLedger 의 getLedger(판단 기록)와 이름이 겹쳐 별칭으로 구분한다.
 import { getLedger as getAssetLedger } from '../../lib/ledger';
+import { cachedJson } from '../../lib/quoteCache'; // [S20-1] 중복 GET 30초 캐시·동시요청 dedup
 import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta } from '../../lib/assetHistory';
 import { dedupBy } from '../../lib/useDedup';
 import { useTabState } from '../../lib/pwa/useTabState';
@@ -498,17 +499,14 @@ export default function PWADashboard({ latestReport }) {
 
   useEffect(() => {
     if (!mounted) return;
-    fetch(`/api/pwa-dashboard?trader=${trader}`)
-      .then(r => r.json())
-      .then(d => { if (d.ok) setData(d); else setError(d.error || 'failed'); })
+    cachedJson(`/api/pwa-dashboard?trader=${trader}`)
+      .then(d => { if (d && d.ok) setData(d); else setError((d && d.error) || 'failed'); })
       .catch(e => setError(String(e)));
-    fetch(`/api/pwa-performance?trader=${trader}&days=30`)
-      .then(r => r.json())
-      .then(d => { if (d.ok) setPerf(d); })
+    cachedJson(`/api/pwa-performance?trader=${trader}&days=30`)
+      .then(d => { if (d && d.ok) setPerf(d); })
       .catch(() => {});
-    fetch(`/api/pwa/accuracy?trader_id=${trader}`)
-      .then(r => r.json())
-      .then(d => { if (d.ok) setAccuracy(d); })
+    cachedJson(`/api/pwa/accuracy?trader_id=${trader}`)
+      .then(d => { if (d && d.ok) setAccuracy(d); })
       .catch(() => {});
     fetch(`/api/notifications?trader=${trader}`)
       .then(r => r.json())
@@ -545,8 +543,7 @@ export default function PWADashboard({ latestReport }) {
       .then(r => r.json())
       .then(d => { if (d && Array.isArray(d.feed)) setReFeed(d); })
       .catch(() => {});
-    fetch(`/api/fx/usdkrw`)
-      .then(r => r.json())
+    cachedJson(`/api/fx/usdkrw`)
       .then(d => { if (d?.ok && d.rate) setFxRate(d.rate); })
       .catch(() => {});
   }, [mounted, trader]);
@@ -569,14 +566,12 @@ export default function PWADashboard({ latestReport }) {
 
   useEffect(() => {
     if (!mounted) return;
-    // [기록] AI 자기검증(차단 적중률) — ML 누적 학습 현황 카드용
-    fetch(`/api/pwa/accuracy?trader_id=${trader}`)
-      .then(r => r.json())
+    // [기록] AI 자기검증(차단 적중률) — ML 누적 학습 현황 카드용 (위 효과와 같은 URL → 캐시 dedup)
+    cachedJson(`/api/pwa/accuracy?trader_id=${trader}`)
       .then(d => { if (d && d.ok) setAccuracy(d); })
       .catch(() => {});
     // [자기검증] 오늘 vs 전일 AI 판단 변화
-    fetch(`/api/pwa-ai-daily?trader=${trader}`)
-      .then(r => r.json())
+    cachedJson(`/api/pwa-ai-daily?trader=${trader}`)
       .then(d => { if (d && d.ok) setAiDaily(d); })
       .catch(() => {});
   }, [mounted, trader]);

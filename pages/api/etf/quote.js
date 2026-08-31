@@ -53,21 +53,16 @@ async function fromYahoo(ysym) {
   return { price, date, currency: meta?.currency || null, marketState: state || null };
 }
 
-export default async function handler(req, res) {
-  const raw = (req.query.ticker || "").toString().trim().toLowerCase().replace(/[^a-z0-9.]/g, "");
-  if (!raw) return res.status(400).json({ ok: false, error: "ticker required" });
-  // 시장 접미사 결정: 명시값 > 숫자코드(.kr) > 기본(.us)
-  const market = (req.query.market || "").toString().toLowerCase();
-  const isKr = market === "kr" || (/^\d+$/.test(raw) && market !== "us");
+// 단일 티커 해석 — Yahoo(시간외 포함) 1차, Stooq 폴백. { price, currency, date, symbol, source } | null
+async function resolveOne(rawIn, market) {
+  const raw = String(rawIn || "").trim().toLowerCase().replace(/[^a-z0-9.]/g, "");
+  if (!raw) return null;
+  const mkt = String(market || "").toLowerCase();
+  const isKr = mkt === "kr" || (/^\d+$/.test(raw) && mkt !== "us");
   const base = raw.includes(".") ? raw.split(".")[0] : raw;
   const stooqSym = raw.includes(".") ? raw : (isKr ? `${raw}.kr` : `${raw}.us`);
   const ccy = isKr ? "KRW" : "USD";
-
   let q = null, source = null;
-  // [2026-08-16] 순서 뒤집음 — Stooq가 1차였을 때는 항상 Stooq의 종가(EOD)가 먼저 성공해서
-  //   fromYahoo()의 시간외가 계산이 사실상 죽은 코드였음(성공하면 바로 return, Yahoo는 호출도 안 됨).
-  //   Yahoo를 1차로 — 정규장에도 충분히 실시간이고, 시간외엔 pre/postMarketPrice까지 반영됨.
-  //   Stooq는 Yahoo 실패(네트워크/미지원 티커) 시에만 폴백.
   const candidates = isKr ? [`${base}.KS`, `${base}.KQ`] : [base.toUpperCase()];
   for (const ysym of candidates) {
     try { const y = await fromYahoo(ysym); if (y) { q = y; source = "yahoo"; break; } } catch (e) { /* graceful */ }
@@ -75,14 +70,36 @@ export default async function handler(req, res) {
   if (!q) {
     try { q = await fromStooq(stooqSym); if (q) source = "stooq.com"; } catch (e) { /* graceful */ }
   }
+  if (!q) return null;
+  return { price: q.price, currency: q.currency || ccy, date: q.date, symbol: stooqSym, source, ticker: raw.toUpperCase() };
+}
 
-  if (q) {
-    // 5분 신선 + 15분 stale-while-revalidate → 자동 갱신, 과호출 방지
+export default async function handler(req, res) {
+  const market = (req.query.market || "").toString().toLowerCase();
+
+  // [S20-1] 배치 — ?tickers=A,B,C 여러 종목을 한 요청으로. 응답: { ok, quotes:{TICKER:{price,currency,date}} }
+  const batchRaw = (req.query.tickers || "").toString();
+  if (batchRaw.trim()) {
+    const list = [...new Set(batchRaw.split(",").map((t) => t.trim()).filter(Boolean))].slice(0, 60);
+    const quotes = {};
+    await Promise.all(list.map(async (tk) => {
+      const one = await resolveOne(tk, market);
+      if (one) quotes[one.ticker] = { price: one.price, currency: one.currency, date: one.date, source: one.source };
+    }));
+    res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=900");
+    return res.status(200).json({ ok: true, quotes });
+  }
+
+  // 단건(기존 호환)
+  const raw0 = (req.query.ticker || "").toString().trim().toLowerCase().replace(/[^a-z0-9.]/g, "");
+  if (!raw0) return res.status(400).json({ ok: false, error: "ticker required" });
+  const one = await resolveOne(raw0, market);
+  if (one) {
     res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=900");
     return res.status(200).json({
-      ok: true, ticker: raw.toUpperCase(), symbol: stooqSym,
-      price: q.price, currency: q.currency || ccy, date: q.date, source,
+      ok: true, ticker: one.ticker, symbol: one.symbol,
+      price: one.price, currency: one.currency, date: one.date, source: one.source,
     });
   }
-  return res.status(200).json({ ok: false, ticker: raw.toUpperCase(), error: "시세 소스 연결 실패(Yahoo·Stooq)" });
+  return res.status(200).json({ ok: false, ticker: raw0.toUpperCase(), error: "시세 소스 연결 실패(Yahoo·Stooq)" });
 }
