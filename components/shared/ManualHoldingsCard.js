@@ -100,13 +100,13 @@ export default function ManualHoldingsCard({ trader = "A", onChanged }) {
                     글자 단위로 쪼개진다(실측 375px에서 종목명 칸 24px·행 높이 178px).
                     숫자는 아래 줄 전체 폭을 쓰는 한 줄로 내리고, 넘치면 자연스럽게 접히게 한다. */}
                 <div className="mhc-r">
-                  <span className="mhc-num">{h.shares}주</span>
-                  <span className="mhc-num">현재가 <b>{fmt(cp != null ? cp : buy)}</b></span>
+                  {/* 두 덩어리로만 나눈다 — 항목별로 쪼개면 좁은 폭에서 3~4줄로 흩어진다(실측). */}
+                  <span className="mhc-num">{h.shares}주 · 현재가 <b>{fmt(cp != null ? cp : buy)}</b></span>
                   <span className="mhc-num">
                     {basisLabel} {fmt(buy)}
                     {pnl != null && <em className={pnl >= 0 ? "up" : "dn"}>{pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}%</em>}
+                    {evalTxt && <> · 평가 <b>{evalTxt}</b></>}
                   </span>
-                  {evalTxt && <span className="mhc-num">평가 <b>{evalTxt}</b></span>}
                 </div>
                 <button
                   className={`mhc-del${confirmId === h.id ? " confirm" : ""}`}
@@ -139,6 +139,7 @@ export default function ManualHoldingsCard({ trader = "A", onChanged }) {
         .mhc-meta { font-size: 0.66rem; color: var(--color-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         /* 숫자 줄 — 넘치면 다음 줄로 접힌다(잘리거나 칸을 밀지 않는다). */
         .mhc-r { grid-area: nums; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; min-width: 0; }
+        /* 각 덩어리는 줄 안에서 끊기지 않고, 다 못 들어가면 통째로 다음 줄로 내려간다 → 최대 2줄. */
         .mhc-num { font-size: 0.7rem; font-weight: 600; color: var(--color-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
         .mhc-num b { font-weight: 800; color: var(--color-ink); }
         .mhc-num em { font-style: normal; margin-left: 4px; font-weight: 800; }
