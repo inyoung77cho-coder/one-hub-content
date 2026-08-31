@@ -18,7 +18,7 @@ const won = (n) => {
   return Math.round(n).toLocaleString();
 };
 
-export default function EtfAllocationPie({ items = [], overlap = null }) {
+export default function EtfAllocationPie({ items = [], overlap = null, perfMap = {} }) {
   const [mode, setMode] = useState("holding");
 
   // ── 보유 종목: 평가액 내림차순 + 비중 ──
@@ -63,24 +63,39 @@ export default function EtfAllocationPie({ items = [], overlap = null }) {
         ) : (
           <>
             <div className="an-list">
-              {rows.map((r, i) => (
-                <div className="an-row" key={r.ticker || i}>
-                  <div className="an-r1">
-                    <span className="an-nm" title={r.name}>{r.name}</span>
-                    {r.pnlPct != null && <span className={`an-pnl ${r.pnlPct >= 0 ? "up" : "dn"}`}>{r.pnlPct >= 0 ? "+" : ""}{r.pnlPct.toFixed(1)}%</span>}
+              {rows.map((r, i) => {
+                const pf = perfMap[String(r.ticker).toUpperCase()] || {};
+                return (
+                  <div className="an-row" key={r.ticker || i}>
+                    <div className="an-r1">
+                      <span className="an-nm" title={r.name}>{r.name}</span>
+                      {r.pnlPct != null && <span className={`an-pnl ${r.pnlPct >= 0 ? "up" : "dn"}`}>{r.pnlPct >= 0 ? "+" : ""}{r.pnlPct.toFixed(1)}%</span>}
+                    </div>
+                    <div className="an-money">
+                      {r.costKrw != null && <><span className="an-mk">매수</span> {won(r.costKrw)}원 <span className="an-arrow">→</span> </>}
+                      <span className="an-mk">평가</span> {won(r.valueKrw)}원
+                      {r.pnlKrw != null && <span className={`an-diff ${r.pnlKrw >= 0 ? "up" : "dn"}`}> · 손익 {r.pnlKrw >= 0 ? "+" : ""}{won(r.pnlKrw)}원</span>}
+                    </div>
+                    <div className="an-r2">
+                      <span className="an-bar"><i style={{ width: `${Math.min(100, r.pct)}%` }} /></span>
+                      <span className="an-pct">비중 {r.pct.toFixed(1)}%</span>
+                    </div>
+                    {(pf.w1 != null || pf.m1 != null) && (
+                      <div className="an-periods">
+                        {pf.w1 != null && <span className="an-pd">1주 <b className={pf.w1 >= 0 ? "up" : "dn"}>{pf.w1 >= 0 ? "+" : ""}{pf.w1}%</b></span>}
+                        {pf.m1 != null && <span className="an-pd">1개월 <b className={pf.m1 >= 0 ? "up" : "dn"}>{pf.m1 >= 0 ? "+" : ""}{pf.m1}%</b></span>}
+                        <span className="an-pd-src">시세 기준</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="an-r2">
-                    <span className="an-bar"><i style={{ width: `${Math.min(100, r.pct)}%` }} /></span>
-                    <span className="an-pct">{r.pct.toFixed(1)}%</span>
-                    <span className="an-val">{won(r.valueKrw)}원</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <div className="an-foot">
-              합계 <b>{won(total)}원</b> · {rows.length}종목
+              합계 매수 <b>{won(rows.reduce((s, r) => s + (r.costKrw || 0), 0))}원</b> → 평가 <b>{won(total)}원</b> · {rows.length}종목
               {topHold && topHold.pct >= 40 && <span className="an-warn"> · ⚠ {topHold.name} {topHold.pct.toFixed(0)}% 단일종목 쏠림</span>}
             </div>
+            <div className="an-note">수익률(우상단)은 <b>매수가 대비 총 손익</b>, 1주·1개월은 <b>시세(NAV) 등락</b>입니다. 상승 빨강·하락 파랑. 확정 아님.</div>
           </>
         )
       ) : (
@@ -127,16 +142,27 @@ export default function EtfAllocationPie({ items = [], overlap = null }) {
         .an-toggle button.on { background: var(--color-primary); color: #fff; }
         .an-empty { font-size: 0.78rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 11px; padding: 16px 14px; text-align: center; line-height: 1.55; }
         .an-list { display: flex; flex-direction: column; gap: 11px; }
-        .an-row { display: flex; flex-direction: column; gap: 5px; }
+        .an-row { display: flex; flex-direction: column; gap: 5px; padding-bottom: 11px; border-bottom: 1px solid var(--color-line); }
+        .an-row:last-child { border-bottom: none; padding-bottom: 0; }
         .an-r1 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-        .an-nm { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .an-pnl { flex-shrink: 0; font-size: 0.8rem; font-weight: 800; font-family: ui-monospace, monospace; }
+        .an-nm { font-size: 0.85rem; font-weight: 800; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .an-pnl { flex-shrink: 0; font-size: 0.84rem; font-weight: 800; font-family: ui-monospace, monospace; }
         .an-pnl.up { color: var(--color-danger); } .an-pnl.dn { color: var(--color-primary); }
+        .an-money { font-size: 0.74rem; color: var(--color-ink-2); font-family: ui-monospace, monospace; word-break: keep-all; }
+        .an-mk { font-family: var(--font-sans); font-size: 0.62rem; font-weight: 800; color: var(--color-ink-3); }
+        .an-arrow { color: var(--color-ink-3); }
+        .an-diff.up { color: var(--color-danger); font-weight: 700; } .an-diff.dn { color: var(--color-primary); font-weight: 700; }
         .an-r2 { display: flex; align-items: center; gap: 8px; }
         .an-bar { flex: 1; height: 7px; background: var(--color-card-soft); border-radius: 999px; overflow: hidden; }
         .an-bar i { display: block; height: 100%; background: var(--color-primary); border-radius: 999px; }
-        .an-pct { flex-shrink: 0; font-size: 0.72rem; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; min-width: 42px; text-align: right; }
-        .an-val { flex-shrink: 0; font-size: 0.68rem; color: var(--color-ink-3); font-family: ui-monospace, monospace; min-width: 54px; text-align: right; }
+        .an-pct { flex-shrink: 0; font-size: 0.7rem; font-weight: 800; color: var(--color-ink-2); font-family: ui-monospace, monospace; min-width: 62px; text-align: right; }
+        .an-periods { display: flex; align-items: center; gap: 12px; }
+        .an-pd { font-size: 0.68rem; color: var(--color-ink-3); font-weight: 700; }
+        .an-pd b { font-family: ui-monospace, monospace; font-weight: 800; margin-left: 2px; }
+        .an-pd b.up { color: var(--color-danger); } .an-pd b.dn { color: var(--color-primary); }
+        .an-pd-src { font-size: 0.58rem; color: var(--color-ink-3); margin-left: auto; }
+        .an-note { margin-top: 12px; font-size: 0.64rem; color: var(--color-ink-3); line-height: 1.5; word-break: keep-all; }
+        .an-note b { color: var(--color-ink-2); font-weight: 700; }
         .an-foot { margin-top: 12px; font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; word-break: keep-all; }
         .an-foot b { color: var(--color-ink); font-weight: 800; }
         .an-warn { color: var(--color-danger); font-weight: 700; }

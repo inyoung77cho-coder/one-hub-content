@@ -542,7 +542,7 @@ export default function EtfDashboard() {
     const pnlKrw = valueKrw != null && costTotal != null ? valueKrw - costTotal : null;
     const pnlPct = curPx != null && q?.currency === h.avgCcy ? (curPx / h.avgPrice - 1) * 100
       : valueKrw != null && costTotal ? (valueKrw / costTotal - 1) * 100 : null;
-    return { curPx, curCcy: q?.currency, valueKrw, pnlKrw, pnlPct, date: q?.date };
+    return { curPx, curCcy: q?.currency, valueKrw, costTotal, pnlKrw, pnlPct, date: q?.date };
   };
   const myTotal = holdings.reduce((acc, h) => { const m = holdingMetrics(h); return acc + (m.valueKrw || 0); }, 0);
 
@@ -584,16 +584,44 @@ export default function EtfDashboard() {
   // [ETF 분석] 보유 종목별 성과(평가액+수익률) — 등록 포지션 + 내 보유를 티커로 합산.
   const perfItems = (() => {
     const m = {};
-    const push = (ticker, name, valueKrw, pnlPct) => {
+    const push = (ticker, name, valueKrw, pnlPct, costKrw, pnlKrw) => {
       if (!ticker || !(valueKrw > 0)) return;
       const k = String(ticker).toUpperCase();
-      if (!m[k]) m[k] = { ticker, name: name || ticker, valueKrw, pnlPct: pnlPct != null ? pnlPct : null };
-      else { m[k].valueKrw += valueKrw; if (m[k].pnlPct == null && pnlPct != null) m[k].pnlPct = pnlPct; }
+      if (!m[k]) m[k] = { ticker, name: name || ticker, valueKrw, pnlPct: pnlPct != null ? pnlPct : null, costKrw: costKrw != null ? costKrw : null, pnlKrw: pnlKrw != null ? pnlKrw : null };
+      else {
+        m[k].valueKrw += valueKrw;
+        if (costKrw != null) m[k].costKrw = (m[k].costKrw || 0) + costKrw;
+        if (pnlKrw != null) m[k].pnlKrw = (m[k].pnlKrw || 0) + pnlKrw;
+        if (m[k].pnlPct == null && pnlPct != null) m[k].pnlPct = pnlPct;
+      }
     };
-    positions.forEach((p) => { const l = posLive(p); push(p.ticker, p.name, l.valueKrw != null ? l.valueKrw : (p.value_krw ?? null), l.pnlPct != null ? l.pnlPct : (p.pnl_pct ?? null)); });
-    holdings.forEach((h) => { const mm = holdingMetrics(h); push(h.ticker, h.name, mm.valueKrw, mm.pnlPct); });
-    return Object.values(m);
+    positions.forEach((p) => {
+      const l = posLive(p);
+      const cost = p.krw_cost ?? p.invested_krw ?? p.cost_krw ?? null;
+      const val = l.valueKrw != null ? l.valueKrw : (p.value_krw ?? null);
+      const pnlK = (val != null && cost != null) ? val - cost : (p.pnl_krw ?? null);
+      push(p.ticker, p.name, val, l.pnlPct != null ? l.pnlPct : (p.pnl_pct ?? null), cost, pnlK);
+    });
+    holdings.forEach((h) => { const mm = holdingMetrics(h); push(h.ticker, h.name, mm.valueKrw, mm.pnlPct, mm.costTotal, mm.pnlKrw); });
+    // 비율만 아는 항목은 costKrw가 없을 수 있음 → 총수익률(pnlPct)로 매수금액 역산 보조.
+    return Object.values(m).map((x) => {
+      if (x.costKrw == null && x.pnlPct != null && x.valueKrw != null) x.costKrw = x.valueKrw / (1 + x.pnlPct / 100);
+      if (x.pnlKrw == null && x.costKrw != null) x.pnlKrw = x.valueKrw - x.costKrw;
+      return x;
+    });
   })();
+  // [ETF 보유 분석] 기간 등락률(1주/1개월, NAV) — 보유 종목 티커로 조회(보유 탭 진입 시).
+  const [perfMap, setPerfMap] = useState({});
+  const perfKey = perfItems.map((x) => x.ticker).join(",");
+  useEffect(() => {
+    if (etfTab !== "hold" || !perfKey) return;
+    let alive = true;
+    fetch(`/api/pwa/etf-perf?tickers=${encodeURIComponent(perfKey)}`)
+      .then((r) => r.json()).then((d) => { if (alive && d && d.perf) setPerfMap(d.perf); })
+      .catch(() => {});
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [perfKey, etfTab]);
   // [ETF 재구성 Phase1] 규칙기반 추천 후보(순수함수).
   const etfRecs = recommendEtfs({ holdings, positions: pieItems, target: targetAlloc, overlap });
   // [ETF Phase2] 후보 '이유'를 Claude로 다듬어 채운다(추천 탭 진입 시 1회, 실패 시 규칙문구 폴백).
@@ -849,7 +877,7 @@ export default function EtfDashboard() {
       </div>
 
       {/* [ETF 재구성 Phase1] 보유 탭 상단 — 테마별 분배 도넛(지역/섹터) */}
-      {etfTab === "hold" && <EtfAllocationPie items={perfItems} overlap={overlap} />}
+      {etfTab === "hold" && <EtfAllocationPie items={perfItems} overlap={overlap} perfMap={perfMap} />}
 
       {/* [ETF 재구성 Phase1] 추천 탭 상단 — 규칙기반 ETF 종목 추천 + 이유 */}
       {etfTab === "rec" && (
