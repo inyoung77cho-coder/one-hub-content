@@ -235,6 +235,7 @@ function HomeAccordion({ id, title, summary, defaultOpen = false, children }) {
 
 export default function PWADashboard({ latestReport }) {
   const [tab, setTab] = useState('dashboard');
+  const [codeNameMap, setCodeNameMap] = useState({}); // [S20-2] 종목코드→한글명(보유명 우선 + stocks-search 보강)
   const [data, setData] = useState(null);
   const [trader, setTrader] = useState('A');
   const [error, setError] = useState(null);
@@ -548,6 +549,39 @@ export default function PWADashboard({ latestReport }) {
       .catch(() => {});
   }, [mounted, trader]);
 
+  // [S20-2] 추천 종목명 한/영 혼재 정정 — 종목코드→한글명 맵.
+  //   ① 보유 종목명(KIS, 한글) 우선 → ② 국내(6자리)인데 영문명이면 stocks-search 로 한글명 보강 → ③ 못 찾으면 원문.
+  useEffect(() => {
+    if (!data) return;
+    let alive = true;
+    const isEng = (s) => /[A-Za-z]/.test(s || '') && !/[가-힣]/.test(s || '');
+    const base = {};
+    let poss = [];
+    try { poss = Array.isArray(data.balance?.positions) ? data.balance.positions : JSON.parse(data.balance?.positions || '[]'); } catch (e) {}
+    (poss || []).forEach((p) => { if (p && p.code && p.name) base[p.code] = p.name; });
+    setCodeNameMap((m) => ({ ...base, ...m })); // 보유명 반영(기존 보강값은 유지)
+    const need = [];
+    [...(data.today_buys || []), ...(data.screening_candidates || []), ...(data.valid_signals || [])].forEach((s) => {
+      const code = s && (s.code != null ? String(s.code) : null);
+      const nm = s && (s.stock || s.name);
+      if (code && /^\d{6}$/.test(code) && !base[code] && isEng(nm)) need.push(code);
+    });
+    const uniq = [...new Set(need)].slice(0, 25);
+    if (uniq.length) {
+      Promise.all(uniq.map(async (code) => {
+        const d = await cachedJson(`/api/stocks-search?q=${encodeURIComponent(code)}`);
+        const hit = (d?.results || d?.items || []).find((r) => String(r.code) === code);
+        return hit && hit.name && /[가-힣]/.test(hit.name) ? [code, hit.name] : null;
+      })).then((pairs) => {
+        if (!alive) return;
+        const add = {};
+        pairs.filter(Boolean).forEach(([c, n]) => { add[c] = n; });
+        if (Object.keys(add).length) setCodeNameMap((m) => ({ ...m, ...add }));
+      });
+    }
+    return () => { alive = false; };
+  }, [data]);
+
   // [성과비교] 가장 이른 매수일 기준으로 시장지수 구간 수익률 조회(보유가 해외 우세면 S&P, 아니면 KOSPI)
   useEffect(() => {
     if (!mounted) return;
@@ -641,7 +675,7 @@ export default function PWADashboard({ latestReport }) {
     // [나 vs AI] AI 제안에 대한 내 판단 기록 — 승인/예약=매매(take), 거절/스킵=관망(pass)
     const _p = pendingList.find((x) => x.code === code);
     if (_p) recordDecision({
-      code, name: _p.name,
+      code, name: (code != null && codeNameMap[String(code)]) || _p.name, // [S20-2] 기록 한글명
       entry: Number(_p.current_price ?? _p.price) || null,
       decision: action === 'skip' ? 'pass' : 'take',
       trader,
@@ -683,10 +717,12 @@ export default function PWADashboard({ latestReport }) {
       }
     } catch (e) { setPendingError(String(e)); }
     finally { setActingCode(null); }
-  }, [trader, pendingList]);
+  }, [trader, pendingList, codeNameMap]);
 
   // [나 vs AI] 추천 카드에서 직접 판단 기록 — 후보엔 가격 필드가 없으므로 현재가를 조회해 진입가로 저장
   const logDecision = useCallback(async (code, name, decision, priceHint) => {
+    // [S20-2] 기록도 한글명으로 — 종목코드 매핑이 있으면 교체(영문으로 기록 남지 않게).
+    name = (code != null && codeNameMap[String(code)]) || name;
     // [S19-2 2026-08-30] 예전엔 entry=null 로 먼저 기록하고 시세를 뒤에서 백필했는데, 백필이
     //   조용히 실패하면 그 판단은 matureLedger 의 entry>0 필터에 걸려 영원히 채점되지 않았다
     //   (실측: '샀어요' 2건이 entry=null·snaps=[]). 이제 시세를 먼저 시도하고, 실패해도
@@ -707,7 +743,7 @@ export default function PWADashboard({ latestReport }) {
     }
     recordDecision({ code, name, entry, decision, trader });
     setDecTick((t) => t + 1);
-  }, [trader]);
+  }, [trader, codeNameMap]);
 
   const searchStocks = useCallback(async (q) => {
     if (!q || q.length < 1) { setSearchResults([]); return; }
@@ -952,10 +988,12 @@ export default function PWADashboard({ latestReport }) {
         ? `오늘은 ${watchCount}건 분석했지만 매수 조건은 안 됐어요`
         : '오늘은 아직 활동 기록이 없어요';
 
+  // [S20-2] 종목코드→한글명. 매핑 있으면 한글, 없으면 원문(실제 해외 상장은 영문 유지).
+  const krName = (code, fallback) => (code != null && codeNameMap[String(code)]) || fallback || (code != null ? String(code) : '');
   // [T-2] TOP PICK — 종목코드 dedup + 스코어 차등 + 근거 태그 2개 + 타이브레이커.
   const _mkPick = (x, isBuy) => ({
     code: x.code || null,
-    name: x.stock || x.name || '',
+    name: krName(x.code, x.stock || x.name || ''),
     score: Number(x.final_score ?? x.score ?? 0),
     isBuy,
     reasons: x.reasons || null,
@@ -1697,10 +1735,12 @@ export default function PWADashboard({ latestReport }) {
                 (data.valid_signals || []).forEach((v) => { if (v.code) validByCode[v.code] = v; });
                 // [S1.4] 종목코드 기준 공용 dedup(이중 방어) 후 정렬
                 const uniqCands = dedupBy(data.screening_candidates, (c) => c.code || c.name)
-                  .map((c) => (validByCode[c.code] ? { ...c, _valid: validByCode[c.code] } : c));
+                  // [S20-2] 종목명 한글 정규화(원천에서 한 번 → 하위 렌더·기록 모두 한글)
+                  .map((c) => (validByCode[c.code] ? { ...c, _valid: validByCode[c.code] } : { ...c }))
+                  .map((c) => ({ ...c, name: krName(c.code, c.name || c.stock) }));
                 const uniqCodes = new Set(uniqCands.map((c) => c.code));
                 Object.values(validByCode).forEach((v) => {
-                  if (!uniqCodes.has(v.code)) uniqCands.push({ code: v.code, name: v.name, score: 15, regime: v.regime, _valid: v });
+                  if (!uniqCodes.has(v.code)) uniqCands.push({ code: v.code, name: krName(v.code, v.name), score: 15, regime: v.regime, _valid: v });
                 });
                 // [S7.2] 정렬 칩: 관심도순(개인화 점수) / 기대수익순 — 실거래 검증 통과 종목은 항상 최상단.
                 const sorted = [...uniqCands].sort((a, b) => {
