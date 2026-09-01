@@ -2,7 +2,7 @@
 //   설계 원칙: 텍스트 단락 대신 숫자·막대·배지로 한눈에. 나 vs AI를 첫 화면 최상단 히어로로 승격.
 //   데이터는 전부 기존 소스: 원장(lib/ledger) · /api/pwa-dashboard · /api/pwa-pending ·
 //   /api/pwa/re/feed · lib/verdictLedger(판단 기록) · /api/today/news. 새로 만든 저장소 없음.
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import { getTrader, useTrader } from "../../lib/trader";
 import { dedupBy } from "../../lib/useDedup";
@@ -94,6 +94,7 @@ export default function TodayPage({ announcements = [] }) {
   const [notis, setNotis] = useState([]); // [알림] 텔레그램/리포트 알림 피드
   const [opNotes, setOpNotes] = useState([]); // [알림] OneHub 신고가(spot_price)
   const [reBrief, setReBrief] = useState(null); // [사용자 지시] 내 부동산 vs 지역 대장단지 가격 비교(re/briefing 재사용)
+  const reBriefLoadedRef = useRef(false); // [S21-1] 부동산 탭 진입 시 1회만 briefing 로드
   const [storyComments, setStoryComments] = useState([]); // [사용자 지시] 오늘의 이야기 — 카테고리별(주식/부동산/ETF/기타) 미리보기
   const [regionDelta, setRegionDelta] = useState(null); // [이야기 탭] 지역별 이야기 건수 증감(참석자 추적 불가 — 건수로 대체, 확인 완료)
   const [newRegions, setNewRegions] = useState([]); // [이야기 탭] REGIONS에 새로 추가된 동(로컬 "본 목록" 대비)
@@ -153,19 +154,8 @@ export default function TodayPage({ announcements = [] }) {
       .then((d) => { if (d?.ok && d.brief) setBrief(d.brief); }).catch(() => {});
     fetch(`/api/pwa-today-news-brief`).then((r) => r.json())
       .then((d) => { if (d?.ok && d.brief) setNewsBrief(d.brief); }).catch(() => {});
-    // [사용자 지시] 브리핑이 항상 백엔드 기본 지역(서현동)만 보여주던 문제 — 내 단지의 법정동을
-    //   찾아 region= 으로 넘겨 "보유 주택 지역" 시황이 나오게 한다. 단지가 없거나 동을 못 찾으면
-    //   기존처럼 기본 지역 그대로(에러 아님).
-    const loadBriefing = (region) =>
-      fetch(`/api/pwa/re/briefing${region ? `?region=${encodeURIComponent(region)}` : ""}`).then((r) => r.json())
-        .then((b) => { if (b && !b.error) setReBrief(b); }).catch(() => {});
-    if (myProp?.name) {
-      fetch(`/api/pwa/re/complexAreas?complex=${encodeURIComponent(myProp.name)}`).then((r) => r.json())
-        .then((d) => loadBriefing(d?.법정동 || null))
-        .catch(() => loadBriefing(null));
-    } else {
-      loadBriefing(null);
-    }
+    // [S21-1] 부동산 브리핑(re/briefing 4.9s)·complexAreas 는 마운트에서 제거 → 부동산 탭(view===1)
+    //   진입 시 1회만 로드(loadReBrief). 오늘 화면 완성에서 이 4.9초를 빼고, 상단 3행은 링크 폴백.
     {
       const region = getStoryRegionOverride() || Object.values(REGIONS)[0][0];
       fetch(`/api/comments?date=${encodeURIComponent(region)}`).then((r) => r.json())
@@ -186,7 +176,7 @@ export default function TodayPage({ announcements = [] }) {
 
   useEffect(() => {
     load();
-    const on = () => load();
+    const on = () => { reBriefLoadedRef.current = false; load(); }; // [S21-1] 자산 변경 시 부동산 브리핑도 재로드 허용
     window.addEventListener("onehub-trader-change", on);
     window.addEventListener("onehub-assets-change", on);
     return () => {
@@ -195,6 +185,26 @@ export default function TodayPage({ announcements = [] }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // [S21-1] 부동산 브리핑 지연 로드 — 부동산 탭(view===1) 진입 시 1회만 호출한다.
+  //   내 단지 법정동으로 region 을 잡아 briefing, 그 값으로 reBrief/reHeadline/myLeaderGapPct 채움.
+  const loadReBrief = useCallback(() => {
+    let myProp = null;
+    try { myProp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); } catch (e) {}
+    const loadBriefing = (region) =>
+      fetch(`/api/pwa/re/briefing${region ? `?region=${encodeURIComponent(region)}` : ""}`).then((r) => r.json())
+        .then((b) => { if (b && !b.error) setReBrief(b); }).catch(() => {});
+    if (myProp?.name) {
+      fetch(`/api/pwa/re/complexAreas?complex=${encodeURIComponent(myProp.name)}`).then((r) => r.json())
+        .then((d) => loadBriefing(d?.법정동 || null))
+        .catch(() => loadBriefing(null));
+    } else {
+      loadBriefing(null);
+    }
+  }, []);
+  useEffect(() => {
+    if (view === 1 && !reBriefLoadedRef.current) { reBriefLoadedRef.current = true; loadReBrief(); }
+  }, [view, loadReBrief]);
 
   const dismissNewRegions = useCallback((e) => {
     e.stopPropagation();
