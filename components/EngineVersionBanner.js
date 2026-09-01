@@ -11,6 +11,7 @@
 //   · 못 물어본 것(ok:false)과 다른 것(계약 불일치)을 구분해서 말한다.
 //   · 숫자를 지어내지 않는다 — 모르면 모른다고 한다.
 import { useEffect, useState } from "react";
+import { cachedJson } from "../lib/quoteCache"; // [S21-5] /api/version 중복 GET dedup
 
 // PWA 가 기대하는 엔진 API 계약. 엔진이 깨는 변경을 하면 양쪽을 함께 올린다.
 export const EXPECTED_CONTRACT = "2026-07";
@@ -20,8 +21,7 @@ export default function EngineVersionBanner() {
 
   useEffect(() => {
     let dead = false;
-    fetch("/api/version")
-      .then((r) => r.json())
+    cachedJson("/api/version") // [S21-5] FeedbackButton 과 같은 URL → 중복 GET dedup
       .then((d) => {
         if (dead) return;
         if (!d?.ok) {

@@ -592,9 +592,8 @@ export default function PWADashboard({ latestReport }) {
     let overseas = 0, domestic = 0;
     try { getEtfHoldings(trader).forEach((h) => (h.market === 'us' ? overseas++ : domestic++)); getStockHoldings(trader).forEach((h) => (h.market === 'us' ? overseas++ : domestic++)); } catch (e) {}
     const symbol = overseas > domestic ? 'spx' : 'kospi';
-    fetch(`/api/index/history?symbol=${symbol}&from=${sd}`)
-      .then((r) => r.json())
-      .then((d) => setBenchPerf({ ...d, from: sd, symbol }))
+    cachedJson(`/api/index/history?symbol=${symbol}&from=${sd}`) // [S21-5] 같은 URL 3회 → dedup
+      .then((d) => setBenchPerf(d ? { ...d, from: sd, symbol } : { ok: false, from: sd, symbol }))
       .catch(() => setBenchPerf({ ok: false, from: sd, symbol }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mounted, trader, assetSum, fxRate, stManualTick]);

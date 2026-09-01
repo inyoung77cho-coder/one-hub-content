@@ -5,6 +5,7 @@
 //   매칭되는 뉴스가 없으면 카드 자체를 숨긴다(빈 자리 방지, 원칙1).
 import { useEffect, useState } from "react";
 import { getStockHoldings } from "../lib/stockHoldings";
+import { cachedJson } from "../lib/quoteCache"; // [S21-5] /api/today/news 중복 GET dedup
 
 const MACRO_CATS = new Set(["global", "macro", "policy"]);
 
@@ -25,8 +26,7 @@ export default function HoldingsNews({ trader = "A", onOpenNews, bare = false })
     } catch (e) { names = []; }
     if (names.length === 0) { setRows([]); return; }
 
-    fetch("/api/today/news")
-      .then((r) => r.json())
+    cachedJson("/api/today/news")
       .then((d) => {
         if (!alive) return;
         const items = Array.isArray(d?.items) ? d.items : [];

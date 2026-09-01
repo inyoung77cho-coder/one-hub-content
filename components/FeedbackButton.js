@@ -2,6 +2,7 @@
 // 마찰 최소(카테고리 한 탭 + 한 줄 + 보내기), 맥락 자동(화면명·버전·신원은 서버에서).
 import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
+import { cachedJson } from "../lib/quoteCache"; // [S21-5] /api/version 중복 GET dedup
 
 const CATS = [
   { key: "bug", label: "버그", emoji: "🔴" },
@@ -35,7 +36,7 @@ export default function FeedbackButton({ variant = "float" }) {
 
   useEffect(() => {
     // 버전 맥락 자동(선택) — 실패해도 무시
-    fetch("/api/version").then((r) => r.json()).then((d) => setVer(d?.version || d?.api_contract || "")).catch(() => {});
+    cachedJson("/api/version").then((d) => setVer(d?.version || d?.api_contract || "")).catch(() => {}); // [S21-5] dedup
   }, []);
 
   const screen = screenName(router.pathname);

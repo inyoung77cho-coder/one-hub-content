@@ -134,7 +134,7 @@ export default function TodayPage({ announcements = [] }) {
     let myProp = null;
     try { myProp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); setMyComplex(myProp?.name || ""); setReMyProp(myProp || null); } catch (e) {}
     Promise.all([
-      fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => null),
+      cachedJson(`/api/pwa-dashboard?trader=${tr}`), // [S21-5] 오늘/AI 탭 공유 URL → 중복 GET dedup
       fetch(`/api/pwa-pending?trader=${tr}`).then((r) => r.json()).catch(() => null),
       fetch(`/api/pwa/re/feed`).then((r) => r.json()).catch(() => null),
       getAssetLedger(tr).catch(() => null),
@@ -148,7 +148,7 @@ export default function TodayPage({ announcements = [] }) {
     cachedJson(`/api/pwa-ai-daily?trader=${tr}`).then((d) => { if (d && d.ok) setAiDaily(d); }).catch(() => {});
     fetch(`/api/notifications?trader=${tr}`).then((r) => r.json())
       .then((n) => { if (n?.ok && Array.isArray(n.items)) setNotis(dedupBy(n.items, (x) => x.id ?? `${x.title || ""}|${x.body || ""}|${x.sent_at || x.created_at || ""}`)); }).catch(() => {});
-    fetch(`/api/today/news`).then((r) => r.json())
+    cachedJson(`/api/today/news`) // [S21-5] HoldingsNews 와 같은 URL → 중복 GET dedup
       .then((d) => { setNews(Array.isArray(d?.items) ? d.items : []); }).catch(() => setNews([]));
     fetch(`/api/pwa-market-brief`).then((r) => r.json())
       .then((d) => { if (d?.ok && d.brief) setBrief(d.brief); }).catch(() => {});
