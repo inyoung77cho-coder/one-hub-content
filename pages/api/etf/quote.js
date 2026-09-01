@@ -86,8 +86,15 @@ export default async function handler(req, res) {
       const one = await resolveOne(tk, market);
       if (one) quotes[one.ticker] = { price: one.price, currency: one.currency, date: one.date, source: one.source };
     }));
-    res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=900");
-    return res.status(200).json({ ok: true, quotes });
+    // [S21-7] 부분 실패를 조용히 넘기지 않도록 못 가져온 티커를 missing 으로 알린다.
+    //   키 정규화는 resolveOne 과 동일(소문자·영숫자/점만·대문자). 클라는 missing 만 개별 재조회한다.
+    const missing = list.filter((tk) => {
+      const key = String(tk).trim().toLowerCase().replace(/[^a-z0-9.]/g, "").toUpperCase();
+      return !quotes[key];
+    });
+    // 실패분이 있으면 그 상태를 5분간 굳히지 않도록 캐시를 짧게.
+    res.setHeader("Cache-Control", missing.length ? "s-maxage=30, stale-while-revalidate=60" : "s-maxage=300, stale-while-revalidate=900");
+    return res.status(200).json({ ok: true, quotes, missing });
   }
 
   // 단건(기존 호환)
