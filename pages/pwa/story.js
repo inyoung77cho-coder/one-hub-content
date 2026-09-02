@@ -8,12 +8,22 @@ import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import Comments from "../../components/Comments";
 import { getStoryRegionOverride, setStoryRegionOverride, guessMyDong, guOf, REGIONS } from "../../lib/storyRegion";
+import { recordSnapshot as recordRegionSnapshot, getRegionDelta } from "../../lib/storyRegionHistory"; // [S23 T-9] 지역별 이야기 증감(오늘 화면에서 이관)
 
 export default function PwaStory() {
   const [region, setRegion] = useState("");
   const [guessed, setGuessed] = useState(null);
   const [picking, setPicking] = useState(false);
   const [pickGu, setPickGu] = useState(null); // [구→동] 1단계에서 고른 구 — null이면 구 선택 화면
+  const [regionDelta, setRegionDelta] = useState(null); // [S23 T-9] 지역별 이야기 증감(오늘 화면에서 이관)
+
+  // [S23 T-9] 지역별 이야기 건수 오늘치 적립 + 전날 대비 증감(오늘 화면과 같은 소스·스냅샷).
+  useEffect(() => {
+    fetch("/api/story-region-stats")
+      .then((r) => r.json())
+      .then((d) => { if (d?.ok && d.counts) { recordRegionSnapshot(d.counts); setRegionDelta(getRegionDelta()); } })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     const override = getStoryRegionOverride();
@@ -77,6 +87,21 @@ export default function PwaStory() {
         </section>
       )}
 
+      {/* [S23 T-9] 지역별 이야기 증감 — 오늘 화면에서 이관. 변화 없거나 데이터 없으면 정직하게 안내. */}
+      {regionDelta && regionDelta.deltas && regionDelta.deltas.filter((d) => d.delta !== 0).length > 0 && (
+        <section className="card">
+          <div className="story-rd-h">📊 지역별 이야기 증감 <span className="story-rd-sub">{regionDelta.prevDate} 대비</span></div>
+          <div className="story-rd-list">
+            {regionDelta.deltas.filter((d) => d.delta !== 0).slice(0, 6).map((d) => (
+              <div className="story-rd-row" key={d.region}>
+                <span className="story-rd-nick">{d.region}</span>
+                <span className="story-rd-cnt">{d.count}건</span>
+                <span className={d.delta > 0 ? "story-rd-up" : "story-rd-down"}>{d.delta > 0 ? "▲" : "▼"}{Math.abs(d.delta)}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       <section className="card">
         <Comments date={region} />
       </section>
@@ -87,6 +112,14 @@ export default function PwaStory() {
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
         .story-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; }
         .story-fixed { flex-shrink: 0; }
+        .story-rd-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
+        .story-rd-sub { font-size: 0.68rem; font-weight: 600; color: var(--color-ink-3); margin-left: 6px; }
+        .story-rd-list { display: flex; flex-direction: column; gap: 5px; }
+        .story-rd-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
+        .story-rd-nick { color: var(--color-ink-2); font-weight: 700; }
+        .story-rd-cnt { color: var(--color-ink-3); }
+        .story-rd-up { margin-left: auto; color: var(--color-danger, #dc2626); font-weight: 700; }
+        .story-rd-down { margin-left: auto; color: var(--color-primary); font-weight: 700; }
         .story-region { color: var(--color-primary); }
         .story-sub-inline { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
         .story-change { margin-left: auto; flex-shrink: 0; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 999px; cursor: pointer; font-family: var(--font-sans); }

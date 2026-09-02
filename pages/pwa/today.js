@@ -17,6 +17,7 @@ import { getHoldings as getEtfHoldings } from "../../lib/etfHoldings";
 import { recommendEtfs } from "../../lib/etfRecommend";
 import { getTargetClass, computeClassDrift, topDriftMessage } from "../../lib/targetClass"; // [S23 T-2] ETF 조치 근거 통일(자산군 목표)
 import { taxFocusOf, currentMonth } from "../../lib/taxCalendar"; // [S23 T-7] 절세 팁을 달력에 연결(DAY% 회전 제거)
+import { getTodayCadence } from "../../lib/todayCadence"; // [S23 T-6] 주간·월간·분기 훅
 import { deriveUrgency, deriveStance } from "../../components/shared/KisHoldingsCard"; // [S20-3] 조치 판정 규칙 재사용(복제 금지)
 import { computeAiFreshness } from "../../lib/aiFreshness"; // [S20-3] AI 갱신 상태(AI 탭과 공유)
 import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta, getHistory as getAssetHistory } from "../../lib/assetHistory"; // [S20-3/S23 T-4] 총자산 전일 대비·곡선
@@ -305,17 +306,19 @@ export default function TodayPage({ announcements = [] }) {
   const etfHoldingsCnt = getEtfHoldings(trader).length;
   // [S23 T-2 #4] ETF 조치 근거를 assets.js '오늘의 한 수'와 같은 소스로 통일 — 자산군 목표(onehub_target_class)
   //   이탈. 두 화면이 다른 목표(ETF 내부배분 vs 자산군배분)로 다른 말을 하던 것을 하나로.
+  const opClass = {
+    stock: bd.stock_uk != null ? Number(bd.stock_uk) : 0,
+    etf: bd.etf_uk != null ? Number(bd.etf_uk) : 0,
+    realestate: Math.max(0, (bd.realestate_uk != null ? Number(bd.realestate_uk) : 0) - (residenceUk || 0)),
+    cash: bd.cash_uk != null ? Number(bd.cash_uk) : 0,
+  };
   let etfRebalMsg = null;
   try {
-    const opClass = {
-      stock: bd.stock_uk != null ? Number(bd.stock_uk) : 0,
-      etf: bd.etf_uk != null ? Number(bd.etf_uk) : 0,
-      realestate: Math.max(0, (bd.realestate_uk != null ? Number(bd.realestate_uk) : 0) - (residenceUk || 0)),
-      cash: bd.cash_uk != null ? Number(bd.cash_uk) : 0,
-    };
     const classMsg = topDriftMessage(computeClassDrift(opClass, getTargetClass()));
     if (classMsg && classMsg.tone === "warn") etfRebalMsg = classMsg.text;
   } catch (e) {}
+  // [S23 T-6] 주간·월간·분기 훅 — 발동한 날에만 카드 1장. 기존 소스만 사용, 데이터 없으면 빈 배열.
+  const cadenceHooks = (() => { try { return getTodayCadence({ trader, opClass }); } catch (e) { return []; } })();
   // ── 행3: AI 변화 한 줄(AI 탭과 동일 규칙 — lib/aiFreshness)
   const aiFreshness = computeAiFreshness(aiDaily, dash);
   // ── 대결 결과 배너 — 오늘 스냅샷이 찍힌 날에만 노출(없으면 렌더 안 함).
@@ -496,6 +499,18 @@ export default function TodayPage({ announcements = [] }) {
 
         {/* ══ "오늘의 대결" — 카드1(대결) · 카드2(주식 뉴스) · 카드3(주식 할일) 3장으로 통일 ══ */}
         {view === 0 && (<>
+        {/* [S23 T-6] 주기 훅 — 발동한 날에만(월/월초/분기초/11월) 맨 위 카드 1장. 매일은 안 뜬다. */}
+        {cadenceHooks.length > 0 && (
+          <section className="card td-cadence">
+            {cadenceHooks.map((h) => (
+              <button type="button" className="tc-row" key={h.key} onClick={() => router.push(h.href)}>
+                <span className="tc-ic">{h.icon}</span>
+                <span className="tc-body"><b className="tc-t">{h.title}</b><span className="tc-s">{h.text}</span></span>
+                <span className="tc-arrow">›</span>
+              </button>
+            ))}
+          </section>
+        )}
         {/* [S20-3] 카드0 — 오늘 1화면 요약 3행: ①총자산 ②오늘 조치할 종목 ③AI 변화. 최상단 고정. */}
         <section className="card td-sum">
           {/* 행1 — [S23 T-2] 운용자산(실거주 제외) + 운용 전일 대비 + 마지막 갱신. 실거주 없으면 총자산. */}
@@ -977,62 +992,31 @@ export default function TodayPage({ announcements = [] }) {
         )}
 
         {/* ══ "오늘의 이야기" — [사용자 지시] 주식/부동산/ETF/기타로 나눠 카드 작성 ══ */}
-        {view === 3 && (
-          <section className="card tile" onClick={() => router.push("/pwa/story")} role="button" tabIndex={0}>
-            <div className="tile-h">💬 오늘의 이야기</div>
-            <p className="tile-headline">{storyHeadline}</p>
-          </section>
-        )}
-        {view === 3 && STORY_CATS.map(([cat, ic]) => {
-          const items = cat === "기타"
-            ? storyComments.filter((c) => (c.category || "전체") === "전체")
-            : storyComments.filter((c) => c.category === cat);
+        {/* [S23 T-9] 이야기 요약 한 장 — 4개 카테고리 카드 통합. 비었을 때 안내는 한 번만.
+            지역별 증감 카드는 /pwa/story 로 이관(여기선 미표시, 스냅샷 적립은 loadStoryData 에서 계속). */}
+        {view === 3 && (() => {
+          const total = storyComments.length;
+          const cnt = (c) => storyComments.filter((x) => x.category === c).length;
+          const rep = total > 0 ? storyComments[storyComments.length - 1] : null;
           return (
-            <section className="card tile story-cat" key={cat} onClick={() => router.push("/pwa/story")} role="button" tabIndex={0}>
-              <div className="tile-h">{ic} {cat} 이야기 <span className="story-cat-n">{items.length}</span></div>
-              {items.length > 0 ? (
-                <div className="story-cat-list">
-                  {items.slice(-2).reverse().map((c) => (
-                    <div className="story-cat-row" key={c.id}>
-                      <span className="story-cat-nick">{c.nick}</span>
-                      <span className="story-cat-text">{c.text}</span>
+            <section className="card tile" onClick={() => router.push("/pwa/story")} role="button" tabIndex={0}>
+              <div className="tile-h">💬 오늘의 이야기 {total > 0 && <span className="story-cat-n">{total}건</span>}</div>
+              {total > 0 ? (
+                <>
+                  <p className="tile-sub">주식 {cnt("주식")} · 부동산 {cnt("부동산")} · ETF {cnt("ETF")}</p>
+                  {rep && (
+                    <div className="story-cat-row" style={{ marginTop: 8 }}>
+                      <span className="story-cat-nick">{rep.nick}</span>
+                      <span className="story-cat-text">{rep.text}</span>
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               ) : (
-                <div className="tile-empty">아직 {cat} 이야기가 없어요. 첫 글을 남겨보세요.</div>
+                <p className="tile-headline">{storyHeadline}</p>
               )}
             </section>
           );
-        })}
-
-        {/* ══ 지역별 이야기 건수 증감 — [확인 완료] 참석자(고유 사용자) 추적 장치가 없어
-             동별 이야기 "건수" 증감으로 대체(lib/storyRegionHistory.js, 로컬 일별 스냅샷) ══ */}
-        {view === 3 && (
-          <section className="card tile">
-            <div className="tile-h">📊 지역별 이야기 증감</div>
-            {regionDelta ? (
-              regionDelta.deltas.filter((d) => d.delta !== 0).length > 0 ? (
-                <div className="story-cat-list">
-                  {regionDelta.deltas.filter((d) => d.delta !== 0).slice(0, 5).map((d) => (
-                    <div className="story-cat-row" key={d.region}>
-                      <span className="story-cat-nick">{d.region}</span>
-                      <span className="story-cat-text">{d.count}건</span>
-                      <span className={d.delta > 0 ? "story-delta-up" : "story-delta-down"}>
-                        {d.delta > 0 ? "▲" : "▼"}{Math.abs(d.delta)}
-                      </span>
-                    </div>
-                  ))}
-                  <p className="tile-sub">{regionDelta.prevDate} 대비</p>
-                </div>
-              ) : (
-                <div className="tile-empty">어제와 비교해 변화가 없어요.</div>
-              )
-            ) : (
-              <div className="tile-empty">데이터를 쌓는 중이에요 — 내일부터 전날 대비 증감이 보여요.</div>
-            )}
-          </section>
-        )}
+        })()}
 
         {/* ══ Youtube/단톡방 업데이트 공지 — [확인 완료] content/announcements/*.md,
              관리자가 직접 커밋(content/daily와 동일 패턴, 새 백엔드 없음) ══ */}
@@ -1122,6 +1106,14 @@ export default function TodayPage({ announcements = [] }) {
         .tds-subtotals { display: flex; gap: 12px; flex-wrap: wrap; margin: 2px 0 2px; font-size: 0.72rem; color: var(--color-ink-3); }
         .tds-subtotals .tds-realty-upd { color: var(--color-ink-2); font-weight: 600; }
         .tds-spark { margin-left: 6px; }
+        /* [S23 T-6] 주기 훅 카드 */
+        .td-cadence { border-left: 3px solid var(--color-primary); padding: 6px 12px; }
+        .tc-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: none; padding: 8px 2px; cursor: pointer; font-family: var(--font-sans); }
+        .tc-ic { flex: none; font-size: 1.1rem; }
+        .tc-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .tc-t { font-size: 0.84rem; font-weight: 800; color: var(--color-ink); }
+        .tc-s { font-size: 0.76rem; color: var(--color-ink-2); word-break: keep-all; }
+        .tc-arrow { flex: none; color: var(--color-ink-3); font-size: 1.1rem; }
         .etf1-taxnum { margin-top: 6px; font-size: 0.74rem; color: var(--color-ink-2); font-variant-numeric: tabular-nums; }
         .tds-actbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
         .tds-actrow { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); text-align: left; }
