@@ -18,6 +18,7 @@ import { recommendEtfs } from "../../lib/etfRecommend";
 import { getTargetClass, computeClassDrift, topDriftMessage } from "../../lib/targetClass"; // [S23 T-2] ETF 조치 근거 통일(자산군 목표)
 import { taxFocusOf, currentMonth } from "../../lib/taxCalendar"; // [S23 T-7] 절세 팁을 달력에 연결(DAY% 회전 제거)
 import { getTodayCadence } from "../../lib/todayCadence"; // [S23 T-6] 주간·월간·분기 훅
+import { recordVisit } from "../../lib/visitLog"; // [S23 T-10] 방문일 계기판(스트릭 배지 아님)
 import { deriveUrgency, deriveStance } from "../../components/shared/KisHoldingsCard"; // [S20-3] 조치 판정 규칙 재사용(복제 금지)
 import { computeAiFreshness } from "../../lib/aiFreshness"; // [S20-3] AI 갱신 상태(AI 탭과 공유)
 import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta, getHistory as getAssetHistory } from "../../lib/assetHistory"; // [S20-3/S23 T-4] 총자산 전일 대비·곡선
@@ -197,6 +198,7 @@ export default function TodayPage({ announcements = [] }) {
   }, []);
 
   useEffect(() => {
+    try { recordVisit(getTrader()); } catch (e) {} // [S23 T-10] 오늘 접속 기록(주간 리포트 계기판)
     load();
     const on = () => { reBriefLoadedRef.current = false; reDataLoadedRef.current = false; storyLoadedRef.current = false; load(); }; // [S21-1/S23 T-8] 자산 변경 시 지연 데이터도 재로드 허용
     window.addEventListener("onehub-trader-change", on);
