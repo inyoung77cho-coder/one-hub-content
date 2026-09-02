@@ -9,6 +9,7 @@ import { getLedger } from "../../lib/ledger";
 import { recordSnapshot, getDelta, getHistory } from "../../lib/assetHistory";
 import AvgPriceWarningCard from "../../components/shared/AvgPriceWarningCard"; // [S22-1] 이상 평단 확인 카드(주식·ETF 공용)
 import { getTargetClass, setTargetClass, computeClassDrift, topDriftMessage, CLASS_PRESETS } from "../../lib/targetClass"; // [S22-4] 자산군 목표 배분
+import { pickInsight } from "../../lib/crossInsight"; // [S22-10] 자산군 교차 인사이트(하나만)
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
@@ -169,6 +170,13 @@ export default function AssetsMapPage() {
   const targetClass = getTargetClass();
   const classDrift = computeClassDrift(opClass, targetClass);
   const classDriftMsg = topDriftMessage(classDrift);
+  // [S22-10] 자산군 교차 인사이트 — 세 자산을 다 아는 앱만 할 수 있는 한 줄(가장 강한 것 하나).
+  //   (환노출 규칙용 overseasPct 는 보유 실시세 환산이 필요해 후속 — 지금은 자산군 집중·유동성 규칙이 동작.)
+  const overseasPct = 0;
+  const crossInsight = (() => {
+    try { return pickInsight(assets, { ...(dash?.market || {}), blockedCount: dash?.blockedCount, overseasPct }); }
+    catch (e) { return null; }
+  })();
 
   // 자산 지도/쏠림 진단만 뷰에 따라 분모가 바뀐다(총자산 헤드라인은 항상 total 유지 = 단일 소스).
   const mapDenom = useEx ? opTotal : total;
@@ -365,6 +373,17 @@ export default function AssetsMapPage() {
             <p className="as-incomplete" key={i}>ℹ️ <b>{w.name}</b>은 증권사 연동 계좌와 같은 종목코드라 직접입력분은 총자산에 더하지 않았습니다. 실제로 다른 증권사 계좌라면 보유 목록에서 해당 증권사를 선택해 주세요.</p>
           ))}
         </section>
+
+        {/* [S22-10] 자산군 교차 인사이트 — 세 자산을 묶어야 할 수 있는 한 줄. 가장 강한 것 하나만. */}
+        {crossInsight && (
+          <section className="card" style={{ borderLeft: "3px solid var(--color-primary)" }}>
+            <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--color-ink)", lineHeight: 1.55, wordBreak: "keep-all" }}>💡 {crossInsight.text}</div>
+            <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10 }}>
+              {crossInsight.cta && <Link href={crossInsight.cta.href} style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--color-primary)" }}>{crossInsight.cta.label}</Link>}
+              <span style={{ marginLeft: "auto", fontSize: "0.66rem", color: "var(--color-ink-3)" }}>{crossInsight.disclaimer}</span>
+            </div>
+          </section>
+        )}
 
         {/* [S22-4] 자산군 목표 배분 — 미설정이면 설정 유도(추측 기본값 없음), 설정 시 이탈(%p) 표시.
             분모는 운용자산(실거주 제외). '비중'이 아니라 '차이'를 말한다. */}

@@ -9,6 +9,7 @@ import { ReForm } from "../../components/shared/AssetForms";
 import Term from "../../components/Term";
 import RePositionCard, { RegionLeadersCard, RegionForecastCard, MoveDifficultyCard } from "../../components/RePositionCard";
 import { ensureDailySnapshot } from "../../lib/dailySnapshot"; // [S22-3] 총자산 곡선 적립 backstop
+import { estimateSellCost, MOVE_COST_DISCLAIMER } from "../../lib/moveCost"; // [S22-9] 갈아타기 거래비용
 import ReIncomeSummaryCard from "../../components/ReIncomeSummaryCard";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
@@ -61,6 +62,21 @@ export default function RealEstateDashboard() {
   const [reSearchRes, setReSearchRes] = useState([]);
   // [S22-3] 부동산만 보고 나가도 그날 총자산 곡선에 1건 남긴다(backstop).
   useEffect(() => { ensureDailySnapshot(); }, []);
+
+  // [S22-9] 분기 리듬 명시 — 부동산은 매일 볼 화면이 아니다. 다음 데이터 갱신(분기)을 정직하게 적는다.
+  //   SSR 불일치 방지 위해 마운트 후 계산.
+  const [nextQ, setNextQ] = useState(null);
+  useEffect(() => {
+    try {
+      const now = new Date();
+      const m = now.getMonth();
+      const qs = [0, 3, 6, 9];
+      let ny = now.getFullYear();
+      let nm = qs.find((qm) => qm > m);
+      if (nm === undefined) { nm = 0; ny += 1; }
+      setNextQ(`${ny}년 ${nm + 1}월 1일`);
+    } catch (e) {}
+  }, []);
   useEffect(() => {
     if (!reSearchOpen) return;
     const q = reSearchQ.trim();
@@ -277,10 +293,32 @@ export default function RealEstateDashboard() {
           );
         })()}
 
+        {/* [S22-9] 분기 리듬 명시 — 부동산은 매일 보는 화면이 아니다. 정직한 주기 표시가 신뢰를 만든다. */}
+        {nextQ && (
+          <div style={{ fontSize: "0.72rem", color: "var(--color-ink-3)", margin: "0 2px 10px", lineHeight: 1.5 }}>📅 부동산은 분기·연 단위로 움직입니다 — 다음 데이터 갱신 <b>{nextQ}</b>. 매일 볼 화면이 아니에요.</div>
+        )}
+
         {/* [§3.7·§3.8] 내 단지 포지션 — 막대+실선(계단)으로 대장 대비 위치·평형별 적정가 */}
         {myProp?.name && brief && !brief.error && (
           <RePositionCard brief={brief} myProp={myProp} dongOf={dongOf} userAvm={userAvm} />
         )}
+
+        {/* [S22-9] 갈아타기 참고 — 내 집을 지금 팔 때 드는 거래비용(중개비·양도세 간이 추정). 유료 후보의 씨앗. */}
+        {myProp?.name && repEvalUk > 0 && (() => {
+          const sc = estimateSellCost({ sellPriceUk: repEvalUk, buyPriceUk: Number(myProp?.buyUk) || 0 });
+          return (
+            <section className="card">
+              <div style={{ fontSize: "0.86rem", fontWeight: 800, marginBottom: 8 }}>🔁 갈아타기 참고 <span style={{ fontWeight: 600, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>내 집을 지금 팔면</span></div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: "0.8rem", color: "var(--color-ink-2)" }}>
+                <div style={{ display: "flex" }}><span>예상 매도가</span><b style={{ marginLeft: "auto", color: "var(--color-ink)" }}>{uk(repEvalUk)}</b></div>
+                <div style={{ display: "flex" }}><span>중개보수(추정)</span><b style={{ marginLeft: "auto" }}>−{uk(sc.broker)}</b></div>
+                <div style={{ display: "flex" }}><span>양도세(추정)</span><b style={{ marginLeft: "auto" }}>{sc.capGain > 0 ? `−${uk(sc.capGain)}` : "비과세(1주택·2년)"}</b></div>
+                <div style={{ display: "flex", borderTop: "1px solid var(--color-line)", paddingTop: 5, marginTop: 2 }}><span style={{ fontWeight: 700 }}>손에 쥐는 금액(추정)</span><b style={{ marginLeft: "auto", color: "var(--color-primary)" }}>{uk(Math.round((repEvalUk - sc.total) * 100) / 100)}</b></div>
+              </div>
+              <div style={{ marginTop: 8, fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>상급지로 갈아타려면 여기에 목표 단지 취득세·중개비와 시세 차액이 더 듭니다. ⚖️ {MOVE_COST_DISCLAIMER}</div>
+            </section>
+          );
+        })()}
 
         {/* [Card2] 동네별 대장 비교 — 주간 사전선정(region_leaders) 가벼운 읽기 */}
         {myProp?.name && (
