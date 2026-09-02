@@ -15,6 +15,7 @@ import { getStoryRegionOverride, REGIONS, getNewRegions, ackNewRegions } from ".
 import { recordSnapshot as recordRegionSnapshot, getRegionDelta } from "../../lib/storyRegionHistory";
 import { getHoldings as getEtfHoldings } from "../../lib/etfHoldings";
 import { recommendEtfs } from "../../lib/etfRecommend";
+import { getTargetClass, computeClassDrift, topDriftMessage } from "../../lib/targetClass"; // [S23 T-2] ETF 조치 근거 통일(자산군 목표)
 import { deriveUrgency, deriveStance } from "../../components/shared/KisHoldingsCard"; // [S20-3] 조치 판정 규칙 재사용(복제 금지)
 import { computeAiFreshness } from "../../lib/aiFreshness"; // [S20-3] AI 갱신 상태(AI 탭과 공유)
 import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta } from "../../lib/assetHistory"; // [S20-3] 총자산 전일 대비
@@ -247,6 +248,13 @@ export default function TodayPage({ announcements = [] }) {
   const dvUk = (v) => (v == null ? null : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}억`);
   const dCls = (v) => (v == null ? "" : v > 0.004 ? "up" : v < -0.004 ? "dn" : "flat");
   const totalUk = ledger?.total_uk != null && Number.isFinite(Number(ledger.total_uk)) ? Number(ledger.total_uk) : null;
+  // [S23 T-2] 운용자산 위계 — assets.js(S22-7)와 같은 규칙. 계산은 lib/ledger.js 필드를 읽기만 한다(다시 빼지 않음).
+  const residenceUk = bd.residence_uk != null ? Number(bd.residence_uk) : null;
+  const hasResidence = residenceUk != null && residenceUk > 0.005;
+  const operatingUk = bd.operating_uk != null ? Number(bd.operating_uk) : totalUk;
+  const headUk = hasResidence ? operatingUk : totalUk;               // 1행 큰 숫자
+  const headDelta = hasResidence ? (assetDelta?.operating ?? null) : (assetDelta?.total ?? null); // 전일 대비(운용 기준)
+  const realtyDelta = assetDelta?.residence ?? assetDelta?.realty ?? null; // 부동산(실거주) 시세 갱신 — 별도 줄
   // ── 행2: 오늘 조치할 종목 — 목표가 도달/손절 근접만(deriveUrgency rank<=2), 최대 3개
   const actionStocks = positions
     .filter((p) => deriveUrgency(p).rank <= 2)
@@ -268,13 +276,18 @@ export default function TodayPage({ announcements = [] }) {
   const nearestToStop = toStops.length ? Math.max(...toStops) : null;
   // 자산군 확장 — ETF 리밸런싱 이탈(보유가 있고 규칙기반 갭이 잡힐 때만), 부동산 대장 대비 포지션.
   const etfHoldingsCnt = getEtfHoldings(trader).length;
+  // [S23 T-2 #4] ETF 조치 근거를 assets.js '오늘의 한 수'와 같은 소스로 통일 — 자산군 목표(onehub_target_class)
+  //   이탈. 두 화면이 다른 목표(ETF 내부배분 vs 자산군배분)로 다른 말을 하던 것을 하나로.
   let etfRebalMsg = null;
   try {
-    if (etfHoldingsCnt > 0) {
-      const target = JSON.parse(localStorage.getItem("onehub_target_alloc") || "null");
-      const recs = recommendEtfs({ holdings: getEtfHoldings(trader), positions: [], target, overlap: null });
-      if (recs.length && recs[0].axis === "region") etfRebalMsg = recs[0].reasonRule;
-    }
+    const opClass = {
+      stock: bd.stock_uk != null ? Number(bd.stock_uk) : 0,
+      etf: bd.etf_uk != null ? Number(bd.etf_uk) : 0,
+      realestate: Math.max(0, (bd.realestate_uk != null ? Number(bd.realestate_uk) : 0) - (residenceUk || 0)),
+      cash: bd.cash_uk != null ? Number(bd.cash_uk) : 0,
+    };
+    const classMsg = topDriftMessage(computeClassDrift(opClass, getTargetClass()));
+    if (classMsg && classMsg.tone === "warn") etfRebalMsg = classMsg.text;
   } catch (e) {}
   // ── 행3: AI 변화 한 줄(AI 탭과 동일 규칙 — lib/aiFreshness)
   const aiFreshness = computeAiFreshness(aiDaily, dash);
@@ -422,21 +435,31 @@ export default function TodayPage({ announcements = [] }) {
         {view === 0 && (<>
         {/* [S20-3] 카드0 — 오늘 1화면 요약 3행: ①총자산 ②오늘 조치할 종목 ③AI 변화. 최상단 고정. */}
         <section className="card td-sum">
-          {/* 행1 — 총자산 + 전일 대비 + 마지막 갱신 */}
+          {/* 행1 — [S23 T-2] 운용자산(실거주 제외) + 운용 전일 대비 + 마지막 갱신. 실거주 없으면 총자산. */}
           <div className="tds-row tds-asset">
-            <span className="tds-k">총자산</span>
-            {totalUk != null ? (
-              <b className="tds-total">{totalUk.toFixed(2)}억</b>
+            <span className="tds-k">{hasResidence ? "운용자산" : "총자산"}</span>
+            {headUk != null ? (
+              <b className="tds-total">{headUk.toFixed(2)}억</b>
             ) : (
               <b className="tds-total tds-muted">불러오는 중…</b>
             )}
-            {assetDelta && assetDelta.total != null ? (
-              <span className={`tds-dchip ${dCls(assetDelta.total)}`}>{assetDelta.total >= 0 ? "▲" : "▼"} {dvUk(assetDelta.total)} <i>{assetDelta.prevDate} 대비</i></span>
-            ) : totalUk != null ? (
+            {headDelta != null ? (
+              <span className={`tds-dchip ${dCls(headDelta)}`}>{headDelta >= 0 ? "▲" : "▼"} {dvUk(headDelta)} <i>{assetDelta?.days > 1 ? `${assetDelta.days}일 전 대비` : "어제 대비"}</i></span>
+            ) : headUk != null ? (
               <span className="tds-dnew">오늘부터 기록 — 내일부터 전일 대비 표시</span>
             ) : null}
             {at && <span className="tds-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
           </div>
+          {/* [S23 T-2] 총자산·실거주는 작은 줄로(assets.js 와 같은 문구·기호). 시세 갱신은 판단 성과와 분리. */}
+          {hasResidence && (
+            <div className="tds-subtotals">
+              <span>총자산 {totalUk != null ? totalUk.toFixed(2) : "-"}억</span>
+              <span>🔑 실거주 {residenceUk.toFixed(2)}억 · 못 파는 자산</span>
+              {realtyDelta != null && Math.abs(realtyDelta) > 0.004 && (
+                <span className="tds-realty-upd">실거래 반영 · 부동산 {realtyDelta >= 0 ? "+" : "−"}{Math.abs(realtyDelta).toFixed(2)}억</span>
+              )}
+            </div>
+          )}
 
           {/* 행2 — 오늘 조치할 종목(목표가 도달/손절 근접) */}
           <div className="tds-row tds-act">
@@ -1005,6 +1028,8 @@ export default function TodayPage({ announcements = [] }) {
         .tds-dchip.flat { background: var(--color-card-soft, rgba(0,0,0,.04)); color: var(--color-ink-3); }
         .tds-dnew { font-size: 0.7rem; color: var(--color-ink-3); }
         .tds-fresh { margin-left: auto; font-size: 0.68rem; }
+        .tds-subtotals { display: flex; gap: 12px; flex-wrap: wrap; margin: 2px 0 2px; font-size: 0.72rem; color: var(--color-ink-3); }
+        .tds-subtotals .tds-realty-upd { color: var(--color-ink-2); font-weight: 600; }
         .tds-actbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
         .tds-actrow { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); text-align: left; }
         .tds-badge { flex-shrink: 0; font-size: 0.6rem; font-weight: 800; border: 1px solid; border-radius: 999px; padding: 1px 6px; }

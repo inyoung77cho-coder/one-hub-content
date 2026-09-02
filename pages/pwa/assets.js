@@ -156,9 +156,10 @@ export default function AssetsMapPage() {
   //   맞게 계산된다(양쪽 다 총액이면 상관없지만 한쪽만 순액이면 실거주가 부풀어 보인다).
   const realtyUk = bd.realestate_uk != null ? Number(bd.realestate_uk) : 0;
   const invRealtyUk = invProps.reduce((s, p) => s + Math.max(0, (Number(p.valueUk) || 0) - (Number(p.deposit) || 0)), 0);
-  const residenceUk = Math.max(0, realtyUk - invRealtyUk);   // 실거주(못 파는 자산)
+  // [S23 T-2] 실거주/운용은 lib/ledger.js 가 낸 필드를 읽는다(오늘 페이지와 같은 소스). 없으면 로컬 폴백(무회귀).
+  const residenceUk = bd.residence_uk != null ? Number(bd.residence_uk) : Math.max(0, realtyUk - invRealtyUk); // 실거주(못 파는 자산)
   const hasResidence = residenceUk > 0.005;
-  const opTotal = Math.max(0, total - residenceUk);           // 운용 가능 자산
+  const opTotal = bd.operating_uk != null ? Number(bd.operating_uk) : Math.max(0, total - residenceUk);        // 운용 가능 자산
   const useEx = exRes && hasResidence;                        // 실거주 제외 뷰 활성
   // [S22-4] 자산군 목표 배분 — 운용 breakdown(실거주 제외)으로 이탈(%p) 계산.
   const opClass = {
