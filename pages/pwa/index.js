@@ -7,6 +7,7 @@ import LastUpdated from '../../components/LastUpdated';
 import MarketSession from '../../components/MarketSession';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
 import { recordDecision, getTodayDecision, reconcileAutoWatch, getLedger } from '../../lib/verdictLedger';
+import { recordDecisionWithPrice } from '../../lib/recordDecision'; // [S23 T-1] 가격 확보→기록 공용(today.js 와 공유)
 import { getSeed, wonG } from '../../lib/gameWallet';
 import { initGameSync } from '../../lib/gameSync';
 import PortfolioDuelCard from '../../components/PortfolioDuelCard';
@@ -733,15 +734,8 @@ export default function PWADashboard({ latestReport }) {
     setDecFeedback({ name, decision, date: `${_rd.getMonth() + 1}/${_rd.getDate()}` });
     clearTimeout(logDecision._t); logDecision._t = setTimeout(() => setDecFeedback(null), 5000);
 
-    let entry = Number(priceHint) || null;
-    if (!entry) {
-      // [2026-08-21 WI-03/04] 가격만 필요한데 전체 AI 분석을 호출하던 지점 — 시세 전용.
-      try {
-        const q = await fetchStockQuote(code);
-        entry = q?.price || null;
-      } catch {}
-    }
-    recordDecision({ code, name, entry, decision, trader });
+    // [S23 T-1] 가격 확보→기록은 공용 함수로 일원화(today.js 와 동일 경로). 기존 source(manual) 유지.
+    await recordDecisionWithPrice({ code, name, decision, trader, priceHint });
     setDecTick((t) => t + 1);
   }, [trader, codeNameMap]);
 

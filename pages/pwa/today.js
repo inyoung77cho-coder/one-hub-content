@@ -20,6 +20,8 @@ import { deriveUrgency, deriveStance } from "../../components/shared/KisHoldings
 import { computeAiFreshness } from "../../lib/aiFreshness"; // [S20-3] AI 갱신 상태(AI 탭과 공유)
 import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta } from "../../lib/assetHistory"; // [S20-3] 총자산 전일 대비
 import { getSnapshots as getDuelSnapshots } from "../../lib/portfolioDuel"; // [S20-3] 대결 결과 배너 판정용
+import { getTodayDecision, getLedger as getVerdictLedger } from "../../lib/verdictLedger"; // [S23 T-1/T-5] 판단 기록·재등장 판정
+import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S23 T-1] 가격 확보→기록(추천 카드와 공유)
 import { cachedJson } from "../../lib/quoteCache"; // [S20-3] /api/pwa-ai-daily 중복 GET dedup
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
@@ -382,48 +384,82 @@ export default function TodayPage({ announcements = [] }) {
   // ── [사용자 지시] "오늘의 대결" 탭 카드3 — 주식 관련 할일 체크리스트(손절임박·AI매수제안·중요알림).
   //   체크 상태는 오늘 날짜(todayStr) 키로 저장 — 자정 넘어가면 다른 키가 되어 자동 초기화된다.
   //   (체크는 "확인함" 표시일 뿐, 실제 포트폴리오 위험이 해소된 게 아니므로 매일 새로 보여줘야 안전)
-  const stockTodos = [
+  // [S23 T-1/T-5] '할 일' = 판단을 요구하는 주식 항목만. 각 행에서 그 자리에서 매도/보유/관망을 기록한다.
+  //   손절 임박·승인 대기가 판단 대상. 뉴스는 '읽을 거리'로 분리(아래), 알림은 정보 행으로 남긴다.
+  const RETRIGGER_DROP_PCT = -4; // 어제 판단 이후 이만큼 더 빠지면 '판단 재검토'로 다시 올린다(하드코딩 상수 단일화)
+  const stockActionable = [
     ...nearStop.slice(0, 3).map((p, i) => {
       const sl = Number(p.stop_loss) || 0;
       const cur = Number(p.current_price) || 0;
       const breached = sl > 0 && cur > 0 && cur < sl;
       const distPct = sl > 0 && cur > 0 ? (cur / sl - 1) * 100 : null;
       return {
-        key: `stop-${p.code || i}`,
+        kind: "stock", code: p.code, name: p.name, entry: cur > 0 ? cur : null,
         title: `${p.name} ${pctTxt(p.pnl_rate)}`,
-        sub: breached ? `손절선 ${sl.toLocaleString()}원 이탈 — 매도 검토 필요` : `손절선까지 ${Math.abs(distPct).toFixed(1)}% 남음`,
-        onClick: () => router.push("/pwa?tab=portfolio"),
+        sub: breached ? `손절선 ${sl.toLocaleString()}원 이탈 — 매도 검토 필요` : (distPct != null ? `손절선까지 ${Math.abs(distPct).toFixed(1)}% 남음` : "손절 근접"),
       };
     }),
-    ...pendItems.slice(0, 3).map((p, i) => ({
-      key: `pend-${p.code || i}`,
+    ...pendItems.slice(0, 3).map((p) => ({
+      kind: "stock", code: p.code, name: p.name || p.stock || p.code, entry: null,
       title: p.name || p.stock || p.code,
-      sub: p.reason || "AI 매수 제안 — 승인/거절 필요",
-      onClick: () => router.push("/pwa?tab=portfolio"),
-    })),
-    ...criticalNotis.map((n, i) => ({
-      key: `noti-${n.id ?? i}`,
-      title: n.title || n.message || "알림",
-      sub: null,
-      onClick: null,
+      sub: p.reason || "AI 매수 제안 — 매수/관망 판단",
     })),
   ];
-  const [checked, setChecked] = useState(() => new Set());
-  useEffect(() => {
+  // 오늘 이미 판단한 종목은 목록에서 제외(getTodayDecision).
+  const notDecidedTodos = stockActionable.filter((t) => !t.code || !getTodayDecision(t.code, trader));
+  // 어제 판단 후 임계 이상 추가 하락한 종목은 '판단 재검토'로 다시 올린다(원장 entry 대비 현재가). 다른 앱이 못 하는 화면.
+  const recheckTodos = (() => {
     try {
-      const raw = localStorage.getItem(`onehub_today_check_${todayStr}`);
-      if (raw) setChecked(new Set(JSON.parse(raw)));
-    } catch {}
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  const toggleCheck = (key) => {
-    setChecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key); else next.add(key);
-      try { localStorage.setItem(`onehub_today_check_${todayStr}`, JSON.stringify([...next])); } catch {}
-      return next;
-    });
+      const led = getVerdictLedger(trader) || [];
+      const byCode = {};
+      led.forEach((e) => { if (e.code && (!byCode[e.code] || e.ts > byCode[e.code].ts)) byCode[e.code] = e; });
+      const out = [];
+      positions.forEach((p) => {
+        const prev = byCode[p.code];
+        if (!prev || !(Number(prev.entry) > 0) || getTodayDecision(p.code, trader)) return;
+        const cur = Number(p.current_price) || 0;
+        if (!(cur > 0)) return;
+        const chg = (cur / Number(prev.entry) - 1) * 100;
+        if (chg <= RETRIGGER_DROP_PCT) out.push({
+          kind: "stock", code: p.code, name: p.name, entry: cur, recheck: true,
+          title: `${p.name} 판단 재검토`,
+          sub: `${prev.decision === "take" ? "보유" : "관망"} 판단 · 이후 ${chg.toFixed(1)}% 추가 하락`,
+        });
+      });
+      return out;
+    } catch (e) { return []; }
+  })();
+  const todoStock = [...notDecidedTodos, ...recheckTodos].filter((t, i, arr) => arr.findIndex((x) => x.code && x.code === t.code) === i);
+  const todoNoti = criticalNotis.map((n, i) => ({ kind: "noti", key: `noti-${n.id ?? i}`, title: n.title || n.message || "알림" }));
+
+  // [S23 T-1] 이번 세션 즉시 피드백('✓ 기록됨 · HH:MM')·인라인 오류(alert 금지).
+  const [recorded, setRecorded] = useState({}); // code → { decision, at }
+  const [decErr, setDecErr] = useState({});     // code → 메시지
+  // choice: 'sell'|'hold'|'pass'. 원장 스키마는 take/pass 2값 — 보유=take, 매도·관망=pass(둘 다 미보유,
+  //   하락하면 정답으로 채점). 눌린 라벨은 UI 피드백용으로 따로 보관한다.
+  const recordTodo = async (item, choice) => {
+    if (!item.code) return;
+    const decision = choice === "hold" ? "take" : "pass";
+    setDecErr((m) => { const n = { ...m }; delete n[item.code]; return n; });
+    try {
+      await recordDecisionWithPrice({ code: item.code, name: item.name, decision, trader, source: "today", priceHint: item.entry });
+      const now = new Date();
+      setRecorded((m) => ({ ...m, [item.code]: { label: choice, at: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}` } }));
+    } catch (e) {
+      setDecErr((m) => ({ ...m, [item.code]: "기록 실패 — 잠시 후 다시 시도해 주세요" }));
+    }
   };
+  const recordedCount = Object.keys(recorded).length;
+  // [S23 T-1] 비판단 행(부동산 관심단지·이야기)용 '확인함' 토글 — 세션 전용(onehub_today_check localStorage 제거:
+  //   날짜별 키가 무한 누적되고 정리 코드가 없던 문제 해소). 판단 원장과 무관한 단순 표시.
+  const [checked, setChecked] = useState(() => new Set());
+  const toggleCheck = (key) => setChecked((prev) => { const n = new Set(prev); if (n.has(key)) n.delete(key); else n.add(key); return n; });
+  // [S23 T-5] 할 일 0건이 '좋은 상태'임을 근거와 함께 말한다 — 손절선 최근접 거리(%).
+  const nearestStopPct = (() => {
+    let best = null;
+    positions.forEach((p) => { const sl = Number(p.stop_loss) || 0; const cur = Number(p.current_price) || 0; if (sl > 0 && cur > 0) { const d = (cur / sl - 1) * 100; if (best == null || d < best) best = d; } });
+    return best;
+  })();
 
   return (
     <div className="td">
@@ -650,26 +686,47 @@ export default function TodayPage({ announcements = [] }) {
           )}
         </section>
 
-        {/* 카드3 — 오늘의 할 일 · 주식(체크리스트, 매일 자정 초기화) */}
+        {/* 카드3 — 오늘의 할 일 · 주식 [S23 T-1] 각 행에서 바로 매도/보유/관망을 기록(페이지 안 떠남). */}
         <section className="card sc">
           <div className="sc-h">오늘의 할 일 · 주식</div>
-          {stockTodos.length === 0 ? (
-            <div className="sc-empty">오늘은 특별히 할 일이 없어요 · 관망</div>
+          {todoStock.length === 0 && todoNoti.length === 0 ? (
+            <div className="sc-empty">
+              {positions.length > 0
+                ? <>오늘은 손댈 게 없습니다 · {positions.length}종목 모두 유지 구간{nearestStopPct != null ? ` · 손절선 최근접 ${nearestStopPct.toFixed(1)}%` : ""}</>
+                : "오늘은 특별히 할 일이 없어요"}
+            </div>
           ) : (
             <div className="sc-list">
-              {stockTodos.map((t) => {
-                const done = checked.has(t.key);
+              {todoStock.map((t) => {
+                const rec = recorded[t.code];
                 return (
-                  <div className={`sc-row ${done ? "done" : ""}`} key={t.key}>
-                    <button type="button" className="sc-check" onClick={() => toggleCheck(t.key)} aria-label={done ? "완료 취소" : "완료 표시"}>{done ? "✓" : ""}</button>
-                    <button type="button" className="sc-body" onClick={() => (t.onClick ? t.onClick() : toggleCheck(t.key))}>
+                  <div className={`sc-drow ${t.recheck ? "recheck" : ""}`} key={t.code}>
+                    <div className="sc-dbody">
                       <span className="sc-t">{t.title}</span>
                       {t.sub && <span className="sc-s">{t.sub}</span>}
-                    </button>
+                      {decErr[t.code] && <span className="sc-err">{decErr[t.code]}</span>}
+                    </div>
+                    {rec ? (
+                      <span className="sc-recorded">✓ {rec.label === "sell" ? "매도" : rec.label === "hold" ? "보유" : "관망"} 기록됨 · {rec.at}</span>
+                    ) : (
+                      <div className="sc-decbtns">
+                        <button type="button" className="sc-decb sell" onClick={() => recordTodo(t, "sell")}>매도</button>
+                        <button type="button" className="sc-decb hold" onClick={() => recordTodo(t, "hold")}>보유</button>
+                        <button type="button" className="sc-decb pass" onClick={() => recordTodo(t, "pass")}>관망</button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
+              {todoNoti.map((t) => (
+                <div className="sc-drow noti" key={t.key}>
+                  <div className="sc-dbody"><span className="sc-t">🔔 {t.title}</span></div>
+                </div>
+              ))}
             </div>
+          )}
+          {recordedCount > 0 && (
+            <button type="button" className="sc-record-link" onClick={() => router.push("/pwa/record")}>오늘 {recordedCount}건 기록 · 내 판단 성적표 보기 →</button>
           )}
         </section>
         </>)}
@@ -876,29 +933,22 @@ export default function TodayPage({ announcements = [] }) {
           );
         })()}
 
-        {/* 카드2 — [사용자 지시] 오늘의 할 일 · ETF (체크박스로 확인 후 취소선) */}
+        {/* 카드2 — [S23 T-5] 기사를 읽는 건 '할 일'이 아니다 → '읽을 거리'로 분리(판단 요구 없음). */}
         {view === 2 && (() => {
-          const todo = [myEtfNews, ...etfNews].filter(Boolean).filter((n, i, arr) => arr.findIndex((x) => x.id === n.id) === i).slice(0, 3);
+          const reads = [myEtfNews, ...etfNews].filter(Boolean).filter((n, i, arr) => arr.findIndex((x) => x.id === n.id) === i).slice(0, 3);
           return (
             <section className="card sc">
-              <div className="sc-h">✅ 오늘의 할 일 · ETF</div>
-              {todo.length > 0 ? (
+              <div className="sc-h">📰 읽을 거리 · ETF</div>
+              {reads.length > 0 ? (
                 <div className="sc-list">
-                  {todo.map((n) => {
-                    const key = `etf-${n.id}`;
-                    const done = checked.has(key);
-                    return (
-                      <div className={`sc-row ${done ? "done" : ""}`} key={key}>
-                        <button type="button" className="sc-check" onClick={() => toggleCheck(key)} aria-label={done ? "완료 취소" : "완료 표시"}>{done ? "✓" : ""}</button>
-                        <button type="button" className="sc-body" onClick={() => openNewsDetail(n)}>
-                          <span className="sc-t">{n.headline}</span>
-                        </button>
-                      </div>
-                    );
-                  })}
+                  {reads.map((n) => (
+                    <button type="button" className="sc-readrow" key={`etf-${n.id}`} onClick={() => openNewsDetail(n)}>
+                      <span className="sc-t">{n.headline}</span>
+                    </button>
+                  ))}
                 </div>
               ) : (
-                <div className="sc-empty">오늘은 특별히 확인할 ETF 이슈가 없어요.</div>
+                <div className="sc-empty">오늘 새 ETF 관련 소식이 없어요.</div>
               )}
               <button className="tile-more" onClick={() => router.push("/pwa/etf")}>ETF 리밸런싱 확인하러 가기 →</button>
             </section>
@@ -1110,7 +1160,21 @@ export default function TodayPage({ announcements = [] }) {
 
         /* ══ 카드3: 오늘의 할 일 · 주식(체크리스트, 매일 자정 초기화) ══ */
         .sc-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 10px; }
-        .sc-empty { font-size: 0.82rem; color: var(--color-ink-2); padding: 6px 2px; }
+        .sc-empty { font-size: 0.82rem; color: var(--color-ink-2); padding: 6px 2px; word-break: keep-all; }
+        /* [S23 T-1] 판단 기록 행 */
+        .sc-drow { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--color-line); }
+        .sc-drow:last-child { border-bottom: none; }
+        .sc-drow.recheck { background: var(--color-warning-soft, transparent); border-radius: 8px; padding: 9px 8px; }
+        .sc-dbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .sc-decbtns { flex: none; display: flex; gap: 5px; }
+        .sc-decb { border: 1px solid var(--color-line); background: var(--color-card); border-radius: 8px; padding: 6px 10px; font-size: 0.74rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; color: var(--color-ink-2); }
+        .sc-decb.sell { border-color: var(--color-danger); color: var(--color-danger); }
+        .sc-decb.hold { border-color: var(--color-primary); color: var(--color-primary); }
+        .sc-recorded { flex: none; font-size: 0.74rem; font-weight: 700; color: var(--color-success, #16a34a); }
+        .sc-err { font-size: 0.7rem; color: var(--color-danger, #dc2626); }
+        .sc-record-link { width: 100%; margin-top: 10px; border: none; background: none; text-align: left; font-size: 0.78rem; font-weight: 700; color: var(--color-primary); cursor: pointer; font-family: var(--font-sans); padding: 4px 2px; }
+        .sc-readrow { display: block; width: 100%; text-align: left; background: none; border: none; border-bottom: 1px solid var(--color-line); padding: 9px 2px; cursor: pointer; font-family: var(--font-sans); }
+        .sc-readrow:last-child { border-bottom: none; }
         .etf1-reco { background: var(--color-primary-soft); border-radius: 11px; padding: 12px 13px; margin-bottom: 10px; }
         .etf1-nm { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); }
         .etf1-why { font-size: 0.78rem; color: var(--color-ink-2); line-height: 1.5; margin-top: 5px; word-break: keep-all; }

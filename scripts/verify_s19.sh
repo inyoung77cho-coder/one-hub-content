@@ -32,9 +32,12 @@ grep -q "entry_backfilled" lib/verdictLedger.js;              chk "백필 구분
 awk '/if \(idx >= 0\)/,/^  } else \{/' lib/verdictLedger.js | grep -q "snaps = \[{ ts: now, price }\]"; chk "entry 백필 시 snaps 시드" $?
 awk '/export async function matureLedger/,/^}/' lib/verdictLedger.js | grep -q "needEntry"; chk "matureLedger 진입가 백필 루틴" $?
 ! grep -q "slice(-120)" lib/verdictLedger.js;                 chk "원장 상한 120 → 상향(조용한 손실 방지)" $?
-# entry 없이 먼저 기록하던 경로 제거 — recordDecision 호출은 시세 확정 뒤 1회뿐이어야 한다
-C=$(awk '/const logDecision = useCallback/,/}, \[trader\]\);/' pages/pwa/index.js | grep -c "recordDecision(")
-[ "$C" -eq 1 ];                                               chk "logDecision 내 recordDecision 1회 (실측 $C)" $?
+# [S23 T-1] entry 없이 먼저 기록하던 경로 제거 — 이제 공용 함수 recordDecisionWithPrice 로 추출.
+#   logDecision 은 그 공용 함수를 1회 호출하고(today.js 와 공유), 공용 함수는 시세 확정 뒤 recordDecision 을 1회만 부른다.
+C=$(awk '/const logDecision = useCallback/,/}, \[trader, codeNameMap\]\);/' pages/pwa/index.js | grep -c "recordDecisionWithPrice(")
+[ "$C" -eq 1 ];                                               chk "logDecision 내 recordDecisionWithPrice 1회 (실측 $C)" $?
+D=$(grep -c "recordDecision(" lib/recordDecision.js)
+[ "$D" -eq 1 ];                                               chk "recordDecisionWithPrice 내 recordDecision 1회 (실측 $D)" $?
 grep -q "no_price" lib/portfolioDuel.js;                      chk "채점 불가 사유 구분(기간경과 vs 대기)" $?
 grep -q "기록 없음" components/PortfolioDuelCard.js;           chk "채점 불가 사유 화면 표기" $?
 grep -q "pd-record" components/PortfolioDuelCard.js;          chk "누적 성적표(승률·평균·관망비율)" $?
