@@ -116,7 +116,19 @@ export default function TodayPage({ announcements = [] }) {
   const closeNewsDetail = () => {
     if (router.query.news) router.back();
   };
-  const [view, setView] = useState(0); // [OS-2] 0=대결 1=부동산 2=ETF 3=이야기 — 종목변경 순환에 맞춰 콘텐츠 필터
+  const [view, setView] = useState(0); // [OS-2] 0=자산 1=부동산 2=ETF 3=이야기
+  // [S23 T-3] 화면을 URL(?v=)에 싣는다 — 공유·새로고침·딥링크 유지. 뉴스 모달(?news=)과 같은 쿼리에 공존.
+  const V_NAMES = ["assets", "re", "etf", "story"];
+  const vToIdx = (v) => { const i = V_NAMES.indexOf(String(v || "")); return i >= 0 ? i : 0; };
+  useEffect(() => {
+    if (!router.isReady) return; // [검증 교훈] isReady 전 query 는 빈값 → 딥링크 튕김 방지
+    setView(vToIdx(router.query.v));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.query.v]);
+  const goView = (i) => {
+    setView(i);
+    router.push({ pathname: router.pathname, query: { ...router.query, v: V_NAMES[i] } }, undefined, { shallow: true, scroll: false });
+  };
   // [ETF] 오늘의 ETF — 주간 상승률 최고(국내/해외) 실데이터(movers). ETF 뷰 진입 시 1회 로드.
   const [etfMovers, setEtfMovers] = useState(null);
   useEffect(() => {
@@ -137,10 +149,9 @@ export default function TodayPage({ announcements = [] }) {
     Promise.all([
       cachedJson(`/api/pwa-dashboard?trader=${tr}`), // [S21-5] 오늘/AI 탭 공유 URL → 중복 GET dedup
       fetch(`/api/pwa-pending?trader=${tr}`).then((r) => r.json()).catch(() => null),
-      fetch(`/api/pwa/re/feed`).then((r) => r.json()).catch(() => null),
       getAssetLedger(tr).catch(() => null),
-    ]).then(([d, p, f, L]) => {
-      setDash(d); setPend(p); setFeed(f); setLedger(L); setAt(new Date());
+    ]).then(([d, p, L]) => {
+      setDash(d); setPend(p); setLedger(L); setAt(new Date()); // [S23 T-8] re/feed 는 부동산 화면 지연 로드로 이동
       setStatus(d || L ? "ok" : "error");
       // [S20-3] 총자산이 유효할 때만 오늘치 스냅샷 적립 후 전일 대비 계산(assets.js 와 동일 규칙).
       if (L && L.ok && L.total_uk != null) { recordAssetSnapshot(tr, L); setAssetDelta(getAssetDelta(tr)); }
@@ -155,29 +166,34 @@ export default function TodayPage({ announcements = [] }) {
       .then((d) => { if (d?.ok && d.brief) setBrief(d.brief); }).catch(() => {});
     fetch(`/api/pwa-today-news-brief`).then((r) => r.json())
       .then((d) => { if (d?.ok && d.brief) setNewsBrief(d.brief); }).catch(() => {});
-    // [S21-1] 부동산 브리핑(re/briefing 4.9s)·complexAreas 는 마운트에서 제거 → 부동산 탭(view===1)
-    //   진입 시 1회만 로드(loadReBrief). 오늘 화면 완성에서 이 4.9초를 빼고, 상단 3행은 링크 폴백.
-    {
-      const region = getStoryRegionOverride() || Object.values(REGIONS)[0][0];
-      fetch(`/api/comments?date=${encodeURIComponent(region)}`).then((r) => r.json())
-        .then((d) => { if (Array.isArray(d?.comments)) setStoryComments(d.comments); }).catch(() => {});
-    }
-    // [이야기 탭] 지역별 이야기 건수 오늘치를 받아 로컬에 하루 1건 적립 → 전날 대비 증감 계산.
-    fetch(`/api/story-region-stats`).then((r) => r.json())
-      .then((d) => {
-        if (!d?.ok || !d.counts) return;
-        recordRegionSnapshot(d.counts);
-        setRegionDelta(getRegionDelta());
-      }).catch(() => {});
+    // [S23 T-8] re/feed·re-spot(부동산)·comments·story-region-stats(이야기)는 기본 화면에서 안 쓰이므로
+    //   각 화면 활성 시(초기 ?v= 진입 포함) 지연 로드한다(loadReData·loadStoryData). 여기선 로컬 계산만.
     setNewRegions(getNewRegions());
-    if (myProp?.name) fetch(`/api/input/re-spot?complex_name=${encodeURIComponent(myProp.name)}`).then((r) => r.json())
-      .then((s) => { if (s?.ok && Array.isArray(s.items)) setOpNotes(s.items); }).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dash]);
 
+  // [S23 T-8] 부동산 화면 데이터 — re/feed(대장 대비), re-spot(운영자 신고가). 화면 활성 시 1회.
+  const reDataLoadedRef = useRef(false);
+  const loadReData = useCallback(() => {
+    fetch(`/api/pwa/re/feed`).then((r) => r.json()).then((f) => setFeed(f)).catch(() => {});
+    let myProp = null;
+    try { myProp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); } catch (e) {}
+    if (myProp?.name) fetch(`/api/input/re-spot?complex_name=${encodeURIComponent(myProp.name)}`).then((r) => r.json())
+      .then((s) => { if (s?.ok && Array.isArray(s.items)) setOpNotes(s.items); }).catch(() => {});
+  }, []);
+  // [S23 T-8] 이야기 화면 데이터 — comments, story-region-stats. 화면 활성 시 1회.
+  const storyLoadedRef = useRef(false);
+  const loadStoryData = useCallback(() => {
+    const region = getStoryRegionOverride() || Object.values(REGIONS)[0][0];
+    fetch(`/api/comments?date=${encodeURIComponent(region)}`).then((r) => r.json())
+      .then((d) => { if (Array.isArray(d?.comments)) setStoryComments(d.comments); }).catch(() => {});
+    fetch(`/api/story-region-stats`).then((r) => r.json())
+      .then((d) => { if (!d?.ok || !d.counts) return; recordRegionSnapshot(d.counts); setRegionDelta(getRegionDelta()); }).catch(() => {});
+  }, []);
+
   useEffect(() => {
     load();
-    const on = () => { reBriefLoadedRef.current = false; load(); }; // [S21-1] 자산 변경 시 부동산 브리핑도 재로드 허용
+    const on = () => { reBriefLoadedRef.current = false; reDataLoadedRef.current = false; storyLoadedRef.current = false; load(); }; // [S21-1/S23 T-8] 자산 변경 시 지연 데이터도 재로드 허용
     window.addEventListener("onehub-trader-change", on);
     window.addEventListener("onehub-assets-change", on);
     return () => {
@@ -204,8 +220,13 @@ export default function TodayPage({ announcements = [] }) {
     }
   }, []);
   useEffect(() => {
-    if (view === 1 && !reBriefLoadedRef.current) { reBriefLoadedRef.current = true; loadReBrief(); }
-  }, [view, loadReBrief]);
+    // [S23 T-8] 조건은 '탭을 눌렀을 때'가 아니라 '해당 화면이 활성일 때' — ?v=re/story 직접 진입도 포함.
+    if (view === 1) {
+      if (!reBriefLoadedRef.current) { reBriefLoadedRef.current = true; loadReBrief(); }
+      if (!reDataLoadedRef.current) { reDataLoadedRef.current = true; loadReData(); }
+    }
+    if (view === 3 && !storyLoadedRef.current) { storyLoadedRef.current = true; loadStoryData(); }
+  }, [view, loadReBrief, loadReData, loadStoryData]);
 
   const dismissNewRegions = useCallback((e) => {
     e.stopPropagation();
@@ -260,6 +281,8 @@ export default function TodayPage({ announcements = [] }) {
     .filter((p) => deriveUrgency(p).rank <= 2)
     .sort((a, b) => deriveUrgency(a).rank - deriveUrgency(b).rank)
     .slice(0, 3);
+  // [S23 T-3] 세그먼트 배지 — 자산=조치 종목, 부동산=신고가(지연 로드 후), ETF=배지 없음, 이야기=새 소식. 0이면 렌더 안 함.
+  const segBadges = [actionStocks.length, opNotes.length, 0, (newRegions?.length || 0)];
   // 조치 근거 1줄 — KisHoldingsCard 와 동일한 목표가 잔여/손절 근접 계산.
   const actionReason = (p) => {
     const cur = Number(p.current_price) || 0, tgt = Number(p.target) || 0, sl = Number(p.stop_loss) || 0;
@@ -416,14 +439,16 @@ export default function TodayPage({ announcements = [] }) {
           </div>
         </header>
 
+        {/* [S23 T-3] 4칸 세그먼트 탭 — 네 화면이 다 보이고, 현재 위치를 알고, 바로 오간다. URL(?v=)에 실린다. */}
         <div className="td-titlewrap">
-          <RotatingPageTitle
-            fixed="오늘"
-            mutedSuffix
-            items={[{ suffix: "의 자산" }, { suffix: "의 부동산" }, { suffix: "의 ETF" }, { suffix: "의 이야기" }]}
-            onChange={(i) => setView(i)}
-            onLabelClick={(item) => { if (item.suffix === "의 이야기") router.push("/pwa/story"); }}
-          />
+          <div className="td-seg" role="tablist" aria-label="오늘 화면">
+            {["자산", "부동산", "ETF", "이야기"].map((label, i) => (
+              <button key={i} role="tab" aria-selected={view === i} className={`td-seg-b ${view === i ? "on" : ""}`} onClick={() => goView(i)}>
+                {label}
+                {segBadges[i] > 0 && <span className="td-seg-badge">{segBadges[i]}</span>}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       {/* [사용자 지시] KRX/NXT 장운영 배지는 "오늘의 대결"(주식) 탭에서만 — 부동산/ETF/이야기엔 불필요 */}
@@ -1009,6 +1034,10 @@ export default function TodayPage({ announcements = [] }) {
         .td-ic { display: flex; align-items: center; gap: 8px; }
         .td-search { width: 34px; height: 34px; border-radius: 50%; background: var(--color-card); border: none; display: grid; place-items: center; font-size: 15px; cursor: pointer; box-shadow: var(--shadow-card); }
         .td-titlewrap { display: flex; align-items: center; gap: 8px; margin: 6px 2px 6px; }
+        .td-seg { display: flex; gap: 4px; width: 100%; background: var(--inset-bg, var(--color-card-soft, rgba(0,0,0,0.04))); border: 1px solid var(--color-line); border-radius: 12px; padding: 3px; }
+        .td-seg-b { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: none; background: transparent; color: var(--color-ink-2); border-radius: 9px; padding: 8px 4px; font-size: 0.82rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .td-seg-b.on { background: var(--color-card); color: var(--color-ink); box-shadow: var(--shadow-card); }
+        .td-seg-badge { min-width: 16px; height: 16px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.62rem; font-weight: 800; color: #fff; background: var(--color-primary); border-radius: 999px; }
         .td-market { display: flex; align-items: center; gap: 10px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 8px 12px; margin: 0 2px 14px; box-shadow: var(--shadow-card); }
         .td-fresh3 { margin-left: auto; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
