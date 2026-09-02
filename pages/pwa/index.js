@@ -2831,6 +2831,7 @@ export default function PWADashboard({ latestReport }) {
               <span className="pwa-card-label">📂 상세 리포트</span>
               <div className="report-list">
                 {[
+                  ['/pwa/record', '🧾', '내 판단 성적표', '승률 · 관망 비율 · 놓친 수익'],
                   ['/pwa/daily?from=archive', '📅', '일간 리포트', '매일 장 마감 요약'],
                   ['/pwa/weekly?from=archive', '📊', '주간 리포트', '국면 · 과열도 · 매매'],
                   ['/pwa/history?from=archive', '🤖', 'AI 히스토리', 'AI 판단 기록 전체'],
