@@ -8,6 +8,7 @@ import TopNav from "../../components/TopNav";
 import { computeSummary, toManwon } from "../../lib/aiAssets";
 import { getTrader } from "../../lib/trader";
 import { getLedger } from "../../lib/ledger";
+import { recordSnapshot } from "../../lib/assetHistory"; // [S22-3] AI 탭 진입 시에도 총자산 곡선 적립
 import { acctRule } from "../../lib/taxRules";
 import { getStockHoldings } from "../../lib/stockHoldings";
 import EtfDataStatus from "../../components/EtfDataStatus";
@@ -90,6 +91,7 @@ export default function AIAdvisor() {
         fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => null),
         fetch(`/api/fx/usdkrw`).then((r) => r.json()).catch(() => null),
       ]).then(([a, dash, fxj]) => {
+        if (a && a.ok && a.total_uk != null) recordSnapshot(tr, a); // [S22-3] 곡선 적립(같은 날 병합)
         setRealtyState(a?.realty_state || null);
         const assets = buildAssets(a, dash);
         const fxRate = fxj?.ok ? fxj.rate : null;

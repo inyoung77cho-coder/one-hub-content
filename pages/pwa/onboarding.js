@@ -4,6 +4,7 @@
 //   색상은 디자인 토큰(var(--…))만 사용. 다크모드는 <html data-theme>.
 import { useState } from "react";
 import { useRouter } from "next/router";
+import { setTargetClass, CLASS_PRESETS } from "../../lib/targetClass"; // [S22-4] 자산군 목표 배분 프리셋
 
 // 성향(goal) → 목표 배분(%) 매핑 — AI자산 목표% 소스
 const ALLOC_MAP = {
@@ -32,6 +33,7 @@ const QUESTIONS = [
 export default function Onboarding() {
   const router = useRouter();
   const [step, setStep] = useState(0);
+  const [classPreset, setClassPreset] = useState(null); // [S22-4] 자산군 목표 배분 선택(온보딩)
   const [personality, setPersonality] = useState({}); // goal / risk / horizon
   const [stockForm, setStockForm] = useState({ name: "", qty: "", price: "" });
   const [stockList, setStockList] = useState([]); // [{name, uk}]
@@ -194,6 +196,16 @@ export default function Onboarding() {
                   </div>
                 </div>
               )}
+              {/* [S22-4] 자산군 목표 배분(선택·건너뛰기 허용) — 주식·ETF·부동산·현금 사이 목표. 종합자산 이탈 판정 기준. */}
+              <div className="preview" style={{ marginTop: 10 }}>
+                <div className="pt">🎯 자산군 목표 배분 <span style={{ fontWeight: 400, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>선택 · 나중에 바꿀 수 있어요</span></div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                  {Object.keys(CLASS_PRESETS).map((p) => (
+                    <button key={p} type="button" onClick={() => { setTargetClass(CLASS_PRESETS[p], p); setClassPreset(p); }} style={{ border: `1px solid ${classPreset === p ? "var(--color-primary)" : "var(--color-line)"}`, background: classPreset === p ? "var(--color-primary-soft)" : "var(--color-card)", color: classPreset === p ? "var(--color-primary)" : "var(--color-ink-2)", borderRadius: 8, padding: "8px 14px", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" }}>{p}</button>
+                  ))}
+                </div>
+                {classPreset && <div style={{ marginTop: 6, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>주식 {CLASS_PRESETS[classPreset].stock}% · ETF {CLASS_PRESETS[classPreset].etf}% · 부동산 {CLASS_PRESETS[classPreset].realestate}% · 현금 {CLASS_PRESETS[classPreset].cash}%</div>}
+              </div>
               <div className="foot"><button className="btn-prev" onClick={() => go(0)}>이전</button><button className="btn-next" onClick={() => go(2)}>다음 →</button></div>
             </div>
           )}

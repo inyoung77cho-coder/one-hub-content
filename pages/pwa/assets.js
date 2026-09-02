@@ -7,6 +7,7 @@ import { getTrader, useTrader } from "../../lib/trader";
 import { getLedger } from "../../lib/ledger";
 import { recordSnapshot, getDelta, getHistory } from "../../lib/assetHistory";
 import AvgPriceWarningCard from "../../components/shared/AvgPriceWarningCard"; // [S22-1] 이상 평단 확인 카드(주식·ETF 공용)
+import { getTargetClass, setTargetClass, computeClassDrift, topDriftMessage, CLASS_PRESETS } from "../../lib/targetClass"; // [S22-4] 자산군 목표 배분
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
@@ -157,6 +158,16 @@ export default function AssetsMapPage() {
   const hasResidence = residenceUk > 0.005;
   const opTotal = Math.max(0, total - residenceUk);           // 운용 가능 자산
   const useEx = exRes && hasResidence;                        // 실거주 제외 뷰 활성
+  // [S22-4] 자산군 목표 배분 — 운용 breakdown(실거주 제외)으로 이탈(%p) 계산.
+  const opClass = {
+    stock: bd.stock_uk != null ? Number(bd.stock_uk) : 0,
+    etf: bd.etf_uk != null ? Number(bd.etf_uk) : 0,
+    realestate: invRealtyUk,
+    cash: bd.cash_uk != null ? Number(bd.cash_uk) : 0,
+  };
+  const targetClass = getTargetClass();
+  const classDrift = computeClassDrift(opClass, targetClass);
+  const classDriftMsg = topDriftMessage(classDrift);
 
   // 자산 지도/쏠림 진단만 뷰에 따라 분모가 바뀐다(총자산 헤드라인은 항상 total 유지 = 단일 소스).
   const mapDenom = useEx ? opTotal : total;
@@ -338,6 +349,43 @@ export default function AssetsMapPage() {
           {(assets?.warnings || []).filter((w) => w.code === "DUPLICATE_WITH_KIS").map((w, i) => (
             <p className="as-incomplete" key={i}>ℹ️ <b>{w.name}</b>은 증권사 연동 계좌와 같은 종목코드라 직접입력분은 총자산에 더하지 않았습니다. 실제로 다른 증권사 계좌라면 보유 목록에서 해당 증권사를 선택해 주세요.</p>
           ))}
+        </section>
+
+        {/* [S22-4] 자산군 목표 배분 — 미설정이면 설정 유도(추측 기본값 없음), 설정 시 이탈(%p) 표시.
+            분모는 운용자산(실거주 제외). '비중'이 아니라 '차이'를 말한다. */}
+        <section className="card">
+          <div style={{ fontSize: "0.86rem", fontWeight: 800, marginBottom: 10 }}>🎯 목표 배분 <span style={{ fontWeight: 600, color: "var(--color-ink-3)", fontSize: "0.72rem" }}>운용자산 기준 · 실거주 제외</span></div>
+          {targetClass ? (
+            <>
+              {classDriftMsg && <p style={{ margin: "0 0 10px", fontSize: "0.82rem", fontWeight: 700, color: classDriftMsg.tone === "warn" ? "var(--color-warn, #d97706)" : "var(--color-ink-2)" }}>{classDriftMsg.tone === "warn" ? "⚠ " : "✓ "}{classDriftMsg.text}</p>}
+              {classDrift ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {classDrift.map((d) => (
+                    <div key={d.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.78rem" }}>
+                      <span style={{ width: 52, color: "var(--color-ink-2)" }}>{d.label}</span>
+                      <span style={{ fontVariantNumeric: "tabular-nums", width: 44 }}>{d.curPct}%</span>
+                      <span style={{ color: "var(--color-ink-3)" }}>목표 {d.tgtPct}%</span>
+                      <span style={{ marginLeft: "auto", fontWeight: 700, color: Math.abs(d.drift) < 3 ? "var(--color-ink-3)" : d.drift > 0 ? "var(--color-danger)" : "var(--color-primary)" }}>{d.drift > 0 ? "+" : ""}{d.drift}%p</span>
+                    </div>
+                  ))}
+                </div>
+              ) : <p style={{ margin: 0, fontSize: "0.78rem", color: "var(--color-ink-3)" }}>운용자산이 아직 없어 이탈을 계산할 수 없습니다.</p>}
+              <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {Object.keys(CLASS_PRESETS).map((p) => (
+                  <button key={p} onClick={() => { setTargetClass(CLASS_PRESETS[p], p); load(); }} style={{ border: "1px solid var(--color-line)", background: targetClass._preset === p ? "var(--color-primary-soft)" : "var(--color-card)", color: targetClass._preset === p ? "var(--color-primary)" : "var(--color-ink-2)", borderRadius: 8, padding: "6px 12px", fontSize: "0.76rem", fontWeight: 700, cursor: "pointer" }}>{p}</button>
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <p style={{ margin: "0 0 10px", fontSize: "0.82rem", color: "var(--color-ink-2)", lineHeight: 1.5 }}>목표 배분을 정하면 <b>어느 자산군이 목표에서 얼마나 벗어났는지</b> 알려드립니다.</p>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                {Object.keys(CLASS_PRESETS).map((p) => (
+                  <button key={p} onClick={() => { setTargetClass(CLASS_PRESETS[p], p); load(); }} style={{ border: "1px solid var(--color-primary)", background: "var(--color-card)", color: "var(--color-primary)", borderRadius: 8, padding: "8px 14px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}>{p}</button>
+                ))}
+              </div>
+            </>
+          )}
         </section>
 
         {/* [N6] 이상 평단 확인 — 총자산에서 뺀 사실은 총자산이 보이는 곳에서 설명한다.

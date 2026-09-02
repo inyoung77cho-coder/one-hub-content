@@ -10,6 +10,7 @@ import EtfDataStatus from "../../components/EtfDataStatus";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS, getOtherAssets, addOtherAsset, removeOtherAsset, updateOtherAsset, sellOtherAsset, OTHER_KINDS, saneEtfAvg } from "../../lib/etfHoldings";
 import AvgPriceWarningCard from "../../components/shared/AvgPriceWarningCard"; // [S22-1] 이상 평단 확인 카드(주식·ETF 공용)
+import { ensureDailySnapshot } from "../../lib/dailySnapshot"; // [S22-3] 총자산 곡선 적립 backstop
 import { classifyEtf } from "../../lib/etfClassify";
 import { useTabState } from "../../lib/pwa/useTabState";
 import EtfAllocationPie from "../../components/EtfAllocationPie";
@@ -255,6 +256,9 @@ export default function EtfDashboard() {
         .catch(() => {});
     });
   }, []);
+
+  // [S22-3] ETF만 보고 나가도 그날 총자산 곡선에 1건 남긴다(backstop).
+  useEffect(() => { ensureDailySnapshot(); }, []);
 
   // [내 ETF] 로컬 보유 + 등록ETF 수량 로드(60초 폴링) — 시세는 아래 통합 시세 효과가 담당
   useEffect(() => {

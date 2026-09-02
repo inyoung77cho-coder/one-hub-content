@@ -8,6 +8,7 @@ import { dedupBy } from "../../lib/useDedup";
 import { ReForm } from "../../components/shared/AssetForms";
 import Term from "../../components/Term";
 import RePositionCard, { RegionLeadersCard, RegionForecastCard, MoveDifficultyCard } from "../../components/RePositionCard";
+import { ensureDailySnapshot } from "../../lib/dailySnapshot"; // [S22-3] 총자산 곡선 적립 backstop
 import ReIncomeSummaryCard from "../../components/ReIncomeSummaryCard";
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
@@ -58,6 +59,8 @@ export default function RealEstateDashboard() {
   const [reSearchOpen, setReSearchOpen] = useState(false);
   const [reSearchQ, setReSearchQ] = useState("");
   const [reSearchRes, setReSearchRes] = useState([]);
+  // [S22-3] 부동산만 보고 나가도 그날 총자산 곡선에 1건 남긴다(backstop).
+  useEffect(() => { ensureDailySnapshot(); }, []);
   useEffect(() => {
     if (!reSearchOpen) return;
     const q = reSearchQ.trim();
