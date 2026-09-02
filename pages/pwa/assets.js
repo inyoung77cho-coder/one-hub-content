@@ -4,6 +4,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
+import Sparkline from "../../components/shared/Sparkline"; // [S23 T-4] 총자산 스파크라인(오늘 화면과 공용)
 import { getTrader, useTrader } from "../../lib/trader";
 import { getLedger } from "../../lib/ledger";
 import { recordSnapshot, getDelta, getHistory } from "../../lib/assetHistory";
@@ -39,26 +40,7 @@ const ASSET_VIEWS = [
 const dvUk = (v) => (v == null ? null : `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(2)}억`);
 const dCls = (v) => (v == null ? "" : v > 0.004 ? "up" : v < -0.004 ? "down" : "flat");
 
-// 총자산 시계열 미니 스파크라인(SVG). 최근 데이터가 오른쪽. 값이 2개 미만이면 렌더 안 함.
-function Sparkline({ data }) {
-  const pts = (data || []).filter((v) => v != null);
-  if (pts.length < 2) return null;
-  const W = 120, H = 30, min = Math.min(...pts), max = Math.max(...pts);
-  const span = max - min || 1;
-  const coords = pts.map((v, i) => {
-    const x = (i / (pts.length - 1)) * W;
-    const y = H - ((v - min) / span) * (H - 4) - 2;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  });
-  const rising = pts[pts.length - 1] >= pts[0];
-  const color = rising ? "var(--color-success, #0E9E6A)" : "var(--color-danger, #E5484D)";
-  return (
-    <svg className="as-spark" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden="true">
-      <polyline points={coords.join(" ")} fill="none" stroke={color} strokeWidth="1.6"
-        strokeLinejoin="round" strokeLinecap="round" />
-    </svg>
-  );
-}
+// [S23 T-4] 스파크라인은 오늘 화면과 공용 컴포넌트로 통일(components/shared/Sparkline).
 
 // 자산군 메타(라벨·색·링크) — [순서변경] 주식 hooking → 부동산·주식 AI가 유료 전환점 → ETF → 현금
 const CLASSES = [
@@ -348,11 +330,12 @@ export default function AssetsMapPage() {
               🎯 오늘의 한 수 — {classDriftMsg.text}. <Link href="/pwa/etf" style={{ color: "var(--color-primary)" }}>리밸런싱 보기 →</Link>
             </p>
           )}
-          {/* [추세] 전일 대비 변화 + 스파크라인을 별도 줄에. 데이터가 하루뿐이면 '기록 시작' 안내. */}
+          {/* [추세] 전일 대비 변화 + 스파크라인(최근 30일). 데이터가 2건 미만이면 '기록 시작' 안내. */}
           {delta && delta.total != null ? (
             <div className="as-trend">
               <span className={`as-dchip ${dCls(delta.total)}`}>{delta.total >= 0 ? "▲" : "▼"} {dvUk(delta.total)}</span>
-              <span className="as-dlabel">{delta.prevDate} 대비</span>
+              <span className="as-dlabel">{delta.days > 1 ? `${delta.days}일 전 대비` : "어제 대비"}</span>
+              <Sparkline data={hist.slice(-30).map((h) => (h.operating != null ? h.operating : h.total))} className="as-spark" />
             </div>
           ) : (
             <p className="as-dnew">📈 오늘부터 총자산 추이를 기록합니다 — 내일부터 전일 대비 변화가 표시됩니다.</p>

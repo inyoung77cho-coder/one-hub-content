@@ -16,9 +16,11 @@ import { recordSnapshot as recordRegionSnapshot, getRegionDelta } from "../../li
 import { getHoldings as getEtfHoldings } from "../../lib/etfHoldings";
 import { recommendEtfs } from "../../lib/etfRecommend";
 import { getTargetClass, computeClassDrift, topDriftMessage } from "../../lib/targetClass"; // [S23 T-2] ETF 조치 근거 통일(자산군 목표)
+import { taxFocusOf, currentMonth } from "../../lib/taxCalendar"; // [S23 T-7] 절세 팁을 달력에 연결(DAY% 회전 제거)
 import { deriveUrgency, deriveStance } from "../../components/shared/KisHoldingsCard"; // [S20-3] 조치 판정 규칙 재사용(복제 금지)
 import { computeAiFreshness } from "../../lib/aiFreshness"; // [S20-3] AI 갱신 상태(AI 탭과 공유)
-import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta } from "../../lib/assetHistory"; // [S20-3] 총자산 전일 대비
+import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta, getHistory as getAssetHistory } from "../../lib/assetHistory"; // [S20-3/S23 T-4] 총자산 전일 대비·곡선
+import Sparkline from "../../components/shared/Sparkline"; // [S23 T-4] 총자산 스파크라인(종합자산과 공용)
 import { getSnapshots as getDuelSnapshots } from "../../lib/portfolioDuel"; // [S20-3] 대결 결과 배너 판정용
 import { getTodayDecision, getLedger as getVerdictLedger } from "../../lib/verdictLedger"; // [S23 T-1/T-5] 판단 기록·재등장 판정
 import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S23 T-1] 가격 확보→기록(추천 카드와 공유)
@@ -509,6 +511,8 @@ export default function TodayPage({ announcements = [] }) {
             ) : headUk != null ? (
               <span className="tds-dnew">오늘부터 기록 — 내일부터 전일 대비 표시</span>
             ) : null}
+            {/* [S23 T-4] 30일 총자산 곡선 — 종합자산과 같은 데이터·모양(공용 Sparkline). 2건 미만이면 위 '기록 중' 안내로 대체. */}
+            {(() => { const s = getAssetHistory(trader).slice(-30).map((h) => (h.operating != null ? h.operating : h.total)); return s.filter((v) => v != null).length >= 2 ? <Sparkline data={s} className="tds-spark" /> : null; })()}
             {at && <span className="tds-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
           </div>
           {/* [S23 T-2] 총자산·실거주는 작은 줄로(assets.js 와 같은 문구·기호). 시세 갱신은 판단 성과와 분리. */}
@@ -892,14 +896,16 @@ export default function TodayPage({ announcements = [] }) {
             const recs = recommendEtfs({ holdings: getEtfHoldings(), positions: [], target, overlap: null });
             if (recs.length) pick = recs[DAY % recs.length];
           } catch (e) {}
-          const TAX_TIPS = [
-            "일반계좌 해외 ETF 양도차익은 연 250만원까지 비과세 — 연말 전 실현손익을 점검하세요.",
-            "손실 종목을 같은 해에 실현하면 이익과 상계(손익통산)돼 양도세가 줄어듭니다.",
-            "연금저축·IRP 납입은 연 최대 900만원까지 세액공제(13.2~16.5%) — 납입 여력을 확인하세요.",
-            "국내상장 해외 ETF는 배당소득세(15.4%)·금융소득종합과세 대상 — 계좌 배치를 점검하세요.",
-            "ISA 만기 자금을 연금계좌로 옮기면 추가 세액공제 한도가 생깁니다.",
-          ];
-          const tip = TAX_TIPS[DAY % TAX_TIPS.length];
+          // [S23 T-7] DAY% 회전 삭제 → 세금 달력(taxCalendar). 이 달에 해당 항목이 없으면 카드 미렌더.
+          const taxFocus2 = taxFocusOf(currentMonth());
+          // 내 숫자(실현 기반 — 평단과 무관해 S22-1 이상치의 영향을 받지 않음: 안전).
+          let taxNum = null;
+          try {
+            const realized = JSON.parse(localStorage.getItem("onehub_etf_realized") || "[]");
+            const yr = String(new Date().getFullYear());
+            const net = (Array.isArray(realized) ? realized : []).filter((r) => String(r.date || "").startsWith(yr)).reduce((s, r) => s + (Number(r.gainKrw) || 0), 0);
+            taxNum = { net, remain: Math.max(0, 2500000 - Math.max(0, net)) };
+          } catch (e) {}
           const mv = etfMovers && (etfMovers.domestic || etfMovers.overseas) ? etfMovers : null;
           const mvRow = (label, m) => m ? (
             <button type="button" className="etf1-mv" onClick={() => router.push("/pwa/etf")}>
@@ -910,7 +916,8 @@ export default function TodayPage({ announcements = [] }) {
           ) : null;
           return (
             <section className="card sc">
-              <div className="sc-h">🎯 오늘의 ETF 한 수</div>
+              {/* [S23 T-7] 'DAY% 회전'을 '오늘의'라고 부르지 않는다 — 규칙 기반 순환 안내로 정직하게. */}
+              <div className="sc-h">🎯 ETF 한 수 <span style={{ fontWeight: 600, fontSize: "0.66rem", color: "var(--color-ink-3)" }}>규칙 기반 안내</span></div>
               {mv && (
                 <div className="etf1-movers">
                   <div className="etf1-mv-h">🔥 이번 주 상승률 최고 <span>최근 7일 · 실거래 종가</span></div>
@@ -924,9 +931,14 @@ export default function TodayPage({ announcements = [] }) {
                   <div className="etf1-why">{pick.reasonRule}</div>
                 </div>
               ) : (
-                <div className="sc-empty">보유·목표배분을 입력하면 오늘의 추천 한 종목이 표시돼요.</div>
+                <div className="sc-empty">보유·목표배분을 입력하면 규칙 기반 후보 한 종목이 표시돼요.</div>
               )}
-              <div className="etf1-tax">💡 <b>오늘의 절세</b> · {tip}</div>
+              {/* [S23 T-7] 절세는 세금 달력 — 이 달에 해당 항목이 있을 때만. 내 실현 숫자를 함께(있으면). */}
+              {taxFocus2 && (
+                <div className="etf1-tax">🗓️ <b>{taxFocus2.title}</b> · {taxFocus2.desc}
+                  {taxNum && <div className="etf1-taxnum">올해 실현 {taxNum.net.toLocaleString()}원 · 연 250만 공제 남은 <b>{taxNum.remain.toLocaleString()}원</b></div>}
+                </div>
+              )}
               <button className="tile-more" onClick={() => router.push("/pwa/etf?etf=rec")}>추천·절세 자세히 보기 →</button>
               <div className="etf1-disc">규칙기반 참고 정보 · 투자자문/특정종목 권유 아님.</div>
             </section>
@@ -1109,6 +1121,8 @@ export default function TodayPage({ announcements = [] }) {
         .tds-fresh { margin-left: auto; font-size: 0.68rem; }
         .tds-subtotals { display: flex; gap: 12px; flex-wrap: wrap; margin: 2px 0 2px; font-size: 0.72rem; color: var(--color-ink-3); }
         .tds-subtotals .tds-realty-upd { color: var(--color-ink-2); font-weight: 600; }
+        .tds-spark { margin-left: 6px; }
+        .etf1-taxnum { margin-top: 6px; font-size: 0.74rem; color: var(--color-ink-2); font-variant-numeric: tabular-nums; }
         .tds-actbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
         .tds-actrow { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); text-align: left; }
         .tds-badge { flex-shrink: 0; font-size: 0.6rem; font-weight: 800; border: 1px solid; border-radius: 999px; padding: 1px 6px; }
