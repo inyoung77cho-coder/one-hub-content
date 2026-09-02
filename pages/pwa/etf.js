@@ -11,6 +11,7 @@ import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS, getOtherAssets, addOtherAsset, removeOtherAsset, updateOtherAsset, sellOtherAsset, OTHER_KINDS, saneEtfAvg } from "../../lib/etfHoldings";
 import AvgPriceWarningCard from "../../components/shared/AvgPriceWarningCard"; // [S22-1] 이상 평단 확인 카드(주식·ETF 공용)
 import { ensureDailySnapshot } from "../../lib/dailySnapshot"; // [S22-3] 총자산 곡선 적립 backstop
+import { taxFocusOf, isTaxSeason, currentMonth } from "../../lib/taxCalendar"; // [S22-8] ETF 세금 달력(평시 접힘)
 import { classifyEtf } from "../../lib/etfClassify";
 import { useTabState } from "../../lib/pwa/useTabState";
 import EtfAllocationPie from "../../components/EtfAllocationPie";
@@ -259,6 +260,11 @@ export default function EtfDashboard() {
 
   // [S22-3] ETF만 보고 나가도 그날 총자산 곡선에 1건 남긴다(backstop).
   useEffect(() => { ensureDailySnapshot(); }, []);
+
+  // [S22-8] 세금 영역은 평시 접힘, 세금 시즌(11·12·1·5월)에만 기본 펼침. SSR 불일치 방지 위해 마운트 후 결정.
+  const [taxOpen, setTaxOpen] = useState(false);
+  const [taxFocus, setTaxFocus] = useState(null);
+  useEffect(() => { const m = currentMonth(); setTaxFocus(taxFocusOf(m)); setTaxOpen(isTaxSeason(m)); }, []);
 
   // [내 ETF] 로컬 보유 + 등록ETF 수량 로드(60초 폴링) — 시세는 아래 통합 시세 효과가 담당
   useEffect(() => {
@@ -1278,9 +1284,22 @@ export default function EtfDashboard() {
         );
       })()}
 
+      {/* [S22-8] 세금 영역 접기/펼치기 — 평시 접힘(소음 방지), 세금 시즌엔 기본 펼침 + 이번 달 포커스 표시. */}
+      {etfTab === "rec" && (
+        <button className="card" onClick={() => setTaxOpen((o) => !o)}
+          style={{ width: "100%", textAlign: "left", display: "flex", alignItems: "center", gap: 8, cursor: "pointer", border: taxFocus ? "1px solid var(--color-primary)" : "1px solid var(--color-line)", background: "var(--color-card)", fontFamily: "var(--font-sans)" }}>
+          <span style={{ fontSize: "0.86rem", fontWeight: 800, color: "var(--color-ink)" }}>🧾 세금·절세</span>
+          {taxFocus && <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--color-primary)", background: "var(--color-primary-soft)", borderRadius: 999, padding: "2px 8px" }}>이번 달 · {taxFocus.title}</span>}
+          <span style={{ marginLeft: "auto", fontSize: "0.76rem", color: "var(--color-ink-3)" }}>{taxOpen ? "접기 ▲" : "펼치기 ▼"}</span>
+        </button>
+      )}
+      {taxFocus && etfTab === "rec" && taxOpen && (
+        <p style={{ margin: "0 0 8px", fontSize: "0.76rem", color: "var(--color-ink-2)", lineHeight: 1.5, padding: "0 4px" }}>{taxFocus.desc}</p>
+      )}
+
       {/* [ETF 재구성 Phase1] 연도별 개인투자 절세 방안 — 기존 '세금·절세'(미실현 전량매도)와
           '올해 실현 양도차익'을 연도 기준 한 카드로 묶음. 일반계좌 250만 공제·손익통산. */}
-      {etfTab === "rec" && (() => {
+      {etfTab === "rec" && taxOpen && (() => {
         const yr = new Date(Date.now() + 9 * 3600 * 1000).getUTCFullYear();
         const yrItems = realized.filter((r) => String(r.date).startsWith(String(yr)));
         const net = yrItems.reduce((s, r) => s + (Number(r.gainKrw) || 0), 0);

@@ -3,6 +3,7 @@
 //   데이터: lib/assetsTotal(단일 소스) + /api/pwa-dashboard. 자체 합산 금지 — 원장 값만 사용.
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import { getTrader, useTrader } from "../../lib/trader";
 import { getLedger } from "../../lib/ledger";
 import { recordSnapshot, getDelta, getHistory } from "../../lib/assetHistory";
@@ -319,11 +320,25 @@ export default function AssetsMapPage() {
         {/* ── 총자산+추세(공통) — [사용자 지시] 자산군 쏠림/국면 코멘트 문구 삭제(주식 탭은 주식
             이야기만) + 운용자산(실거주 제외 토글) 섹션도 삭제 ── */}
         <section className="card as-hero">
+          {/* [S22-7] 위계 전환 — 실제 판단 대상인 '운용자산'을 헤드라인으로. 총자산·실거주는 그 아래.
+              (실거주가 없으면 운용=총자산이라 종전과 동일하게 총자산만 크게 보인다.) */}
           <div className="as-total">
-            <span>총자산</span>
-            <b>{uk(total)}</b>
+            <span>{hasResidence ? <>운용자산 <span style={{ fontWeight: 600, fontSize: "0.62rem", color: "var(--color-ink-3)" }}>실거주 제외</span></> : "총자산"}</span>
+            <b>{uk(hasResidence ? opTotal : total)}</b>
             {at && <span className="as-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
           </div>
+          {hasResidence && (
+            <div className="as-subtotals" style={{ display: "flex", gap: 12, flexWrap: "wrap", margin: "2px 0 4px", fontSize: "0.74rem", color: "var(--color-ink-3)" }}>
+              <span>총자산 <b style={{ color: "var(--color-ink-2)", fontVariantNumeric: "tabular-nums" }}>{uk(total)}</b></span>
+              <span>🔑 실거주 {uk(residenceUk)} · <span style={{ color: "var(--color-ink-3)" }}>못 파는 자산</span></span>
+            </div>
+          )}
+          {/* [S22-7] 오늘의 한 수 — 가장 급한 신호 하나만(지금은 목표 배분 이탈 기준, S22-4). 없으면 침묵. */}
+          {classDriftMsg && classDriftMsg.tone === "warn" && classDriftMsg.top && (
+            <p className="as-onemove" style={{ margin: "6px 0 2px", fontSize: "0.8rem", fontWeight: 700, color: "var(--color-ink)" }}>
+              🎯 오늘의 한 수 — {classDriftMsg.text}. <Link href="/pwa/etf" style={{ color: "var(--color-primary)" }}>리밸런싱 보기 →</Link>
+            </p>
+          )}
           {/* [추세] 전일 대비 변화 + 스파크라인을 별도 줄에. 데이터가 하루뿐이면 '기록 시작' 안내. */}
           {delta && delta.total != null ? (
             <div className="as-trend">
@@ -471,7 +486,7 @@ export default function AssetsMapPage() {
             [사용자 지시] "시장 맥락·내 position"/"오늘의 브리핑" 아코디언 삭제 — 판단 근거는
             AI 페이지에서 다룬다. 이 탭은 주식 이야기만. */}
 
-        <div className="as-note">종합자산은 읽기 전용 지도예요. 상세 확인·수정은 각 자산 페이지에서 이어집니다.</div>
+        <div className="as-note">상세 확인·수정은 각 자산 페이지에서 이어집니다.</div>
       </DataState>
 
       {/* [OS-2] "+"는 현재 선택된 뷰(주식/ETF/부동산)의 자산군으로 바로 열림 */}
