@@ -12,6 +12,7 @@ import {
   recordSnapshot, recordDuelDecision, hasDecisionToday, detectSellCandidates, portfolioValue,
   getDecisionAnalysis, correctBaseCash, computeAiFromLive, DEFAULT_CASH, removeSnapshot,
 } from "../lib/portfolioDuel";
+import { getVerdictStats } from "../lib/verdictStats"; // [S22-2] 판단 건수 단일 소스(추천+대결 통합)
 
 // [사용자 지시] 억 단위 반올림은 소액 계좌에서 나/AI 차이가 0.00억으로 뭉개져 보였다 —
 //   원 단위 그대로(백원 단위까지) 표기해 실제 차이가 보이게 한다.
@@ -395,15 +396,23 @@ export default function PortfolioDuelCard() {
       )}
 
       <button type="button" className="pd-history-toggle" onClick={() => setShowHistory((v) => !v)}>
-        {showHistory ? "판단 기록 접기" : `판단 기록 보기 (${duel.decisions.length}건)`}
+        {showHistory ? "대결 판단 기록 접기" : `대결 판단 기록 보기 (${duel.decisions.length}건)`}
       </button>
       {showHistory && (
         <div className="pd-history">
           {/* [S19-2] 목록보다 먼저 '지금까지 어땠나' — 누적이 목적인 기능의 답. */}
           {record && (
             <div className="pd-record">
+              {/* [S22-2] 화면마다 다르게 세지 않도록, '내 판단' 총계는 통합 소스(getVerdictStats)에서만.
+                  아래 대결 세부(수용/거부·성적)는 이 카드가 다루는 대결 원장 기준임을 명시한다. */}
+              {(() => { const vs = getVerdictStats(trader); return (
+                <div className="pd-record-row" style={{ marginBottom: 6 }}>
+                  <span className="pd-rec-k">내 판단</span><b>{vs.total}건</b>
+                  <span className="pd-rec-k" style={{ opacity: 0.7 }}>추천 {vs.bySource.recommend.total} · 대결 {vs.bySource.duel.total}</span>
+                </div>
+              ); })()}
               <div className="pd-record-row">
-                <span className="pd-rec-k">판단</span><b>{record.total}건</b>
+                <span className="pd-rec-k">대결 판단</span><b>{record.total}건</b>
                 <span className="pd-rec-k">수용</span><b>{record.accepted}</b>
                 <span className="pd-rec-k">거부</span><b>{record.rejected}</b>
                 <span className="pd-rec-k">채점 완료</span><b>{record.scored}건</b>

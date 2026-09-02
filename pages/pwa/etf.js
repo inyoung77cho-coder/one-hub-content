@@ -8,7 +8,8 @@ import AppHeader from "../../components/AppHeader";
 import AssetMapTitle from "../../components/AssetMapTitle";
 import EtfDataStatus from "../../components/EtfDataStatus";
 import { getTrader } from "../../lib/trader";
-import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS, getOtherAssets, addOtherAsset, removeOtherAsset, updateOtherAsset, sellOtherAsset, OTHER_KINDS } from "../../lib/etfHoldings";
+import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS, getOtherAssets, addOtherAsset, removeOtherAsset, updateOtherAsset, sellOtherAsset, OTHER_KINDS, saneEtfAvg } from "../../lib/etfHoldings";
+import AvgPriceWarningCard from "../../components/shared/AvgPriceWarningCard"; // [S22-1] 이상 평단 확인 카드(주식·ETF 공용)
 import { classifyEtf } from "../../lib/etfClassify";
 import { useTabState } from "../../lib/pwa/useTabState";
 import EtfAllocationPie from "../../components/EtfAllocationPie";
@@ -542,9 +543,18 @@ export default function EtfDashboard() {
     const pnlKrw = valueKrw != null && costTotal != null ? valueKrw - costTotal : null;
     const pnlPct = curPx != null && q?.currency === h.avgCcy ? (curPx / h.avgPrice - 1) * 100
       : valueKrw != null && costTotal ? (valueKrw / costTotal - 1) * 100 : null;
-    return { curPx, curCcy: q?.currency, valueKrw, costTotal, pnlKrw, pnlPct, date: q?.date };
+    return { curPx, curCcy: q?.currency, curKrw, valueKrw, costTotal, pnlKrw, pnlPct, date: q?.date };
   };
-  const myTotal = holdings.reduce((acc, h) => { const m = holdingMetrics(h); return acc + (m.valueKrw || 0); }, 0);
+  // [S22-1] 평단이 현재가와 10배 이상 어긋난 보유 → 파생계산(평가·손익·도넛·연금취득가)에서 제외하고
+  //   "확인 필요" 카드로 물어본다(앱은 값을 고치지 않는다). 시세 없으면 판정 보류=정상 취급.
+  const holdingBad = (h) => !saneEtfAvg(h, holdingMetrics(h).curKrw, fxRate);
+  const okHoldings = holdings.filter((h) => !holdingBad(h));
+  const badHoldings = holdings.filter(holdingBad);
+  const etfAvgWarnings = badHoldings.map((h) => ({
+    code: "AVG_PRICE_OUT_OF_RANGE", source: "etf", id: h.id, name: h.ticker,
+    avgPrice: Number(h.avgPrice), avgCcy: h.avgCcy,
+  }));
+  const myTotal = okHoldings.reduce((acc, h) => { const m = holdingMetrics(h); return acc + (m.valueKrw || 0); }, 0);
 
   // [등록 ETF] 수량(백엔드 제공 우선, 없으면 사용자 입력) + 실측 종가 기반 실시간 평가금액
   const posLive = (p) => {
@@ -562,7 +572,7 @@ export default function EtfDashboard() {
   const liveTotal = (() => {
     let sum = 0, any = false;
     positions.forEach((p) => { const l = posLive(p); if (l.valueKrw != null) { sum += l.valueKrw; any = true; } });
-    holdings.forEach((h) => { const v = holdingMetrics(h).valueKrw; if (v != null) { sum += v; any = true; } });
+    okHoldings.forEach((h) => { const v = holdingMetrics(h).valueKrw; if (v != null) { sum += v; any = true; } });
     return any ? sum : null;
   })();
   // [히어로 일원화] 실시간 평가(수량×실측종가)가 있으면 그걸 대표값으로, 없으면 백엔드 평가액.
@@ -578,7 +588,7 @@ export default function EtfDashboard() {
 
   // [ETF 재구성 Phase1] 테마 도넛·추천에 넘길 '티커+원화평가액' 목록.
   //   목표배분 섹션과 동일한 평가규칙(백엔드 value_krw 우선, 없으면 실측종가 기반 holdingMetrics).
-  const pieItems = [...positions, ...holdings]
+  const pieItems = [...positions, ...okHoldings]
     .map((x) => ({ ticker: x.ticker, valueKrw: x.value_krw ?? x.eval_krw ?? (holdingMetrics(x).valueKrw || 0) }))
     .filter((x) => x.ticker && x.valueKrw > 0);
   // [ETF 분석] 보유 종목별 성과(평가액+수익률) — 등록 포지션 + 내 보유를 티커로 합산.
@@ -602,7 +612,7 @@ export default function EtfDashboard() {
       const pnlK = (val != null && cost != null) ? val - cost : (p.pnl_krw ?? null);
       push(p.ticker, p.name, val, l.pnlPct != null ? l.pnlPct : (p.pnl_pct ?? null), cost, pnlK);
     });
-    holdings.forEach((h) => { const mm = holdingMetrics(h); push(h.ticker, h.name, mm.valueKrw, mm.pnlPct, mm.costTotal, mm.pnlKrw); });
+    okHoldings.forEach((h) => { const mm = holdingMetrics(h); push(h.ticker, h.name, mm.valueKrw, mm.pnlPct, mm.costTotal, mm.pnlKrw); });
     // 비율만 아는 항목은 costKrw가 없을 수 있음 → 총수익률(pnlPct)로 매수금액 역산 보조.
     return Object.values(m).map((x) => {
       if (x.costKrw == null && x.pnlPct != null && x.valueKrw != null) x.costKrw = x.valueKrw / (1 + x.pnlPct / 100);
@@ -716,7 +726,7 @@ export default function EtfDashboard() {
   if (hasPension) {
     // 세액공제 한도는 개인연금+IRP 합산(연 900만) — 두 계좌 취득액을 함께 본다
     const limit = pensionCreditLimitCombined();
-    const penRows = holdings.filter((h) => isPensionAcct(h.account || "일반"));
+    const penRows = okHoldings.filter((h) => isPensionAcct(h.account || "일반"));
     const acquired = penRows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
     const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
     const room = Math.max(0, limit - contrib);
@@ -876,6 +886,9 @@ export default function EtfDashboard() {
         })}
       </div>
 
+      {/* [S22-1] 이상 평단 확인 — 평단이 현재가와 10배 이상 어긋난 보유는 평가·손익에서 뺐음을 묻는다(주식과 공용 카드). */}
+      {etfTab === "hold" && <AvgPriceWarningCard warnings={etfAvgWarnings} onReload={() => { const tr = getTrader(); const l = getHoldings(tr); setHoldings(l); refreshQuotes(l); }} />}
+
       {/* [ETF 재구성 Phase1] 보유 탭 상단 — 테마별 분배 도넛(지역/섹터) */}
       {etfTab === "hold" && <EtfAllocationPie items={perfItems} overlap={overlap} perfMap={perfMap} />}
 
@@ -1010,13 +1023,13 @@ export default function EtfDashboard() {
       {/* [ETF 재구성 Phase1] 연금 운영 제안 — 계좌 배치 최적화(구 E-5) + 연금 세액공제 진행률을 묶음 */}
       {etfTab === "rec" && (() => {
         const genAcct = holdings.filter((h) => (h.account || "일반") === "일반");
-        const taxAcct = holdings.filter((h) => isPensionAcct(h.account || "일반") || (h.account || "일반") === "ISA");
+        const taxAcct = okHoldings.filter((h) => isPensionAcct(h.account || "일반") || (h.account || "일반") === "ISA");
         const overseasInGen = genAcct.filter(isOverseasHolding);   // [S18] 통화가 아니라 시장으로
         const domesticInTax = taxAcct.filter((h) => h.avgCcy === "KRW");
         const swap = overseasInGen.length > 0 && domesticInTax.length > 0;
         const hasPen = holdings.some((h) => isPensionAcct(h.account || "일반")) || otherAssets.some((o) => isPensionAcct(o.account || "일반"));
         const limit = pensionCreditLimitCombined();
-        const penRows = holdings.filter((h) => isPensionAcct(h.account || "일반"));
+        const penRows = okHoldings.filter((h) => isPensionAcct(h.account || "일반"));
         const acquired = penRows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
         const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
         const prog = Math.max(0, Math.min(1, limit ? contrib / limit : 0));
@@ -1077,7 +1090,7 @@ export default function EtfDashboard() {
           const recs = recommendAccounts(nbSel.taxType, nbSel.market);
           // 연금 추천이 있으면 세액공제 여유도 같이 보여준다(있는 데이터만, 추측 없음).
           const limit = pensionCreditLimitCombined();
-          const penRows = holdings.filter((h) => isPensionAcct(h.account || "일반"));
+          const penRows = okHoldings.filter((h) => isPensionAcct(h.account || "일반"));
           const acquired = penRows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
           const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
           const room = Math.max(0, limit - contrib);
@@ -1453,7 +1466,7 @@ export default function EtfDashboard() {
                   {/* [계좌 세분화] 연금 세액공제 진행률 — 개인연금+IRP 합산(연 900만) 기준. 첫 연금 그룹에 1회만 표시 */}
                   {acct === firstPension && (() => {
                     const limit = pensionCreditLimitCombined();
-                    const penRows = holdings.filter((h) => isPensionAcct(h.account || "일반"));
+                    const penRows = okHoldings.filter((h) => isPensionAcct(h.account || "일반"));
                     const acquired = penRows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
                     const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
                     const prog = Math.max(0, Math.min(1, contrib / limit));

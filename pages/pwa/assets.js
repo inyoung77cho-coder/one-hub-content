@@ -6,7 +6,7 @@ import { useRouter } from "next/router";
 import { getTrader, useTrader } from "../../lib/trader";
 import { getLedger } from "../../lib/ledger";
 import { recordSnapshot, getDelta, getHistory } from "../../lib/assetHistory";
-import { verifyStockAvg, updateStockAvg } from "../../lib/stockHoldings";
+import AvgPriceWarningCard from "../../components/shared/AvgPriceWarningCard"; // [S22-1] 이상 평단 확인 카드(주식·ETF 공용)
 import TraderBadge from "../../components/shared/TraderBadge";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
@@ -73,8 +73,6 @@ export default function AssetsMapPage() {
   const [status, setStatus] = useState("loading");
   const [at, setAt] = useState(null);
   const [qaOpen, setQaOpen] = useState(false);
-  const [fixId, setFixId] = useState(null);      // [N6] 평단 수정 중인 종목 id
-  const [fixVal, setFixVal] = useState("");      // [N6] 사용자가 직접 입력하는 평단(앱이 추정하지 않는다)
   const [delta, setDelta] = useState(null);      // [추세] 전일 대비 총자산·자산별 변화(브라우저 스냅샷 기반)
   const [hist, setHist] = useState([]);          // [추세] 총자산 일별 스냅샷 시계열
   const [exRes, setExRes] = useState(true);      // [§3.1] 실거주(대표단지) 제외 보기 — 기본 켜짐(운용가능 먼저)
@@ -345,35 +343,7 @@ export default function AssetsMapPage() {
         {/* [N6] 이상 평단 확인 — 총자산에서 뺀 사실은 총자산이 보이는 곳에서 설명한다.
             앱은 값을 고치지 않는다. 원본이 평단인지 총매입액인지는 입력한 사람만 알기 때문이다.
             [OS-2] 평단 이슈는 주로 직접입력 주식이라 "주식" 뷰에서만. */}
-        {view === 0 && (assets?.warnings || []).filter((w) => w.code === "AVG_PRICE_OUT_OF_RANGE").map((w) => (
-          <section className="card as-fix" key={w.id || w.name}>
-            <div className="as-h">확인이 필요합니다</div>
-            <p className="as-fix-q">
-              <b>{w.name}</b>의 평단이 <b>{Number(w.avgPrice).toLocaleString()}원</b>으로 입력돼 있습니다.
-              흔한 원인은 <b>총매입액을 평단 칸에 넣은 경우</b>지만, 실제로 맞는 값일 수도 있습니다.
-              {w.dup_with_kis
-                ? <> 이 종목은 증권사 연동에도 있어 <b>총자산 합산에는 쓰지 않지만</b>, 목록·수익률에는 이 값이 그대로 보입니다.</>
-                : <> 그래서 <b>총자산에서 잠시 뺐습니다</b>.</>}
-              {" "}어느 쪽인지는 입력하신 분만 아셔서 저희가 임의로 고치지 않았습니다.
-            </p>
-            {fixId === w.id ? (
-              <div className="as-fix-edit">
-                <input className="as-fix-in" type="number" inputMode="numeric" value={fixVal} placeholder="1주당 평단(원)"
-                  onChange={(e) => setFixVal(e.target.value)} aria-label="평단 입력" />
-                <button className="as-fix-b p" onClick={() => {
-                  const r = updateStockAvg({ id: w.id, avgPrice: fixVal, trader: getTrader() });
-                  if (r.ok) { setFixId(null); setFixVal(""); load(); }
-                }}>저장</button>
-                <button className="as-fix-b" onClick={() => { setFixId(null); setFixVal(""); }}>취소</button>
-              </div>
-            ) : (
-              <div className="as-fix-cta">
-                <button className="as-fix-b p" onClick={() => { setFixId(w.id); setFixVal(""); }}>평단 수정</button>
-                <button className="as-fix-b" onClick={() => { verifyStockAvg({ id: w.id, trader: getTrader() }); load(); }}>이 값이 맞습니다</button>
-              </div>
-            )}
-          </section>
-        ))}
+        {view === 0 && <AvgPriceWarningCard warnings={assets?.warnings} onReload={load} />}
 
         {/* ── 뷰별 전용 카드 ── */}
         {/* [사용자 지시] "주식" 뷰 — 상단 탭(보유/추천) 선택에 따라 실제 목록을 보여준다.
