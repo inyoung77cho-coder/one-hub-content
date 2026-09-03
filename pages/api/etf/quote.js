@@ -28,11 +28,18 @@ async function fromStooq(symbol) {
 //   Yahoo meta.marketState(PRE/REGULAR/POST/CLOSED)로 세션을 보고, PRE/POST 세션이면
 //   preMarketPrice/postMarketPrice를 우선 사용 — 국내(.KS/.KQ)는 Yahoo가 이 필드를 안 주는 경우가
 //   많아 사실상 regularMarketPrice로 자연히 폴백(국내 시간외는 KIS 연동으로 별도 진행 예정).
+// 반환: 시세객체 | "NOTFOUND"(심볼 없음 명시) | null(소프트 실패: 타임아웃·네트워크·빈응답·레이트리밋).
+//   [S24-3] '심볼 없음'과 '일시 실패'를 구분해야 .KS→.KQ 폴백을 안전하게 제한할 수 있다.
 async function fromYahoo(ysym) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ysym)}?interval=1d&range=5d`;
   const r = await fetch(url, { signal: AbortSignal.timeout(6000), headers: { "User-Agent": "Mozilla/5.0" } });
+  const j = await r.json().catch(() => null);
+  const err = j?.chart?.error;
+  if (err) {
+    const code = String(err.code || "").toLowerCase();
+    return code.includes("not found") || code.includes("notfound") ? "NOTFOUND" : null;
+  }
   if (!r.ok) return null;
-  const j = await r.json();
   const res = j?.chart?.result?.[0];
   const meta = res?.meta;
   if (!meta) return null;
@@ -64,8 +71,18 @@ async function resolveOne(rawIn, market) {
   const ccy = isKr ? "KRW" : "USD";
   let q = null, source = null;
   const candidates = isKr ? [`${base}.KS`, `${base}.KQ`] : [base.toUpperCase()];
-  for (const ysym of candidates) {
-    try { const y = await fromYahoo(ysym); if (y) { q = y; source = "yahoo"; break; } } catch (e) { /* graceful */ }
+  // [S24-3] .KQ 는 .KS 가 '심볼 없음'을 명시했을 때만 시도한다. 타임아웃·네트워크·빈응답은 폴백 사유가
+  //   아니다(그때는 실패로 두고 missing 으로 → S21-7 재조회). Yahoo 133690.KQ 유령(23,513)이 .KS
+  //   일시 실패 시 채택돼 −88.5% 를 만든 사고의 근본 차단.
+  let ksNotFound = false;
+  for (let i = 0; i < candidates.length; i++) {
+    if (i > 0 && !ksNotFound) break;
+    try {
+      const y = await fromYahoo(candidates[i]);
+      if (y === "NOTFOUND") { if (i === 0) ksNotFound = true; continue; }
+      if (y) { q = y; source = "yahoo"; break; }
+      if (i === 0) break; // 소프트 실패 → 폴백 안 함
+    } catch (e) { if (i === 0) break; } // 예외(타임아웃 등) → 폴백 안 함
   }
   if (!q) {
     try { q = await fromStooq(stooqSym); if (q) source = "stooq.com"; } catch (e) { /* graceful */ }

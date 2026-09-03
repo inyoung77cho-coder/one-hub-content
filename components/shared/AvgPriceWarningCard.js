@@ -6,11 +6,13 @@ import { useState } from "react";
 import { getTrader } from "../../lib/trader";
 import { verifyStockAvg, updateStockAvg } from "../../lib/stockHoldings";
 import { verifyEtfAvg, updateEtfAvg } from "../../lib/etfHoldings";
+import { verifyPrice } from "../../lib/priceGuard"; // [S24-3] 시세 급변 확인(평단 아님)
 
 export default function AvgPriceWarningCard({ warnings = [], onReload }) {
   const [fixId, setFixId] = useState(null);
   const [fixVal, setFixVal] = useState("");
-  const list = (warnings || []).filter((w) => w.code === "AVG_PRICE_OUT_OF_RANGE");
+  // [S24-3] 평단 이상(AVG_PRICE_OUT_OF_RANGE)과 시세 급변(SUSPECT_PRICE)을 같은 톤으로, 문구만 구분해 함께 표시.
+  const list = (warnings || []).filter((w) => w.code === "AVG_PRICE_OUT_OF_RANGE" || w.code === "SUSPECT_PRICE");
   if (!list.length) return null;
 
   const trader = getTrader();
@@ -18,6 +20,7 @@ export default function AvgPriceWarningCard({ warnings = [], onReload }) {
   const unit = (w) => (w.avgCcy === "USD" ? "$" : "원");
   const reload = () => { try { onReload && onReload(); } catch (e) {} };
   const doVerify = (w) => { (isEtf(w) ? verifyEtfAvg : verifyStockAvg)({ id: w.id, trader }); reload(); };
+  const doVerifyPrice = (w) => { verifyPrice(w.ticker); reload(); };
   const doFix = (w, v) => {
     const r = (isEtf(w) ? updateEtfAvg : updateStockAvg)({ id: w.id, avgPrice: v, trader });
     if (r && r.ok) { setFixId(null); setFixVal(""); reload(); }
@@ -28,26 +31,40 @@ export default function AvgPriceWarningCard({ warnings = [], onReload }) {
       {list.map((w) => (
         <section className="card apw" key={w.id || w.name}>
           <div className="apw-h">확인이 필요합니다</div>
-          <p className="apw-q">
-            <b>{w.name}</b>의 평단이 <b>{Number(w.avgPrice).toLocaleString()}{unit(w)}</b>으로 입력돼 있습니다.
-            흔한 원인은 <b>총매입액이나 {isEtf(w) ? "액면분할 전 가격" : "총매입액"}을 평단 칸에 넣은 경우</b>지만, 실제로 맞는 값일 수도 있습니다.
-            {w.dup_with_kis
-              ? <> 이 종목은 증권사 연동에도 있어 <b>총자산 합산에는 쓰지 않지만</b>, 목록·수익률에는 이 값이 그대로 보입니다.</>
-              : <> 그래서 <b>총자산·손익에서 잠시 뺐습니다</b>.</>}
-            {" "}어느 쪽인지는 입력하신 분만 아셔서 저희가 임의로 고치지 않았습니다.
-          </p>
-          {fixId === w.id ? (
-            <div className="apw-edit">
-              <input className="apw-in" type="number" inputMode="numeric" value={fixVal}
-                placeholder={`1주당 평단(${unit(w)})`} onChange={(e) => setFixVal(e.target.value)} aria-label="평단 입력" />
-              <button className="apw-b p" onClick={() => doFix(w, fixVal)}>저장</button>
-              <button className="apw-b" onClick={() => { setFixId(null); setFixVal(""); }}>취소</button>
-            </div>
+          {w.code === "SUSPECT_PRICE" ? (
+            <>
+              <p className="apw-q">
+                <b>{w.name}</b>의 <b>시세</b>가 직전 정상가와 3배 이상 차이납니다{w.incoming != null && w.last != null ? <> (조회값 {Number(w.incoming).toLocaleString()} · 직전 {Number(w.last).toLocaleString()})</> : null}.
+                시세 소스 오류(유령 심볼 등)일 수 있어 <b>확인 전까지 총자산에서 뺐습니다</b>. <b>액면분할·병합</b>이라면 실제로 맞는 값입니다.
+              </p>
+              <div className="apw-cta">
+                <button className="apw-b" onClick={() => doVerifyPrice(w)}>이 시세가 맞습니다</button>
+              </div>
+            </>
           ) : (
-            <div className="apw-cta">
-              <button className="apw-b p" onClick={() => { setFixId(w.id); setFixVal(""); }}>평단 수정</button>
-              <button className="apw-b" onClick={() => doVerify(w)}>이 값이 맞습니다</button>
-            </div>
+            <>
+              <p className="apw-q">
+                <b>{w.name}</b>의 평단이 <b>{Number(w.avgPrice).toLocaleString()}{unit(w)}</b>으로 입력돼 있습니다.
+                흔한 원인은 <b>총매입액이나 {isEtf(w) ? "액면분할 전 가격" : "총매입액"}을 평단 칸에 넣은 경우</b>지만, 실제로 맞는 값일 수도 있습니다.
+                {w.dup_with_kis
+                  ? <> 이 종목은 증권사 연동에도 있어 <b>총자산 합산에는 쓰지 않지만</b>, 목록·수익률에는 이 값이 그대로 보입니다.</>
+                  : <> 그래서 <b>총자산·손익에서 잠시 뺐습니다</b>.</>}
+                {" "}어느 쪽인지는 입력하신 분만 아셔서 저희가 임의로 고치지 않았습니다.
+              </p>
+              {fixId === w.id ? (
+                <div className="apw-edit">
+                  <input className="apw-in" type="number" inputMode="numeric" value={fixVal}
+                    placeholder={`1주당 평단(${unit(w)})`} onChange={(e) => setFixVal(e.target.value)} aria-label="평단 입력" />
+                  <button className="apw-b p" onClick={() => doFix(w, fixVal)}>저장</button>
+                  <button className="apw-b" onClick={() => { setFixId(null); setFixVal(""); }}>취소</button>
+                </div>
+              ) : (
+                <div className="apw-cta">
+                  <button className="apw-b p" onClick={() => { setFixId(w.id); setFixVal(""); }}>평단 수정</button>
+                  <button className="apw-b" onClick={() => doVerify(w)}>이 값이 맞습니다</button>
+                </div>
+              )}
+            </>
           )}
         </section>
       ))}

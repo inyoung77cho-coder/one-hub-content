@@ -21,7 +21,7 @@ import { getTodayCadence } from "../../lib/todayCadence"; // [S23 T-6] 주간·�
 import { recordVisit } from "../../lib/visitLog"; // [S23 T-10] 방문일 계기판(스트릭 배지 아님)
 import { deriveUrgency, deriveStance } from "../../components/shared/KisHoldingsCard"; // [S20-3] 조치 판정 규칙 재사용(복제 금지)
 import { computeAiFreshness } from "../../lib/aiFreshness"; // [S20-3] AI 갱신 상태(AI 탭과 공유)
-import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta, getHistory as getAssetHistory } from "../../lib/assetHistory"; // [S20-3/S23 T-4] 총자산 전일 대비·곡선
+import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta, getHistory as getAssetHistory, getAssetSeries } from "../../lib/assetHistory"; // [S20-3/S23 T-4/S24-1] 총자산 전일 대비·곡선(단위 일관)
 import Sparkline from "../../components/shared/Sparkline"; // [S23 T-4] 총자산 스파크라인(종합자산과 공용)
 import { getSnapshots as getDuelSnapshots } from "../../lib/portfolioDuel"; // [S20-3] 대결 결과 배너 판정용
 import { getTodayDecision, getLedger as getVerdictLedger } from "../../lib/verdictLedger"; // [S23 T-1/T-5] 판단 기록·재등장 판정
@@ -281,7 +281,9 @@ export default function TodayPage({ announcements = [] }) {
   const hasResidence = residenceUk != null && residenceUk > 0.005;
   const operatingUk = bd.operating_uk != null ? Number(bd.operating_uk) : totalUk;
   const headUk = hasResidence ? operatingUk : totalUk;               // 1행 큰 숫자
-  const headDelta = hasResidence ? (assetDelta?.operating ?? null) : (assetDelta?.total ?? null); // 전일 대비(운용 기준)
+  // [S24-1] 전일 대비 — 운용 델타 우선, 없으면(구 스냅샷) 총자산 델타로 폴백하되 라벨에 기준을 밝힌다.
+  const headDelta = hasResidence ? (assetDelta?.operating ?? assetDelta?.total ?? null) : (assetDelta?.total ?? null);
+  const headDeltaBasis = (hasResidence && assetDelta?.operating == null && headDelta != null) ? " · 총자산 기준" : "";
   const realtyDelta = assetDelta?.residence ?? assetDelta?.realty ?? null; // 부동산(실거주) 시세 갱신 — 별도 줄
   // ── 행2: 오늘 조치할 종목 — 목표가 도달/손절 근접만(deriveUrgency rank<=2), 최대 3개
   const actionStocks = positions
@@ -524,12 +526,17 @@ export default function TodayPage({ announcements = [] }) {
               <b className="tds-total tds-muted">불러오는 중…</b>
             )}
             {headDelta != null ? (
-              <span className={`tds-dchip ${dCls(headDelta)}`}>{headDelta >= 0 ? "▲" : "▼"} {dvUk(headDelta)} <i>{assetDelta?.days > 1 ? `${assetDelta.days}일 전 대비` : "어제 대비"}</i></span>
+              <span className={`tds-dchip ${dCls(headDelta)}`}>{headDelta >= 0 ? "▲" : "▼"} {dvUk(headDelta)} <i>{assetDelta?.days > 1 ? `${assetDelta.days}일 전 대비` : "어제 대비"}{headDeltaBasis}</i></span>
             ) : headUk != null ? (
               <span className="tds-dnew">오늘부터 기록 — 내일부터 전일 대비 표시</span>
             ) : null}
-            {/* [S23 T-4] 30일 총자산 곡선 — 종합자산과 같은 데이터·모양(공용 Sparkline). 2건 미만이면 위 '기록 중' 안내로 대체. */}
-            {(() => { const s = getAssetHistory(trader).slice(-30).map((h) => (h.operating != null ? h.operating : h.total)); return s.filter((v) => v != null).length >= 2 ? <Sparkline data={s} className="tds-spark" /> : null; })()}
+            {/* [S24-1] 30일 곡선 — 단위 일관 시계열(operating/total 혼합 금지). 2건 미만이면 '기록 중 N일째'. */}
+            {(() => {
+              const s = getAssetSeries(trader, hasResidence).slice(-30);
+              if (s.length >= 2) return <Sparkline data={s} className="tds-spark" />;
+              const n = getAssetHistory(trader).length;
+              return n >= 1 ? <span className="tds-dnew">기록 중 · {n}일째</span> : null;
+            })()}
             {at && <span className="tds-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
           </div>
           {/* [S23 T-2] 총자산·실거주는 작은 줄로(assets.js 와 같은 문구·기호). 시세 갱신은 판단 성과와 분리. */}

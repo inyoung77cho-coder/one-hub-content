@@ -7,7 +7,7 @@ import Link from "next/link";
 import Sparkline from "../../components/shared/Sparkline"; // [S23 T-4] 총자산 스파크라인(오늘 화면과 공용)
 import { getTrader, useTrader } from "../../lib/trader";
 import { getLedger } from "../../lib/ledger";
-import { recordSnapshot, getDelta, getHistory } from "../../lib/assetHistory";
+import { recordSnapshot, getDelta, getHistory, getAssetSeries } from "../../lib/assetHistory";
 import AvgPriceWarningCard from "../../components/shared/AvgPriceWarningCard"; // [S22-1] 이상 평단 확인 카드(주식·ETF 공용)
 import { getTargetClass, setTargetClass, computeClassDrift, topDriftMessage, CLASS_PRESETS } from "../../lib/targetClass"; // [S22-4] 자산군 목표 배분
 import { pickInsight } from "../../lib/crossInsight"; // [S22-10] 자산군 교차 인사이트(하나만)
@@ -330,16 +330,21 @@ export default function AssetsMapPage() {
               🎯 오늘의 한 수 — {classDriftMsg.text}. <Link href="/pwa/etf" style={{ color: "var(--color-primary)" }}>리밸런싱 보기 →</Link>
             </p>
           )}
-          {/* [추세] 전일 대비 변화 + 스파크라인(최근 30일). 데이터가 2건 미만이면 '기록 시작' 안내. */}
-          {delta && delta.total != null ? (
-            <div className="as-trend">
-              <span className={`as-dchip ${dCls(delta.total)}`}>{delta.total >= 0 ? "▲" : "▼"} {dvUk(delta.total)}</span>
-              <span className="as-dlabel">{delta.days > 1 ? `${delta.days}일 전 대비` : "어제 대비"}</span>
-              <Sparkline data={hist.slice(-30).map((h) => (h.operating != null ? h.operating : h.total))} className="as-spark" />
-            </div>
-          ) : (
-            <p className="as-dnew">📈 오늘부터 총자산 추이를 기록합니다 — 내일부터 전일 대비 변화가 표시됩니다.</p>
-          )}
+          {/* [S24-1] 전일 대비(운용 우선·구스냅샷은 총자산 폴백+라벨) + 단위 일관 30일 곡선. */}
+          {(() => {
+            const dv = hasResidence ? (delta?.operating ?? delta?.total ?? null) : (delta?.total ?? null);
+            const basis = (hasResidence && delta?.operating == null && dv != null) ? " · 총자산 기준" : "";
+            const series = getAssetSeries(getTrader(), hasResidence).slice(-30);
+            if (dv != null) return (
+              <div className="as-trend">
+                <span className={`as-dchip ${dCls(dv)}`}>{dv >= 0 ? "▲" : "▼"} {dvUk(dv)}</span>
+                <span className="as-dlabel">{delta.days > 1 ? `${delta.days}일 전 대비` : "어제 대비"}{basis}</span>
+                {series.length >= 2 && <Sparkline data={series} className="as-spark" />}
+              </div>
+            );
+            const n = hist.length;
+            return <p className="as-dnew">📈 {n >= 1 ? `기록 중 · ${n}일째 — 내일부터 전일 대비 변화가 표시됩니다.` : "오늘부터 총자산 추이를 기록합니다."}</p>;
+          })()}
           {/* [N1] 총자산이 불완전하면 숫자와 같은 카드에서 말한다. 다른 화면으로 미루지 않는다. */}
           {(assets?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && (
             <p className="as-incomplete">⚠ 증권사 연동 자산을 불러오지 못했습니다 — 이 총자산은 <b>실제보다 적습니다</b>. 잠시 후 다시 시도해 주세요.</p>
