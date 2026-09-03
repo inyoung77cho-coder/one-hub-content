@@ -19,6 +19,7 @@ import { getTargetClass, computeClassDrift, topDriftMessage } from "../../lib/ta
 import { taxFocusOf, currentMonth } from "../../lib/taxCalendar"; // [S23 T-7] 절세 팁을 달력에 연결(DAY% 회전 제거)
 import { getTodayCadence } from "../../lib/todayCadence"; // [S23 T-6] 주간·월간·분기 훅
 import { recordVisit } from "../../lib/visitLog"; // [S23 T-10] 방문일 계기판(스트릭 배지 아님)
+import useSwipeTabs from "../../components/shared/useSwipeTabs"; // [S24-5] 페이지 내 좌우 탭 스와이프
 import { deriveUrgency, deriveStance } from "../../components/shared/KisHoldingsCard"; // [S20-3] 조치 판정 규칙 재사용(복제 금지)
 import { computeAiFreshness } from "../../lib/aiFreshness"; // [S20-3] AI 갱신 상태(AI 탭과 공유)
 import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta, getHistory as getAssetHistory, getAssetSeries } from "../../lib/assetHistory"; // [S20-3/S23 T-4/S24-1] 총자산 전일 대비·곡선(단위 일관)
@@ -132,9 +133,12 @@ export default function TodayPage({ announcements = [] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, router.query.v]);
   const goView = (i) => {
+    // [S24-5 함정6] 탭 전환은 router.replace — push 를 쓰면 뒤로가기를 여러 번 눌러야 페이지를 벗어난다.
+    //   뉴스 모달(?news=)만 push 를 유지(openNewsDetail).
     setView(i);
-    router.push({ pathname: router.pathname, query: { ...router.query, v: V_NAMES[i] } }, undefined, { shallow: true, scroll: false });
+    router.replace({ pathname: router.pathname, query: { ...router.query, v: V_NAMES[i] } }, undefined, { shallow: true, scroll: false });
   };
+  const swipe = useSwipeTabs({ index: view, count: 4, onChange: goView });
   // [ETF] 오늘의 ETF — 주간 상승률 최고(국내/해외) 실데이터(movers). ETF 뷰 진입 시 1회 로드.
   const [etfMovers, setEtfMovers] = useState(null);
   useEffect(() => {
@@ -444,6 +448,7 @@ export default function TodayPage({ announcements = [] }) {
   // [S23 T-1] 이번 세션 즉시 피드백('✓ 기록됨 · HH:MM')·인라인 오류(alert 금지).
   const [recorded, setRecorded] = useState({}); // code → { decision, at }
   const [decErr, setDecErr] = useState({});     // code → 메시지
+  const [readOpen, setReadOpen] = useState(false); // [S24-6] 읽을 거리(뉴스 3장 통합) 기본 접힘
   // choice: 'sell'|'hold'|'pass'. 원장 스키마는 take/pass 2값 — 보유=take, 매도·관망=pass(둘 다 미보유,
   //   하락하면 정답으로 채점). 눌린 라벨은 UI 피드백용으로 따로 보관한다.
   const recordTodo = async (item, choice) => {
@@ -471,7 +476,7 @@ export default function TodayPage({ announcements = [] }) {
   })();
 
   return (
-    <div className="td">
+    <div className="td" onTouchStart={swipe.onTouchStart} onTouchMove={swipe.onTouchMove} onTouchEnd={swipe.onTouchEnd}>
       {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 */}
       <div className="sticky-hdr">
         <header className="td-hd">
@@ -502,10 +507,11 @@ export default function TodayPage({ announcements = [] }) {
       <DataState status={status} hasData={!!dash || !!ledger} onRetry={load} skeletonLines={4} skeletonBlock>
 
         {/* ══ "오늘의 대결" — 카드1(대결) · 카드2(주식 뉴스) · 카드3(주식 할일) 3장으로 통일 ══ */}
-        {view === 0 && (<>
-        {/* [S23 T-6] 주기 훅 — 발동한 날에만(월/월초/분기초/11월) 맨 위 카드 1장. 매일은 안 뜬다. */}
+        {view === 0 && (<div className="td-v0">
+        {/* [S24-6] 화면 위계 — flex order 로 재배치(JSX 이동 없이): ①요약 ②판단 ③주기훅 ④읽을거리. */}
+        {/* [S23 T-6] 주기 훅 — 발동한 날에만(월/월초/분기초/11월) 카드 1장. 매일은 안 뜬다. */}
         {cadenceHooks.length > 0 && (
-          <section className="card td-cadence">
+          <section className="card td-cadence" style={{ order: 3 }}>
             {cadenceHooks.map((h) => (
               <button type="button" className="tc-row" key={h.key} onClick={() => router.push(h.href)}>
                 <span className="tc-ic">{h.icon}</span>
@@ -516,7 +522,7 @@ export default function TodayPage({ announcements = [] }) {
           </section>
         )}
         {/* [S20-3] 카드0 — 오늘 1화면 요약 3행: ①총자산 ②오늘 조치할 종목 ③AI 변화. 최상단 고정. */}
-        <section className="card td-sum">
+        <section className="card td-sum" style={{ order: 1 }}>
           {/* 행1 — [S23 T-2] 운용자산(실거주 제외) + 운용 전일 대비 + 마지막 갱신. 실거주 없으면 총자산. */}
           <div className="tds-row tds-asset">
             <span className="tds-k">{hasResidence ? "운용자산" : "총자산"}</span>
@@ -610,12 +616,20 @@ export default function TodayPage({ announcements = [] }) {
           )}
         </section>
 
-        {/* [S20-3] 대결 카드는 AI 탭으로 이동. 결과가 나온 날만 배너 한 줄로 안내. */}
+        {/* [S20-3] 대결 카드는 AI 탭으로 이동. 결과가 나온 날만 배너 한 줄로(테두리 없는 한 줄 — 카드 아님). */}
         {duelResultToday && (
-          <button type="button" className="td-duel-banner" onClick={() => router.push("/pwa?tab=report&sec=vs")}>
+          <button type="button" className="td-duel-banner" style={{ order: 4 }} onClick={() => router.push("/pwa?tab=report&sec=vs")}>
             🏆 오늘의 <b>나 vs AI</b> 대결 결과가 나왔어요 · AI 탭에서 보기 →
           </button>
         )}
+
+        {/* [S24-6] 읽을 거리 — 시황·봇 뉴스·주식 뉴스 3장을 한 묶음으로. 기본 접힘, 헤더에 건수만(삭제 아님·접기). */}
+        <button type="button" className="card td-readhead td-demote" style={{ order: 5 }} onClick={() => setReadOpen((o) => !o)}>
+          <span className="td-readhead-t">📰 읽을 거리</span>
+          {(() => { const n = (stockNews?.length || 0) + (brief ? 1 : 0) + (newsBrief ? 1 : 0); return n > 0 ? <span className="td-readhead-n">오늘 {n}건</span> : null; })()}
+          <span className="td-readhead-x">{readOpen ? "접기 ▲" : "펼치기 ▼"}</span>
+        </button>
+        {readOpen && (<div style={{ order: 5 }}>
 
         {/* 카드1.5 — 시황 브리핑. 텔레그램 "ONE-HUB Market Brief"와 같은 스냅샷을
             /api/pwa-market-brief로 받아 압축 요약. 데이터가 아직 없으면(신규 배포 직후 등)
@@ -713,9 +727,11 @@ export default function TodayPage({ announcements = [] }) {
             <div className="tile-empty">오늘 새로 올라온 증시 뉴스가 없어요.</div>
           )}
         </section>
+        </div>)}
 
         {/* 카드3 — 오늘의 할 일 · 주식 [S23 T-1] 각 행에서 바로 매도/보유/관망을 기록(페이지 안 떠남). */}
-        <section className="card sc">
+        {/* [S24-6] 이 앱의 유일한 차별점 — 다섯 장 중 하나만 시각적으로 들어올린다(promote). */}
+        <section className="card sc td-promote" style={{ order: 2 }}>
           <div className="sc-h">오늘의 할 일 · 주식</div>
           {todoStock.length === 0 && todoNoti.length === 0 ? (
             <div className="sc-empty">
@@ -757,7 +773,7 @@ export default function TodayPage({ announcements = [] }) {
             <button type="button" className="sc-record-link" onClick={() => router.push("/pwa/record")}>오늘 {recordedCount}건 기록 · 내 판단 성적표 보기 →</button>
           )}
         </section>
-        </>)}
+        </div>)}
 
         {/* ══ "오늘의 부동산" — [사용자 지시] 4카드: 내부동산·지역비교 / 신고가 공지 / 뉴스 / 오늘 할일(관심단지) ══ */}
         {view === 1 && (<>
@@ -1115,6 +1131,14 @@ export default function TodayPage({ announcements = [] }) {
         .tds-subtotals { display: flex; gap: 12px; flex-wrap: wrap; margin: 2px 0 2px; font-size: 0.72rem; color: var(--color-ink-3); }
         .tds-subtotals .tds-realty-upd { color: var(--color-ink-2); font-weight: 600; }
         .tds-spark { margin-left: 6px; }
+        /* [S24-6] view0 카드 위계 — flex order 로 재배치, 판단만 승격·나머지 약화 */
+        .td-v0 { display: flex; flex-direction: column; }
+        .td-promote { border: 1.5px solid var(--color-primary); box-shadow: 0 10px 28px rgba(10,22,44,0.14); }
+        .td-demote { box-shadow: none; }
+        .td-readhead { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 12px 14px; font-family: var(--font-sans); cursor: pointer; }
+        .td-readhead-t { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); }
+        .td-readhead-n { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-3); }
+        .td-readhead-x { margin-left: auto; font-size: 0.76rem; color: var(--color-ink-3); }
         /* [S23 T-6] 주기 훅 카드 */
         .td-cadence { border-left: 3px solid var(--color-primary); padding: 6px 12px; }
         .tc-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: none; padding: 8px 2px; cursor: pointer; font-family: var(--font-sans); }

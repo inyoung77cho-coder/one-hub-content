@@ -238,6 +238,12 @@
 html {
   font-size: 16px;
   scroll-behavior: smooth;
+  /* [S24-4] OS 글자 크기 설정은 계속 반영(핀치만 막고 접근성은 지킨다) */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* [S24-4] 끝에서 튕김·위로 당겨 새로고침 차단(rubber-band / pull-to-refresh) */
+  overscroll-behavior: none;
+  overscroll-behavior-y: contain;
 }
 
 body {
@@ -248,8 +254,23 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  min-height: 100dvh; /* [S24-4] 주소창 출렁임 방지(지원 브라우저는 dvh 채택) */
   overflow-x: hidden;
+  overscroll-behavior: none;
+  /* [S24-4] 두 번 탭 확대·탭 하이라이트 제거 — 앱 느낌 */
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
+
+/* [S24-4] 비텍스트 UI(버튼·링크·헤더·탭·배지)는 길게 눌러도 선택 메뉴가 뜨지 않게. 본문 텍스트·입력은 선택 유지. */
+button, a, [role="button"], [role="tab"], nav, header, .td-seg, .pwa-tabs, .pwa-subtabs {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+input, textarea, select, [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
+/* [S24-4] 관성 스크롤(iOS) */
+.pwa-shell, .td, main, [class*="-wrap"] { -webkit-overflow-scrolling: touch; }
 
 a { color: inherit; text-decoration: none; }
 button { background: none; border: none; cursor: pointer; font: inherit; }

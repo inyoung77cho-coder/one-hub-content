@@ -33,6 +33,7 @@ export default function Settings() {
   const [health, setHealth] = useState(null);
   const [tokenSec, setTokenSec] = useState(null);
   const [theme, setTheme] = useState("light");
+  const [allowZoom, setAllowZoom] = useState(false); // [S24-4] 화면 확대 허용(핀치 탈출구)
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMsg, setPushMsg] = useState("");
@@ -79,6 +80,7 @@ export default function Settings() {
 
   useEffect(() => {
     try { setTheme(localStorage.getItem("onehub_theme") || "light"); } catch {}
+    try { setAllowZoom(localStorage.getItem("onehub_allow_zoom") === "1"); } catch {}
     try { setTrader(localStorage.getItem("onehub_trader") || "A"); } catch {}
     try { setOpsView(localStorage.getItem("onehub_ops_view") === "1"); } catch {}
     loadHealth();
@@ -274,6 +276,16 @@ export default function Settings() {
               <span className="l">{dark ? "다크 모드" : "라이트 모드"}</span>
               <button className="tbtn" onClick={toggleTheme}>{dark ? "☀️ 라이트로" : "🌙 다크로"}</button>
             </div>
+            {/* [S24-4] 핀치 확대 탈출구(WCAG 1.4.4) — 켜면 두 손가락 확대가 되살아난다. */}
+            <div className="row" style={{ marginTop: 12, borderTop: "1px solid var(--color-line)", paddingTop: 12 }}>
+              <span className="l">화면 확대 허용</span>
+              <button className="tbtn" onClick={() => {
+                const next = !allowZoom; setAllowZoom(next);
+                try { localStorage.setItem("onehub_allow_zoom", next ? "1" : "0"); } catch (e) {}
+                try { window.dispatchEvent(new Event("onehub-zoom-change")); } catch (e) {}
+              }}>{allowZoom ? "켜짐" : "꺼짐"}</button>
+            </div>
+            <div className="hint">기본은 앱처럼 확대를 막습니다. 글자를 크게 보려면 켜세요(OS 글자 크기 설정은 항상 반영됩니다).</div>
           </div>
 
           {/* 계정 */}

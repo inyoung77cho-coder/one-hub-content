@@ -2,8 +2,9 @@ import "../styles/globals.css";
 import Nav from "../components/Nav";
 import EngineVersionBanner from "../components/EngineVersionBanner";
 import SplashScreen from "../components/SplashScreen";
+import InstallPrompt from "../components/InstallPrompt"; // [S24-4] 홈 화면 추가 유도(3일차 1회)
 import Head from "next/head";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/router";
 import { Analytics } from "@vercel/analytics/react";
 import { initSync } from "../lib/syncManager";
@@ -17,6 +18,19 @@ export default function App({ Component, pageProps }) {
   const router = useRouter();
   const isPWARoute = router.pathname.startsWith("/pwa");
   const isHome = router.pathname === "/"; // 홈은 자체 네이비 nav 사용 → 전역 Nav 숨김
+
+  // [S24-4] PWA 화면 앱 느낌 — 핀치 확대 차단(user-scalable=no). 단 설정의 '화면 확대 허용' 토글로 되살릴 수 있게
+  //   런타임 viewport 를 바꾼다(WCAG 1.4.4 탈출구). 마케팅 페이지는 각자 viewport 를 선언하므로 영향 없음.
+  const [allowZoom, setAllowZoom] = useState(false);
+  useEffect(() => {
+    const read = () => { try { setAllowZoom(localStorage.getItem("onehub_allow_zoom") === "1"); } catch (e) {} };
+    read();
+    window.addEventListener("onehub-zoom-change", read);
+    return () => window.removeEventListener("onehub-zoom-change", read);
+  }, []);
+  const vpContent = allowZoom
+    ? "width=device-width, initial-scale=1, viewport-fit=cover"
+    : "width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no, maximum-scale=1";
 
   // [공용기기 방어] 로그인한 사용자가 이 기기의 직전 사용자와 다르면 로컬 상태를 초기화한다.
   //   로그아웃 없이 다음 사람이 로그인하는 경우(가장 흔함)까지 커버. 초기화 시 1회 새로고침.
@@ -75,6 +89,8 @@ export default function App({ Component, pageProps }) {
   return (
     <>
       <Head>
+        {/* [S24-4] PWA 화면만 앱 뷰포트(핀치 차단·safe-area). 마케팅 페이지는 자체 viewport 로 override. */}
+        {isPWARoute && <meta name="viewport" content={vpContent} />}
         <meta name="google-site-verification" content="Sqkl2VEdEQR2Calqdn4Fxa4QzLTk56dNTvpJBaMuIEs" />
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
         <link rel="manifest" href="/manifest.json" />
@@ -90,6 +106,7 @@ export default function App({ Component, pageProps }) {
       {/* [S17-0 Part3] 엔진 버전·계약 불일치를 PWA 전 화면에서 알린다.
           한 화면만 정직하면 의미가 없다. 정상이면 아무것도 그리지 않는다. */}
       {isPWARoute && <EngineVersionBanner />}
+      {isPWARoute && <InstallPrompt />}
       <Component {...pageProps} />
       <Analytics />
     </>
