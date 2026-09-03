@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
+import AudioPlaylist from "../../components/shared/AudioPlaylist"; // [S24-10] 언어별 연속 재생
 
 // 상단 대메뉴 = 경제영어(en) / 중국어(zh) / 일반영어(gen). 각 대메뉴 아래 하위 메뉴로 계층 구분.
 const MODES = [
@@ -872,6 +873,12 @@ export default function EnglishPage() {
                     : <LessonCard key={l.id} lesson={l} lang={lang} />
                 ))}
               </div>
+              {/* [S24-10] 오늘의 듣기 — 같은 언어 항목을 이어서(한 편 끝나면 자동 다음). 원문 오디오가 있는 편만. */}
+              {(() => {
+                const list = feed.items.filter((l) => l && l.id && l.has_audio !== false).map((l) => ({ id: l.id, title: l.title || l.headline || l.topic || `${(lang === "zh" ? TRACK_KO_ZH : TRACK_KO)[l.track] || l.track || ""} 학습`, src: `/api/english/audio/${l.id}` }));
+                if (!list.length) return null;
+                return <AudioPlaylist items={list} storageKey={`onehub_listen_pos_${mode}`} title={`${mode === "zh" ? "🇨🇳 중국어" : mode === "gen" ? "🇺🇸 일반영어" : "🇺🇸 경제영어"} 오늘의 듣기 · ${list.length}편 [이어 듣기]`} />;
+              })()}
             </>
           )}
 

@@ -20,6 +20,8 @@ import { taxFocusOf, currentMonth } from "../../lib/taxCalendar"; // [S23 T-7] �
 import { getTodayCadence } from "../../lib/todayCadence"; // [S23 T-6] 주간·월간·분기 훅
 import { recordVisit } from "../../lib/visitLog"; // [S23 T-10] 방문일 계기판(스트릭 배지 아님)
 import useSwipeTabs from "../../components/shared/useSwipeTabs"; // [S24-5] 페이지 내 좌우 탭 스와이프
+import { briefingScript } from "../../lib/briefingScript"; // [S24-9] 오늘 브리핑 대본(화면과 같은 소스)
+import BriefingSpeak from "../../components/BriefingSpeak"; // [S24-9] 한국어 읽어주기
 import { deriveUrgency, deriveStance } from "../../components/shared/KisHoldingsCard"; // [S20-3] 조치 판정 규칙 재사용(복제 금지)
 import { computeAiFreshness } from "../../lib/aiFreshness"; // [S20-3] AI 갱신 상태(AI 탭과 공유)
 import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta, getHistory as getAssetHistory, getAssetSeries } from "../../lib/assetHistory"; // [S20-3/S23 T-4/S24-1] 총자산 전일 대비·곡선(단위 일관)
@@ -500,6 +502,20 @@ export default function TodayPage({ announcements = [] }) {
     .sort((a, b) => a.dist - b.dist)
     .slice(0, 3)
     .map((x) => ({ code: x.p.code, name: x.p.name, entry: Number(x.p.current_price) || null, dist: x.dist }));
+  // [S24-9] 오늘 브리핑 대본 — 화면과 같은 값(운용자산·조치·판단 경과)으로. S24-1 이후라 숫자 정합.
+  const briefScript = (() => {
+    try {
+      const d = new Date();
+      return briefingScript({
+        dateLabel: `${d.getMonth() + 1}월 ${d.getDate()}일`,
+        headUk, hasResidence, deltaUk: headDelta,
+        todoCount: todoStock.length,
+        positionCount: positions.length,
+        progress: verdictProgress,
+        aiLine: aiFreshness && typeof aiFreshness.line === "string" ? aiFreshness.line : null,
+      });
+    } catch (e) { return ""; }
+  })();
 
   return (
     <div className="td" onTouchStart={swipe.onTouchStart} onTouchMove={swipe.onTouchMove} onTouchEnd={swipe.onTouchEnd}>
@@ -571,6 +587,8 @@ export default function TodayPage({ announcements = [] }) {
             })()}
             {at && <span className="tds-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
           </div>
+          {/* [S24-9] 오늘 요약 한국어로 들려주기 — 출퇴근·운전 중. 버튼 탭에서만 재생(iOS), MediaSession. */}
+          {briefScript && <div className="tds-speakrow"><BriefingSpeak script={briefScript} /></div>}
           {/* [S23 T-2] 총자산·실거주는 작은 줄로(assets.js 와 같은 문구·기호). 시세 갱신은 판단 성과와 분리. */}
           {hasResidence && (
             <div className="tds-subtotals">
@@ -1214,6 +1232,7 @@ export default function TodayPage({ announcements = [] }) {
         .tc-s { font-size: 0.76rem; color: var(--color-ink-2); word-break: keep-all; }
         .tc-arrow { flex: none; color: var(--color-ink-3); font-size: 1.1rem; }
         .etf1-taxnum { margin-top: 6px; font-size: 0.74rem; color: var(--color-ink-2); font-variant-numeric: tabular-nums; }
+        .tds-speakrow { margin: 6px 0 2px; }
         .tds-actbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
         .tds-actrow { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); text-align: left; }
         .tds-badge { flex-shrink: 0; font-size: 0.6rem; font-weight: 800; border: 1px solid; border-radius: 999px; padding: 1px 6px; }

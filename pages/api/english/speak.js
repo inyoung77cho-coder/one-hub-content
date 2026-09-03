@@ -9,9 +9,11 @@ export default async function handler(req, res) {
     res.setHeader("Allow", "GET");
     return res.status(405).end();
   }
-  const text = String(req.query.text || "").trim().slice(0, 200);
+  // [S24-9] 한국어 브리핑은 문장이 길어 600자까지. 그 외(단어·표현)는 종전대로.
+  const langIn = req.query.language;
+  const language = langIn === "zh" ? "zh" : langIn === "ko" ? "ko" : "en";
+  const text = String(req.query.text || "").trim().slice(0, language === "ko" ? 600 : 200);
   if (!text) return res.status(400).json({ error: "text required" });
-  const language = req.query.language === "zh" ? "zh" : "en";
   // [사용자 지시 2026-08-30] 중국어 나레이터를 남성으로. 실제 음성 선택은 백엔드(:5005 edge-tts)가
   //   하므로 여기서는 voice 를 그대로 넘겨만 준다(허용 목록으로 제한 — 임의 문자열 전달 금지).
   //   백엔드가 voice 를 아직 모르면 무시하고 기본 음성을 쓰므로 이 변경만으로는 깨지지 않는다.
