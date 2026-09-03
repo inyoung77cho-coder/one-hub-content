@@ -4,7 +4,7 @@
 //   ★이어 듣기 위치 기억(localStorage, 기기별이 자연스러워 SYNC 대상 아님).
 import { useRef, useState, useEffect, useCallback } from "react";
 
-export default function AudioPlaylist({ items = [], storageKey = "onehub_listen_pos", title = "오늘의 듣기" }) {
+export default function AudioPlaylist({ items = [], storageKey = "onehub_listen_pos", title = "오늘의 듣기", onComplete }) {
   const [idx, setIdx] = useState(-1);       // -1 = 정지
   const [playing, setPlaying] = useState(false);
   const audioRef = useRef(null);
@@ -21,7 +21,7 @@ export default function AudioPlaylist({ items = [], storageKey = "onehub_listen_
     if (!a) {
       a = new Audio();
       audioRef.current = a;
-      a.onended = () => { const cur = a._i; const n = (cur == null ? 0 : cur) + 1; if (n < itemsRef.current.length) playAt(n); else { setPlaying(false); } };
+      a.onended = () => { const cur = a._i; try { onComplete && onComplete(cur); } catch (e) {} const n = (cur == null ? 0 : cur) + 1; if (n < itemsRef.current.length) playAt(n); else { setPlaying(false); } }; // [S24-12] 한 편 끝까지(100%) = 청취 완료
       a.onerror = () => setPlaying(false);
     }
     a._i = i;

@@ -3,8 +3,74 @@ import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
 import { useRouter } from "next/router";
+import { useState, useEffect } from "react";
+import { earn as earnToken } from "../../lib/activityToken"; // [S24-12] 주간 리포트 열람 토큰(주 1회)
+import { getTrader as getTraderWk } from "../../lib/trader";
 import ReportShell from "../../components/shared/ReportShell";
 import ShareButton from "../../components/ShareButton";
+
+// [S24-11] 부동산 주간 현황 — 기존 :5002 주간 리포트(/api/pwa/re/weekly, weekly_report.py 크론)를 재사용.
+//   새 수집기 없음. 실거래가 없던 주도 "없음"을 정직하게. 분기로 움직이는 시장의 '주간 관찰 기록'.
+function isoWeekLabel() {
+  const d = new Date();
+  const day = (d.getDay() + 6) % 7;
+  const th = new Date(d); th.setDate(d.getDate() - day + 3);
+  const firstTh = new Date(th.getFullYear(), 0, 4);
+  const wk = 1 + Math.round(((th - firstTh) / 86400000 - 3 + ((firstTh.getDay() + 6) % 7)) / 7);
+  const mon = new Date(d); mon.setDate(d.getDate() - day);
+  const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+  const fmt = (x) => `${x.getMonth() + 1}/${x.getDate()}`;
+  return { label: `${th.getFullYear()}년 ${wk}주차`, range: `${fmt(mon)}~${fmt(sun)}` };
+}
+function RealEstateWeekly() {
+  const [re, setRe] = useState(null);
+  const [done, setDone] = useState(false);
+  useEffect(() => {
+    try { earnToken("weekly", getTraderWk()); } catch (e) {} // [S24-12] 주간 리포트 열람(주 1회 상한)
+    fetch("/api/pwa/re/weekly")
+      .then((r) => r.json())
+      .then((d) => {
+        setRe(d && !d.error ? d : null); setDone(true);
+        try {
+          const trades = d && (d.total_trades ?? d.trades ?? (Array.isArray(d.items) ? d.items.length : null));
+          if (d && !d.error) localStorage.setItem("onehub_re_weekly", JSON.stringify({ ts: Date.now(), trades: trades ?? null, leader: d.leader || d.leader_apt || null, leaderPrice: d.leader_price ?? d.price84_uk ?? null }));
+        } catch (e) {}
+      })
+      .catch(() => setDone(true));
+  }, []);
+  const wk = isoWeekLabel();
+  const trades = re ? (re.total_trades ?? re.trades ?? (Array.isArray(re.items) ? re.items.length : null)) : null;
+  const summary = re ? (re.summary || re.headline || re.note || null) : null;
+  return (
+    <div className="rew">
+      <div className="rew-h">🏠 부동산 주간 현황 <span className="rew-wk">{wk.label} ({wk.range})</span></div>
+      {!done ? (
+        <div className="rew-q">불러오는 중…</div>
+      ) : re ? (
+        <>
+          {summary && <p className="rew-s">{summary}</p>}
+          <div className="rew-row">
+            {re.leader || re.leader_apt ? <span>지역 대장 <b>{re.leader || re.leader_apt}</b>{re.leader_price ?? re.price84_uk ? ` ${(re.leader_price ?? re.price84_uk)}억` : ""}</span> : null}
+            <span>{trades != null ? (trades > 0 ? `지난주 실거래 ${trades}건` : "지난주 실거래 없음") : "실거래 집계 준비 중"}</span>
+          </div>
+          <div className="rew-note">부동산은 분기·연 단위로 움직입니다 — 주간은 관찰 기록입니다.</div>
+        </>
+      ) : (
+        <div className="rew-q">이번 주 부동산 리포트가 아직 없습니다. 매주 월요일 갱신됩니다.</div>
+      )}
+      <style jsx>{`
+        .rew { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
+        .rew-h { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
+        .rew-wk { font-size: 0.7rem; font-weight: 600; color: var(--color-ink-3); margin-left: 4px; }
+        .rew-s { font-size: 0.82rem; color: var(--color-ink-2); line-height: 1.5; margin: 0 0 8px; word-break: keep-all; }
+        .rew-row { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.8rem; color: var(--color-ink-2); }
+        .rew-row b { color: var(--color-ink); }
+        .rew-note { margin-top: 8px; font-size: 0.68rem; color: var(--color-ink-3); }
+        .rew-q { font-size: 0.8rem; color: var(--color-ink-3); }
+      `}</style>
+    </div>
+  );
+}
 
 const REGIME = { BULL: { l: "상승장", c: "var(--color-success)" }, BEAR: { l: "하락장", c: "var(--color-danger)" }, SIDEWAYS: { l: "횡보장", c: "var(--color-ink-2)" } };
 const rg = (r) => REGIME[r] || REGIME.SIDEWAYS;
@@ -14,6 +80,7 @@ export default function PwaWeekly({ reports }) {
   const router = useRouter();
   return (
     <ReportShell title="📊 주간 리포트" sub="주간 국면·평균 과열도·매매 요약 · 눌러서 상세 보기">
+      <RealEstateWeekly />
       {(!reports || reports.length === 0) ? (
         <div className="rp-empty">아직 주간 리포트가 없습니다.</div>
       ) : (

@@ -6,6 +6,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import AudioPlaylist from "../../components/shared/AudioPlaylist"; // [S24-10] 언어별 연속 재생
+import { earn, getTokens, TOKEN_DISCLAIMER } from "../../lib/activityToken"; // [S24-12] 활동 토큰(현장경제)
+import { getTrader as getTraderEn } from "../../lib/trader";
+import { useRouter } from "next/router";
 
 // 상단 대메뉴 = 경제영어(en) / 중국어(zh) / 일반영어(gen). 각 대메뉴 아래 하위 메뉴로 계층 구분.
 const MODES = [
@@ -771,8 +774,16 @@ function WeekendChat({ lang = "en" }) {
 }
 
 export default function EnglishPage() {
+  const router = useRouter();
   const [mode, setMode] = useState("en");        // en(경제영어) / zh(중국어) / gen(일반영어)
   const [tab, setTab] = useState("news");
+  const [tokBal, setTokBal] = useState(0); // [S24-12] 활동 토큰 잔액
+  useEffect(() => {
+    const read = () => { try { setTokBal(getTokens(getTraderEn())); } catch (e) {} };
+    read();
+    window.addEventListener("onehub-tokens-change", read);
+    return () => window.removeEventListener("onehub-tokens-change", read);
+  }, []);
   const [feed, setFeed] = useState({ loading: true, date: null, items: [], error: null, review: false });
   const [past, setPast] = useState({ open: false, loading: false, items: [] });
 
@@ -837,6 +848,12 @@ export default function EnglishPage() {
         ))}
       </div>
 
+      {/* [S24-12] 활동 토큰 — 여기(현장경제)와 성적표에만. 잔액을 크게 띄우지 않는다. 현금 가치 없음. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "4px 2px 10px" }}>
+        <span style={{ fontSize: "0.74rem", fontWeight: 700, color: "var(--color-ink-2)" }}>🪙 {tokBal}토큰 <i style={{ fontStyle: "normal", fontWeight: 400, fontSize: "0.66rem", color: "var(--color-ink-3)", marginLeft: 4 }}>{TOKEN_DISCLAIMER}</i></span>
+        <button type="button" onClick={() => router.push("/pwa/english-test")} style={{ marginLeft: "auto", border: "1px solid var(--color-primary)", color: "var(--color-primary)", background: "var(--color-card)", borderRadius: 8, padding: "5px 10px", fontSize: "0.74rem", fontWeight: 700, fontFamily: "var(--font-sans)", cursor: "pointer" }}>오늘 들은 내용 테스트 →</button>
+      </div>
+
       {/* 하위 메뉴 — 대메뉴별로 다름(계층). */}
       <div className="en-subtabs" role="tablist">
         {SUBTABS[mode].map(([key, ic, label]) => (
@@ -877,7 +894,7 @@ export default function EnglishPage() {
               {(() => {
                 const list = feed.items.filter((l) => l && l.id && l.has_audio !== false).map((l) => ({ id: l.id, title: l.title || l.headline || l.topic || `${(lang === "zh" ? TRACK_KO_ZH : TRACK_KO)[l.track] || l.track || ""} 학습`, src: `/api/english/audio/${l.id}` }));
                 if (!list.length) return null;
-                return <AudioPlaylist items={list} storageKey={`onehub_listen_pos_${mode}`} title={`${mode === "zh" ? "🇨🇳 중국어" : mode === "gen" ? "🇺🇸 일반영어" : "🇺🇸 경제영어"} 오늘의 듣기 · ${list.length}편 [이어 듣기]`} />;
+                return <AudioPlaylist items={list} storageKey={`onehub_listen_pos_${mode}`} title={`${mode === "zh" ? "🇨🇳 중국어" : mode === "gen" ? "🇺🇸 일반영어" : "🇺🇸 경제영어"} 오늘의 듣기 · ${list.length}편 [이어 듣기]`} onComplete={() => { try { earn("listen", getTraderEn()); } catch (e) {} }} />;
               })()}
             </>
           )}

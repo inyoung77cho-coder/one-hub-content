@@ -8,6 +8,7 @@ import BottomNav from "../../components/BottomNav";
 import { getTrader } from "../../lib/trader";
 import { getVerdictScorecard } from "../../lib/verdictStats";
 import { samplePolicy } from "../../lib/sampleSize";
+import { getTokens, TOKEN_DISCLAIMER } from "../../lib/activityToken"; // [S24-12] 외국어 항목·토큰
 
 const pct = (v) => (v == null ? "–" : `${v > 0 ? "+" : ""}${v}%`);
 
@@ -27,6 +28,19 @@ export default function RecordPage() {
 
   const pol = sc ? samplePolicy(sc.scored) : null;
   const learning = !pol || pol.tier === "learning";
+  // [S24-12] 외국어 테스트 항목 + 활동 토큰(성적표·현장경제에만 표시).
+  const [langTests, setLangTests] = useState([]);
+  const [tokens, setTokens] = useState(0);
+  useEffect(() => {
+    const readTok = () => {
+      try { setTokens(getTokens(getTrader())); } catch (e) {}
+      try { setLangTests(JSON.parse(localStorage.getItem(`onehub_lang_tests_${getTrader()}`) || "[]") || []); } catch (e) {}
+    };
+    readTok();
+    window.addEventListener("onehub-tokens-change", readTok);
+    window.addEventListener("onehub-trader-change", readTok);
+    return () => { window.removeEventListener("onehub-tokens-change", readTok); window.removeEventListener("onehub-trader-change", readTok); };
+  }, []);
 
   return (
     <div className="rec-wrap">
@@ -104,6 +118,23 @@ export default function RecordPage() {
             )}
           </>
         )}
+
+        {/* [S24-12] 외국어 항목 + 활동 토큰 — 성적표(와 현장경제)에만. 잔액을 홈 상단에 띄우지 않음. */}
+        <section className="rec-card">
+          <div className="rec-card-h">🌏 외국어 · 활동 토큰</div>
+          <div className="rec-row"><span>활동 토큰</span><b>{tokens}</b><span className="rec-sub">{TOKEN_DISCLAIMER}</span></div>
+          {langTests.length > 0 ? (
+            <>
+              <div className="rec-row"><span>외국어 테스트</span><b>{langTests.length}회</b></div>
+              {langTests.slice(-3).reverse().map((t, i) => (
+                <div className="rec-row" key={i}><span>{t.date}</span><b>{t.score}/{t.total} 정답</b></div>
+              ))}
+            </>
+          ) : (
+            <p className="rec-quiet">아직 외국어 테스트 기록이 없습니다. 현장경제에서 오늘 들은 내용을 테스트해 보세요.</p>
+          )}
+          <button className="rec-cta" onClick={() => router.push("/pwa/english-test")}>오늘 들은 내용 테스트 →</button>
+        </section>
       </main>
       <BottomNav />
       <style jsx>{`
