@@ -26,6 +26,7 @@ import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta, getHi
 import Sparkline from "../../components/shared/Sparkline"; // [S23 T-4] 총자산 스파크라인(종합자산과 공용)
 import { getSnapshots as getDuelSnapshots } from "../../lib/portfolioDuel"; // [S20-3] 대결 결과 배너 판정용
 import { getTodayDecision, getLedger as getVerdictLedger } from "../../lib/verdictLedger"; // [S23 T-1/T-5] 판단 기록·재등장 판정
+import { getVerdictScorecard } from "../../lib/verdictStats"; // [S24-8] 성적표 상시 진입 요약
 import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S23 T-1] 가격 확보→기록(추천 카드와 공유)
 import { cachedJson } from "../../lib/quoteCache"; // [S20-3] /api/pwa-ai-daily 중복 GET dedup
 import TraderBadge from "../../components/shared/TraderBadge";
@@ -474,6 +475,31 @@ export default function TodayPage({ announcements = [] }) {
     positions.forEach((p) => { const sl = Number(p.stop_loss) || 0; const cur = Number(p.current_price) || 0; if (sl > 0 && cur > 0) { const d = (cur / sl - 1) * 100; if (best == null || d < best) best = d; } });
     return best;
   })();
+  // [S24-7] 조치가 없어도 매일 바뀌는 진짜 콘텐츠 = 내 과거 판단의 경과. 최근 판단 3건의 이후 수익률.
+  const priceByCode = (() => { const m = {}; positions.forEach((p) => { if (p.code) m[String(p.code)] = Number(p.current_price) || 0; }); return m; })();
+  const verdictProgress = (() => {
+    let led = [];
+    try { led = getVerdictLedger(trader) || []; } catch (e) {}
+    return led
+      .filter((e) => e.code && Number(e.entry) > 0)
+      .sort((a, b) => (b.ts || 0) - (a.ts || 0))
+      .slice(0, 3)
+      .map((e) => {
+        const cur = priceByCode[String(e.code)] || null;
+        const ret = cur > 0 ? (cur / Number(e.entry) - 1) * 100 : null;
+        const days = Math.max(0, Math.floor((Date.now() - (e.ts || Date.now())) / 86400000));
+        const mature = days >= 3;
+        const correct = ret == null ? null : (e.decision === "pass" ? ret < 0 : ret >= 0);
+        return { code: e.code, name: e.name || e.code, decision: e.decision, ret, days, mature, correct, backfilled: !!e.entry_backfilled };
+      });
+  })();
+  // [S24-7] 판단 기록이 아예 없을 때 — 손절선 최근접 3종목(관망 버튼용).
+  const observeStocks = [...positions]
+    .filter((p) => p.code && Number(p.current_price) > 0 && !getTodayDecision(p.code, trader))
+    .map((p) => { const sl = Number(p.stop_loss) || 0; const cur = Number(p.current_price) || 0; return { p, dist: sl > 0 ? (cur / sl - 1) * 100 : 999 }; })
+    .sort((a, b) => a.dist - b.dist)
+    .slice(0, 3)
+    .map((x) => ({ code: x.p.code, name: x.p.name, entry: Number(x.p.current_price) || null, dist: x.dist }));
 
   return (
     <div className="td" onTouchStart={swipe.onTouchStart} onTouchMove={swipe.onTouchMove} onTouchEnd={swipe.onTouchEnd}>
@@ -734,10 +760,42 @@ export default function TodayPage({ announcements = [] }) {
         <section className="card sc td-promote" style={{ order: 2 }}>
           <div className="sc-h">오늘의 할 일 · 주식</div>
           {todoStock.length === 0 && todoNoti.length === 0 ? (
-            <div className="sc-empty">
-              {positions.length > 0
-                ? <>오늘은 손댈 게 없습니다 · {positions.length}종목 모두 유지 구간{nearestStopPct != null ? ` · 손절선 최근접 ${nearestStopPct.toFixed(1)}%` : ""}</>
-                : "오늘은 특별히 할 일이 없어요"}
+            /* [S24-7] 조용한 날에도 판단 카드는 비어 있지 않다. 우선순위 폭포: 경과 → 관찰 → 안내. */
+            <div className="sc-quiet">
+              {verdictProgress.length > 0 ? (
+                <>
+                  <div className="sc-empty">오늘은 손댈 게 없습니다{positions.length > 0 ? ` · ${positions.length}종목 모두 유지 구간` : ""}{nearestStopPct != null ? ` · 손절선 최근접 ${nearestStopPct.toFixed(1)}%` : ""}</div>
+                  <div className="sc-prog-h">내 판단, 그 뒤로</div>
+                  {verdictProgress.map((v) => (
+                    <div className="sc-prog-row" key={v.code}>
+                      <span className="sc-prog-nm">{v.days}일 전 {v.decision === "take" ? "보유" : "관망"} 판단 · {v.name}{v.backfilled && <i className="sc-prog-est"> (진입가 추정)</i>}</span>
+                      <span className={`sc-prog-ret ${v.ret == null ? "" : v.ret >= 0 ? "up" : "dn"}`}>
+                        {v.ret == null ? "집계 중" : `${v.ret >= 0 ? "+" : ""}${v.ret.toFixed(1)}%`}
+                        {v.mature && v.correct != null ? (v.correct ? " ✓" : " ✗") : (v.ret != null ? " · 진행 중" : "")}
+                      </span>
+                    </div>
+                  ))}
+                </>
+              ) : observeStocks.length > 0 ? (
+                <>
+                  <div className="sc-empty">오늘 조치할 종목은 없습니다 · {positions.length}종목 모두 유지 구간</div>
+                  <div className="sc-prog-h">가장 가까운 종목을 관망으로 남겨두면 나중에 성적표에 잡힙니다</div>
+                  {observeStocks.map((o) => {
+                    const rec = recorded[o.code];
+                    return (
+                      <div className="sc-drow" key={o.code}>
+                        <div className="sc-dbody"><span className="sc-t">{o.name}</span><span className="sc-s">손절선까지 {Math.abs(o.dist).toFixed(1)}%</span></div>
+                        {rec ? <span className="sc-recorded">✓ 관망 기록됨 · {rec.at}</span> : (
+                          <div className="sc-decbtns"><button type="button" className="sc-decb pass" onClick={() => recordTodo({ code: o.code, name: o.name, entry: o.entry }, "pass")}>관망</button></div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  <div className="sc-note-quiet">기록하지 않아도 됩니다.</div>
+                </>
+              ) : (
+                <div className="sc-empty">{positions.length > 0 ? "오늘은 특별히 할 일이 없어요" : "증권사 계좌를 연동하면 보유 종목의 조치·판단이 여기 올라옵니다."}</div>
+              )}
             </div>
           ) : (
             <div className="sc-list">
@@ -769,9 +827,17 @@ export default function TodayPage({ announcements = [] }) {
               ))}
             </div>
           )}
-          {recordedCount > 0 && (
-            <button type="button" className="sc-record-link" onClick={() => router.push("/pwa/record")}>오늘 {recordedCount}건 기록 · 내 판단 성적표 보기 →</button>
-          )}
+          {/* [S24-8] 성적표 상시 진입 — 기록 유무와 무관하게 항상 한 줄. 닭·달걀 문제 해소. */}
+          {(() => {
+            let vs = null; try { vs = getVerdictScorecard(trader); } catch (e) {}
+            const total = vs ? vs.total : 0;
+            let txt;
+            if (recordedCount > 0) txt = `오늘 ${recordedCount}건 기록 · 내 판단 성적표 →`;
+            else if (total === 0) txt = "아직 판단 기록이 없습니다 · 성적표가 어떤 화면인지 보기 →";
+            else if (vs && vs.scored < 30) txt = `내 판단 ${total}건 · ${Math.max(0, 30 - vs.scored)}건 더 쌓이면 승률을 판정합니다 · 성적표 →`;
+            else txt = `내 판단 ${total}건${vs && vs.winRate != null ? ` · 승률 ${vs.winRate}%` : ""} · 성적표 →`;
+            return <button type="button" className="sc-record-link" onClick={() => router.push("/pwa/record")}>{txt}</button>;
+          })()}
         </section>
         </div>)}
 
@@ -1214,6 +1280,16 @@ export default function TodayPage({ announcements = [] }) {
         .sc-record-link { width: 100%; margin-top: 10px; border: none; background: none; text-align: left; font-size: 0.78rem; font-weight: 700; color: var(--color-primary); cursor: pointer; font-family: var(--font-sans); padding: 4px 2px; }
         .sc-readrow { display: block; width: 100%; text-align: left; background: none; border: none; border-bottom: 1px solid var(--color-line); padding: 9px 2px; cursor: pointer; font-family: var(--font-sans); }
         .sc-readrow:last-child { border-bottom: none; }
+        /* [S24-7] 조용한 날 — 내 판단 경과 / 오늘의 관찰 */
+        .sc-prog-h { font-size: 0.74rem; font-weight: 700; color: var(--color-ink-3); margin: 10px 0 6px; word-break: keep-all; }
+        .sc-prog-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 0.8rem; padding: 5px 0; border-bottom: 1px solid var(--color-line); }
+        .sc-prog-row:last-child { border-bottom: none; }
+        .sc-prog-nm { color: var(--color-ink-2); }
+        .sc-prog-est { font-style: normal; font-size: 0.66rem; color: var(--color-ink-3); }
+        .sc-prog-ret { font-variant-numeric: tabular-nums; font-weight: 700; flex: none; }
+        .sc-prog-ret.up { color: var(--color-success, #16a34a); }
+        .sc-prog-ret.dn { color: var(--color-danger, #dc2626); }
+        .sc-note-quiet { font-size: 0.7rem; color: var(--color-ink-3); margin-top: 8px; }
         .etf1-reco { background: var(--color-primary-soft); border-radius: 11px; padding: 12px 13px; margin-bottom: 10px; }
         .etf1-nm { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); }
         .etf1-why { font-size: 0.78rem; color: var(--color-ink-2); line-height: 1.5; margin-top: 5px; word-break: keep-all; }

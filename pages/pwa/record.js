@@ -38,10 +38,29 @@ export default function RecordPage() {
         {!ready ? (
           <div className="rec-card"><p className="rec-quiet">불러오는 중…</p></div>
         ) : !sc || sc.total === 0 ? (
-          <div className="rec-card">
-            <p className="rec-quiet">아직 남긴 판단이 없습니다. 추천·대결 카드에서 <b>샀어요/관망</b>을 누르면 3거래일 뒤부터 채점됩니다.</p>
-            <button className="rec-cta" onClick={() => router.push("/pwa?tab=recommend")}>추천 보러 가기 →</button>
-          </div>
+          /* [S24-8] 0건이어도 빈 화면 대신 '무엇이 보이게 될지'를 예시로. 실제인 척하지 않는다. */
+          <>
+            <div className="rec-card">
+              <p className="rec-quiet">아직 남긴 판단이 없습니다. 오늘 화면·추천·대결 카드에서 <b>매도/보유/관망</b>을 누르면 3거래일 뒤부터 채점됩니다.</p>
+              <button className="rec-cta" onClick={() => router.push("/pwa/today")}>오늘 화면에서 판단 남기기 →</button>
+            </div>
+            <div className="rec-ex-badge">아래는 <b>예시</b>입니다 · 실제 데이터가 아닙니다</div>
+            <div className="rec-card rec-ex">
+              <div className="rec-card-h">나 vs AI <span className="rec-sub">채점된 판단 평균</span></div>
+              <div className="rec-vs">
+                <div className="rec-vs-c"><span>나</span><b className="pos">+3.4%</b></div>
+                <div className="rec-vs-c"><span>AI(전부 매매)</span><b className="pos">+1.1%</b></div>
+              </div>
+              <p className="rec-verdict">내 판단이 AI보다 +2.3% 앞섭니다.</p>
+            </div>
+            <div className="rec-grid rec-ex">
+              <div className="rec-kpi"><span>승률</span><b>58%</b><i>산 건 오르고, 관망한 건 내렸으면 정답</i></div>
+              <div className="rec-kpi"><span>관망 비율</span><b>70%</b><i>10번 중 7번 관망</i></div>
+              <div className="rec-kpi"><span>놓친 수익</span><b className="neg">+2.1%</b><i>관망한 3건이 그 뒤 올랐습니다</i></div>
+              <div className="rec-kpi"><span>판단 성향</span><b>신중형</b><i>관망 비율로 본 스타일</i></div>
+            </div>
+            <p className="rec-foot">판단을 남기면 위 화면이 <b>내 실제 숫자</b>로 채워집니다.</p>
+          </>
         ) : (
           <>
             {/* 모수 — getVerdictStats 단일 소스 */}
@@ -112,6 +131,8 @@ export default function RecordPage() {
         .rec-kpi b { display: block; font-size: 1.15rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; margin: 2px 0; }
         .rec-kpi i { font-style: normal; font-size: 0.68rem; color: var(--color-ink-3); line-height: 1.4; word-break: keep-all; }
         .rec-foot { font-size: 0.7rem; color: var(--color-ink-3); line-height: 1.5; margin: 12px 2px 0; word-break: keep-all; }
+        .rec-ex-badge { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-2); background: var(--color-warning-soft, var(--inset-bg, rgba(0,0,0,0.04))); border-radius: 8px; padding: 7px 11px; margin: 4px 0 10px; text-align: center; }
+        .rec-ex { border-style: dashed; opacity: 0.9; }
         .pos { color: var(--color-success, #16a34a); }
         .neg { color: var(--color-danger, #dc2626); }
       `}</style>
