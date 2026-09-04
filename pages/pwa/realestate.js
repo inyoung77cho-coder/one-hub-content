@@ -11,6 +11,7 @@ import RePositionCard, { RegionLeadersCard, RegionForecastCard, MoveDifficultyCa
 import { ensureDailySnapshot } from "../../lib/dailySnapshot"; // [S22-3] 총자산 곡선 적립 backstop
 import useSwipeTabs from "../../components/shared/useSwipeTabs"; // [S25-5] 분석↔시나리오 스와이프
 import SegTabs from "../../components/shared/SegTabs"; // [S26-5] 공용 세그먼트 탭
+import ReNewHigh from "../../components/ReNewHigh"; // [S28-10] 신고가(없으면 안 뜸)
 import { estimateSellCost, MOVE_COST_DISCLAIMER } from "../../lib/moveCost"; // [S22-9] 갈아타기 거래비용
 import ReIncomeSummaryCard from "../../components/ReIncomeSummaryCard";
 
@@ -250,6 +251,9 @@ export default function RealEstateDashboard() {
         <SegTabs items={[{ key: "analysis", label: "분석" }, { key: "scenario", label: "시나리오" }]}
           index={reTab === "scenario" ? 1 : 0} onChange={(i) => setReTab(RE_TABS[i])} ariaLabel="부동산 분석/시나리오" />
       </div>
+
+      {/* [S28-10] 신고가 — 부동산 화면 최상단(내 단지 우선). 신고가 없는 날엔 렌더 안 함. */}
+      <ReNewHigh />
 
       {/* [item1] 부동산 찾기 — 단지 검색 + 대장 아파트 + 관심지역(동) */}
       {reSearchOpen && (

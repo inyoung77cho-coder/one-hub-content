@@ -53,6 +53,14 @@ export default function MaintenanceShop() {
         )}
       </div>
 
+      {/* [S28-9] 다른 엔진 관측 — 제안은 아직 없음(채점 기준 미정). 서버에 매일 적립 중. */}
+      <div className="ms-card">
+        <div className="ms-h">다른 엔진 관측 <span className="ms-sub">수집 중 · 제안 없음</span></div>
+        <div className="ms-row"><span className="ms-k">🏠 부동산(적정가 vs 실거래 오차)</span><span className="ms-hold">수집 중</span></div>
+        <div className="ms-row"><span className="ms-k">💹 ETF(추천 vs 4주 수익)</span><span className="ms-hold">수집 중 · 이력 축적</span></div>
+        <div className="ms-foot" style={{ marginTop: 8 }}>주식 엔진과 달리 채점 기준부터 정해야 합니다. 기준 없이 제안을 만들면 근거 없는 숫자가 나오므로, 지금은 매일 관측만 쌓습니다.</div>
+      </div>
+
       <div className="ms-foot">숫자는 표본이 충분할 때만 판정합니다. 2~3건으로 규칙을 바꾸면 노이즈를 학습합니다. 백테스트가 좋다고 미래가 좋은 것은 아닙니다.</div>
 
       <style jsx>{`
