@@ -14,6 +14,7 @@ import { getTargetClass, setTargetClass, computeClassDrift, topDriftMessage, CLA
 import { pickInsight } from "../../lib/crossInsight"; // [S22-10] 자산군 교차 인사이트(하나만)
 import TraderBadge from "../../components/shared/TraderBadge";
 import AppHeader from "../../components/AppHeader";
+import SegTabs from "../../components/shared/SegTabs";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
 import LastUpdated from "../../components/LastUpdated";
@@ -230,9 +231,13 @@ export default function AssetsMapPage() {
         {/* [사용자 지시] 주식 페이지의 보유/추천을 상위 메뉴바 바로 아래 탭으로 — "주식" 뷰에서만 노출 */}
         {view === 0 && (
           <>
-          <div className="as-stocktabs">
-            <button type="button" className={`as-st-btn ${stockTab === "hold" ? "on" : ""}`} onClick={() => setStockTab("hold")}>보유</button>
-            <button type="button" className={`as-st-btn ${stockTab === "recommend" ? "on" : ""}`} onClick={() => setStockTab("recommend")}>추천</button>
+          <div style={{ margin: "0 2px 12px" }}>
+            <SegTabs
+              items={[{ key: "hold", label: "보유" }, { key: "recommend", label: "추천" }]}
+              index={stockTab === "recommend" ? 1 : 0}
+              onChange={(i) => setStockTab(i === 1 ? "recommend" : "hold")}
+              ariaLabel="주식 보유/추천"
+            />
           </div>
           {/* [사용자 지적] 보유↔추천을 눌러도 첫 화면(자산 지도 카드)이 똑같아 '탭이 바뀌었나'를
               알 수 없었다. 탭 바로 아래에 그 탭에서만 달라지는 한 줄을 둬 전환을 눈으로 확인시킨다. */}
@@ -534,71 +539,69 @@ export default function AssetsMapPage() {
         .as-row.ex { opacity: 0.72; }
         .as-dotc.ex { background: repeating-linear-gradient(45deg, var(--color-ink-3) 0 2px, transparent 2px 4px); }
         .as-hd { display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top, 0px) + 12px) 2px 10px; }
-        .as-logo { font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--color-ink); background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
+        .as-logo { font-weight: 800; font-size: var(--fs-6); letter-spacing: -.5px; color: var(--color-ink); background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
         .as-dot { color: var(--color-success); }
         .as-ic { display: flex; align-items: center; gap: 8px; }
-        .as-search { width: 34px; height: 34px; border-radius: 50%; background: var(--color-card); border: none; display: grid; place-items: center; font-size: 15px; cursor: pointer; box-shadow: var(--shadow-card); }
-        .as-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; }
+        .as-search { width: 34px; height: 34px; border-radius: 50%; background: var(--color-card); border: none; display: grid; place-items: center; font-size: var(--fs-5); cursor: pointer; box-shadow: var(--shadow-card); }
+        .as-title { display: flex; align-items: center; gap: 8px; font-size: var(--fs-6); font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; }
         .as-fixed { flex-shrink: 0; }
-        .as-sub { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
-        .as-fresh { margin-left: auto; font-size: 0.68rem; }
+        .as-sub { font-size: var(--fs-2); font-weight: 600; color: var(--color-ink-3); }
+        .as-fresh { margin-left: auto; font-size: var(--fs-1); }
         /* [사용자 지시] "주식" 뷰 전용 보유/추천 탭 — 상위 메뉴바(타이틀) 바로 아래 */
-        .as-stocktabs { display: flex; gap: 6px; margin: 0 2px 12px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 4px; box-shadow: var(--shadow-card); }
-        .as-st-btn { flex: 1; min-height: 36px; border: none; background: none; border-radius: 9px; color: var(--color-ink-2); font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
-        .as-st-btn.on { background: var(--color-primary); color: var(--color-on-primary); }
+        /* [S26-5] as-stocktabs → 공용 SegTabs 로 이관(정본). 죽은 규칙 제거. */
         /* [사용자 지적] 탭 전용 한 줄 — 탭을 눌렀을 때 첫 화면에서 무엇이 달라졌는지 보여주는 유일한 줄 */
-        .as-tabnote { margin: -6px 4px 12px; font-size: 0.72rem; line-height: 1.5; color: var(--color-ink-2); word-break: keep-all; }
+        .as-tabnote { margin: -6px 4px 12px; font-size: var(--fs-2); line-height: 1.5; color: var(--color-ink-2); word-break: keep-all; }
         .as-tabnote b { color: var(--color-ink); font-weight: 800; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         /* [S25-4] 자산군 요약 카드 캐러셀 */
         .as-sumcard { touch-action: pan-y; }
-        .as-sum-h { display: flex; align-items: center; font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
+        .as-sum-h { display: flex; align-items: center; font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
         .as-sum-dots { margin-left: auto; display: flex; gap: 5px; }
         .as-sum-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--color-line); cursor: pointer; }
         .as-sum-dots i.on { background: var(--color-primary); }
-        .as-sum-val { font-size: 1.4rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+        .as-sum-val { font-size: var(--fs-7); font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; }
         .as-sum-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
-        .as-sum-drift { font-size: 0.76rem; color: var(--color-ink-2); }
-        .as-sum-more { margin-top: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-primary); border-radius: 9px; padding: 8px 14px; font-size: 0.78rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .as-sum-drift { font-size: var(--fs-2); color: var(--color-ink-2); }
+        .as-sum-more { margin-top: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-primary); border-radius: var(--radius-sm); padding: 8px 14px; font-size: var(--fs-2); font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .as-total { display: flex; align-items: baseline; gap: 8px; }
-        .as-total span { font-size: 0.78rem; font-weight: 600; color: var(--color-ink-3); }
-        .as-total b { font-size: 1.5rem; font-weight: 800; color: var(--color-ink); }
+        .as-total span { font-size: var(--fs-2); font-weight: 600; color: var(--color-ink-3); }
+        .as-total b { font-size: var(--fs-7); font-weight: 800; color: var(--color-ink); }
         .as-trend { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
-        .as-trend .as-dchip { font-size: 0.84rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .as-trend .as-dchip { font-size: var(--fs-3); font-weight: 800; font-variant-numeric: tabular-nums; }
         .as-trend .as-dchip.up { color: var(--color-success, #0E9E6A); }
         .as-trend .as-dchip.down { color: var(--color-danger, #E5484D); }
         .as-trend .as-dchip.flat { color: var(--color-ink-3); }
-        .as-trend .as-dlabel { font-size: 0.7rem; color: var(--color-ink-3); font-weight: 600; }
+        .as-trend .as-dlabel { font-size: var(--fs-1); color: var(--color-ink-3); font-weight: 600; }
         .as-spark { width: 84px; height: 26px; flex: 0 0 auto; margin-left: auto; }
-        .as-dnew { font-size: 0.72rem; color: var(--color-ink-3); line-height: 1.5; margin: 6px 0 0; word-break: keep-all; }
+        .as-dnew { font-size: var(--fs-2); color: var(--color-ink-3); line-height: 1.5; margin: 6px 0 0; word-break: keep-all; }
         /* [KIS 투자 현황] */
         .kis-sum { border-left: 4px solid var(--color-primary); }
-        .ks-h { display: flex; align-items: center; gap: 8px; font-size: 0.86rem; font-weight: 800; color: var(--color-ink); }
-        .ks-sub { font-size: 0.66rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 8px; }
-        .ks-fresh { margin-left: auto; font-size: 0.66rem; }
-        .ks-total { font-size: 1.7rem; font-weight: 800; color: var(--color-ink); letter-spacing: -.5px; margin-top: 8px; font-variant-numeric: tabular-nums; }
-        .ks-total em { font-style: normal; font-size: 0.9rem; font-weight: 700; color: var(--color-ink-3); margin-left: 2px; }
+        .ks-h { display: flex; align-items: center; gap: 8px; font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); }
+        .ks-sub { font-size: var(--fs-1); font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 8px; }
+        .ks-fresh { margin-left: auto; font-size: var(--fs-1); }
+        .ks-total { font-size: var(--fs-8); font-weight: 800; color: var(--color-ink); letter-spacing: -.5px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+        .ks-total em { font-style: normal; font-size: var(--fs-4); font-weight: 700; color: var(--color-ink-3); margin-left: 2px; }
         .ks-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-        .ks-dchip { font-size: 0.74rem; font-weight: 800; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 4px; background: var(--color-card-soft); border-radius: 8px; padding: 4px 9px; }
-        .ks-dchip i { font-style: normal; font-size: 0.62rem; font-weight: 600; color: var(--color-ink-3); }
+        .ks-dchip { font-size: var(--fs-2); font-weight: 800; font-variant-numeric: tabular-nums; display: inline-flex; align-items: center; gap: 4px; background: var(--color-card-soft); border-radius: var(--radius-sm); padding: 4px 9px; }
+        .ks-dchip i { font-style: normal; font-size: var(--fs-1); font-weight: 600; color: var(--color-ink-3); }
         .ks-dchip.up { color: var(--color-success, #0E9E6A); } .ks-dchip.down { color: var(--color-danger, #E5484D); } .ks-dchip.flat { color: var(--color-ink-3); }
         .ks-split { display: flex; height: 10px; border-radius: 999px; overflow: hidden; margin-top: 14px; background: var(--color-card-soft); }
         .ks-split i { display: block; height: 100%; }
         .ks-split i.stk { background: var(--color-primary); }
         .ks-split i.csh { background: var(--color-warning, #E8A33D); }
         .ks-cells { display: flex; gap: 10px; margin-top: 12px; }
-        .ks-cell { flex: 1; background: var(--color-card-soft); border-radius: 12px; padding: 11px 12px; }
-        .ks-ck { display: block; font-size: 0.68rem; font-weight: 700; color: var(--color-ink-2); }
-        .ks-cell b { display: block; font-size: 1.02rem; font-weight: 800; color: var(--color-ink); margin-top: 4px; font-variant-numeric: tabular-nums; }
-        .ks-cs { display: block; font-size: 0.64rem; color: var(--color-ink-3); margin-top: 3px; }
-        .ks-note { font-size: 0.66rem; color: var(--color-ink-3); line-height: 1.5; margin-top: 12px; word-break: keep-all; }
-        .as-rd { font-size: 0.66rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .ks-cell { flex: 1; background: var(--color-card-soft); border-radius: var(--radius-md); padding: 11px 12px; }
+        .ks-ck { display: block; font-size: var(--fs-1); font-weight: 700; color: var(--color-ink-2); }
+        .ks-cell b { display: block; font-size: var(--fs-5); font-weight: 800; color: var(--color-ink); margin-top: 4px; font-variant-numeric: tabular-nums; }
+        .ks-cs { display: block; font-size: var(--fs-1); color: var(--color-ink-3); margin-top: 3px; }
+        .ks-note { font-size: var(--fs-1); color: var(--color-ink-3); line-height: 1.5; margin-top: 12px; word-break: keep-all; }
+        .as-rd { font-size: var(--fs-1); font-weight: 700; font-variant-numeric: tabular-nums; }
         .as-rd.up { color: var(--color-success, #0E9E6A); }
         .as-rd.down { color: var(--color-danger, #E5484D); }
         .as-rd.flat { color: var(--color-ink-3); }
         .as-arrow { color: var(--color-primary); font-weight: 800; flex-shrink: 0; }
-        .as-arrow.sm { font-size: 0.8rem; }
-        .as-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 12px; }
+        .as-arrow.sm { font-size: var(--fs-3); }
+        .as-h { font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); margin-bottom: 12px; }
         .as-map { display: flex; align-items: center; gap: 14px; }
         /* [N5] 좁은 화면에서 도넛과 범례가 나란히 서면 범례 폭이 ~183px로 눌려
            '🏠 부동산'이 52px 필요한데 40px만 받아 잘린다(실측 375px).
@@ -609,8 +612,8 @@ export default function AssetsMapPage() {
           .as-legend { width: 100%; }
         }
         .as-donut { width: 92px; height: 92px; flex-shrink: 0; }
-        .as-donut-t { font-size: 8px; fill: var(--color-ink-3); font-weight: 700; }
-        .as-donut-v { font-size: 11px; fill: var(--color-ink); font-weight: 800; }
+        .as-donut-t { font-size: var(--fs-1); fill: var(--color-ink-3); font-weight: 700; }
+        .as-donut-v { font-size: var(--fs-1); fill: var(--color-ink); font-weight: 800; }
         .as-legend { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
         /* [N5-2] 범례 잘림 — 그리드 아이템 기본 min-width:auto 라 이름 칸이 안 줄어 잘렸다(M1과 동일 원인).
            min-width:0 을 줘야 ellipsis 가 실제로 동작한다. 숫자는 tabular-nums 로 자릿수 정렬. */
@@ -618,39 +621,39 @@ export default function AssetsMapPage() {
         .as-row:last-child { border-bottom: none; }
         .as-row:last-child { border-bottom: none; }
         .as-dotc { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-        .as-rl { min-width: 0; font-size: 0.78rem; font-weight: 700; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .as-rv { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1.2; font-size: 0.78rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
-        .as-rv em { font-style: normal; font-weight: 600; color: var(--color-ink-3); font-size: 0.72rem; }
-        .as-rp { font-size: 0.68rem; color: var(--color-ink-3); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; min-width: 38px; }
-        .as-add { width: 100%; margin-top: 14px; min-height: 44px; border: 1px dashed var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-ink-2); border-radius: 11px; font-size: 0.84rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .as-rl { min-width: 0; font-size: var(--fs-2); font-weight: 700; color: var(--color-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .as-rv { display: inline-flex; flex-direction: column; align-items: flex-end; line-height: 1.2; font-size: var(--fs-2); font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+        .as-rv em { font-style: normal; font-weight: 600; color: var(--color-ink-3); font-size: var(--fs-2); }
+        .as-rp { font-size: var(--fs-1); color: var(--color-ink-3); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; min-width: 38px; }
+        .as-add { width: 100%; margin-top: 14px; min-height: 44px; border: 1px dashed var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-ink-2); border-radius: var(--radius-sm); font-size: var(--fs-3); font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         /* [N1] 총자산 불완전 고지 — 숫자 바로 아래. 눈에 띄되 공포를 팔지 않는다. */
-        .as-incomplete { margin: 8px 0 0; font-size: 0.74rem; line-height: 1.5; color: var(--color-warning); word-break: keep-all; }
+        .as-incomplete { margin: 8px 0 0; font-size: var(--fs-2); line-height: 1.5; color: var(--color-warning); word-break: keep-all; }
         /* [S19-1] 동기화 대기 안내 안의 재시도 — 문장 흐름을 끊지 않는 인라인 버튼 */
-        .as-sync-retry { border: none; background: none; padding: 0; margin-left: 4px; color: var(--color-primary); font-size: 0.74rem; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-family: var(--font-sans); }
+        .as-sync-retry { border: none; background: none; padding: 0; margin-left: 4px; color: var(--color-primary); font-size: var(--fs-2); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font-family: var(--font-sans); }
         /* [N6] 이상 평단 확인 — 경고색(빨강) 아님. 사용자 잘못이라 단정하지 않는다. */
-        .as-fix-q { font-size: 0.8rem; line-height: 1.55; color: var(--color-ink-2); margin: 0 0 10px; word-break: keep-all; }
+        .as-fix-q { font-size: var(--fs-3); line-height: 1.55; color: var(--color-ink-2); margin: 0 0 10px; word-break: keep-all; }
         .as-fix-cta, .as-fix-edit { display: flex; gap: 8px; align-items: center; }
-        .as-fix-b { flex: 0 0 auto; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; padding: 9px 14px; font-size: 0.78rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .as-fix-b { flex: 0 0 auto; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: var(--radius-sm); padding: 9px 14px; font-size: var(--fs-2); font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .as-fix-b.p { border-color: var(--color-primary); color: var(--color-primary); }
-        .as-fix-in { flex: 1 1 0; min-width: 0; border: 1px solid var(--color-line); border-radius: 9px; padding: 9px 10px; font-size: 0.82rem; font-family: var(--font-sans); background: var(--color-card); color: var(--color-ink); font-variant-numeric: tabular-nums; }
-        .as-vc-cta { width: 100%; min-height: 42px; border: 1px solid var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-primary); border-radius: 10px; font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .as-fix-in { flex: 1 1 0; min-width: 0; border: 1px solid var(--color-line); border-radius: var(--radius-sm); padding: 9px 10px; font-size: var(--fs-3); font-family: var(--font-sans); background: var(--color-card); color: var(--color-ink); font-variant-numeric: tabular-nums; }
+        .as-vc-cta { width: 100%; min-height: 42px; border: 1px solid var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-primary); border-radius: var(--radius-sm); font-size: var(--fs-3); font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         /* [사용자 지시] "주식" 뷰 — 계좌현황 + 보유/추천 분할 요약 */
         .as-vc-acct { margin-bottom: 12px; }
-        .as-vc-acct-lbl { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-3); margin-bottom: 2px; }
-        .as-vc-acct-total { font-size: 1.2rem; font-weight: 900; font-family: ui-monospace, monospace; color: var(--color-ink); }
-        .as-vc-acct-sub { font-size: 0.78rem; color: var(--color-ink-2); margin-top: 2px; }
+        .as-vc-acct-lbl { font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-3); margin-bottom: 2px; }
+        .as-vc-acct-total { font-size: var(--fs-6); font-weight: 900; font-family: ui-monospace, monospace; color: var(--color-ink); }
+        .as-vc-acct-sub { font-size: var(--fs-2); color: var(--color-ink-2); margin-top: 2px; }
         .as-vc-acct-sub b { font-weight: 800; }
         .as-vc-acct-sub b.up { color: var(--color-success); } .as-vc-acct-sub b.dn { color: var(--color-danger); }
-        .as-vc-empty { font-size: 0.78rem; color: var(--color-ink-2); padding: 6px 2px; }
+        .as-vc-empty { font-size: var(--fs-2); color: var(--color-ink-2); padding: 6px 2px; }
         /* [사용자 지시] 보유/추천 탭 전체 목록(핵심 정보만 간결하게) */
         .as-sl-list { display: flex; flex-direction: column; margin-bottom: 12px; }
-        .as-sl-row { display: flex; align-items: baseline; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--color-line); font-size: 0.8rem; }
+        .as-sl-row { display: flex; align-items: baseline; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--color-line); font-size: var(--fs-3); }
         .as-sl-row:last-child { border-bottom: none; }
         .as-sl-name { color: var(--color-ink); font-weight: 700; flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .as-sl-mid { flex: 1; min-width: 0; color: var(--color-ink-3); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .as-sl-mid { flex: 1; min-width: 0; color: var(--color-ink-3); font-size: var(--fs-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .as-sl-row .up { color: var(--color-success); font-weight: 700; flex: none; }
         .as-sl-row .dn { color: var(--color-danger); font-weight: 700; flex: none; }
-        .as-note { font-size: 0.7rem; color: var(--color-ink-3); text-align: center; margin-top: 6px; line-height: 1.5; word-break: keep-all; }
+        .as-note { font-size: var(--fs-1); color: var(--color-ink-3); text-align: center; margin-top: 6px; line-height: 1.5; word-break: keep-all; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>
