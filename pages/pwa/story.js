@@ -163,8 +163,10 @@ export default function PwaStory({ episodes = [] }) {
           </div>
         </section>
       )}
+      {/* [S29-11] 지역 댓글은 회차 아래로 · 제목을 '우리 동네 이야기'로(기대를 낮춘다) ·
+          이번 회차가 있으면 그것에 대해 남기도록 유도 */}
       <section className="card">
-        <Comments date={region} />
+        <Comments date={region} title="우리 동네 이야기" topic={latestEp ? latestEp.title : ""} />
       </section>
       {/* [S29-7] 이미 만들어 둔 7화 연재를 앱 안에서 연결(놀고 있던 자산) */}
       <section className="card">

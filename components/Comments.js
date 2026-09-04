@@ -5,7 +5,9 @@ import { useState, useEffect } from "react";
 
 const CATS = ["전체", "주식", "ETF", "부동산"];
 
-export default function Comments({ date }) {
+export default function Comments({ date, title = "이야기", topic = "" }) {
+  // [S29-11] title="우리 동네 이야기" 로 기대를 낮추고, topic(이번 회차 제목)이 있으면
+  //   빈 화면에 대고 쓰는 대신 "이번 회차에 대해" 쓰도록 유도한다.
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
@@ -96,7 +98,7 @@ export default function Comments({ date }) {
   return (
     <div className="comments-section">
       <h3 className="comments-title">
-        <span>이야기</span>
+        <span>{title}</span>
         <span className="comments-count">{comments.length}</span>
       </h3>
 
@@ -115,7 +117,11 @@ export default function Comments({ date }) {
             <button type="button" className="comments-retry" onClick={fetchComments}>다시 시도</button>
           </div>
         ) : visible.length === 0 ? (
-          <div className="comments-empty">{filter === "전체" ? "아직 댓글이 없습니다. 첫 이야기를 남겨보세요!" : `${filter} 카테고리 글이 아직 없습니다.`}</div>
+          <div className="comments-empty">{filter !== "전체"
+            ? `${filter} 카테고리 글이 아직 없습니다.`
+            : topic
+              ? `이번 회차 「${topic}」, 당신 생각은 어때요? 먼저 한마디 남겨보세요.`
+              : "아직 이야기가 없습니다. 첫 이야기를 남겨보세요!"}</div>
         ) : (
           visible.map((c) => (
             <div key={c.id} className="comment-item">
@@ -151,7 +157,7 @@ export default function Comments({ date }) {
             ))}
           </div>
           <textarea className="comment-textarea"
-            placeholder="오늘 시장, 종목, 뭐든 자유롭게 이야기해보세요 (최대 500자)"
+            placeholder={topic ? `이번 회차 「${topic}」에 대해, 또는 우리 동네 이야기 (최대 500자)` : "오늘 시장, 종목, 뭐든 자유롭게 이야기해보세요 (최대 500자)"}
             value={text} onChange={(e) => setText(e.target.value)}
             maxLength={500} rows={3} />
           <div className="comment-form-footer">

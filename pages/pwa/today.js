@@ -44,7 +44,7 @@ import MarketStatusBadge from "../../components/MarketStatusBadge";
 import RotatingPageTitle from "../../components/RotatingPageTitle";
 import ShareButton from "../../components/ShareButton";
 import FeedbackButton from "../../components/FeedbackButton";
-import { getAnnouncements } from "../../lib/reports";
+import { getAnnouncements, getLatestEpisodeAnnounce } from "../../lib/reports";
 
 const CAT_KO = { global: "글로벌", macro: "거시", markets: "증시", realestate: "부동산", policy: "정책", affairs: "시사" };
 // [사용자 지시] 오늘의 이야기 — 주식/부동산/ETF/기타 카드 구분. Comments.js 카테고리는 전체/주식/ETF/부동산이라
@@ -1173,34 +1173,31 @@ export default function TodayPage({ announcements = [] }) {
 
         {/* ══ Youtube/단톡방 업데이트 공지 — [확인 완료] content/announcements/*.md,
              관리자가 직접 커밋(content/daily와 동일 패턴, 새 백엔드 없음) ══ */}
-        {view === 3 && (
+        {/* [S29-11] 공지 = 회차 발행(getStaticProps 폴백). 둘 다 없으면 카드 자체를 숨긴다(빈 공지 카드 금지). */}
+        {view === 3 && announcements.length > 0 && (
           <section className="card tile">
             <div className="tile-h">📢 업데이트 공지</div>
-            {announcements.length > 0 ? (
-              <div className="story-cat-list">
-                {announcements.map((a) => (
-                  a.url ? (
-                    <a className="story-announce-row" key={a.date + a.title} href={a.url} target="_blank" rel="noopener noreferrer">
-                      <span className="mini-ic">{a.icon}</span>
-                      <span className="mini-body">
-                        <span className="mini-t">{a.title}</span>
-                        {a.body && <span className="mini-s">{a.body}</span>}
-                      </span>
-                    </a>
-                  ) : (
-                    <div className="story-announce-row" key={a.date + a.title}>
-                      <span className="mini-ic">{a.icon}</span>
-                      <span className="mini-body">
-                        <span className="mini-t">{a.title}</span>
-                        {a.body && <span className="mini-s">{a.body}</span>}
-                      </span>
-                    </div>
-                  )
-                ))}
-              </div>
-            ) : (
-              <div className="tile-empty">아직 등록된 공지가 없어요.</div>
-            )}
+            <div className="story-cat-list">
+              {announcements.map((a) => (
+                a.url ? (
+                  <a className="story-announce-row" key={a.date + a.title} href={a.url} target={a.url.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer">
+                    <span className="mini-ic">{a.icon}</span>
+                    <span className="mini-body">
+                      <span className="mini-t">{a.title}</span>
+                      {a.body && <span className="mini-s">{a.body}</span>}
+                    </span>
+                  </a>
+                ) : (
+                  <div className="story-announce-row" key={a.date + a.title}>
+                    <span className="mini-ic">{a.icon}</span>
+                    <span className="mini-body">
+                      <span className="mini-t">{a.title}</span>
+                      {a.body && <span className="mini-s">{a.body}</span>}
+                    </span>
+                  </div>
+                )
+              ))}
+            </div>
           </section>
         )}
 
@@ -1436,6 +1433,12 @@ export default function TodayPage({ announcements = [] }) {
 
 // [이야기 탭 공지] content/announcements/*.md — 관리자가 파일을 커밋하면 노출(가짜 공지 없음).
 export async function getStaticProps() {
-  return { props: { announcements: getAnnouncements(5) }, revalidate: 300 };
+  // [S29-11] 공지 파일이 없으면 최신 회차를 공지로(회차 발행이 곧 공지). 둘 다 없으면 빈 배열 → 카드 자체를 숨긴다.
+  let announcements = getAnnouncements(5);
+  if (announcements.length === 0) {
+    const ep = getLatestEpisodeAnnounce();
+    if (ep) announcements = [ep];
+  }
+  return { props: { announcements }, revalidate: 300 };
 }
 
