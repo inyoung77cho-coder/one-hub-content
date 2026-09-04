@@ -11,6 +11,7 @@ import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS, getOtherAssets, addOtherAsset, removeOtherAsset, updateOtherAsset, sellOtherAsset, OTHER_KINDS, saneEtfAvg } from "../../lib/etfHoldings";
 import AvgPriceWarningCard from "../../components/shared/AvgPriceWarningCard"; // [S22-1] 이상 평단 확인 카드(주식·ETF 공용)
 import useSwipeTabs from "../../components/shared/useSwipeTabs"; // [S25-5] 보유↔추천 스와이프
+import EtfTrendTheme from "../../components/EtfTrendTheme"; // [S25-8/9] 추세·테마·비중 조정(예측 없음)
 import { ensureDailySnapshot } from "../../lib/dailySnapshot"; // [S22-3] 총자산 곡선 적립 backstop
 import { taxFocusOf, isTaxSeason, currentMonth } from "../../lib/taxCalendar"; // [S22-8] ETF 세금 달력(평시 접힘)
 import { classifyEtf } from "../../lib/etfClassify";
@@ -903,6 +904,15 @@ export default function EtfDashboard() {
 
       {/* [ETF 재구성 Phase1] 보유 탭 상단 — 테마별 분배 도넛(지역/섹터) */}
       {etfTab === "hold" && <EtfAllocationPie items={perfItems} overlap={overlap} perfMap={perfMap} />}
+
+      {/* [S25-8/9] 보유 ETF 추세(30일·4주)·테마별 변화·비중 조정(관찰·산수, 예측 없음) */}
+      {etfTab === "hold" && (() => {
+        const th = okHoldings.map((h) => ({ ticker: h.ticker, valueKrw: holdingMetrics(h).valueKrw }));
+        if (!th.length) return null;
+        let tgt = null;
+        try { const t = JSON.parse(localStorage.getItem("onehub_target_alloc") || "null"); tgt = t?.region || t || null; } catch (e) {}
+        return <EtfTrendTheme holdings={th} targetAlloc={tgt} />;
+      })()}
 
       {/* [ETF 재구성 Phase1] 추천 탭 상단 — 규칙기반 ETF 종목 추천 + 이유 */}
       {etfTab === "rec" && (
