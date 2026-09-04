@@ -3,6 +3,7 @@ import { dedupBy } from '../../lib/useDedup';
 import ReportShell from '../../components/shared/ReportShell';
 import { samplePolicy } from '../../lib/sampleSize';
 import { aggregateByCategory } from '../../lib/ruleMap';
+import EngineProposals from '../../components/EngineProposals';
 
 export default function AccuracyPage() {
   const [data, setData] = useState(null);
@@ -121,8 +122,11 @@ export default function AccuracyPage() {
                   </div>
                 ))}
               </div>
-              <div className="ac-imp-foot">개선 제안은 최근 검증 결과에서 자동 산출됩니다. 실제 차단 기준 반영은 주간 리뷰에서 확정됩니다.</div>
+              <div className="ac-imp-foot">위는 '어느 규칙이 약해 보이나'(관측)입니다. 실제 조정 제안은 아래에서 표본·백테스트 기준을 통과할 때만 올라옵니다.</div>
             </section>
+
+            {/* [S28-6] 승인 대기 제안(백테스트·근거·한계 포함) — 승인해도 서버는 안 바뀜(패치·명령만) */}
+            <EngineProposals />
 
             {/* [S28-3] 차단 사유별 — 카테고리로 묶고, 표본 30건 미만은 '판정 보류'(정확도·색 안 붙임) */}
             <section className="ac-card">
