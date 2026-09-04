@@ -2,14 +2,19 @@
 //   ＋(빠른입력)은 하단 BottomNav의 FAB가 담당. ⚙️(설정)은 하단 탭에서 빠져 상단 버튼으로 이동(ⓒ).
 //   로고=오늘(홈) 이동. 검색=AI 종목 검색(onSearch 있으면 그걸, 없으면 /pwa?tab=analyze 이동).
 import { useRouter } from "next/router";
+import { useState } from "react";
+import dynamic from "next/dynamic";
 import TraderBadge from "./shared/TraderBadge";
-import FeedbackButton from "./FeedbackButton";
+// [S29-4] 헤더 오른쪽은 🔍 · ⚙️ 둘만. 의견 버튼은 설정 안으로 이동(엄지 안 닿는 자리에서 뺌).
+// [S29-5] 🔍 는 페이지 이동이 아니라 맥락 검색 시트를 연다(동적 로드 — 열 때만).
+const SearchSheet = dynamic(() => import("./SearchSheet"), { ssr: false });
 
 export default function AppHeader({ onSearch }) {
   const router = useRouter();
+  const [searchOpen, setSearchOpen] = useState(false);
   const search = () => {
     if (typeof onSearch === "function") onSearch();
-    else router.push("/pwa?tab=analyze");
+    else setSearchOpen(true);
   };
   return (
     <header className="apphd">
@@ -18,10 +23,10 @@ export default function AppHeader({ onSearch }) {
       </button>
       <div className="apphd-actions">
         <TraderBadge />
-        <button type="button" className="apphd-search" onClick={search} aria-label="AI 종목 검색" title="AI 종목 검색">🔍</button>
-        <FeedbackButton variant="icon" />
+        <button type="button" className="apphd-search" onClick={search} aria-label="검색" title="검색">🔍</button>
         <button type="button" className="apphd-search" onClick={() => router.push("/pwa/settings")} aria-label="설정" title="설정">⚙️</button>
       </div>
+      {searchOpen && <SearchSheet onClose={() => setSearchOpen(false)} />}
       <style jsx>{`
         .apphd {
           position: sticky; top: 0; z-index: 140;

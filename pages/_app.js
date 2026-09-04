@@ -86,6 +86,15 @@ export default function App({ Component, pageProps }) {
     };
   }, [router.events]);
 
+  // [S29-4] 설정으로 들어갈 때 '직전 화면' 경로를 기억 — 설정의 의견 보내기가 정확한 화면 이름을 첨부하도록.
+  useEffect(() => {
+    const onStart = (url) => {
+      try { if (String(url).includes("/pwa/settings")) sessionStorage.setItem("onehub_prev_path", router.pathname); } catch (e) {}
+    };
+    router.events.on("routeChangeStart", onStart);
+    return () => router.events.off("routeChangeStart", onStart);
+  }, [router.events, router.pathname]);
+
   return (
     <>
       <Head>

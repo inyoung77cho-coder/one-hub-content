@@ -25,7 +25,7 @@ function screenName(pathname) {
   return seg.length ? seg[seg.length - 1] : "홈";
 }
 
-export default function FeedbackButton({ variant = "float" }) {
+export default function FeedbackButton({ variant = "float", screenOverride }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [cat, setCat] = useState("inconvenience");
@@ -39,7 +39,8 @@ export default function FeedbackButton({ variant = "float" }) {
     cachedJson("/api/version").then((d) => setVer(d?.version || d?.api_contract || "")).catch(() => {}); // [S21-5] dedup
   }, []);
 
-  const screen = screenName(router.pathname);
+  // [S29-4] 설정에서 열면 '설정' 대신 직전 화면(pathname)을 매핑해 첨부한다(screenOverride).
+  const screen = screenName(screenOverride || router.pathname);
 
   const submit = async () => {
     if (!msg.trim() || busy) return;
@@ -61,7 +62,7 @@ export default function FeedbackButton({ variant = "float" }) {
   const iconStyle = { width: 34, height: 34, borderRadius: "50%", background: "var(--color-card)",
     border: "none", display: "grid", placeItems: "center", fontSize: 15, cursor: "pointer", boxShadow: "var(--shadow-card)" };
   const floatStyle = { position: "fixed", left: 14, bottom: 78, zIndex: 900, width: 46, height: 46, borderRadius: 23,
-    border: "none", background: "#4f46e5", color: "#fff", fontSize: 20, boxShadow: "0 4px 14px rgba(79,70,229,0.45)", cursor: "pointer" };
+    border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 20, boxShadow: "var(--shadow-float)", cursor: "pointer" };
 
   return (
     <>
@@ -78,7 +79,7 @@ export default function FeedbackButton({ variant = "float" }) {
                 <div style={{ fontSize: 40 }}>🙏</div>
                 <div style={{ fontWeight: 800, margin: "8px 0 4px" }}>감사합니다!</div>
                 <div style={{ fontSize: 13, color: "#64748b" }}>의견을 확인 후 반영하겠습니다.</div>
-                <button onClick={close} style={{ marginTop: 16, padding: "10px 22px", borderRadius: 10, border: "none", background: "#4f46e5", color: "#fff", fontWeight: 700, cursor: "pointer" }}>닫기</button>
+                <button onClick={close} style={{ marginTop: 16, padding: "10px 22px", borderRadius: 10, border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", fontWeight: 700, cursor: "pointer" }}>닫기</button>
               </div>
             ) : (
               <>
@@ -91,8 +92,8 @@ export default function FeedbackButton({ variant = "float" }) {
                 <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
                   {CATS.map((c) => (
                     <button key={c.key} onClick={() => setCat(c.key)}
-                      style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: cat === c.key ? "2px solid #4f46e5" : "1px solid #e2e8f0",
-                        background: cat === c.key ? "rgba(79,70,229,0.10)" : "transparent", color: "var(--color-ink,#0f172a)",
+                      style={{ flex: 1, padding: "9px 0", borderRadius: 10, border: cat === c.key ? "2px solid var(--color-primary)" : "1px solid #e2e8f0",
+                        background: cat === c.key ? "var(--color-primary-soft)" : "transparent", color: "var(--color-ink,#0f172a)",
                         fontSize: 13, fontWeight: cat === c.key ? 800 : 500, cursor: "pointer" }}>
                       {c.emoji} {c.label}
                     </button>
@@ -105,7 +106,7 @@ export default function FeedbackButton({ variant = "float" }) {
 
                 <button onClick={submit} disabled={busy || !msg.trim()}
                   style={{ width: "100%", marginTop: 12, height: 46, borderRadius: 12, border: "none",
-                    background: busy || !msg.trim() ? "#94a3b8" : "#4f46e5", color: "#fff", fontSize: 15, fontWeight: 800, cursor: busy ? "wait" : "pointer" }}>
+                    background: busy || !msg.trim() ? "#94a3b8" : "var(--color-primary)", color: "var(--color-on-primary)", fontSize: 15, fontWeight: 800, cursor: busy ? "wait" : "pointer" }}>
                   {busy ? "보내는 중…" : "보내기"}
                 </button>
                 <div style={{ fontSize: 11, color: "#94a3b8", textAlign: "center", marginTop: 8 }}>계정·화면·버전은 자동으로 함께 전송됩니다.</div>

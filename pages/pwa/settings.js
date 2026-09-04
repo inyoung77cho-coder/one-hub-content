@@ -203,7 +203,7 @@ export default function Settings() {
           <button type="button" className="hd-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">ONE<span className="hd-dot">·</span>HUB</button>
           <div className="hd-ic">
             <button type="button" className="hd-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색" title="AI 종목 검색">🔍</button>
-            <FeedbackButton variant="icon" />
+            <FeedbackButton variant="icon" screenOverride={(typeof window !== "undefined" && sessionStorage.getItem("onehub_prev_path")) || undefined} />
           </div>
         </header>
         <h1 className="hd-title">⚙️ 설정</h1>
