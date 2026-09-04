@@ -1,6 +1,7 @@
 // ONE-HUB v10 — ETF / Asset Intelligence 대시보드 (P7, 작업지시서 §11.2)
 // 독립 라우트. 확정값(수익3단분해·세금·중복도)은 진한색/실선. 예측(Forecast)은 시나리오 투영(참고용·확정 아님).
 // ★ 단일 점수 블랙박스 금지 — Portfolio Score는 구성요소를 펼쳐 보여준다(§11.2).
+import { cachedJson } from "../../lib/quoteCache";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import BottomNav from "../../components/BottomNav";
@@ -229,7 +230,7 @@ export default function EtfDashboard() {
   useEffect(() => {
     const load = () => {
       const tr = getTrader(); // [§3-8] 선택된 계좌(A/B) 반영
-      const g = (fn) => fetch(`/api/pwa/etf/${fn}?trader=${tr}`).then((r) => r.json());
+      const g = (fn) => cachedJson(`/api/pwa/etf/${fn}?trader=${tr}`);
       Promise.all([g("report"), g("tax"), g("overlap"), g("rebalance")])
         .then(([r, t, o, rb]) => {
           if (r.error || t.error) setErr(r.error || t.error);
@@ -311,7 +312,7 @@ export default function EtfDashboard() {
   const refreshAll = useCallback(() => {
     setRefreshing(true);
     const tr = getTrader();
-    const g = (fn) => fetch(`/api/pwa/etf/${fn}?trader=${tr}`).then((r) => r.json());
+    const g = (fn) => cachedJson(`/api/pwa/etf/${fn}?trader=${tr}`);
     Promise.all([g("report"), g("tax"), g("overlap"), g("rebalance")])
       .then(([r, t, o, rb]) => { if (!(r.error || t.error)) { setReport(r); setTax(t); setOverlap(o); setRebal(rb); } })
       .catch(() => {});

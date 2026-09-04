@@ -2,6 +2,7 @@
 //   백엔드 = onehub-english.service(:5005), 프록시 = /api/english/[fn].
 //   학습 흐름은 ①먼저 듣기(대본 가림) → ②지문·표현 읽기 → ③다시 듣기 3단계.
 //   지문은 원문 복사가 아니라 사실만 추려 다시 쓴 학습용 텍스트(원문은 링크로).
+import { cachedJson } from "../../lib/quoteCache";
 import { useCallback, useEffect, useRef, useState } from "react";
 import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
@@ -827,8 +828,7 @@ export default function EnglishPage() {
         .then((d) => { if (alive) setFeed({ loading: false, date: null, items: d.items || [], error: d.error || null, review: true }); })
         .catch(() => alive && setFeed({ loading: false, date: null, items: [], error: "연결 실패", review: true }));
     } else {
-      fetch(`/api/english/today?track=${theme}&language=${lang}${mq}`)
-        .then((r) => r.json())
+      cachedJson(`/api/english/today?track=${theme}&language=${lang}${mq}`)
         .then((d) => { if (alive) setFeed({ loading: false, date: d.date, items: d.items || [], error: d.error || null, review: false }); })
         .catch(() => alive && setFeed({ loading: false, date: null, items: [], error: "연결 실패", review: false }));
     }

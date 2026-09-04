@@ -3,16 +3,9 @@ import Head from 'next/head';
 import Link from 'next/link';
 import PageHero from '../components/PageHero';
 import { useState, useEffect } from 'react';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-} from 'recharts';
+import dynamic from 'next/dynamic';
+// [S29-2] recharts 동적 로드(ssr:false) — 초기 번들에서 제외. 로딩 중 같은 높이 자리표시자.
+const HeatChart = dynamic(() => import('../components/shared/HeatChart'), { ssr: false, loading: () => <div style={{ height: 300 }} /> });
 
 const GRADE_COLORS = {
   HOT: '#F04452',
@@ -141,20 +134,7 @@ export default function HeatHistory() {
 
         {!loading && !error && chartData.length > 0 && (
           <div style={{ background: '#FFFFFF', borderRadius: 12, padding: '16px 8px', marginBottom: 24, border: '1px solid #E8EEF7' }}>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={chartData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#E8EEF7" />
-                <XAxis dataKey="label" stroke="#888" fontSize={11} />
-                <YAxis domain={[0, 100]} stroke="#888" fontSize={11} />
-                <Tooltip
-                  contentStyle={{ background: '#FFFFFF', border: '1px solid #E8EEF7', borderRadius: 8 }}
-                  labelStyle={{ color: '#1E293B' }}
-                />
-                <ReferenceLine y={70} stroke="#F04452" strokeDasharray="4 4" label={{ value: 'HOT', position: 'right', fill: '#F04452', fontSize: 11 }} />
-                <ReferenceLine y={30} stroke="#2F6BFF" strokeDasharray="4 4" label={{ value: 'COLD', position: 'right', fill: '#2F6BFF', fontSize: 11 }} />
-                <Line type="monotone" dataKey="heat_score" stroke="#16C784" strokeWidth={2} dot={false} name="Heat Score" />
-              </LineChart>
-            </ResponsiveContainer>
+            <HeatChart chartData={chartData} />
           </div>
         )}
 

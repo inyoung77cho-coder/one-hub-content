@@ -4,7 +4,9 @@
 //   '자산' 내부 세그먼트(종합·주식·ETF·부동산)는 각 페이지 상단 세그먼트(TopNav)가 담당.
 import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
-import QuickAddSheet from "./shared/QuickAddSheet";
+import dynamic from "next/dynamic";
+// [S29-2] 빠른입력 시트는 FAB 을 누르는 순간에만 필요 → 동적 로드(초기 번들에서 제외).
+const QuickAddSheet = dynamic(() => import("./shared/QuickAddSheet"), { ssr: false });
 
 const TABS = [
   ["today", "🎯", "오늘", "/pwa/today"],

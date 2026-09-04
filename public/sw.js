@@ -1,8 +1,9 @@
 // public/sw.js — ONE-HUB PWA Service Worker
 
 // [V1] 배포마다 갱신 → 구 SW 강제 교체 트리거. 설정 화면에도 표기(사용자가 최신 여부 확인).
-const SW_VERSION = 'v10.2-20260809';
-const CACHE_VERSION = 'onehub-v28';
+const SW_VERSION = 'v10.3-20260904';
+const CACHE_VERSION = 'onehub-v29';
+const API_CACHE = CACHE_VERSION + '-api'; // [S29-3] 읽기 전용 GET SWR 런타임 캐시
 
 // [N3] 알림 종류별 착지점 — 백엔드는 kind만 실어 보내면 된다.
 //   ★sample_30(정식 통계 열림)이 재방문 루프의 핵심: 오늘 탭 ⑤ 진행바 → 30건 도달 알림 → 열람.
@@ -30,7 +31,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key.startsWith('onehub-') && key !== CACHE_NAME)
+          .filter((key) => key.startsWith('onehub-') && key !== CACHE_NAME && key !== API_CACHE)
           .map((key) => {
             console.log('[SW] 이전 캐시 삭제:', key);
             return caches.delete(key);
@@ -43,8 +44,26 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = event.request.url;
 
-  // API 요청 → 항상 네트워크
-  if (url.includes('/api/')) return;
+  // [S29-3] API 요청 — 읽기 전용 GET 만 stale-while-revalidate(재방문 즉시 + 백그라운드 갱신).
+  //   ★쓰기(POST 등)·인증·개인 상태 변경 경로는 절대 캐시하지 않는다.
+  if (url.includes('/api/')) {
+    const noCache = /\/api\/(auth|push-|feedback|.*-pending|queue-|skip-|approve-|user\/state|comments|ops\/|me\/consent|proposals\/decide|pwa\/sell|pwa\/re\/spot)/.test(url);
+    if (event.request.method === 'GET' && !noCache) {
+      event.respondWith(
+        caches.open(API_CACHE).then((cache) =>
+          cache.match(event.request).then((cached) => {
+            const network = fetch(event.request).then((response) => {
+              if (response && response.status === 200) cache.put(event.request, response.clone());
+              return response;
+            }).catch(() => cached);
+            return cached || network; // 캐시 있으면 즉시 + 백그라운드 갱신, 없으면 네트워크
+          })
+        )
+      );
+      return;
+    }
+    return; // 그 외(쓰기 등)는 항상 네트워크 — 캐시 금지
+  }
 
   // HTML 페이지(navigation) → network-first: 항상 최신 HTML 서빙, 실패 시만 캐시
   if (event.request.mode === 'navigate') {

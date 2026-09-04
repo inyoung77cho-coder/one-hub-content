@@ -4,7 +4,9 @@
 //   컨셉: KIS 실보유(또는 1500만원 가상현금)를 기준으로 고정하고, 매일의 매수/매도 추천을
 //   수용하는 "AI"와 내 선택대로만 반영하는 "나" 두 포트폴리오 총액을 하나의 라인차트로 비교.
 import { useEffect, useState, useCallback } from "react";
-import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from "recharts";
+import dynamic from "next/dynamic";
+// [S29-2] recharts 는 대결 카드를 여는 사람만 내려받게 — 동적 로드(ssr:false). 로딩 중엔 같은 높이 자리표시자(튐 방지).
+const DuelChart = dynamic(() => import("./shared/DuelChart"), { ssr: false, loading: () => <div style={{ height: 160 }} /> });
 import { getTrader } from "../lib/trader";
 import { fetchStockQuotes } from "../lib/stockLive";
 import {
@@ -322,23 +324,7 @@ export default function PortfolioDuelCard() {
       )}
       {err && <div className="pd-err">{err}</div>}
 
-      {chartData.length > 1 && (
-        <ResponsiveContainer width="100%" height={160}>
-          <LineChart data={chartData} margin={{ top: 6, right: 8, left: 0, bottom: 0 }}>
-            <XAxis dataKey="label" stroke="var(--color-ink-3)" fontSize={10} tickLine={false} />
-            <YAxis
-              domain={["dataMin", "dataMax"]}
-              tickFormatter={wonCompact}
-              stroke="var(--color-ink-3)"
-              fontSize={10}
-              tickLine={false}
-              width={52}
-            />
-            <Line type="monotone" dataKey="나" stroke="var(--color-success)" strokeWidth={2} dot={{ r: 2 }} />
-            <Line type="monotone" dataKey="AI" stroke="var(--purple, #8b5cf6)" strokeWidth={2} dot={{ r: 2 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      )}
+      {chartData.length > 1 && <DuelChart chartData={chartData} formatY={wonCompact} />}
       {chartData.length <= 1 && <div className="pd-chart-empty">매일 접속할 때마다 그날 평가액이 한 점씩 쌓입니다 — 아직 한 점뿐이라 그래프는 내일부터 보여요.</div>}
 
       {(buyCands.length > 0 || sellCands.length > 0) && (

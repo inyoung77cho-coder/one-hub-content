@@ -31,7 +31,9 @@ import ShareButton from '../../components/ShareButton';
 import RotatingPageTitle from '../../components/RotatingPageTitle';
 import useSwipeTabs from '../../components/shared/useSwipeTabs'; // [S25-1] AI 3섹션 스와이프
 import SegTabs from '../../components/shared/SegTabs'; // [S26-5] 공용 세그먼트 탭
-import MaintenanceShop from '../../components/MaintenanceShop'; // [S28-7] 정비소(운영자 전용)
+import dynamic from 'next/dynamic';
+// [S29-2] 정비소는 운영자만 여는 화면 → 동적 로드(초기 번들에서 제외).
+const MaintenanceShop = dynamic(() => import('../../components/MaintenanceShop'), { ssr: false, loading: () => <div style={{ minHeight: 200 }} /> });
 import { getIsOperator } from '../../lib/isOperator';
 import { getEngineImprovement } from '../../lib/engineImprovement';
 import AiJudgeCard from '../../components/AiJudgeCard'; // [S25-2] 심판석 판정 카드

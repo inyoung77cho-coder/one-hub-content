@@ -101,4 +101,15 @@ printf "[측정] 카드 클래스 정의(이름 card): %s  (목표 1)\n" "$M3"
 printf "[측정] 탭 구현체(클래스 루트)     : %s  (목표 1)\n" "$M4"
 printf "[측정] 하단여백 토큰 미적용 페이지: %s  (목표 0)\n" "$M5"
 
+echo "── [S29-1] 성능 계측 (FAIL 아님 · 숫자만) ──"
+P1=""; for f in index today english etf; do n=$(grep -cE "fetch\(|cachedJson\(" pages/pwa/$f.js 2>/dev/null); P1="$P1$f $n · "; done
+P2=$(grep -rlE "next/dynamic" pages components lib 2>/dev/null | grep -viE "\.bak" | wc -l)
+# cachedJson 미적용 = fetch 를 쓰는데 cachedJson 을 안 import 한 pwa 페이지 수
+P3=0; for f in $(ls pages/pwa/*.js 2>/dev/null | grep -vE '\.bak|pwa_index_new'); do if grep -qE "fetch\(" "$f" && ! grep -qE "cachedJson" "$f"; then P3=$((P3+1)); fi; done
+P4F=$(wc -l pages/pwa/*.js 2>/dev/null | grep -v total | sort -rn | head -1)
+printf "[성능] 페이지별 마운트 API 요청 : %s\n" "${P1%· }"
+printf "[성능] next/dynamic 사용처       : %s  (목표 3+)\n" "$P2"
+printf "[성능] cachedJson 미적용 페이지  : %s  (목표 0)\n" "$P3"
+printf "[성능] 최대 페이지 줄 수         : %s\n" "$P4F"
+
 echo "FAIL=$F"; [ "$F" -eq 0 ]
