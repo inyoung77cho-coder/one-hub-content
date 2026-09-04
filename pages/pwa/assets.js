@@ -15,6 +15,7 @@ import { pickInsight } from "../../lib/crossInsight"; // [S22-10] 자산군 교�
 import TraderBadge from "../../components/shared/TraderBadge";
 import AppHeader from "../../components/AppHeader";
 import SegTabs from "../../components/shared/SegTabs";
+import SyncStatus from "../../components/SyncStatus";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
 import LastUpdated from "../../components/LastUpdated";
@@ -250,6 +251,7 @@ export default function AssetsMapPage() {
         )}
       </div>
 
+      <SyncStatus />
       <DataState status={status} hasData={!!assets} onRetry={load} skeletonLines={5} skeletonBlock>
         {/* ── [사용자 지시] 자산 지도 카드를 맨 위로 — "주식" 뷰에서는 계좌현황 요약을 카드 맨 위에 병합 ── */}
         <section className="card">

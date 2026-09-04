@@ -34,6 +34,7 @@ import { cachedJson } from "../../lib/quoteCache"; // [S20-3] /api/pwa-ai-daily 
 import TraderBadge from "../../components/shared/TraderBadge";
 import AppHeader from "../../components/AppHeader";
 import SegTabs from "../../components/shared/SegTabs";
+import SyncStatus from "../../components/SyncStatus";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
 import LastUpdated from "../../components/LastUpdated";
@@ -543,6 +544,7 @@ export default function TodayPage({ announcements = [] }) {
       {/* [사용자 지시] KRX/NXT 장운영 배지는 "오늘의 대결"(주식) 탭에서만 — 부동산/ETF/이야기엔 불필요 */}
       <div className="td-market">{view === 0 && <MarketStatusBadge />}{at && <span className="td-fresh3"><LastUpdated timestamp={at} onRefresh={load} /></span>}</div>
 
+      <SyncStatus />
       <DataState status={status} hasData={!!dash || !!ledger} onRetry={load} skeletonLines={4} skeletonBlock>
 
         {/* ══ "오늘의 대결" — 카드1(대결) · 카드2(주식 뉴스) · 카드3(주식 할일) 3장으로 통일 ══ */}
