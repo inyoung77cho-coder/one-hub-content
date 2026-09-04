@@ -31,6 +31,9 @@ import ShareButton from '../../components/ShareButton';
 import RotatingPageTitle from '../../components/RotatingPageTitle';
 import useSwipeTabs from '../../components/shared/useSwipeTabs'; // [S25-1] AI 3섹션 스와이프
 import SegTabs from '../../components/shared/SegTabs'; // [S26-5] 공용 세그먼트 탭
+import MaintenanceShop from '../../components/MaintenanceShop'; // [S28-7] 정비소(운영자 전용)
+import { getIsOperator } from '../../lib/isOperator';
+import { getEngineImprovement } from '../../lib/engineImprovement';
 import AiJudgeCard from '../../components/AiJudgeCard'; // [S25-2] 심판석 판정 카드
 import AssetMapTitle from '../../components/AssetMapTitle';
 import { recordAccuracySnapshot, getAccuracyHistory } from '../../lib/aiAccuracyHistory';
@@ -278,10 +281,22 @@ export default function PWADashboard({ latestReport }) {
   // [S3/G2] AI 트러스트 3섹션 서브내비(vs/verify/archive)를 URL(?sec=)로 유지 — 뒤로가기·딥링크(F4) 지원
   // [FB-4 §4.2] 정직성 브랜드 강화 — AI 페이지는 '자기검증'을 앞세운다(기본 진입 섹션).
   // [OS-2] AI 페이지 3탭 — "AI vs 나 대결" 우선 노출로 재정렬(사용자 지시, FB-4의 '자기검증 우선'을 대체).
-  const TRUST_TABS = ['vs', 'verify', 'archive']; // [OS-2] RotatingPageTitle 순환 순서 = 탭 순서
+  // [S28-7] 정비소(maint)는 운영자에게만. TRUST_TABS 엔 넣되(딥링크 유효) 표시/렌더는 게이트.
+  const TRUST_TABS = ['vs', 'verify', 'archive', 'maint'];
   const [trustSec, setTrustSec] = useTabState('sec', TRUST_TABS, 'vs');
-  // [S25-1] 3섹션 좌우 스와이프(useSwipeTabs 재사용, S24-5). 하단 탭 이동엔 쓰지 않는다.
-  const aiSwipe = useSwipeTabs({ index: TRUST_TABS.indexOf(trustSec), count: TRUST_TABS.length, onChange: (i) => setTrustSec(TRUST_TABS[i]) });
+  const [isOp, setIsOp] = useState(false);
+  const [engImprove, setEngImprove] = useState(null); // [S28-7 #3] 이번 달 개선 요약(없으면 null → 안 뜸)
+  useEffect(() => {
+    let alive = true;
+    getIsOperator().then((v) => { if (alive) setIsOp(v); });
+    getEngineImprovement('A').then((v) => { if (alive) setEngImprove(v); }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  // 비운영자가 ?sec=maint 로 들어오면 심판석으로 되돌린다.
+  useEffect(() => { if (!isOp && trustSec === 'maint') setTrustSec('vs'); }, [isOp, trustSec]); // eslint-disable-line
+  const visibleCount = isOp ? 4 : 3;
+  // [S25-1] 좌우 스와이프(useSwipeTabs). 보이는 탭 수만큼만.
+  const aiSwipe = useSwipeTabs({ index: Math.min(TRUST_TABS.indexOf(trustSec), visibleCount - 1), count: visibleCount, onChange: (i) => setTrustSec(TRUST_TABS[i]) });
   const [recSort, setRecSort] = useState('interest'); // [S7.2] 추천 정렬(interest/upside)
   const [autoWatchNote, setAutoWatchNote] = useState([]); // [S-6] 추천해제→자동 관망 편입 알림
   const [buyNotice, setBuyNotice] = useState(null); // [S-6] 바로매수 핸드오프 { name, code }
@@ -1105,8 +1120,8 @@ export default function PWADashboard({ latestReport }) {
           {tab === 'report' && (
             <div className="trust-nav">
               <SegTabs
-                items={[{ key: 'vs', label: '나 vs AI' }, { key: 'verify', label: 'AI 자기검증' }, { key: 'archive', label: '기록' }]}
-                index={TRUST_TABS.indexOf(trustSec)}
+                items={[{ key: 'vs', label: '나 vs AI' }, { key: 'verify', label: 'AI 자기검증' }, { key: 'archive', label: '기록' }, ...(isOp ? [{ key: 'maint', label: '🔧 정비소' }] : [])]}
+                index={Math.min(TRUST_TABS.indexOf(trustSec), visibleCount - 1)}
                 onChange={(i) => setTrustSec(TRUST_TABS[i])}
                 ariaLabel="AI 심판석"
               />
@@ -2304,6 +2319,14 @@ export default function PWADashboard({ latestReport }) {
             {trustSec === 'vs' && <AiJudgeCard />}
             {/* [나 vs AI 대결] — 2026-08-23 완전 재설계. today.js와 동일한 components/PortfolioDuelCard.js 로 통합. */}
             {trustSec === 'vs' && <PortfolioDuelCard />}
+            {/* [S28-7 #3] 사용자에게 나가는 결과 요약 한 줄 — 개선이 있었던 달에만(없으면 안 뜸). */}
+            {trustSec === 'vs' && engImprove && engImprove.improved && (
+              <div style={{ margin: '0 0 12px', padding: '11px 14px', borderRadius: 'var(--radius-md)', background: 'var(--color-success-soft)', color: 'var(--color-success-ink)', fontSize: 'var(--fs-3)', fontWeight: 700, wordBreak: 'keep-all' }}>
+                이번 달 AI가 한 번 개선됐습니다 · 매수 판단 정확도 {engImprove.from_pct}% → {engImprove.to_pct}%
+              </div>
+            )}
+            {/* [S28-7] 정비소 — 운영자 전용. 비운영자는 위 effect 가 vs 로 되돌림. */}
+            {trustSec === 'maint' && isOp && <MaintenanceShop />}
 
             {/* [S2.2 G2] AI 자기검증 — 판단 흐름 · 학습 현황 · 개선노트 */}
             {trustSec === 'verify' && (<>

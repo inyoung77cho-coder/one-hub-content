@@ -18,6 +18,8 @@ import { recommendEtfs } from "../../lib/etfRecommend";
 import { getTargetClass, computeClassDrift, topDriftMessage } from "../../lib/targetClass"; // [S23 T-2] ETF 조치 근거 통일(자산군 목표)
 import { taxFocusOf, currentMonth } from "../../lib/taxCalendar"; // [S23 T-7] 절세 팁을 달력에 연결(DAY% 회전 제거)
 import { getTodayCadence } from "../../lib/todayCadence"; // [S23 T-6] 주간·월간·분기 훅
+import { getIsOperator } from "../../lib/isOperator"; // [S28-8] 운영자 훅 게이트
+import { getEngineImprovement } from "../../lib/engineImprovement"; // [S28-8] 이번 달 개선
 import { recordVisit } from "../../lib/visitLog"; // [S23 T-10] 방문일 계기판(스트릭 배지 아님)
 import useSwipeTabs from "../../components/shared/useSwipeTabs"; // [S24-5] 페이지 내 좌우 탭 스와이프
 import { briefingScript } from "../../lib/briefingScript"; // [S24-9] 오늘 브리핑 대본(화면과 같은 소스)
@@ -104,6 +106,21 @@ export default function TodayPage({ announcements = [] }) {
   const [status, setStatus] = useState("loading");
   const [at, setAt] = useState(null);
   const [aiDaily, setAiDaily] = useState(null); // [S20-3] 오늘 vs 전일 AI 판단 diff(AI 탭과 동일 소스)
+  const [engine, setEngine] = useState(null); // [S28-8] 엔진 개선 훅용(운영자·승인대기·이번달개선)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const tr = (() => { try { return getTrader(); } catch (e) { return "A"; } })();
+      const isOp = await getIsOperator().catch(() => false);
+      let pendingCount = 0;
+      if (isOp) {
+        try { const d = await fetch("/api/pwa/proposals").then((r) => r.json()); pendingCount = ((d && d.proposals) || []).filter((p) => p.status === "pending").length; } catch (e) {}
+      }
+      const improvement = await getEngineImprovement(tr).catch(() => null);
+      if (alive) setEngine({ isOperator: isOp, pendingCount, improvement });
+    })();
+    return () => { alive = false; };
+  }, []);
   const [assetDelta, setAssetDelta] = useState(null); // [S20-3] 총자산 전일 대비(lib/assetHistory)
   const [notis, setNotis] = useState([]); // [알림] 텔레그램/리포트 알림 피드
   const [opNotes, setOpNotes] = useState([]); // [알림] OneHub 신고가(spot_price)
@@ -332,7 +349,7 @@ export default function TodayPage({ announcements = [] }) {
     if (classMsg && classMsg.tone === "warn") etfRebalMsg = classMsg.text;
   } catch (e) {}
   // [S23 T-6] 주간·월간·분기 훅 — 발동한 날에만 카드 1장. 기존 소스만 사용, 데이터 없으면 빈 배열.
-  const cadenceHooks = (() => { try { return getTodayCadence({ trader, opClass }); } catch (e) { return []; } })();
+  const cadenceHooks = (() => { try { return getTodayCadence({ trader, opClass, engine }); } catch (e) { return []; } })();
   // ── 행3: AI 변화 한 줄(AI 탭과 동일 규칙 — lib/aiFreshness)
   const aiFreshness = computeAiFreshness(aiDaily, dash);
   // ── 대결 결과 배너 — 오늘 스냅샷이 찍힌 날에만 노출(없으면 렌더 안 함).
@@ -505,6 +522,13 @@ export default function TodayPage({ announcements = [] }) {
     .sort((a, b) => a.dist - b.dist)
     .slice(0, 3)
     .map((x) => ({ code: x.p.code, name: x.p.name, entry: Number(x.p.current_price) || null, dist: x.dist }));
+  // [S28-8] 최종 폴백 = AI 의 최근 판단 경과(조치·내 판단 경과 둘 다 없을 때). 매일 바뀌는 재료.
+  const aiYesterday = (() => {
+    const chg = (aiDaily && aiDaily.changes) || [];
+    const acts = chg.filter((c) => c && (c.type === "action" || c.type === "new") && (c.name || c.stock || c.code)).slice(0, 3);
+    if (!acts.length) return null;
+    return { date: aiDaily && aiDaily.today_date, items: acts };
+  })();
   // [S24-9] 오늘 브리핑 대본 — 화면과 같은 값(운용자산·조치·판단 경과)으로. S24-1 이후라 숫자 정합.
   const briefScript = (() => {
     try {
@@ -815,6 +839,21 @@ export default function TodayPage({ announcements = [] }) {
                     );
                   })}
                   <div className="sc-note-quiet">기록하지 않아도 됩니다.</div>
+                </>
+              ) : aiYesterday ? (
+                <>
+                  <div className="sc-empty">오늘 손댈 종목은 없습니다{aiYesterday.date ? ` · AI 최근 분석 ${aiYesterday.date}` : ""}</div>
+                  <div className="sc-prog-h">AI는 최근 이렇게 판단했습니다</div>
+                  {aiYesterday.items.map((c, i) => {
+                    const ACT = { BUY: "매수", SELL: "매도", HOLD: "관망" };
+                    return (
+                      <div className="sc-prog-row" key={i}>
+                        <span className="sc-prog-nm">{c.name || c.stock || c.code}</span>
+                        <span className="sc-prog-ret">{c.type === "new" ? "신규 " : ""}{ACT[c.action] || c.action || "판단"}</span>
+                      </div>
+                    );
+                  })}
+                  <div className="sc-note-quiet">자세한 근거는 AI 페이지에서 볼 수 있어요.</div>
                 </>
               ) : (
                 <div className="sc-empty">{positions.length > 0 ? "오늘은 특별히 할 일이 없어요" : "증권사 계좌를 연동하면 보유 종목의 조치·판단이 여기 올라옵니다."}</div>
