@@ -92,7 +92,8 @@ PWA=$(ls pages/pwa/*.js 2>/dev/null | grep -vE '\.bak|pwa_index_new\.js')
 M1=$(grep -hoE "font-size:\s*[0-9.]+(rem|px)" $PWA | grep -oE "[0-9.]+(rem|px)" | sort -u | wc -l)
 M2=$(grep -hoE "border-radius:\s*[0-9][0-9.]*(px|rem)" $PWA | wc -l)
 M3=$(grep -hoiE "\.[a-z0-9_-]*card[a-z0-9_-]*\s*\{" $PWA | sort -u | wc -l)
-M4=$(grep -hoE "\.(td-seg|as-stocktabs|etf-subtab|re-tab-btn|pwa-subtab|en-subtabs|en-tabs|en-langs|vc-seg|seg3|itab|mv-tabs|mf-tabs|alloc-seg|af-seg|tn-tabs|rp-aitab|ba-tabs|pwa-tabs|story-chip|scope-chip)\b" $PWA | sort -u | wc -l)
+# 탭 CSS 규칙 정의만 카운트(주석·className 참조 제외 위해 \s*\{ 요구). WD에서 정밀화.
+M4=$(grep -hoE "\.(td-seg|as-stocktabs|etf-subtab|re-tab-btn|pwa-subtab|en-subtabs|en-tabs|en-langs|vc-seg|seg3|itab|mv-tabs|mf-tabs|alloc-seg|af-seg|tn-tabs|rp-aitab|ba-tabs|pwa-tabs|story-chip|scope-chip)\s*\{" $PWA | sort -u | wc -l)
 M5=0; for f in $PWA; do if grep -q "BottomNav" "$f" && ! grep -q -- "--nav-clearance" "$f"; then M5=$((M5+1)); fi; done
 printf "[측정] font-size 리터럴 고유값   : %s  (목표 8)\n" "$M1"
 printf "[측정] border-radius 리터럴 선언 : %s  (목표 0)\n" "$M2"
