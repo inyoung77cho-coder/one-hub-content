@@ -59,14 +59,14 @@ function RealEstateWeekly() {
         <div className="rew-q">이번 주 부동산 리포트가 아직 없습니다. 매주 월요일 갱신됩니다.</div>
       )}
       <style jsx>{`
-        .rew { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 14px; margin-bottom: 14px; }
-        .rew-h { font-size: 0.9rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
-        .rew-wk { font-size: 0.7rem; font-weight: 600; color: var(--color-ink-3); margin-left: 4px; }
-        .rew-s { font-size: 0.82rem; color: var(--color-ink-2); line-height: 1.5; margin: 0 0 8px; word-break: keep-all; }
-        .rew-row { display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.8rem; color: var(--color-ink-2); }
+        .rew { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 14px; margin-bottom: 14px; }
+        .rew-h { font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
+        .rew-wk { font-size: var(--fs-1); font-weight: 600; color: var(--color-ink-3); margin-left: 4px; }
+        .rew-s { font-size: var(--fs-3); color: var(--color-ink-2); line-height: 1.5; margin: 0 0 8px; word-break: keep-all; }
+        .rew-row { display: flex; flex-wrap: wrap; gap: 12px; font-size: var(--fs-3); color: var(--color-ink-2); }
         .rew-row b { color: var(--color-ink); }
-        .rew-note { margin-top: 8px; font-size: 0.68rem; color: var(--color-ink-3); }
-        .rew-q { font-size: 0.8rem; color: var(--color-ink-3); }
+        .rew-note { margin-top: 8px; font-size: var(--fs-1); color: var(--color-ink-3); }
+        .rew-q { font-size: var(--fs-3); color: var(--color-ink-3); }
       `}</style>
     </div>
   );
@@ -106,20 +106,20 @@ export default function PwaWeekly({ reports }) {
         })
       )}
       <style jsx>{`
-        .rp-empty { text-align: center; color: var(--color-ink-3); padding: 40px 0; font-size: 0.85rem; }
+        .rp-empty { text-align: center; color: var(--color-ink-3); padding: 40px 0; font-size: var(--fs-4); }
         .wc { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px; margin-bottom: 12px; }
         .wc-body { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); }
         .wc-body:active { opacity: .7; }
         .wc-share { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--color-line); display: flex; justify-content: flex-end; }
         .wc-top { display: flex; align-items: baseline; gap: 10px; }
-        .wc-week { font-size: 0.95rem; font-weight: 800; font-family: ui-monospace, monospace; }
-        .wc-regime { font-size: 0.8rem; font-weight: 700; }
-        .wc-go { margin-left: auto; font-size: 0.9rem; font-weight: 800; color: var(--color-primary); }
-        .wc-range { font-size: 0.72rem; color: var(--color-ink-3); margin-top: 3px; font-family: ui-monospace, monospace; }
+        .wc-week { font-size: var(--fs-5); font-weight: 800; font-family: ui-monospace, monospace; }
+        .wc-regime { font-size: var(--fs-3); font-weight: 700; }
+        .wc-go { margin-left: auto; font-size: var(--fs-4); font-weight: 800; color: var(--color-primary); }
+        .wc-range { font-size: var(--fs-2); color: var(--color-ink-3); margin-top: 3px; font-family: ui-monospace, monospace; }
         .wc-stats { display: flex; gap: 10px; margin-top: 12px; }
-        .ws { flex: 1; background: var(--color-card-soft); border-radius: 11px; padding: 10px 13px; }
-        .ws span { display: block; font-size: 0.66rem; color: var(--color-ink-3); font-weight: 600; margin-bottom: 3px; }
-        .ws b { font-size: 1.05rem; font-weight: 800; color: var(--color-ink); }
+        .ws { flex: 1; background: var(--color-card-soft); border-radius: var(--radius-sm); padding: 10px 13px; }
+        .ws span { display: block; font-size: var(--fs-1); color: var(--color-ink-3); font-weight: 600; margin-bottom: 3px; }
+        .ws b { font-size: var(--fs-5); font-weight: 800; color: var(--color-ink); }
       `}</style>
     </ReportShell>
   );

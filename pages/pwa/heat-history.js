@@ -72,20 +72,20 @@ export default function PwaHeatHistory() {
       )}
       <style jsx>{`
         .tt { display: flex; gap: 6px; margin-bottom: 14px; }
-        .tt button { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 999px; padding: 7px 16px; font-size: 0.8rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .tt button { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 999px; padding: 7px 16px; font-size: var(--fs-3); font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .tt button.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
-        .rp-empty { text-align: center; color: var(--color-ink-3); padding: 40px 0; font-size: 0.85rem; }
+        .rp-empty { text-align: center; color: var(--color-ink-3); padding: 40px 0; font-size: var(--fs-4); }
         .hh-now { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px; margin-bottom: 12px; text-align: center; }
-        .hh-now-lbl { font-size: 0.72rem; color: var(--color-ink-3); font-weight: 700; }
+        .hh-now-lbl { font-size: var(--fs-2); color: var(--color-ink-3); font-weight: 700; }
         .hh-now-val { font-size: 2.4rem; font-weight: 800; line-height: 1.1; margin: 4px 0; }
-        .hh-now-val small { font-size: 1rem; font-weight: 600; color: var(--color-ink-3); }
-        .hh-now-meta { font-size: 0.78rem; font-weight: 700; display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; }
+        .hh-now-val small { font-size: var(--fs-5); font-weight: 600; color: var(--color-ink-3); }
+        .hh-now-meta { font-size: var(--fs-2); font-weight: 700; display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; }
         .hh-list { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 6px 14px; }
         .hh-h, .hh-row { display: grid; grid-template-columns: 1.4fr 0.7fr 1fr 0.9fr 0.6fr; gap: 6px; align-items: center; }
-        .hh-h { font-size: 0.64rem; color: var(--color-ink-3); font-weight: 700; padding: 8px 0; border-bottom: 1px solid var(--color-line); }
-        .hh-row { padding: 9px 0; border-bottom: 1px solid var(--color-line); font-size: 0.76rem; font-weight: 600; }
+        .hh-h { font-size: var(--fs-1); color: var(--color-ink-3); font-weight: 700; padding: 8px 0; border-bottom: 1px solid var(--color-line); }
+        .hh-row { padding: 9px 0; border-bottom: 1px solid var(--color-line); font-size: var(--fs-2); font-weight: 600; }
         .hh-row:last-child { border-bottom: none; }
-        .hh-t { color: var(--color-ink-2); font-family: ui-monospace, monospace; font-size: 0.7rem; }
+        .hh-t { color: var(--color-ink-2); font-family: ui-monospace, monospace; font-size: var(--fs-1); }
         .hh-heat { font-weight: 800; }
       `}</style>
     </ReportShell>

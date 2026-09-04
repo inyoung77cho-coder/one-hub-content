@@ -109,23 +109,23 @@ export default function EnglishTest() {
       <style jsx>{`
         .et-wrap { min-height: 100vh; background: var(--color-bg); padding-bottom: var(--nav-clearance-fab); }
         .et-main { max-width: 560px; margin: 0 auto; padding: 12px 14px 40px; }
-        .et-title { font-size: 1.1rem; font-weight: 800; color: var(--color-ink); margin: 6px 0 4px; }
-        .et-lead { font-size: 0.8rem; color: var(--color-ink-2); line-height: 1.5; margin: 0 0 14px; word-break: keep-all; }
-        .et-disc { color: var(--color-ink-3); font-size: 0.7rem; }
-        .et-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 16px; }
-        .et-bal { font-size: 0.82rem; font-weight: 700; color: var(--color-ink-2); margin-bottom: 8px; }
-        .et-q { font-size: 0.84rem; color: var(--color-ink-2); }
-        .et-msg { font-size: 0.8rem; color: var(--color-danger, #dc2626); margin: 8px 0; }
-        .et-b { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 10px; padding: 11px 16px; font-size: 0.84rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; margin-top: 12px; }
+        .et-title { font-size: var(--fs-6); font-weight: 800; color: var(--color-ink); margin: 6px 0 4px; }
+        .et-lead { font-size: var(--fs-3); color: var(--color-ink-2); line-height: 1.5; margin: 0 0 14px; word-break: keep-all; }
+        .et-disc { color: var(--color-ink-3); font-size: var(--fs-1); }
+        .et-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 16px; }
+        .et-bal { font-size: var(--fs-3); font-weight: 700; color: var(--color-ink-2); margin-bottom: 8px; }
+        .et-q { font-size: var(--fs-3); color: var(--color-ink-2); }
+        .et-msg { font-size: var(--fs-3); color: var(--color-danger, #dc2626); margin: 8px 0; }
+        .et-b { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: var(--radius-sm); padding: 11px 16px; font-size: var(--fs-3); font-weight: 700; font-family: var(--font-sans); cursor: pointer; margin-top: 12px; }
         .et-b.p { border-color: var(--color-primary); background: var(--color-primary); color: var(--color-on-primary); }
         .et-b:disabled { opacity: 0.5; cursor: default; }
         .et-item { margin-bottom: 16px; }
-        .et-item-q { font-size: 0.86rem; color: var(--color-ink); margin-bottom: 8px; }
+        .et-item-q { font-size: var(--fs-4); color: var(--color-ink); margin-bottom: 8px; }
         .et-choices { display: flex; flex-direction: column; gap: 6px; }
-        .et-choice { text-align: left; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; padding: 10px 12px; font-size: 0.82rem; font-family: var(--font-sans); cursor: pointer; }
+        .et-choice { text-align: left; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: var(--radius-sm); padding: 10px 12px; font-size: var(--fs-3); font-family: var(--font-sans); cursor: pointer; }
         .et-choice.on { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); font-weight: 700; }
-        .et-result { font-size: 1rem; font-weight: 800; color: var(--color-ink); margin-bottom: 12px; }
-        .et-rv { display: flex; justify-content: space-between; gap: 8px; font-size: 0.78rem; padding: 6px 0; border-bottom: 1px solid var(--color-line); }
+        .et-result { font-size: var(--fs-5); font-weight: 800; color: var(--color-ink); margin-bottom: 12px; }
+        .et-rv { display: flex; justify-content: space-between; gap: 8px; font-size: var(--fs-2); padding: 6px 0; border-bottom: 1px solid var(--color-line); }
         .et-rv-q { color: var(--color-ink-2); }
         .et-rv.ok .et-rv-a { color: var(--color-success, #16a34a); font-weight: 700; }
         .et-rv.no .et-rv-a { color: var(--color-danger, #dc2626); font-weight: 700; }

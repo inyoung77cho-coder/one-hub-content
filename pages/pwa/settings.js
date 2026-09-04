@@ -566,58 +566,58 @@ export default function Settings() {
         /* [사용자 지시] 상위 메뉴 고정 — 헤더뿐 아니라 타이틀·세그먼트·탭까지 하나의 블록으로 */
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px 4px; }
         .hd { display: flex; align-items: center; justify-content: space-between; background: var(--color-bg); padding: calc(env(safe-area-inset-top, 0px) + 10px) 4px 12px; }
-        .hd-logo { font-weight: 800; font-size: 20px; letter-spacing: -.5px; color: var(--color-ink); font-family: var(--font-sans); background: none; border: none; padding: 0; cursor: pointer; }
+        .hd-logo { font-weight: 800; font-size: var(--fs-6); letter-spacing: -.5px; color: var(--color-ink); font-family: var(--font-sans); background: none; border: none; padding: 0; cursor: pointer; }
         .hd-dot { color: var(--color-success); }
         .hd-ic { display: flex; align-items: center; gap: 8px; }
-        .hd-search { width: 34px; height: 34px; border-radius: 50%; background: var(--color-card); border: none; display: grid; place-items: center; font-size: 15px; cursor: pointer; box-shadow: var(--shadow-card); }
-        .hd-title { font-size: 1.05rem; font-weight: 800; margin: 6px 2px 12px; }
+        .hd-search { width: 34px; height: 34px; border-radius: 50%; background: var(--color-card); border: none; display: grid; place-items: center; font-size: var(--fs-5); cursor: pointer; box-shadow: var(--shadow-card); }
+        .hd-title { font-size: var(--fs-5); font-weight: 800; margin: 6px 2px 12px; }
         .seg { display: flex; gap: 3px; background: var(--color-card-soft); border: 1px solid var(--color-line); padding: 3px; border-radius: var(--radius-pill); margin-bottom: 12px; }
-        .seg button { flex: 1; padding: 8px 0; border: none; background: none; border-radius: var(--radius-pill); font-family: var(--font-sans); font-size: 0.82rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
+        .seg button { flex: 1; padding: 8px 0; border: none; background: none; border-radius: var(--radius-pill); font-family: var(--font-sans); font-size: var(--fs-3); font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
         .seg button.on { background: var(--color-card); color: var(--color-primary); box-shadow: var(--shadow-card); }
         .itab { display: flex; gap: 3px; background: var(--color-card-soft); border: 1px solid var(--color-line); padding: 3px; border-radius: var(--radius-pill); margin-bottom: 12px; }
-        .itab button { flex: 1; padding: 8px 0; border: none; background: none; border-radius: var(--radius-pill); font-family: var(--font-sans); font-size: 0.82rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
+        .itab button { flex: 1; padding: 8px 0; border: none; background: none; border-radius: var(--radius-pill); font-family: var(--font-sans); font-size: var(--fs-3); font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
         .itab button.on { background: var(--color-card); color: var(--color-primary); box-shadow: var(--shadow-card); }
         .idrow { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
         .idpic { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; background: var(--color-card-soft); }
-        .idpic-ph { display: grid; place-items: center; font-size: 24px; }
+        .idpic-ph { display: grid; place-items: center; font-size: var(--fs-7); }
         .idmeta { display: flex; flex-direction: column; gap: 2px; }
-        .idnick { font-size: 1rem; font-weight: 800; color: var(--color-ink); }
-        .idbeta { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-3); }
+        .idnick { font-size: var(--fs-5); font-weight: 800; color: var(--color-ink); }
+        .idbeta { font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-3); }
         .idline { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-top: 1px solid var(--color-line); }
-        .idl { font-size: 0.82rem; color: var(--color-ink-2); }
-        .idv { font-size: 0.86rem; font-weight: 700; color: var(--color-ink); }
+        .idl { font-size: var(--fs-3); color: var(--color-ink-2); }
+        .idv { font-size: var(--fs-4); font-weight: 700; color: var(--color-ink); }
         .mono { font-family: ui-monospace, monospace; }
-        .opsnote { font-size: 0.72rem; color: var(--color-ink-3); margin: -2px 2px 10px; }
+        .opsnote { font-size: var(--fs-2); color: var(--color-ink-3); margin: -2px 2px 10px; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
-        .k { font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); margin-bottom: 12px; } .rt { font-weight: 400; font-size: 0.66rem; }
-        .none { color: var(--color-ink-3); font-size: 0.85rem; }
+        .k { font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-2); margin-bottom: 12px; } .rt { font-weight: 400; font-size: var(--fs-1); }
+        .none { color: var(--color-ink-3); font-size: var(--fs-4); }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .hi { display: flex; align-items: center; gap: 8px; }
         .dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-        .hi-m { display: flex; flex-direction: column; } .hi-k { font-size: 0.7rem; color: var(--color-ink-2); } .hi-v { font-size: 0.86rem; font-weight: 700; }
-        .cbrow { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); font-size: 0.84rem; }
-        .cb { font-size: 0.74rem; font-weight: 800; border: 1px solid; border-radius: 8px; padding: 3px 10px; }
-        .detail { display: block; margin-top: 12px; text-align: center; font-size: 0.78rem; color: var(--color-primary); text-decoration: none; font-weight: 700; }
+        .hi-m { display: flex; flex-direction: column; } .hi-k { font-size: var(--fs-1); color: var(--color-ink-2); } .hi-v { font-size: var(--fs-4); font-weight: 700; }
+        .cbrow { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); font-size: var(--fs-3); }
+        .cb { font-size: var(--fs-2); font-weight: 800; border: 1px solid; border-radius: var(--radius-sm); padding: 3px 10px; }
+        .detail { display: block; margin-top: 12px; text-align: center; font-size: var(--fs-2); color: var(--color-primary); text-decoration: none; font-weight: 700; }
         .row { display: flex; align-items: center; justify-content: space-between; }
-        .l { font-size: 0.88rem; } .ver { font-family: ui-monospace, monospace; font-weight: 700; color: var(--color-primary); }
-        .hint { font-size: 0.72rem; color: var(--color-ink-3); margin-top: 10px; }
-        .msg { font-size: 0.76rem; color: var(--color-success); margin-top: 8px; }
-        .badge { font-size: 0.72rem; font-weight: 800; border: 1px solid; border-radius: 8px; padding: 3px 10px; }
-        .sw { width: 46px; height: 26px; border-radius: 13px; border: none; background: var(--color-line); position: relative; transition: background .2s; padding: 0; cursor: pointer; }
+        .l { font-size: var(--fs-4); } .ver { font-family: ui-monospace, monospace; font-weight: 700; color: var(--color-primary); }
+        .hint { font-size: var(--fs-2); color: var(--color-ink-3); margin-top: 10px; }
+        .msg { font-size: var(--fs-2); color: var(--color-success); margin-top: 8px; }
+        .badge { font-size: var(--fs-2); font-weight: 800; border: 1px solid; border-radius: var(--radius-sm); padding: 3px 10px; }
+        .sw { width: 46px; height: 26px; border-radius: var(--radius-md); border: none; background: var(--color-line); position: relative; transition: background .2s; padding: 0; cursor: pointer; }
         .sw.on { background: var(--color-primary); } .sw:disabled { opacity: 0.6; }
         .knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--color-on-primary); transition: left .2s; }
         .sw.on .knob { left: 23px; }
-        .tbtn { background: none; border: 1px solid var(--color-line); border-radius: 8px; padding: 6px 12px; font-size: 0.82rem; font-weight: 700; cursor: pointer; color: inherit; }
+        .tbtn { background: none; border: 1px solid var(--color-line); border-radius: var(--radius-sm); padding: 6px 12px; font-size: var(--fs-3); font-weight: 700; cursor: pointer; color: inherit; }
         .tt { display: flex; gap: 3px; background: var(--color-card-soft); padding: 3px; border-radius: var(--radius-pill); }
-        .tt button { border: none; background: none; color: var(--color-ink-2); padding: 5px 14px; border-radius: var(--radius-pill); cursor: pointer; font-weight: 700; font-size: 0.8rem; }
+        .tt button { border: none; background: none; color: var(--color-ink-2); padding: 5px 14px; border-radius: var(--radius-pill); cursor: pointer; font-weight: 700; font-size: var(--fs-3); }
         .tt button.on { background: var(--color-primary); color: var(--color-on-primary); }
-        .usage-total { display: flex; align-items: baseline; justify-content: space-between; font-size: 0.82rem; color: var(--color-ink-2); font-weight: 700; padding-bottom: 12px; border-bottom: 1px solid var(--color-line); }
-        .usage-total b { font-size: 1.3rem; font-weight: 800; color: var(--color-ink); font-family: var(--font-display, var(--font-sans)); }
+        .usage-total { display: flex; align-items: baseline; justify-content: space-between; font-size: var(--fs-3); color: var(--color-ink-2); font-weight: 700; padding-bottom: 12px; border-bottom: 1px solid var(--color-line); }
+        .usage-total b { font-size: var(--fs-6); font-weight: 800; color: var(--color-ink); font-family: var(--font-display, var(--font-sans)); }
         .ubreak { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; }
         .ub { display: flex; flex-direction: column; gap: 3px; background: var(--color-card-soft); border-radius: var(--radius-sm); padding: 8px 10px; }
-        .ub span { font-size: 0.66rem; color: var(--color-ink-3); font-weight: 700; } .ub b { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); }
+        .ub span { font-size: var(--fs-1); color: var(--color-ink-3); font-weight: 700; } .ub b { font-size: var(--fs-3); font-weight: 800; color: var(--color-ink); }
         /* [S7.7] 카카오 B 연결 CTA */
-        .kakao-cta { width: 100%; margin-top: 10px; border: none; border-radius: 10px; padding: 10px 0; font-size: 0.78rem; font-weight: 800; color: var(--color-ink); background: var(--color-warning); cursor: pointer; font-family: var(--font-sans); }
+        .kakao-cta { width: 100%; margin-top: 10px; border: none; border-radius: var(--radius-sm); padding: 10px 0; font-size: var(--fs-2); font-weight: 800; color: var(--color-ink); background: var(--color-warning); cursor: pointer; font-family: var(--font-sans); }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
       {editAsset && <QuickAddSheet initialAsset={editAsset} onClose={() => setEditAsset(null)} />}

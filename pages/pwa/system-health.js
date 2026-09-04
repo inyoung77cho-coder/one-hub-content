@@ -51,10 +51,10 @@ export default function SystemHealth() {
       {err && <p className="e">{err}</p>}
       <style jsx>{`
         .gate { max-width: 360px; margin: 80px auto; padding: 0 20px; font-family: var(--font-sans); text-align: center; color: var(--color-ink); }
-        h1 { font-size: 1.1rem; margin-bottom: 20px; }
-        input { width: 100%; padding: 12px; border: 1px solid var(--color-line); border-radius: 10px; margin-bottom: 10px; font-size: 0.9rem; box-sizing: border-box; background: var(--color-card); color: var(--color-ink); }
-        button { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--color-primary); color: var(--color-on-primary); font-weight: 700; }
-        .e { color: var(--color-danger); font-size: 0.82rem; margin-top: 10px; }
+        h1 { font-size: var(--fs-6); margin-bottom: 20px; }
+        input { width: 100%; padding: 12px; border: 1px solid var(--color-line); border-radius: var(--radius-sm); margin-bottom: 10px; font-size: var(--fs-4); box-sizing: border-box; background: var(--color-card); color: var(--color-ink); }
+        button { width: 100%; padding: 12px; border: none; border-radius: var(--radius-sm); background: var(--color-primary); color: var(--color-on-primary); font-weight: 700; }
+        .e { color: var(--color-danger); font-size: var(--fs-3); margin-top: 10px; }
       `}</style>
     </div>
   );
@@ -141,20 +141,20 @@ export default function SystemHealth() {
       <style jsx>{`
         .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--color-bg); padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 24px); font-family: var(--font-sans); color: var(--color-ink); }
         .hd { display: flex; align-items: center; justify-content: space-between; padding: 12px 2px; }
-        .hd h1 { font-size: 1.05rem; font-weight: 800; margin: 0; } .ts { font-size: 0.68rem; color: var(--color-ink-3); }
-        .rf { border: 1px solid var(--color-line); background: var(--color-card); border-radius: 8px; width: 34px; height: 34px; font-size: 1rem; color: var(--color-ink); }
+        .hd h1 { font-size: var(--fs-5); font-weight: 800; margin: 0; } .ts { font-size: var(--fs-1); color: var(--color-ink-3); }
+        .rf { border: 1px solid var(--color-line); background: var(--color-card); border-radius: var(--radius-sm); width: 34px; height: 34px; font-size: var(--fs-5); color: var(--color-ink); }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
-        .ec { color: var(--color-danger); font-size: 0.84rem; }
-        .k { font-size: 0.76rem; font-weight: 700; color: var(--color-ink-2); margin-bottom: 10px; }
-        .row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--color-line); font-size: 0.86rem; }
+        .ec { color: var(--color-danger); font-size: var(--fs-3); }
+        .k { font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-2); margin-bottom: 10px; }
+        .row { display: flex; align-items: center; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid var(--color-line); font-size: var(--fs-4); }
         .row:last-child { border-bottom: none; } .l { display: flex; align-items: center; color: var(--color-ink); } .v { font-weight: 700; }
         .dt { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 8px; }
-        .none { color: var(--color-ink-3); font-size: 0.84rem; }
-        .flt { display: flex; gap: 6px; margin-bottom: 8px; } .flt select { flex: 1; padding: 6px; border: 1px solid var(--color-line); border-radius: 8px; font-size: 0.74rem; color: var(--color-ink); background: var(--color-card); }
+        .none { color: var(--color-ink-3); font-size: var(--fs-3); }
+        .flt { display: flex; gap: 6px; margin-bottom: 8px; } .flt select { flex: 1; padding: 6px; border: 1px solid var(--color-line); border-radius: var(--radius-sm); font-size: var(--fs-2); color: var(--color-ink); background: var(--color-card); }
         .ev { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--color-line); align-items: flex-start; } .ev:last-child { border-bottom: none; }
-        .ev .dt { margin-top: 5px; } .ev-m { flex: 1; } .ev-t { font-size: 0.82rem; font-weight: 600; } .ev-s { font-size: 0.7rem; font-weight: 700; margin-left: 6px; }
-        .ev-sub { font-size: 0.7rem; color: var(--color-ink-3); margin-top: 1px; } .ev-err { font-size: 0.7rem; color: var(--color-danger); margin-top: 2px; }
-        .links { display: flex; gap: 8px; } .lk { flex: 1; text-align: center; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 12px; text-decoration: none; color: var(--color-primary); font-size: 0.82rem; font-weight: 700; }
+        .ev .dt { margin-top: 5px; } .ev-m { flex: 1; } .ev-t { font-size: var(--fs-3); font-weight: 600; } .ev-s { font-size: var(--fs-1); font-weight: 700; margin-left: 6px; }
+        .ev-sub { font-size: var(--fs-1); color: var(--color-ink-3); margin-top: 1px; } .ev-err { font-size: var(--fs-1); color: var(--color-danger); margin-top: 2px; }
+        .links { display: flex; gap: 8px; } .lk { flex: 1; text-align: center; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 12px; text-decoration: none; color: var(--color-primary); font-size: var(--fs-3); font-weight: 700; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>

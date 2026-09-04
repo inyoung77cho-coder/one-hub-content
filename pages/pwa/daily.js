@@ -48,17 +48,17 @@ export default function PwaDaily({ posts, postsB }) {
       )}
       <style jsx>{`
         .tt { display: flex; gap: 6px; margin-bottom: 14px; }
-        .tt button { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 999px; padding: 7px 16px; font-size: 0.8rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .tt button { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 999px; padding: 7px 16px; font-size: var(--fs-3); font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .tt button.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
-        .rp-empty { text-align: center; color: var(--color-ink-3); padding: 40px 0; font-size: 0.85rem; }
+        .rp-empty { text-align: center; color: var(--color-ink-3); padding: 40px 0; font-size: var(--fs-4); }
         .dc { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); margin-bottom: 10px; overflow: hidden; }
         .dc-top { width: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 13px 15px; background: none; border: none; cursor: pointer; font-family: var(--font-sans); text-align: left; }
-        .dc-date { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; }
-        .dc-regime { font-size: 0.78rem; font-weight: 700; }
-        .dc-heat { font-size: 0.74rem; font-weight: 700; }
-        .dc-trades { font-size: 0.72rem; color: var(--color-ink-3); }
+        .dc-date { font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; }
+        .dc-regime { font-size: var(--fs-2); font-weight: 700; }
+        .dc-heat { font-size: var(--fs-2); font-weight: 700; }
+        .dc-trades { font-size: var(--fs-2); color: var(--color-ink-3); }
         .dc-caret { margin-left: auto; color: var(--color-ink-3); }
-        .dc-insight { padding: 0 15px 14px; font-size: 0.84rem; color: var(--color-ink-2); line-height: 1.6; word-break: keep-all; white-space: pre-wrap; }
+        .dc-insight { padding: 0 15px 14px; font-size: var(--fs-3); color: var(--color-ink-2); line-height: 1.6; word-break: keep-all; white-space: pre-wrap; }
         .dc-share { margin-top: 10px; display: flex; justify-content: flex-end; }
       `}</style>
     </ReportShell>

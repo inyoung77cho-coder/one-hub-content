@@ -110,24 +110,24 @@ export default function PwaStory() {
         .story { max-width: 480px; margin: 0 auto; padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
         /* [사용자 지시] 상위 메뉴 고정 */
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
-        .story-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; }
+        .story-title { display: flex; align-items: center; gap: 8px; font-size: var(--fs-6); font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; }
         .story-fixed { flex-shrink: 0; }
-        .story-rd-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
-        .story-rd-sub { font-size: 0.68rem; font-weight: 600; color: var(--color-ink-3); margin-left: 6px; }
+        .story-rd-h { font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
+        .story-rd-sub { font-size: var(--fs-1); font-weight: 600; color: var(--color-ink-3); margin-left: 6px; }
         .story-rd-list { display: flex; flex-direction: column; gap: 5px; }
-        .story-rd-row { display: flex; align-items: center; gap: 8px; font-size: 0.8rem; }
+        .story-rd-row { display: flex; align-items: center; gap: 8px; font-size: var(--fs-3); }
         .story-rd-nick { color: var(--color-ink-2); font-weight: 700; }
         .story-rd-cnt { color: var(--color-ink-3); }
         .story-rd-up { margin-left: auto; color: var(--color-danger, #dc2626); font-weight: 700; }
         .story-rd-down { margin-left: auto; color: var(--color-primary); font-weight: 700; }
         .story-region { color: var(--color-primary); }
-        .story-sub-inline { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
-        .story-change { margin-left: auto; flex-shrink: 0; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: 11.5px; font-weight: 700; padding: 6px 12px; border-radius: 999px; cursor: pointer; font-family: var(--font-sans); }
+        .story-sub-inline { font-size: var(--fs-2); font-weight: 600; color: var(--color-ink-3); }
+        .story-change { margin-left: auto; flex-shrink: 0; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: var(--fs-2); font-weight: 700; padding: 6px 12px; border-radius: 999px; cursor: pointer; font-family: var(--font-sans); }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
-        .story-picker-h { font-size: 12px; font-weight: 800; color: var(--color-ink-2); margin-bottom: 10px; }
+        .story-picker-h { font-size: var(--fs-2); font-weight: 800; color: var(--color-ink-2); margin-bottom: 10px; }
         .story-picker-h2 { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--color-line); }
         .story-picker-list { display: flex; flex-wrap: wrap; gap: 8px; }
-        .story-chip { border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink-2); font-size: 12.5px; font-weight: 700; padding: 7px 13px; border-radius: 999px; cursor: pointer; font-family: var(--font-sans); }
+        .story-chip { border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink-2); font-size: var(--fs-2); font-weight: 700; padding: 7px 13px; border-radius: 999px; cursor: pointer; font-family: var(--font-sans); }
         .story-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>

@@ -140,29 +140,29 @@ export default function RecordPage() {
       <style jsx>{`
         .rec-wrap { min-height: 100vh; background: var(--color-bg); padding-bottom: var(--nav-clearance-fab); }
         .rec-main { max-width: 560px; margin: 0 auto; padding: 12px 14px 40px; }
-        .rec-title { font-size: 1.15rem; font-weight: 800; color: var(--color-ink); margin: 6px 0 4px; }
-        .rec-lead { font-size: 0.8rem; color: var(--color-ink-2); line-height: 1.5; margin: 0 0 14px; word-break: keep-all; }
-        .rec-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 14px; margin-bottom: 12px; }
-        .rec-card-h { font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 10px; }
-        .rec-sub { font-size: 0.7rem; font-weight: 600; color: var(--color-ink-3); margin-left: 6px; }
-        .rec-row { display: flex; align-items: center; gap: 8px; font-size: 0.84rem; color: var(--color-ink-2); padding: 4px 0; }
+        .rec-title { font-size: var(--fs-6); font-weight: 800; color: var(--color-ink); margin: 6px 0 4px; }
+        .rec-lead { font-size: var(--fs-3); color: var(--color-ink-2); line-height: 1.5; margin: 0 0 14px; word-break: keep-all; }
+        .rec-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 14px; margin-bottom: 12px; }
+        .rec-card-h { font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); margin-bottom: 10px; }
+        .rec-sub { font-size: var(--fs-1); font-weight: 600; color: var(--color-ink-3); margin-left: 6px; }
+        .rec-row { display: flex; align-items: center; gap: 8px; font-size: var(--fs-3); color: var(--color-ink-2); padding: 4px 0; }
         .rec-row b { color: var(--color-ink); font-variant-numeric: tabular-nums; }
-        .rec-quiet { font-size: 0.82rem; color: var(--color-ink-2); line-height: 1.55; margin: 0; }
-        .rec-cta { margin-top: 12px; border: 1px solid var(--color-primary); color: var(--color-primary); background: var(--color-card); border-radius: 9px; padding: 9px 14px; font-size: 0.8rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
-        .rec-note { background: var(--color-warning-soft, var(--color-card)); border: 1px solid var(--color-line); border-radius: 12px; padding: 11px 13px; font-size: 0.78rem; color: var(--color-ink-2); line-height: 1.5; margin-bottom: 12px; word-break: keep-all; }
+        .rec-quiet { font-size: var(--fs-3); color: var(--color-ink-2); line-height: 1.55; margin: 0; }
+        .rec-cta { margin-top: 12px; border: 1px solid var(--color-primary); color: var(--color-primary); background: var(--color-card); border-radius: var(--radius-sm); padding: 9px 14px; font-size: var(--fs-3); font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .rec-note { background: var(--color-warning-soft, var(--color-card)); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 11px 13px; font-size: var(--fs-2); color: var(--color-ink-2); line-height: 1.5; margin-bottom: 12px; word-break: keep-all; }
         .rec-vs { display: flex; gap: 10px; }
-        .rec-vs-c { flex: 1; background: var(--inset-bg, var(--color-card-soft, rgba(0,0,0,0.03))); border-radius: 10px; padding: 12px; text-align: center; }
-        .rec-vs-c span { display: block; font-size: 0.72rem; color: var(--color-ink-3); margin-bottom: 4px; }
-        .rec-vs-c b { font-size: 1.1rem; font-variant-numeric: tabular-nums; }
-        .rec-verdict { font-size: 0.82rem; font-weight: 700; color: var(--color-ink); margin: 10px 0 0; }
+        .rec-vs-c { flex: 1; background: var(--inset-bg, var(--color-card-soft, rgba(0,0,0,0.03))); border-radius: var(--radius-sm); padding: 12px; text-align: center; }
+        .rec-vs-c span { display: block; font-size: var(--fs-2); color: var(--color-ink-3); margin-bottom: 4px; }
+        .rec-vs-c b { font-size: var(--fs-6); font-variant-numeric: tabular-nums; }
+        .rec-verdict { font-size: var(--fs-3); font-weight: 700; color: var(--color-ink); margin: 10px 0 0; }
         .rec-verdict.quiet { font-weight: 500; color: var(--color-ink-3); }
         .rec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .rec-kpi { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 12px; }
-        .rec-kpi span { display: block; font-size: 0.72rem; color: var(--color-ink-3); }
-        .rec-kpi b { display: block; font-size: 1.15rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; margin: 2px 0; }
-        .rec-kpi i { font-style: normal; font-size: 0.68rem; color: var(--color-ink-3); line-height: 1.4; word-break: keep-all; }
-        .rec-foot { font-size: 0.7rem; color: var(--color-ink-3); line-height: 1.5; margin: 12px 2px 0; word-break: keep-all; }
-        .rec-ex-badge { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-2); background: var(--color-warning-soft, var(--inset-bg, rgba(0,0,0,0.04))); border-radius: 8px; padding: 7px 11px; margin: 4px 0 10px; text-align: center; }
+        .rec-kpi { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 12px; }
+        .rec-kpi span { display: block; font-size: var(--fs-2); color: var(--color-ink-3); }
+        .rec-kpi b { display: block; font-size: var(--fs-6); font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; margin: 2px 0; }
+        .rec-kpi i { font-style: normal; font-size: var(--fs-1); color: var(--color-ink-3); line-height: 1.4; word-break: keep-all; }
+        .rec-foot { font-size: var(--fs-1); color: var(--color-ink-3); line-height: 1.5; margin: 12px 2px 0; word-break: keep-all; }
+        .rec-ex-badge { font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-2); background: var(--color-warning-soft, var(--inset-bg, rgba(0,0,0,0.04))); border-radius: var(--radius-sm); padding: 7px 11px; margin: 4px 0 10px; text-align: center; }
         .rec-ex { border-style: dashed; opacity: 0.9; }
         .pos { color: var(--color-success, #16a34a); }
         .neg { color: var(--color-danger, #dc2626); }

@@ -184,41 +184,41 @@ export default function TaxPage() {
 
       <style jsx>{`
         .tx { max-width: 480px; margin: 0 auto; padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
-        .tx-title { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; }
-        .tx-sub { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
+        .tx-title { display: flex; align-items: center; gap: 8px; font-size: var(--fs-6); font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; }
+        .tx-sub { font-size: var(--fs-2); font-weight: 600; color: var(--color-ink-3); }
         .hero { background: linear-gradient(135deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero, 22px); padding: 20px 18px; box-shadow: var(--shadow-float); margin-bottom: 12px; }
         .hero-eyebrow { margin-bottom: 12px; }
-        .hero-lbl { font-size: 12px; font-weight: 700; color: var(--hero-ink-sub); }
-        .hero-big { font-size: 22px; font-weight: 800; letter-spacing: -.4px; margin-bottom: 6px; }
-        .hero-sub { font-size: 13px; color: var(--hero-ink-soft); line-height: 1.55; word-break: keep-all; }
+        .hero-lbl { font-size: var(--fs-2); font-weight: 700; color: var(--hero-ink-sub); }
+        .hero-big { font-size: var(--fs-7); font-weight: 800; letter-spacing: -.4px; margin-bottom: 6px; }
+        .hero-sub { font-size: var(--fs-3); color: var(--hero-ink-soft); line-height: 1.55; word-break: keep-all; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
-        .tile-h { font-size: 0.92rem; font-weight: 800; color: var(--color-ink); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
-        .tile-badge { font-size: 0.62rem; font-weight: 800; padding: 2px 8px; border-radius: 999px; background: var(--color-warning-soft); color: var(--color-warning-ink, var(--color-warning)); }
+        .tile-h { font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+        .tile-badge { font-size: var(--fs-1); font-weight: 800; padding: 2px 8px; border-radius: 999px; background: var(--color-warning-soft); color: var(--color-warning-ink, var(--color-warning)); }
         .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-        .field-l { font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); }
+        .field-l { font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-2); }
         .field-l em { font-style: normal; font-weight: 500; color: var(--color-ink-3); }
-        .field-row { display: flex; align-items: center; gap: 8px; background: var(--color-card-soft, var(--color-bg)); border: 1px solid var(--color-line); border-radius: 11px; padding: 0 12px; }
-        .field-row input { flex: 1; border: none; background: none; padding: 12px 0; font-size: 1rem; font-weight: 700; color: var(--color-ink); font-family: ui-monospace, monospace; outline: none; }
-        .field-unit { font-size: 0.82rem; font-weight: 700; color: var(--color-ink-3); }
-        .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 14px; font-size: 0.86rem; font-weight: 700; color: var(--color-ink); }
+        .field-row { display: flex; align-items: center; gap: 8px; background: var(--color-card-soft, var(--color-bg)); border: 1px solid var(--color-line); border-radius: var(--radius-sm); padding: 0 12px; }
+        .field-row input { flex: 1; border: none; background: none; padding: 12px 0; font-size: var(--fs-5); font-weight: 700; color: var(--color-ink); font-family: ui-monospace, monospace; outline: none; }
+        .field-unit { font-size: var(--fs-3); font-weight: 700; color: var(--color-ink-3); }
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 14px; font-size: var(--fs-4); font-weight: 700; color: var(--color-ink); }
         .toggle { width: 44px; height: 26px; border-radius: 999px; border: none; background: var(--color-line); position: relative; cursor: pointer; padding: 0; }
         .toggle.on { background: var(--color-primary); }
         .toggle-dot { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--color-on-primary); transition: transform .15s; }
         .toggle.on .toggle-dot { transform: translateX(18px); }
         .seg3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-        .seg3 button { padding: 9px 0; border-radius: 9px; border: 1px solid var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-ink-2); font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .seg3 button { padding: 9px 0; border-radius: var(--radius-sm); border: 1px solid var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-ink-2); font-size: var(--fs-2); font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .seg3 button.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
-        .calc-btn { width: 100%; min-height: 48px; border: none; border-radius: 12px; background: var(--color-primary); color: var(--color-on-primary); font-size: 0.92rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .calc-btn { width: 100%; min-height: 48px; border: none; border-radius: var(--radius-md); background: var(--color-primary); color: var(--color-on-primary); font-size: var(--fs-4); font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .calc-btn:disabled { opacity: .45; cursor: default; }
-        .result-big { font-size: 1.7rem; font-weight: 800; font-family: ui-monospace, monospace; color: var(--color-ink); letter-spacing: -.3px; }
-        .result-big.small { font-size: 1.1rem; color: var(--color-ink-2); }
-        .result-sub { font-size: 0.76rem; color: var(--color-ink-3); margin-top: 6px; line-height: 1.5; word-break: keep-all; }
+        .result-big { font-size: var(--fs-8); font-weight: 800; font-family: ui-monospace, monospace; color: var(--color-ink); letter-spacing: -.3px; }
+        .result-big.small { font-size: var(--fs-6); color: var(--color-ink-2); }
+        .result-sub { font-size: var(--fs-2); color: var(--color-ink-3); margin-top: 6px; line-height: 1.5; word-break: keep-all; }
         .result-quiet { padding: 4px 0; }
         .breakdown { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); display: flex; flex-direction: column; gap: 8px; }
-        .brow { display: flex; align-items: center; justify-content: space-between; font-size: 0.8rem; }
+        .brow { display: flex; align-items: center; justify-content: space-between; font-size: var(--fs-3); }
         .brow span { color: var(--color-ink-2); }
         .brow b { font-family: ui-monospace, monospace; color: var(--color-ink); }
-        .disclaimer { font-size: 0.7rem; color: var(--color-ink-3); line-height: 1.6; padding: 12px 14px; background: var(--color-warning-soft); border-radius: 11px; margin-bottom: 12px; word-break: keep-all; }
+        .disclaimer { font-size: var(--fs-1); color: var(--color-ink-3); line-height: 1.6; padding: 12px 14px; background: var(--color-warning-soft); border-radius: var(--radius-sm); margin-bottom: 12px; word-break: keep-all; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>

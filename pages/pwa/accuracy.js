@@ -211,84 +211,84 @@ export default function AccuracyPage() {
       )}
 
       <style jsx>{`
-        .ac-loading { text-align: center; padding: 60px 0; color: var(--color-ink-2); font-size: 0.88rem; }
+        .ac-loading { text-align: center; padding: 60px 0; color: var(--color-ink-2); font-size: var(--fs-4); }
         .ac-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px; margin-bottom: 12px; }
-        .ac-card-h { font-weight: 800; font-size: 0.92rem; color: var(--color-ink); margin-bottom: 13px; display: flex; align-items: baseline; gap: 7px; }
-        .ac-card-sub { font-size: 0.7rem; font-weight: 700; color: var(--color-ink-3); }
+        .ac-card-h { font-weight: 800; font-size: var(--fs-4); color: var(--color-ink); margin-bottom: 13px; display: flex; align-items: baseline; gap: 7px; }
+        .ac-card-sub { font-size: var(--fs-1); font-weight: 700; color: var(--color-ink-3); }
         /* 히어로 요약 */
         .ac-hero { text-align: center; }
-        .ac-hero-lbl { font-size: 0.8rem; color: var(--color-ink-2); margin-bottom: 4px; }
+        .ac-hero-lbl { font-size: var(--fs-3); color: var(--color-ink-2); margin-bottom: 4px; }
         .ac-hero-pct { font-size: 3.7rem; font-weight: 800; line-height: 1.05; font-variant-numeric: tabular-nums; }
-        .ac-hero-tag { font-size: 0.76rem; font-weight: 700; margin-top: 4px; }
-        .ac-hero-sub { font-size: 0.76rem; color: var(--color-ink-2); margin-top: 8px; }
-        .ac-hero-mean { font-size: 0.76rem; color: var(--color-ink-2); margin-top: 10px; line-height: 1.55; word-break: keep-all; }
+        .ac-hero-tag { font-size: var(--fs-2); font-weight: 700; margin-top: 4px; }
+        .ac-hero-sub { font-size: var(--fs-2); color: var(--color-ink-2); margin-top: 8px; }
+        .ac-hero-mean { font-size: var(--fs-2); color: var(--color-ink-2); margin-top: 10px; line-height: 1.55; word-break: keep-all; }
         .ac-hero-mean b { color: var(--color-ink); font-weight: 800; }
-        .ac-funnel { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 14px; font-size: 0.74rem; color: var(--color-ink-2); }
+        .ac-funnel { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 14px; font-size: var(--fs-2); color: var(--color-ink-2); }
         .ac-funnel b { color: var(--color-ink); font-weight: 800; }
         .ac-funnel-ar { color: var(--color-ink-3); }
-        .ac-funnel-wait { font-size: 0.66rem; color: var(--color-ink-3); background: var(--color-card-soft); padding: 2px 8px; border-radius: 10px; }
-        .ac-stats-note { font-size: 0.66rem; color: var(--color-ink-3); text-align: center; margin-top: 9px; word-break: keep-all; }
+        .ac-funnel-wait { font-size: var(--fs-1); color: var(--color-ink-3); background: var(--color-card-soft); padding: 2px 8px; border-radius: var(--radius-sm); }
+        .ac-stats-note { font-size: var(--fs-1); color: var(--color-ink-3); text-align: center; margin-top: 9px; word-break: keep-all; }
         .ac-howto-list { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
-        .ac-howto-list li { font-size: 0.8rem; color: var(--color-ink-2); line-height: 1.55; padding-left: 18px; position: relative; word-break: keep-all; }
+        .ac-howto-list li { font-size: var(--fs-3); color: var(--color-ink-2); line-height: 1.55; padding-left: 18px; position: relative; word-break: keep-all; }
         .ac-howto-list li::before { content: "→"; position: absolute; left: 0; color: var(--color-primary); font-weight: 800; }
         .good { color: var(--color-success); }
         .warn { color: var(--color-warning); }
         .bad { color: var(--color-danger); }
         .na { color: var(--color-ink-3); }
-        .ac-bar { height: 8px; background: var(--color-bg); border-radius: 4px; overflow: hidden; margin: 15px 0 4px; }
+        .ac-bar { height: 8px; background: var(--color-bg); border-radius: var(--radius-sm); overflow: hidden; margin: 15px 0 4px; }
         .ac-bar.sm { height: 6px; margin: 0; }
-        .ac-bar-fill { height: 100%; border-radius: 4px; transition: width 0.7s ease; background: var(--color-ink-3); }
+        .ac-bar-fill { height: 100%; border-radius: var(--radius-sm); transition: width 0.7s ease; background: var(--color-ink-3); }
         .ac-bar-fill.good { background: var(--color-success); }
         .ac-bar-fill.warn { background: var(--color-warning); }
         .ac-bar-fill.bad { background: var(--color-danger); }
         .ac-stats { display: flex; justify-content: space-around; margin-top: 16px; }
-        .ac-stat-v { font-weight: 800; font-size: 1.4rem; color: var(--color-ink); }
-        .ac-stat-k { font-size: 0.68rem; color: var(--color-ink-2); margin-top: 2px; }
-        .ac-avoid { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--color-line); font-size: 0.78rem; color: var(--color-ink-2); line-height: 1.55; text-align: left; }
+        .ac-stat-v { font-weight: 800; font-size: var(--fs-7); color: var(--color-ink); }
+        .ac-stat-k { font-size: var(--fs-1); color: var(--color-ink-2); margin-top: 2px; }
+        .ac-avoid { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--color-line); font-size: var(--fs-2); color: var(--color-ink-2); line-height: 1.55; text-align: left; }
         .ac-avoid b { color: var(--color-ink); }
         .ac-avoid b.hl { color: var(--color-primary); }
-        .ac-est { font-size: 0.62rem; font-weight: 800; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 1px 6px; border-radius: 5px; margin-left: 6px; }
-        .ac-avoid-note { font-size: 0.68rem; color: var(--color-ink-3); margin-top: 4px; }
+        .ac-est { font-size: var(--fs-1); font-weight: 800; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 1px 6px; border-radius: var(--radius-sm); margin-left: 6px; }
+        .ac-avoid-note { font-size: var(--fs-1); color: var(--color-ink-3); margin-top: 4px; }
         /* [A2] 개선 제안 */
         .ac-improve { border-left: 4px solid var(--color-danger); }
         .ac-imp-list { display: flex; flex-direction: column; gap: 9px; }
-        .ac-imp { display: flex; gap: 10px; align-items: flex-start; background: var(--color-card-soft); border-radius: 12px; padding: 12px 13px; }
-        .ac-imp-ic { font-size: 1.05rem; line-height: 1.3; flex-shrink: 0; }
+        .ac-imp { display: flex; gap: 10px; align-items: flex-start; background: var(--color-card-soft); border-radius: var(--radius-md); padding: 12px 13px; }
+        .ac-imp-ic { font-size: var(--fs-5); line-height: 1.3; flex-shrink: 0; }
         .ac-imp-body { flex: 1; min-width: 0; }
-        .ac-imp-t { font-size: 0.85rem; font-weight: 800; color: var(--color-ink); }
-        .ac-imp-d { font-size: 0.75rem; color: var(--color-ink-2); line-height: 1.55; margin-top: 3px; word-break: keep-all; }
-        .ac-imp-foot { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 11px; line-height: 1.5; word-break: keep-all; }
+        .ac-imp-t { font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); }
+        .ac-imp-d { font-size: var(--fs-2); color: var(--color-ink-2); line-height: 1.55; margin-top: 3px; word-break: keep-all; }
+        .ac-imp-foot { font-size: var(--fs-1); color: var(--color-ink-3); margin-top: 11px; line-height: 1.5; word-break: keep-all; }
         /* 사유별 */
         .ac-reason { margin-bottom: 13px; }
         .ac-reason:last-child { margin-bottom: 0; }
-        .ac-reason-top { display: flex; justify-content: space-between; align-items: center; font-size: 0.76rem; margin-bottom: 5px; }
+        .ac-reason-top { display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-2); margin-bottom: 5px; }
         .ac-reason-k { color: var(--color-ink); font-weight: 500; max-width: 62%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .ac-reason-p { font-weight: 800; white-space: nowrap; }
-        .ac-reason-n { color: var(--color-ink-2); font-weight: 500; margin-left: 4px; font-size: 0.68rem; }
+        .ac-reason-n { color: var(--color-ink-2); font-weight: 500; margin-left: 4px; font-size: var(--fs-1); }
         /* 최근 내역 */
         .ac-rec { padding: 12px 0; }
         .ac-rec.div { border-bottom: 1px solid var(--color-line); }
         .ac-rec-top { display: flex; justify-content: space-between; align-items: flex-start; }
-        .ac-rec-name { font-weight: 700; font-size: 0.86rem; color: var(--color-ink); }
-        .ac-rec-code { font-size: 0.68rem; color: var(--color-ink-2); margin-left: 6px; }
-        .ac-verdict { font-size: 0.68rem; font-weight: 700; padding: 2px 10px; border-radius: 20px; white-space: nowrap; }
+        .ac-rec-name { font-weight: 700; font-size: var(--fs-4); color: var(--color-ink); }
+        .ac-rec-code { font-size: var(--fs-1); color: var(--color-ink-2); margin-left: 6px; }
+        .ac-verdict { font-size: var(--fs-1); font-weight: 700; padding: 2px 10px; border-radius: var(--radius-card); white-space: nowrap; }
         .ac-verdict.hit { background: var(--color-success-soft); color: var(--color-success-ink); }
         .ac-verdict.miss { background: var(--color-danger-soft); color: var(--color-danger); }
         .ac-verdict.flat { background: var(--color-card-soft); color: var(--color-ink-2); }
-        .ac-rec-reason { font-size: 0.7rem; color: var(--color-ink-2); margin-top: 3px; }
-        .ac-rec-prices { display: flex; gap: 12px; margin-top: 5px; font-size: 0.76rem; flex-wrap: wrap; }
+        .ac-rec-reason { font-size: var(--fs-1); color: var(--color-ink-2); margin-top: 3px; }
+        .ac-rec-prices { display: flex; gap: 12px; margin-top: 5px; font-size: var(--fs-2); flex-wrap: wrap; }
         .ac-rec-prices b { color: var(--color-ink); }
         .ac-rec-chg { font-weight: 700; }
         .ac-rec-chg.good { color: var(--color-primary); }
         .ac-rec-chg.bad { color: var(--color-danger); }
-        .ac-rec-date { font-size: 0.62rem; color: var(--color-ink-3); margin-top: 3px; }
-        .ac-legend { margin-top: 4px; padding: 13px 16px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; font-size: 0.68rem; color: var(--color-ink-2); line-height: 1.6; }
+        .ac-rec-date { font-size: var(--fs-1); color: var(--color-ink-3); margin-top: 3px; }
+        .ac-legend { margin-top: 4px; padding: 13px 16px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md); font-size: var(--fs-1); color: var(--color-ink-2); line-height: 1.6; }
         /* 빈 상태 */
         .ac-empty { text-align: center; padding: 40px 24px; }
         .ac-empty-ic { font-size: 2.4rem; margin-bottom: 14px; }
-        .ac-empty-t { font-size: 1.05rem; font-weight: 700; color: var(--color-ink); margin-bottom: 8px; }
-        .ac-empty-d { font-size: 0.82rem; color: var(--color-ink-2); line-height: 1.7; margin-bottom: 16px; }
-        .ac-empty-badge { display: inline-block; padding: 8px 20px; border-radius: 20px; background: var(--color-primary-soft); color: var(--color-primary); font-size: 0.8rem; font-weight: 700; }
+        .ac-empty-t { font-size: var(--fs-5); font-weight: 700; color: var(--color-ink); margin-bottom: 8px; }
+        .ac-empty-d { font-size: var(--fs-3); color: var(--color-ink-2); line-height: 1.7; margin-bottom: 16px; }
+        .ac-empty-badge { display: inline-block; padding: 8px 20px; border-radius: var(--radius-card); background: var(--color-primary-soft); color: var(--color-primary); font-size: var(--fs-3); font-weight: 700; }
       `}</style>
     </ReportShell>
   );

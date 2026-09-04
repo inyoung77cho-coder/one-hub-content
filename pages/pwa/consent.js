@@ -84,20 +84,20 @@ export default function ConsentPage() {
       </main>
       <style jsx>{`
         .cs-wrap { max-width: 440px; margin: 0 auto; padding: 40px 22px; font-family: 'Pretendard', sans-serif; color: #26364F; }
-        .cs-h { font-size: 1.3rem; font-weight: 800; color: #12213B; margin: 0 0 6px; }
-        .cs-sub { font-size: 0.9rem; color: #64748B; margin: 0 0 22px; line-height: 1.6; }
-        .cs-all { display: flex; align-items: center; gap: 10px; width: 100%; padding: 14px; border: 1px solid #E1E9F5; border-radius: 12px; background: #F8FAFF; font-size: 0.95rem; font-weight: 800; color: #12213B; cursor: pointer; margin-bottom: 12px; font-family: inherit; }
+        .cs-h { font-size: var(--fs-6); font-weight: 800; color: #12213B; margin: 0 0 6px; }
+        .cs-sub { font-size: var(--fs-4); color: #64748B; margin: 0 0 22px; line-height: 1.6; }
+        .cs-all { display: flex; align-items: center; gap: 10px; width: 100%; padding: 14px; border: 1px solid #E1E9F5; border-radius: var(--radius-md); background: #F8FAFF; font-size: var(--fs-5); font-weight: 800; color: #12213B; cursor: pointer; margin-bottom: 12px; font-family: inherit; }
         .cs-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 18px; }
         .cs-row { display: flex; align-items: center; justify-content: space-between; }
         .cs-item { display: flex; align-items: center; gap: 10px; flex: 1; padding: 11px 4px; background: none; border: none; text-align: left; cursor: pointer; font-family: inherit; }
-        .cs-label { font-size: 0.88rem; color: #46566E; font-weight: 600; }
-        .cs-box { flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid #CBD5E1; color: transparent; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 900; }
+        .cs-label { font-size: var(--fs-4); color: #46566E; font-weight: 600; }
+        .cs-box { flex-shrink: 0; width: 22px; height: 22px; border-radius: var(--radius-sm); border: 1.5px solid #CBD5E1; color: transparent; display: inline-flex; align-items: center; justify-content: center; font-size: var(--fs-3); font-weight: 900; }
         .cs-box.on { background: #2F6BFF; border-color: #2F6BFF; color: var(--color-on-primary); }
-        .cs-view { font-size: 0.78rem; color: #2F6BFF; font-weight: 700; flex-shrink: 0; padding: 4px 6px; }
-        .cs-err { font-size: 0.82rem; color: #E5484D; margin: 0 0 12px; }
-        .cs-submit { width: 100%; padding: 15px; border: none; border-radius: 12px; background: #2F6BFF; color: var(--color-on-primary); font-size: 1rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .cs-view { font-size: var(--fs-2); color: #2F6BFF; font-weight: 700; flex-shrink: 0; padding: 4px 6px; }
+        .cs-err { font-size: var(--fs-3); color: #E5484D; margin: 0 0 12px; }
+        .cs-submit { width: 100%; padding: 15px; border: none; border-radius: var(--radius-md); background: #2F6BFF; color: var(--color-on-primary); font-size: var(--fs-5); font-weight: 800; cursor: pointer; font-family: inherit; }
         .cs-submit:disabled { background: #CBD5E1; cursor: not-allowed; }
-        .cs-note { font-size: 0.76rem; color: #94A3B8; line-height: 1.6; margin: 14px 0 0; }
+        .cs-note { font-size: var(--fs-2); color: #94A3B8; line-height: 1.6; margin: 14px 0 0; }
       `}</style>
     </>
   );

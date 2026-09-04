@@ -73,26 +73,26 @@ export default function VocabPage() {
       <style jsx>{`
         .vc-wrap { min-height: 100vh; background: var(--color-bg); padding-bottom: var(--nav-clearance-fab); }
         .vc-main { max-width: 560px; margin: 0 auto; padding: 12px 14px 40px; }
-        .vc-title { font-size: 1.1rem; font-weight: 800; color: var(--color-ink); margin: 6px 0 4px; }
-        .vc-n { font-size: 0.8rem; color: var(--color-ink-3); }
-        .vc-due { font-size: 0.8rem; color: var(--color-ink-2); background: var(--color-warning-soft, var(--inset-bg, rgba(0,0,0,0.04))); border-radius: 10px; padding: 9px 12px; margin: 6px 0 12px; word-break: keep-all; }
+        .vc-title { font-size: var(--fs-6); font-weight: 800; color: var(--color-ink); margin: 6px 0 4px; }
+        .vc-n { font-size: var(--fs-3); color: var(--color-ink-3); }
+        .vc-due { font-size: var(--fs-3); color: var(--color-ink-2); background: var(--color-warning-soft, var(--inset-bg, rgba(0,0,0,0.04))); border-radius: var(--radius-sm); padding: 9px 12px; margin: 6px 0 12px; word-break: keep-all; }
         .vc-filters { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
-        .vc-seg { display: flex; gap: 2px; background: var(--inset-bg, rgba(0,0,0,0.04)); border-radius: 9px; padding: 2px; }
-        .vc-seg button { border: none; background: transparent; color: var(--color-ink-3); border-radius: 7px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .vc-seg { display: flex; gap: 2px; background: var(--inset-bg, rgba(0,0,0,0.04)); border-radius: var(--radius-sm); padding: 2px; }
+        .vc-seg button { border: none; background: transparent; color: var(--color-ink-3); border-radius: var(--radius-sm); padding: 6px 12px; font-size: var(--fs-2); font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .vc-seg button.on { background: var(--color-card); color: var(--color-ink); }
-        .vc-order { margin-left: auto; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 8px; padding: 6px 12px; font-size: 0.76rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
-        .vc-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 16px; }
-        .vc-empty { font-size: 0.82rem; color: var(--color-ink-2); line-height: 1.55; margin: 0; word-break: keep-all; }
+        .vc-order { margin-left: auto; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: var(--radius-sm); padding: 6px 12px; font-size: var(--fs-2); font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .vc-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 16px; }
+        .vc-empty { font-size: var(--fs-3); color: var(--color-ink-2); line-height: 1.55; margin: 0; word-break: keep-all; }
         .vc-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
-        .vc-item { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 12px; }
+        .vc-item { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 12px; }
         .vc-item.due { border-color: var(--color-primary); }
         .vc-item-top { display: flex; align-items: center; gap: 8px; }
-        .vc-text { font-size: 0.92rem; font-weight: 800; color: var(--color-ink); }
-        .vc-box { font-size: 0.64rem; font-weight: 700; color: var(--color-ink-3); background: var(--inset-bg, rgba(0,0,0,0.04)); border-radius: 999px; padding: 2px 7px; }
-        .vc-x { margin-left: auto; border: none; background: none; color: var(--color-warning-ink, #f59e0b); font-size: 1rem; cursor: pointer; }
-        .vc-mean { font-size: 0.8rem; color: var(--color-ink-2); margin-top: 3px; }
+        .vc-text { font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); }
+        .vc-box { font-size: var(--fs-1); font-weight: 700; color: var(--color-ink-3); background: var(--inset-bg, rgba(0,0,0,0.04)); border-radius: 999px; padding: 2px 7px; }
+        .vc-x { margin-left: auto; border: none; background: none; color: var(--color-warning-ink, #f59e0b); font-size: var(--fs-5); cursor: pointer; }
+        .vc-mean { font-size: var(--fs-3); color: var(--color-ink-2); margin-top: 3px; }
         .vc-rv { display: flex; gap: 8px; margin-top: 10px; }
-        .vc-rb { flex: 1; border: 1px solid var(--color-line); background: var(--color-card); border-radius: 9px; padding: 8px; font-size: 0.8rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .vc-rb { flex: 1; border: 1px solid var(--color-line); background: var(--color-card); border-radius: var(--radius-sm); padding: 8px; font-size: var(--fs-3); font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .vc-rb.ok { border-color: var(--color-primary); color: var(--color-primary); }
         .vc-rb.no { color: var(--color-ink-2); }
       `}</style>

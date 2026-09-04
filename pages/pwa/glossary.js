@@ -44,17 +44,17 @@ export default function GlossaryPage() {
       <style jsx>{`
         .gl { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 40px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
         .gl-hd { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 6px 2px 14px; }
-        .gl-hd h1 { font-size: 22px; font-weight: 800; letter-spacing: -.5px; margin: 0; }
-        .gl-sub { font-size: 12px; font-weight: 600; color: var(--color-ink-3); }
+        .gl-hd h1 { font-size: var(--fs-7); font-weight: 800; letter-spacing: -.5px; margin: 0; }
+        .gl-sub { font-size: var(--fs-2); font-weight: 600; color: var(--color-ink-3); }
         .gl-search { margin-bottom: 14px; }
-        .gl-search input { width: 100%; box-sizing: border-box; border: 1px solid var(--color-line); background: var(--color-card); border-radius: 12px; padding: 12px 14px; font-size: 0.9rem; font-family: var(--font-sans); color: var(--color-ink); }
+        .gl-search input { width: 100%; box-sizing: border-box; border: 1px solid var(--color-line); background: var(--color-card); border-radius: var(--radius-md); padding: 12px 14px; font-size: var(--fs-4); font-family: var(--font-sans); color: var(--color-ink); }
         .gl-search input:focus { outline: none; border-color: var(--color-primary); }
         .gl-list { display: flex; flex-direction: column; gap: 10px; }
-        .gl-item { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 14px 15px; box-shadow: var(--shadow-card); }
-        .gl-term { font-size: 0.92rem; font-weight: 800; color: var(--color-ink); margin-bottom: 5px; }
-        .gl-desc { font-size: 0.82rem; line-height: 1.6; color: var(--color-ink-2); word-break: keep-all; }
-        .gl-empty { font-size: 0.86rem; color: var(--color-ink-2); padding: 24px 4px; text-align: center; }
-        .gl-foot { font-size: 0.72rem; color: var(--color-ink-3); text-align: center; margin-top: 18px; line-height: 1.5; }
+        .gl-item { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 14px 15px; box-shadow: var(--shadow-card); }
+        .gl-term { font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); margin-bottom: 5px; }
+        .gl-desc { font-size: var(--fs-3); line-height: 1.6; color: var(--color-ink-2); word-break: keep-all; }
+        .gl-empty { font-size: var(--fs-4); color: var(--color-ink-2); padding: 24px 4px; text-align: center; }
+        .gl-foot { font-size: var(--fs-2); color: var(--color-ink-3); text-align: center; margin-top: 18px; line-height: 1.5; }
         .gl-foot b { color: var(--color-primary); }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>

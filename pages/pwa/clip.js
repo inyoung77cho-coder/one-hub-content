@@ -76,10 +76,10 @@ export default function ClipPage() {
       <style jsx>{`
         .cl-wrap { min-height: 100vh; background: var(--color-bg); padding-bottom: var(--nav-clearance-fab); }
         .cl-main { max-width: 560px; margin: 0 auto; padding: 12px 14px 40px; }
-        .cl-title { font-size: 1.1rem; font-weight: 800; color: var(--color-ink); margin: 6px 0 6px; }
-        .cl-lead { font-size: 0.82rem; color: var(--color-ink-2); line-height: 1.55; margin: 0 0 12px; word-break: keep-all; }
-        .cl-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 16px; }
-        .cl-q { font-size: 0.82rem; color: var(--color-ink-2); margin: 0; }
+        .cl-title { font-size: var(--fs-6); font-weight: 800; color: var(--color-ink); margin: 6px 0 6px; }
+        .cl-lead { font-size: var(--fs-3); color: var(--color-ink-2); line-height: 1.55; margin: 0 0 12px; word-break: keep-all; }
+        .cl-card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 16px; }
+        .cl-q { font-size: var(--fs-3); color: var(--color-ink-2); margin: 0; }
       `}</style>
     </div>
   );
