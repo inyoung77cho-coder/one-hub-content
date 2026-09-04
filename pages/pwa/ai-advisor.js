@@ -9,6 +9,7 @@ import { computeSummary, toManwon } from "../../lib/aiAssets";
 import { getTrader } from "../../lib/trader";
 import { getLedger } from "../../lib/ledger";
 import { recordSnapshot } from "../../lib/assetHistory"; // [S22-3] AI 탭 진입 시에도 총자산 곡선 적립
+import { cachedJson } from "../../lib/quoteCache"; // [S29-3] GET 디둡·캐시
 import { acctRule } from "../../lib/taxRules";
 import { getStockHoldings } from "../../lib/stockHoldings";
 import EtfDataStatus from "../../components/EtfDataStatus";
@@ -88,8 +89,8 @@ export default function AIAdvisor() {
       //   자체 규칙으로 온보딩을 또 더해(이중합산) 홈과 총자산이 달랐다. 부동산 입력상태도 같은 응답에서.
       Promise.all([
         getLedger(tr).catch(() => null),
-        fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => null),
-        fetch(`/api/fx/usdkrw`).then((r) => r.json()).catch(() => null),
+        cachedJson(`/api/pwa-dashboard?trader=${tr}`).catch(() => null),
+        cachedJson(`/api/fx/usdkrw`).catch(() => null),
       ]).then(([a, dash, fxj]) => {
         if (a && a.ok && a.total_uk != null) recordSnapshot(tr, a); // [S22-3] 곡선 적립(같은 날 병합)
         setRealtyState(a?.realty_state || null);

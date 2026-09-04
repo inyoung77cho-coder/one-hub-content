@@ -12,6 +12,7 @@ import { recordSnapshot, getDelta, getHistory, getAssetSeries } from "../../lib/
 import AvgPriceWarningCard from "../../components/shared/AvgPriceWarningCard"; // [S22-1] 이상 평단 확인 카드(주식·ETF 공용)
 import { getTargetClass, setTargetClass, computeClassDrift, topDriftMessage, CLASS_PRESETS } from "../../lib/targetClass"; // [S22-4] 자산군 목표 배분
 import { pickInsight } from "../../lib/crossInsight"; // [S22-10] 자산군 교차 인사이트(하나만)
+import { cachedJson } from "../../lib/quoteCache"; // [S29-3] 대시보드 GET 디둡·캐시
 import TraderBadge from "../../components/shared/TraderBadge";
 import AppHeader from "../../components/AppHeader";
 import SegTabs from "../../components/shared/SegTabs";
@@ -92,7 +93,7 @@ export default function AssetsMapPage() {
     } catch (e) { setInvProps([]); }
     Promise.all([
       getLedger(tr, { awaitSync: !assets }).catch(() => ({ ok: false })),
-      fetch(`/api/pwa-dashboard?trader=${tr}`).then((r) => r.json()).catch(() => ({ ok: false })),
+      cachedJson(`/api/pwa-dashboard?trader=${tr}`).then((d) => d || { ok: false }).catch(() => ({ ok: false })),
     ]).then(([a, d]) => {
       setAssets(a); setDash(d); setAt(new Date());
       setStatus(a && a.ok ? "ok" : "error");

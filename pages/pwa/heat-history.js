@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import ReportShell from "../../components/shared/ReportShell";
 import { getTrader } from "../../lib/trader";
+import { cachedJson } from "../../lib/quoteCache"; // [S29-3] GET 디둡·캐시
 
 const REGIME = { BULL: "상승장", BEAR: "하락장", SIDEWAYS: "횡보장" };
 const gradeColor = (g) => {
@@ -21,9 +22,8 @@ export default function PwaHeatHistory() {
   useEffect(() => { try { setTrader((getTrader() || "A").toUpperCase()); } catch (e) {} }, []);
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/pwa-heat-history?trader=${trader}&limit=50`)
-      .then((r) => r.json())
-      .then((d) => { setHistory(d.history || d.items || []); setOk(d.ok !== false); setLoading(false); })
+    cachedJson(`/api/pwa-heat-history?trader=${trader}&limit=50`)
+      .then((d) => { d = d || {}; setHistory(d.history || d.items || []); setOk(d.ok !== false); setLoading(false); })
       .catch(() => { setOk(false); setLoading(false); });
   }, [trader]);
 

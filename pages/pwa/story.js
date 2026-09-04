@@ -15,6 +15,7 @@ import { buildEpisodeDraft } from "../../lib/episodeDraft"; // [S29-8] 대본 �
 import { getIsOperator } from "../../lib/isOperator"; // [S29-8] 운영자만
 import { getStoryRegionOverride, setStoryRegionOverride, guessMyDong, guOf, REGIONS } from "../../lib/storyRegion";
 import { recordSnapshot as recordRegionSnapshot, getRegionDelta } from "../../lib/storyRegionHistory"; // [S23 T-9] 지역별 이야기 증감(오늘 화면에서 이관)
+import { cachedJson } from "../../lib/quoteCache"; // [S29-3] GET 디둡·캐시
 
 export default function PwaStory({ episodes = [] }) {
   const router = useRouter();
@@ -37,8 +38,7 @@ export default function PwaStory({ episodes = [] }) {
 
   // [S23 T-9] 지역별 이야기 건수 오늘치 적립 + 전날 대비 증감(오늘 화면과 같은 소스·스냅샷).
   useEffect(() => {
-    fetch("/api/story-region-stats")
-      .then((r) => r.json())
+    cachedJson("/api/story-region-stats")
       .then((d) => { if (d?.ok && d.counts) { recordRegionSnapshot(d.counts); setRegionDelta(getRegionDelta()); } })
       .catch(() => {});
   }, []);
@@ -46,8 +46,7 @@ export default function PwaStory({ episodes = [] }) {
   useEffect(() => {
     const override = getStoryRegionOverride();
     if (override) { setRegion(override); return; }
-    fetch("/api/pwa/re/complexDongs")
-      .then((r) => r.json())
+    cachedJson("/api/pwa/re/complexDongs")
       .then((d) => {
         const map = d?.map || (Array.isArray(d?.items) ? Object.fromEntries(d.items.map((x) => [x.단지명, x.법정동])) : null);
         const g = guessMyDong(map || {});

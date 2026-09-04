@@ -8,6 +8,7 @@ import { earn as earnToken } from "../../lib/activityToken"; // [S24-12] 주간 
 import { getTrader as getTraderWk } from "../../lib/trader";
 import ReportShell from "../../components/shared/ReportShell";
 import ShareButton from "../../components/ShareButton";
+import { cachedJson } from "../../lib/quoteCache"; // [S29-3] GET 디둡·캐시
 
 // [S24-11] 부동산 주간 현황 — 기존 :5002 주간 리포트(/api/pwa/re/weekly, weekly_report.py 크론)를 재사용.
 //   새 수집기 없음. 실거래가 없던 주도 "없음"을 정직하게. 분기로 움직이는 시장의 '주간 관찰 기록'.
@@ -27,8 +28,7 @@ function RealEstateWeekly() {
   const [done, setDone] = useState(false);
   useEffect(() => {
     try { earnToken("weekly", getTraderWk()); } catch (e) {} // [S24-12] 주간 리포트 열람(주 1회 상한)
-    fetch("/api/pwa/re/weekly")
-      .then((r) => r.json())
+    cachedJson("/api/pwa/re/weekly")
       .then((d) => {
         setRe(d && !d.error ? d : null); setDone(true);
         try {

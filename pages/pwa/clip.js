@@ -7,6 +7,7 @@ import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import AudioPlaylist from "../../components/shared/AudioPlaylist";
 import { getTrader } from "../../lib/trader";
+import { cachedJson } from "../../lib/quoteCache"; // [S29-3] GET 디둡·캐시
 import { getLedger } from "../../lib/ledger";
 import { getVerdictScorecard } from "../../lib/verdictStats";
 import { briefingScript } from "../../lib/briefingScript";
@@ -33,9 +34,9 @@ export default function ClipPage() {
     let alive = true;
     setDone(false); setClip(null);
     (async () => {
-      const lessons = await fetch(`/api/english/today?track=${encodeURIComponent(themeTrack)}&language=${themeLang}`).then((r) => r.json()).then((d) => d.items || []).catch(() => []);
+      const lessons = await cachedJson(`/api/english/today?track=${encodeURIComponent(themeTrack)}&language=${themeLang}`).then((d) => (d && d.items) || []).catch(() => []);
       // 서버가 테마당 하루 한 번 생성·캐시한 목표어 브리지 텍스트. 미배포/실패 시 ok:false → 레슨만.
-      const narration = await fetch(`/api/english/theme-clip?track=${encodeURIComponent(themeTrack)}&language=${themeLang}&level=basic`).then((r) => r.json()).catch(() => ({ ok: false }));
+      const narration = (await cachedJson(`/api/english/theme-clip?track=${encodeURIComponent(themeTrack)}&language=${themeLang}&level=basic`)) || { ok: false };
       const c = assembleThemeClip({ track: themeTrack, language: themeLang, lessons, narration, koSummary });
       if (alive) { setClip(c); setDone(true); }
     })();
@@ -74,10 +75,10 @@ export default function ClipPage() {
       } catch (e) {}
 
       let news = "";
-      try { const d = await fetch("/api/pwa-today-news-brief").then((r) => r.json()); if (d && d.ok && d.brief) news = String(d.brief).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 400); } catch (e) {}
+      try { const d = await cachedJson("/api/pwa-today-news-brief"); if (d && d.ok && d.brief) news = String(d.brief).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 400); } catch (e) {}
 
       let foreignItems = [];
-      try { const d = await fetch("/api/english/today?medium=news&language=en").then((r) => r.json()); foreignItems = (d?.items || []).filter((l) => l && l.id && l.has_audio !== false).slice(0, 4).map((l) => ({ title: l.title || l.headline || "오늘 학습", src: `/api/english/audio/${l.id}` })); } catch (e) {}
+      try { const d = await cachedJson("/api/english/today?medium=news&language=en"); foreignItems = (d?.items || []).filter((l) => l && l.id && l.has_audio !== false).slice(0, 4).map((l) => ({ title: l.title || l.headline || "오늘 학습", src: `/api/english/audio/${l.id}` })); } catch (e) {}
 
       const c = buildDailyClip({ summary, verdict, asset, realestate, news, foreignItems });
       if (alive) { setClip(c); setDone(true); }

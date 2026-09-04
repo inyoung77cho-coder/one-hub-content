@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { dedupBy } from '../../lib/useDedup';
+import { cachedJson } from '../../lib/quoteCache';
 import ReportShell from '../../components/shared/ReportShell';
 import { samplePolicy } from '../../lib/sampleSize';
 import { aggregateByCategory } from '../../lib/ruleMap';
@@ -9,8 +10,7 @@ export default function AccuracyPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/pwa/accuracy?trader_id=A')
-      .then(r => r.json())
+    cachedJson('/api/pwa/accuracy?trader_id=A')
       .then(d => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
