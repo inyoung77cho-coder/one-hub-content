@@ -24,6 +24,7 @@ export default function AppHeader({ onSearch }) {
       </div>
       <style jsx>{`
         .apphd {
+          position: sticky; top: 0; z-index: 140;
           max-width: 480px; margin: 0 auto;
           display: flex; align-items: center; justify-content: space-between;
           background: var(--color-bg);

@@ -959,7 +959,7 @@ export default function EnglishPage() {
       <BottomNav active="english" />
 
       <style jsx>{`
-        .en { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 96px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
+        .en { max-width: 480px; margin: 0 auto; padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
         /* 제목+설명을 세로로 고정(설명은 항상 한 줄) → 모드가 바뀌어도 아래 버튼 위치가 안 밀림 */
         .en-hd { margin: 6px 2px 12px; }
         .en-hd h1 { font-size: 22px; font-weight: 800; letter-spacing: -.5px; margin: 0 0 3px; }

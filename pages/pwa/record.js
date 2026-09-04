@@ -138,7 +138,7 @@ export default function RecordPage() {
       </main>
       <BottomNav />
       <style jsx>{`
-        .rec-wrap { min-height: 100vh; background: var(--color-bg); padding-bottom: 78px; }
+        .rec-wrap { min-height: 100vh; background: var(--color-bg); padding-bottom: var(--nav-clearance-fab); }
         .rec-main { max-width: 560px; margin: 0 auto; padding: 12px 14px 40px; }
         .rec-title { font-size: 1.15rem; font-weight: 800; color: var(--color-ink); margin: 6px 0 4px; }
         .rec-lead { font-size: 0.8rem; color: var(--color-ink-2); line-height: 1.5; margin: 0 0 14px; word-break: keep-all; }

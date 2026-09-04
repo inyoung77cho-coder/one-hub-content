@@ -562,7 +562,7 @@ export default function Settings() {
       )}
 
       <style jsx>{`
-        .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--color-bg); padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 84px); font-family: var(--font-sans); color: var(--color-ink); }
+        .m { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--color-bg); padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); }
         /* [사용자 지시] 상위 메뉴 고정 — 헤더뿐 아니라 타이틀·세그먼트·탭까지 하나의 블록으로 */
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px 4px; }
         .hd { display: flex; align-items: center; justify-content: space-between; background: var(--color-bg); padding: calc(env(safe-area-inset-top, 0px) + 10px) 4px 12px; }

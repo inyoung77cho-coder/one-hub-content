@@ -32,6 +32,7 @@ import { getVerdictScorecard } from "../../lib/verdictStats"; // [S24-8] 성적�
 import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S23 T-1] 가격 확보→기록(추천 카드와 공유)
 import { cachedJson } from "../../lib/quoteCache"; // [S20-3] /api/pwa-ai-daily 중복 GET dedup
 import TraderBadge from "../../components/shared/TraderBadge";
+import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
 import LastUpdated from "../../components/LastUpdated";
@@ -521,15 +522,7 @@ export default function TodayPage({ announcements = [] }) {
     <div className="td" onTouchStart={swipe.onTouchStart} onTouchMove={swipe.onTouchMove} onTouchEnd={swipe.onTouchEnd}>
       {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 */}
       <div className="sticky-hdr">
-        <header className="td-hd">
-          <button className="td-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">ONE<span className="td-dot">·</span>HUB</button>
-          <div className="td-ic">
-            <TraderBadge />
-            <button className="td-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>
-            <FeedbackButton variant="icon" />
-            <button className="td-search" onClick={() => router.push("/pwa/settings")} aria-label="설정">⚙️</button>
-          </div>
-        </header>
+        <AppHeader />
 
         {/* [S23 T-3] 4칸 세그먼트 탭 — 네 화면이 다 보이고, 현재 위치를 알고, 바로 오간다. URL(?v=)에 실린다. */}
         <div className="td-titlewrap">
@@ -1186,7 +1179,7 @@ export default function TodayPage({ announcements = [] }) {
       <BottomNav active="today" />
 
       <style jsx>{`
-        .td { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 140px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
+        .td { max-width: 480px; margin: 0 auto; padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
         /* [사용자 지시] 상위 메뉴 고정 */
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
         .td-hd { display: flex; align-items: center; justify-content: space-between; padding: calc(env(safe-area-inset-top, 0px) + 12px) 2px 10px; }

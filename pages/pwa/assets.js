@@ -13,6 +13,7 @@ import AvgPriceWarningCard from "../../components/shared/AvgPriceWarningCard"; /
 import { getTargetClass, setTargetClass, computeClassDrift, topDriftMessage, CLASS_PRESETS } from "../../lib/targetClass"; // [S22-4] 자산군 목표 배분
 import { pickInsight } from "../../lib/crossInsight"; // [S22-10] 자산군 교차 인사이트(하나만)
 import TraderBadge from "../../components/shared/TraderBadge";
+import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
 import LastUpdated from "../../components/LastUpdated";
@@ -221,15 +222,7 @@ export default function AssetsMapPage() {
     <div className="as">
       {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 */}
       <div className="sticky-hdr">
-        <header className="as-hd">
-          <button className="as-logo" onClick={() => router.push("/pwa/today")} aria-label="오늘">ONE<span className="as-dot">·</span>HUB</button>
-          <div className="as-ic">
-            <TraderBadge />
-            <button className="as-search" onClick={() => router.push("/pwa?tab=analyze")} aria-label="AI 종목 검색">🔍</button>
-            <FeedbackButton variant="icon" />
-            <button className="as-search" onClick={() => router.push("/pwa/settings")} aria-label="설정">⚙️</button>
-          </div>
-        </header>
+        <AppHeader />
 
         {/* [사용자 지시] ETF·부동산 페이지로 이동해도 이 타이틀 바가 그대로 이어지도록 공용 컴포넌트로 통일 */}
         <AssetMapTitle current="주식" onChangeView={(i) => setView(i)} />
@@ -535,7 +528,7 @@ export default function AssetsMapPage() {
 
       <style jsx>{`
         /* [N5-3] 하단 여백 = 하단탭(56) + FAB 상단(68+52) 여유. 88px이면 FAB가 마지막 문구를 가렸다. */
-        .as { max-width: 480px; margin: 0 auto; padding: 0 14px calc(env(safe-area-inset-bottom, 0px) + 140px); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
+        .as { max-width: 480px; margin: 0 auto; padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
         /* [사용자 지시] 상위 메뉴 고정 */
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
         .as-row.ex { opacity: 0.72; }

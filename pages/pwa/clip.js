@@ -74,7 +74,7 @@ export default function ClipPage() {
       </main>
       <BottomNav />
       <style jsx>{`
-        .cl-wrap { min-height: 100vh; background: var(--color-bg); padding-bottom: 84px; }
+        .cl-wrap { min-height: 100vh; background: var(--color-bg); padding-bottom: var(--nav-clearance-fab); }
         .cl-main { max-width: 560px; margin: 0 auto; padding: 12px 14px 40px; }
         .cl-title { font-size: 1.1rem; font-weight: 800; color: var(--color-ink); margin: 6px 0 6px; }
         .cl-lead { font-size: 0.82rem; color: var(--color-ink-2); line-height: 1.55; margin: 0 0 12px; word-break: keep-all; }

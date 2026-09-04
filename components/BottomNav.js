@@ -78,7 +78,7 @@ export default function BottomNav({ active }) {
         .bn-fab {
           position: fixed; right: calc(50% - 240px + 16px); bottom: calc(env(safe-area-inset-bottom, 0px) + 68px);
           z-index: 151; width: 52px; height: 52px; border-radius: 50%;
-          border: none; background: var(--color-primary); color: #fff;
+          border: none; background: var(--color-primary); color: var(--color-on-primary);
           font-size: 26px; font-weight: 300; line-height: 1; cursor: pointer;
           box-shadow: var(--shadow-float, 0 8px 24px rgba(0,0,0,.2));
         }

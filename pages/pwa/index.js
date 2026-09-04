@@ -3325,7 +3325,7 @@ export default function PWADashboard({ latestReport }) {
            달리 좌우 14px 여백 없이 화면 끝에 붙어있었다 — 그 페이지들은 모두 14px 패딩 컨테이너 안에
            AppHeader를 두는데 index.js만 pwa-wrapper에 그 여백이 없었던 게 원인. 여기로 옮기고
            pwa-main의 중복 14px은 제거(아래 .pwa-main 참고) — 이중 패딩 방지. */
-        .pwa-wrapper { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--bg); color: var(--text-primary); font-family: var(--font-body); padding: 0 14px 88px; transition: background 0.2s ease, color 0.2s ease; }
+        .pwa-wrapper { max-width: 480px; margin: 0 auto; min-height: 100vh; background: var(--bg); color: var(--text-primary); font-family: var(--font-body); padding: 0 14px var(--nav-clearance-fab); transition: background 0.2s ease, color 0.2s ease; }
         /* [사용자 지시] 상위 메뉴 고정 */
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--bg); margin: 0 -14px; padding: 0 14px; }
         button, input { font-family: inherit; }

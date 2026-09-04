@@ -71,7 +71,7 @@ export default function VocabPage() {
       </main>
       <BottomNav active="english" />
       <style jsx>{`
-        .vc-wrap { min-height: 100vh; background: var(--color-bg); padding-bottom: 84px; }
+        .vc-wrap { min-height: 100vh; background: var(--color-bg); padding-bottom: var(--nav-clearance-fab); }
         .vc-main { max-width: 560px; margin: 0 auto; padding: 12px 14px 40px; }
         .vc-title { font-size: 1.1rem; font-weight: 800; color: var(--color-ink); margin: 6px 0 4px; }
         .vc-n { font-size: 0.8rem; color: var(--color-ink-3); }

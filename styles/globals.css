@@ -237,6 +237,11 @@
 
   /* Spacing */
   --nav-height: 64px;
+  /* [S26-7] 하단 탭/FAB 클리어런스 — 마지막 카드가 BottomNav·FAB 뒤로 숨는 버그 방지.
+     FAB(＋)은 BottomNav 에 내장돼 하단 탭 전 페이지에 존재하므로 사실상 -fab 를 쓴다.
+     BottomNav min-height 56 + FAB 상단(safe+120) 을 덮는 값. */
+  --nav-clearance:     calc(env(safe-area-inset-bottom, 0px) + 84px);
+  --nav-clearance-fab: calc(env(safe-area-inset-bottom, 0px) + 140px);
   --status-height: 36px;
   --max-width: 1080px;
   --section-gap: 4rem;
