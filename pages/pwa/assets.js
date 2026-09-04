@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import Sparkline from "../../components/shared/Sparkline"; // [S23 T-4] 총자산 스파크라인(오늘 화면과 공용)
+import useSwipeTabs from "../../components/shared/useSwipeTabs"; // [S25-4] 자산군 요약 카드 스와이프(페이지 이동 아님)
 import { getTrader, useTrader } from "../../lib/trader";
 import { getLedger } from "../../lib/ledger";
 import { recordSnapshot, getDelta, getHistory, getAssetSeries } from "../../lib/assetHistory";
@@ -153,6 +154,14 @@ export default function AssetsMapPage() {
   const targetClass = getTargetClass();
   const classDrift = computeClassDrift(opClass, targetClass);
   const classDriftMsg = topDriftMessage(classDrift);
+  // [S25-4] 자산군 요약 카드 3장 — 좌우 스와이프로 이 카드만 전환(페이지 이동은 '상세 보기' 클릭만).
+  const summaryCards = [
+    { key: "stock", label: "📈 주식", val: bd.stock_uk != null ? Number(bd.stock_uk) : null, delta: delta?.stock, drift: (classDrift || []).find((d) => d.key === "stock"), series: (hist || []).map((h) => h.stock), href: "/pwa?tab=portfolio" },
+    { key: "etf", label: "💹 ETF", val: bd.etf_uk != null ? Number(bd.etf_uk) : null, delta: delta?.etf, drift: (classDrift || []).find((d) => d.key === "etf"), series: (hist || []).map((h) => h.etf), href: "/pwa/etf" },
+    { key: "realestate", label: "🏠 부동산(투자)", val: invRealtyUk > 0.005 ? invRealtyUk : null, delta: delta?.realty, drift: (classDrift || []).find((d) => d.key === "realestate"), series: (hist || []).map((h) => h.realty), href: "/pwa/realestate" },
+  ];
+  const [sumIdx, setSumIdx] = useState(0);
+  const sumSwipe = useSwipeTabs({ index: sumIdx, count: summaryCards.length, onChange: setSumIdx });
   // [S22-10] 자산군 교차 인사이트 — 세 자산을 다 아는 앱만 할 수 있는 한 줄(가장 강한 것 하나).
   //   (환노출 규칙용 overseasPct 는 보유 실시세 환산이 필요해 후속 — 지금은 자산군 집중·유동성 규칙이 동작.)
   const overseasPct = 0;
@@ -363,6 +372,29 @@ export default function AssetsMapPage() {
           ))}
         </section>
 
+        {/* [S25-4] 자산군 요약 카드 — 좌우 스와이프로 주식↔ETF↔부동산 전환. 스와이프는 이 카드 안에서만,
+            페이지 이동은 '상세 보기' 버튼 클릭으로만(하단 탭 원칙: 페이지끼리는 클릭). */}
+        <section className="card as-sumcard" onTouchStart={sumSwipe.onTouchStart} onTouchMove={sumSwipe.onTouchMove} onTouchEnd={sumSwipe.onTouchEnd}>
+          {(() => {
+            const c = summaryCards[sumIdx];
+            const ser = (c.series || []).filter((v) => v != null).slice(-30);
+            return (
+              <>
+                <div className="as-sum-h"><span>{c.label}</span>
+                  <span className="as-sum-dots">{summaryCards.map((_, i) => <i key={i} className={i === sumIdx ? "on" : ""} onClick={() => setSumIdx(i)} />)}</span>
+                </div>
+                <div className="as-sum-val">{c.val != null ? uk(c.val) : "미입력"}</div>
+                <div className="as-sum-row">
+                  {c.delta != null && Math.abs(c.delta) > 0.004 && <span className={`as-dchip ${dCls(c.delta)}`}>{c.delta >= 0 ? "▲" : "▼"} {dvUk(c.delta)}</span>}
+                  {c.drift && <span className="as-sum-drift">목표 대비 {c.drift.drift >= 0 ? "+" : ""}{c.drift.drift}%p</span>}
+                  {ser.length >= 2 && <Sparkline data={ser} className="as-spark" />}
+                </div>
+                <button className="as-sum-more" onClick={() => router.push(c.href)}>상세 보기 →</button>
+              </>
+            );
+          })()}
+        </section>
+
         {/* [S22-10] 자산군 교차 인사이트 — 세 자산을 묶어야 할 수 있는 한 줄. 가장 강한 것 하나만. */}
         {crossInsight && (
           <section className="card" style={{ borderLeft: "3px solid var(--color-primary)" }}>
@@ -525,6 +557,16 @@ export default function AssetsMapPage() {
         .as-tabnote { margin: -6px 4px 12px; font-size: 0.72rem; line-height: 1.5; color: var(--color-ink-2); word-break: keep-all; }
         .as-tabnote b { color: var(--color-ink); font-weight: 800; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
+        /* [S25-4] 자산군 요약 카드 캐러셀 */
+        .as-sumcard { touch-action: pan-y; }
+        .as-sum-h { display: flex; align-items: center; font-size: 0.86rem; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
+        .as-sum-dots { margin-left: auto; display: flex; gap: 5px; }
+        .as-sum-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--color-line); cursor: pointer; }
+        .as-sum-dots i.on { background: var(--color-primary); }
+        .as-sum-val { font-size: 1.4rem; font-weight: 800; color: var(--color-ink); font-variant-numeric: tabular-nums; }
+        .as-sum-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+        .as-sum-drift { font-size: 0.76rem; color: var(--color-ink-2); }
+        .as-sum-more { margin-top: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-primary); border-radius: 9px; padding: 8px 14px; font-size: 0.78rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .as-total { display: flex; align-items: baseline; gap: 8px; }
         .as-total span { font-size: 0.78rem; font-weight: 600; color: var(--color-ink-3); }
         .as-total b { font-size: 1.5rem; font-weight: 800; color: var(--color-ink); }

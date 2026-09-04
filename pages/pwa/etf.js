@@ -10,6 +10,7 @@ import EtfDataStatus from "../../components/EtfDataStatus";
 import { getTrader } from "../../lib/trader";
 import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS, getOtherAssets, addOtherAsset, removeOtherAsset, updateOtherAsset, sellOtherAsset, OTHER_KINDS, saneEtfAvg } from "../../lib/etfHoldings";
 import AvgPriceWarningCard from "../../components/shared/AvgPriceWarningCard"; // [S22-1] 이상 평단 확인 카드(주식·ETF 공용)
+import useSwipeTabs from "../../components/shared/useSwipeTabs"; // [S25-5] 보유↔추천 스와이프
 import { ensureDailySnapshot } from "../../lib/dailySnapshot"; // [S22-3] 총자산 곡선 적립 backstop
 import { taxFocusOf, isTaxSeason, currentMonth } from "../../lib/taxCalendar"; // [S22-8] ETF 세금 달력(평시 접힘)
 import { classifyEtf } from "../../lib/etfClassify";
@@ -176,6 +177,7 @@ export default function EtfDashboard() {
   const toggleDecomp = () => { const n = !decompOpen; setDecompOpen(n); try { localStorage.setItem("onehub_etf_decomp", n ? "1" : "0"); } catch {} };
   // [ETF 재구성 Phase1] 보유 | 추천 상위 탭(URL ?etf= 동기화)
   const [etfTab, setEtfTab] = useTabState("etf", ["hold", "rec"], "hold");
+  const etfSwipe = useSwipeTabs({ index: etfTab === "rec" ? 1 : 0, count: 2, onChange: (i) => setEtfTab(["hold", "rec"][i]) }); // [S25-5] 보유↔추천 스와이프
   // [ETF 재구성 Phase1] 기타 금융자산 카드 — 추가 폼 + 인라인 수정/매도 상태
   const [oaForm, setOaForm] = useState({ name: "", valueKrw: "", account: "일반", kind: "fund" });
   const [oaActId, setOaActId] = useState(null); // 인라인 액션(수정/매도) 열린 행
@@ -792,7 +794,7 @@ export default function EtfDashboard() {
   const todosForAcct = etfTodos.filter((t) => acctFilter === "전체" || t.acct === "전체" || t.acct === acctFilter || (t.acct === "연금" && isPensionAcct(acctFilter)));
 
   return (
-    <div className="etf pwa-shell">
+    <div className="etf pwa-shell" onTouchStart={etfSwipe.onTouchStart} onTouchMove={etfSwipe.onTouchMove} onTouchEnd={etfSwipe.onTouchEnd}>
       {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 — 헤더+타이틀바를 하나의
           sticky 블록으로 묶는다. */}
       <div className="sticky-hdr">

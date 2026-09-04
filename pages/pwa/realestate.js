@@ -9,6 +9,7 @@ import { ReForm } from "../../components/shared/AssetForms";
 import Term from "../../components/Term";
 import RePositionCard, { RegionLeadersCard, RegionForecastCard, MoveDifficultyCard } from "../../components/RePositionCard";
 import { ensureDailySnapshot } from "../../lib/dailySnapshot"; // [S22-3] 총자산 곡선 적립 backstop
+import useSwipeTabs from "../../components/shared/useSwipeTabs"; // [S25-5] 분석↔시나리오 스와이프
 import { estimateSellCost, MOVE_COST_DISCLAIMER } from "../../lib/moveCost"; // [S22-9] 갈아타기 거래비용
 import ReIncomeSummaryCard from "../../components/ReIncomeSummaryCard";
 
@@ -31,6 +32,8 @@ export default function RealEstateDashboard() {
     try { return localStorage.getItem("onehub_re_tab") === "scenario" ? "scenario" : "analysis"; } catch { return "analysis"; }
   });
   const setReTab = (v) => { setReTabState(v); try { localStorage.setItem("onehub_re_tab", v); } catch {} };
+  const RE_TABS = ["analysis", "scenario"];
+  const reSwipe = useSwipeTabs({ index: reTab === "scenario" ? 1 : 0, count: 2, onChange: (i) => setReTab(RE_TABS[i]) }); // [S25-5] 분석↔시나리오
   const [myC, setMyC] = useState("");   // [S5] 내 단지
   const [tgtC, setTgtC] = useState(""); // [S5] 갈아탈 목표 단지
   const [myProp, setMyProp] = useState(null); // [S5] 내 단지 상세(위저드 등록: 평형·동층·매수가·시점)
@@ -236,7 +239,7 @@ export default function RealEstateDashboard() {
   const myDong = myProp?.name ? dongOf(myProp.name) : (brief?.region || null);
 
   return (
-    <div className="re pwa-shell">
+    <div className="re pwa-shell" onTouchStart={reSwipe.onTouchStart} onTouchMove={reSwipe.onTouchMove} onTouchEnd={reSwipe.onTouchEnd}>
       {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 */}
       <div className="sticky-hdr">
         <AppHeader onSearch={() => setReSearchOpen(true)} />
