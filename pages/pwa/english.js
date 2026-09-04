@@ -916,7 +916,13 @@ export default function EnglishPage() {
               {(() => {
                 const list = feed.items.filter((l) => l && l.id && l.has_audio !== false).map((l) => ({ id: l.id, title: l.title || l.headline || l.topic || `${(lang === "zh" ? TRACK_KO_ZH : TRACK_KO)[l.track] || l.track || ""} 학습`, src: `/api/english/audio/${l.id}` }));
                 if (!list.length) return null;
-                return <AudioPlaylist items={list} storageKey={`onehub_listen_pos_${mode}`} title={`${mode === "zh" ? "🇨🇳 중국어" : mode === "gen" ? "🇺🇸 일반영어" : "🇺🇸 경제영어"} 오늘의 듣기 · ${list.length}편 [이어 듣기]`} onComplete={() => { try { earn("listen", getTraderEn()); } catch (e) {} }} />;
+                return (
+                  <>
+                    <AudioPlaylist items={list} storageKey={`onehub_listen_pos_${mode}`} title={`${mode === "zh" ? "🇨🇳 중국어" : mode === "gen" ? "🇺🇸 일반영어" : "🇺🇸 경제영어"} 오늘의 듣기 · ${list.length}편 [이어 듣기]`} onComplete={() => { try { earn("listen", getTraderEn()); } catch (e) {} }} />
+                    {/* [S25-10] 외국어만 듣던 사람이 전체 브리핑으로 넘어오게 */}
+                    <button type="button" onClick={() => router.push("/pwa/clip")} style={{ display: "block", width: "100%", marginTop: 10, border: "1px solid var(--color-line)", background: "var(--color-card)", color: "var(--color-primary)", borderRadius: 10, padding: 10, fontSize: "0.8rem", fontWeight: 700, fontFamily: "var(--font-sans)", cursor: "pointer" }}>🎧 오늘 브리핑 전체 듣기(자산·판단·뉴스 포함) →</button>
+                  </>
+                );
               })()}
             </>
           )}

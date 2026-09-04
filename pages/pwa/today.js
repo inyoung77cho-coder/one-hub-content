@@ -588,7 +588,13 @@ export default function TodayPage({ announcements = [] }) {
             {at && <span className="tds-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
           </div>
           {/* [S24-9] 오늘 요약 한국어로 들려주기 — 출퇴근·운전 중. 버튼 탭에서만 재생(iOS), MediaSession. */}
-          {briefScript && <div className="tds-speakrow"><BriefingSpeak script={briefScript} /></div>}
+          {briefScript && (
+            <div className="tds-speakrow">
+              <BriefingSpeak script={briefScript} />
+              {/* [S25-10] 각 페이지를 통합한 하루 한 클립 */}
+              <button type="button" className="tds-cliplink" onClick={() => router.push("/pwa/clip")}>🎧 오늘 브리핑 전체 듣기 →</button>
+            </div>
+          )}
           {/* [S23 T-2] 총자산·실거주는 작은 줄로(assets.js 와 같은 문구·기호). 시세 갱신은 판단 성과와 분리. */}
           {hasResidence && (
             <div className="tds-subtotals">
@@ -1232,7 +1238,8 @@ export default function TodayPage({ announcements = [] }) {
         .tc-s { font-size: 0.76rem; color: var(--color-ink-2); word-break: keep-all; }
         .tc-arrow { flex: none; color: var(--color-ink-3); font-size: 1.1rem; }
         .etf1-taxnum { margin-top: 6px; font-size: 0.74rem; color: var(--color-ink-2); font-variant-numeric: tabular-nums; }
-        .tds-speakrow { margin: 6px 0 2px; }
+        .tds-speakrow { margin: 6px 0 2px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .tds-cliplink { border: none; background: none; color: var(--color-primary); font-size: 0.74rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; padding: 0; }
         .tds-actbody { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
         .tds-actrow { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); text-align: left; }
         .tds-badge { flex-shrink: 0; font-size: 0.6rem; font-weight: 800; border: 1px solid; border-radius: 999px; padding: 1px 6px; }
