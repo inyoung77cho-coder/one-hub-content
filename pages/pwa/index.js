@@ -29,6 +29,8 @@ import { fetchStockQuote } from '../../lib/stockLive';
 import { getKrxSession } from '../../lib/marketHours';
 import ShareButton from '../../components/ShareButton';
 import RotatingPageTitle from '../../components/RotatingPageTitle';
+import useSwipeTabs from '../../components/shared/useSwipeTabs'; // [S25-1] AI 3섹션 스와이프
+import AiJudgeCard from '../../components/AiJudgeCard'; // [S25-2] 심판석 판정 카드
 import AssetMapTitle from '../../components/AssetMapTitle';
 import { recordAccuracySnapshot, getAccuracyHistory } from '../../lib/aiAccuracyHistory';
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
@@ -277,6 +279,8 @@ export default function PWADashboard({ latestReport }) {
   // [OS-2] AI 페이지 3탭 — "AI vs 나 대결" 우선 노출로 재정렬(사용자 지시, FB-4의 '자기검증 우선'을 대체).
   const TRUST_TABS = ['vs', 'verify', 'archive']; // [OS-2] RotatingPageTitle 순환 순서 = 탭 순서
   const [trustSec, setTrustSec] = useTabState('sec', TRUST_TABS, 'vs');
+  // [S25-1] 3섹션 좌우 스와이프(useSwipeTabs 재사용, S24-5). 하단 탭 이동엔 쓰지 않는다.
+  const aiSwipe = useSwipeTabs({ index: TRUST_TABS.indexOf(trustSec), count: TRUST_TABS.length, onChange: (i) => setTrustSec(TRUST_TABS[i]) });
   const [recSort, setRecSort] = useState('interest'); // [S7.2] 추천 정렬(interest/upside)
   const [autoWatchNote, setAutoWatchNote] = useState([]); // [S-6] 추천해제→자동 관망 편입 알림
   const [buyNotice, setBuyNotice] = useState(null); // [S-6] 바로매수 핸드오프 { name, code }
@@ -1096,17 +1100,16 @@ export default function PWADashboard({ latestReport }) {
           {/* [OS-2] 오늘·자산·이야기와 동일한 패턴 — "AI" 고정 + vs 나 대결/자기 검증/리포트 순환,
               분석변경 버튼은 항상 행 맨 오른쪽. ?sec= 딥링크로도 진입하므로 controlledIndex로 동기화.
               [사용자 지시] 상위 메뉴 고정 대상이라 report 탭 <main> 안에서 여기로 끌어올림. */}
+          {/* [S25-1] 회전 버튼 '분석변경' → 3칸 세그먼트(today·english 과 같은 모양). ?sec= 딥링크 유지. */}
           {tab === 'report' && (
             <div className="trust-nav">
-              <RotatingPageTitle
-                fixed="AI"
-                mutedSuffix
-                spaced
-                buttonLabel="분석변경"
-                items={[{ suffix: 'vs 나 대결' }, { suffix: '자기검증' }, { suffix: '리포트' }]}
-                controlledIndex={TRUST_TABS.indexOf(trustSec)}
-                onChange={(i) => setTrustSec(TRUST_TABS[i])}
-              />
+              <div className="td-seg" role="tablist" aria-label="AI 심판석">
+                {['나 vs AI', 'AI 자기검증', '기록'].map((label, i) => (
+                  <button key={i} role="tab" aria-selected={TRUST_TABS.indexOf(trustSec) === i}
+                    className={`td-seg-b ${TRUST_TABS.indexOf(trustSec) === i ? 'on' : ''}`}
+                    onClick={() => setTrustSec(TRUST_TABS[i])}>{label}</button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -2276,9 +2279,9 @@ export default function PWADashboard({ latestReport }) {
           </main>
         )}
 
-        {/* ── Report Tab = [S2 IA] 트러스트 허브 ── */}
+        {/* ── Report Tab = [S2 IA] 트러스트 허브 = [S25] AI 심판석 ── */}
         {tab === 'report' && (
-          <main className="pwa-main">
+          <main className="pwa-main" onTouchStart={aiSwipe.onTouchStart} onTouchMove={aiSwipe.onTouchMove} onTouchEnd={aiSwipe.onTouchEnd}>
 
             {/* [사용자 지시 2026-08-30] 갱신 여부를 가장 먼저 — 세 섹션(대결·자기검증·리포트) 공통 최상단.
                 "오늘 AI가 돌긴 했나"가 매일 첫 질문인데, 그 답이 자기검증 안에만 있었다. */}
@@ -2297,6 +2300,8 @@ export default function PWADashboard({ latestReport }) {
               </div>
             )}
 
+            {/* [S25-2] 심판석 — 나와 AI를 같은 자로 재는 판정 카드(getVerdictScorecard 단일 소스). 첫 화면 주인공. */}
+            {trustSec === 'vs' && <AiJudgeCard />}
             {/* [나 vs AI 대결] — 2026-08-23 완전 재설계. today.js와 동일한 components/PortfolioDuelCard.js 로 통합. */}
             {trustSec === 'vs' && <PortfolioDuelCard />}
 
@@ -2614,7 +2619,7 @@ export default function PWADashboard({ latestReport }) {
 
             {/* [§3-5 item3] AI 성적표 — 이번주 요약을 성적표로 격상(승률·차단적중률·손익비·MDD) */}
             <section className="pwa-card">
-              <span className="pwa-card-label">🏆 AI 성적표 · 이번 주</span>
+              <span className="pwa-card-label">🤖 AI 엔진 성적 · 참고 <span style={{ fontWeight: 400, fontSize: '0.66rem', color: 'var(--color-ink-3)' }}>운영 지표</span></span>
               {!perf ? (
                 <div style={{ textAlign: 'center', padding: '16px 0', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
                   이번 주 데이터 수집 중...
@@ -4182,6 +4187,10 @@ export default function PWADashboard({ latestReport }) {
         /* [나 vs AI 대결] */
         /* [사용자 피드백] 오늘·자산·이야기와 동일하게 카드 없이 — 위치/여백을 td-titlewrap과 픽셀 단위로 통일 */
         .trust-nav { display: flex; align-items: center; gap: 8px; margin: 6px 2px 6px; }
+        /* [S25-1] AI 심판석 세그먼트(today·english 과 동일 모양) */
+        .td-seg { display: flex; gap: 4px; width: 100%; background: var(--inset-bg, var(--color-card-soft, rgba(0,0,0,0.04))); border: 1px solid var(--color-line); border-radius: 12px; padding: 3px; }
+        .td-seg-b { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; border: none; background: transparent; color: var(--color-ink-2); border-radius: 9px; padding: 8px 4px; font-size: 0.82rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .td-seg-b.on { background: var(--color-card); color: var(--color-ink); box-shadow: var(--shadow-card); }
         /* [사용자 지시 2026-08-30] AI 갱신 스탬프 — 세 섹션 공통 최상단. 상태를 색이 아니라 문장으로 말한다. */
         .ai-fresh { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 0 0 10px; padding: 9px 12px; border-radius: 12px; border: 1px solid var(--color-line); background: var(--color-card); box-shadow: var(--shadow-card); font-size: 0.74rem; color: var(--color-ink-2); line-height: 1.5; }
         .ai-fresh b { color: var(--color-ink); font-weight: 800; }
