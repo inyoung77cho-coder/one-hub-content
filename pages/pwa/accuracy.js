@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { dedupBy } from '../../lib/useDedup';
 import ReportShell from '../../components/shared/ReportShell';
+import { samplePolicy } from '../../lib/sampleSize';
+import { aggregateByCategory } from '../../lib/ruleMap';
 
 export default function AccuracyPage() {
   const [data, setData] = useState(null);
@@ -32,31 +34,21 @@ export default function AccuracyPage() {
         const bigMiss = recent.filter((r) => r.price_change_pct != null && r.price_change_pct > 0)
           .sort((a, b) => b.price_change_pct - a.price_change_pct)[0];
 
-        // [A2] 큰 오판 개선 제안 — 취약 사유·최대 오판·전체 캘리브레이션에서 결정론적 산출
+        // [S28-3] 사유를 카테고리로 묶고, 표본 30건 이상에서만 판정한다. 2건으로 결론내지 않는다(노이즈 학습 방지).
+        //   실제 개선 제안 생성은 서버 improve_proposer(하드 게이트 50건·백테스트)가 담당 — 여기선 정직한 상태만 보여준다.
+        const cats = aggregateByCategory(data.by_reason);
         const improvements = [];
-        const weak = (data.by_reason || []).filter((r) => r.total >= 2 && (r.accuracy_pct ?? 100) < 50)
-          .sort((a, b) => (a.accuracy_pct ?? 0) - (b.accuracy_pct ?? 0));
-        weak.slice(0, 2).forEach((r) => improvements.push({
-          icon: '🎯', title: `'${r.reason || '미분류'}' 사유 기준 강화`,
-          detail: `적중률 ${r.accuracy_pct}%(${r.success}/${r.total}건). 이 신호 단독 차단은 오판이 잦습니다. 거래량·수급 등 보조지표가 함께 악화될 때만 차단하도록 조건을 좁히는 것을 제안합니다.`,
-        }));
-        if (bigMiss) improvements.push({
-          icon: '📈', title: `최대 오판 보정 · ${bigMiss.stock} +${bigMiss.price_change_pct.toFixed(1)}%`,
-          detail: `차단 후 급등한 사례입니다. 차단 시점 '${bigMiss.block_reason || '사유'}' 신호가 반등 모멘텀을 놓쳤습니다. 거래량 급증(평소 2배↑) 구간은 차단 예외로 두는 규칙을 검토합니다.`,
-        });
-        if (pct != null) {
-          if (pct < 60) improvements.push({
-            icon: '🛡️', title: '차단 임계값 상향(정밀도 우선)',
-            detail: `전체 적중률 ${pct}%. 확신이 낮은 경계 케이스까지 차단하면 오판이 늘어납니다. 임계값을 높여 확신 높은 종목만 차단하도록 조정을 제안합니다.`,
-          });
-          else if (pct >= 70) improvements.push({
-            icon: '⏱️', title: '현 기준 유지 · 검증 주기 단축',
-            detail: `적중률 ${pct}%로 양호합니다. 기준은 유지하되 검증을 3거래일→2거래일로 앞당겨 반응성을 높이는 방안을 검토합니다.`,
-          });
-        }
+        const eligible = cats.filter((c) => !samplePolicy(c.scored).learning); // 30건 이상
+        eligible.filter((c) => (c.accuracy_pct ?? 100) < 50)
+          .sort((a, b) => (a.accuracy_pct ?? 0) - (b.accuracy_pct ?? 0))
+          .slice(0, 2)
+          .forEach((c) => improvements.push({
+            icon: '🎯', title: `'${c.label}' 사유 재검토`,
+            detail: `채점 ${c.scored}건 · 적중률 ${c.accuracy_pct}%. 표본이 충분하고 적중이 낮아, 이 사유의 차단 조건을 좁히는 것을 엔진 정비소(운영자) 검토 대상에 올립니다.`,
+          }));
         if (!improvements.length) improvements.push({
-          icon: '✅', title: '현재 오판 이슈 없음',
-          detail: '큰 오판이나 취약 사유가 확인되지 않았습니다. 현 차단 기준을 유지하며 신규 데이터로 계속 검증합니다.',
+          icon: '📊', title: '아직 제안할 규칙이 없습니다',
+          detail: '표본 30건 이상인 차단 사유가 아직 없습니다. 2~3건으로 규칙을 바꾸면 노이즈를 학습합니다 — 표본이 쌓일 때까지 관찰만 합니다. 실제 개선 제안은 표본 기준을 통과할 때 엔진 정비소에서 생성됩니다.',
         });
 
         return (
@@ -132,22 +124,35 @@ export default function AccuracyPage() {
               <div className="ac-imp-foot">개선 제안은 최근 검증 결과에서 자동 산출됩니다. 실제 차단 기준 반영은 주간 리뷰에서 확정됩니다.</div>
             </section>
 
-            {/* 사유별 적중률 */}
+            {/* [S28-3] 차단 사유별 — 카테고리로 묶고, 표본 30건 미만은 '판정 보류'(정확도·색 안 붙임) */}
             <section className="ac-card">
-              <div className="ac-card-h">차단 사유별 적중률</div>
-              {data.by_reason.map((r, i) => {
-                const p = r.accuracy_pct || 0;
+              <div className="ac-card-h">차단 사유별 적중률 <span className="ac-card-sub">표본 30건+ 만 판정</span></div>
+              {cats.map((c, i) => {
+                const pol = samplePolicy(c.scored);
+                if (pol.learning) {
+                  return (
+                    <div className="ac-reason" key={i}>
+                      <div className="ac-reason-top">
+                        <span className="ac-reason-k">{c.label}</span>
+                        <span className="ac-reason-hold">판정 보류 · {c.scored}/30</span>
+                      </div>
+                      <div className="ac-bar sm"><div className="ac-bar-fill" style={{ width: `${pol.progressPct}%` }} /></div>
+                    </div>
+                  );
+                }
+                const p = c.accuracy_pct || 0;
                 const t = barTone(p);
                 return (
                   <div className="ac-reason" key={i}>
                     <div className="ac-reason-top">
-                      <span className="ac-reason-k">{r.reason || '(미분류)'}</span>
-                      <span className={`ac-reason-p ${t}`}>{r.accuracy_pct != null ? `${r.accuracy_pct}%` : '-'}<span className="ac-reason-n">{r.success}/{r.total}건</span></span>
+                      <span className="ac-reason-k">{c.label}</span>
+                      <span className={`ac-reason-p ${t}`}>{c.accuracy_pct != null ? `${c.accuracy_pct}%` : '-'}<span className="ac-reason-n">{c.hits}/{c.scored}건</span></span>
                     </div>
                     <div className="ac-bar sm"><div className={`ac-bar-fill ${t}`} style={{ width: `${p}%` }} /></div>
                   </div>
                 );
               })}
+              <div className="ac-imp-foot">사유는 자유 문자열을 카테고리로 묶은 것입니다. 이 사유들은 매수 점수의 가중치 규칙(RSI·거래량 등)과 1:1로 대응하지 않습니다 — 차단 판단 자체의 정확도입니다.</div>
             </section>
 
             {/* 최근 차단 내역 */}
@@ -265,6 +270,7 @@ export default function AccuracyPage() {
         .ac-reason-k { color: var(--color-ink); font-weight: 500; max-width: 62%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .ac-reason-p { font-weight: 800; white-space: nowrap; }
         .ac-reason-n { color: var(--color-ink-2); font-weight: 500; margin-left: 4px; font-size: var(--fs-1); }
+        .ac-reason-hold { font-size: var(--fs-1); font-weight: 700; color: var(--color-ink-3); white-space: nowrap; }
         /* 최근 내역 */
         .ac-rec { padding: 12px 0; }
         .ac-rec.div { border-bottom: 1px solid var(--color-line); }
