@@ -7,6 +7,7 @@ import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import AudioPlaylist from "../../components/shared/AudioPlaylist"; // [S24-10] 언어별 연속 재생
 import useSwipeTabs from "../../components/shared/useSwipeTabs"; // [S25-6] 언어 대메뉴 스와이프
+import SegTabs from "../../components/shared/SegTabs"; // [S26-5] 공용 세그먼트 탭
 import { earn, getTokens, TOKEN_DISCLAIMER } from "../../lib/activityToken"; // [S24-12] 활동 토큰(현장경제)
 import { isSaved as isVocabSaved, toggleSave as toggleVocab, getVocabCount } from "../../lib/vocabNote"; // [S25-7] 내 단어장
 import { getTrader as getTraderEn } from "../../lib/trader";
@@ -14,19 +15,13 @@ import { useRouter } from "next/router";
 
 // 상단 대메뉴 = 경제영어(en) / 중국어(zh) / 일반영어(gen). 각 대메뉴 아래 하위 메뉴로 계층 구분.
 // [S25-6] 사용자 요구 순서: 경제영어 · 일반영어 · 중국어.
-const MODES = [
-  ["en", "💼", "경제영어"],
-  ["gen", "🎬", "일반영어"],
-  ["zh", "🇨🇳", "중국어"],
-];
-// 대메뉴별 하위 메뉴 [키, 아이콘, 라벨]
-const SUBTABS = {
-  en:  [["news", "📰", "뉴스"], ["video", "▶️", "영상"], ["idiom", "💬", "이디엄"]],
-  zh:  [["news", "📰", "신문"], ["video", "▶️", "영상"], ["idiom", "💬", "구어"]],
-  gen: [["live", "🎬", "라이브"], ["review", "📝", "주말복습"]],
-};
-const TRACK_KO = { economy: "경제", display: "디스플레이", general: "생활영어" };
-const TRACK_KO_ZH = { economy: "경제", display: "디스플레이", general: "생활중국어" };
+// [S26-11] 축 셋 분리: 언어(영어·중국어) · 테마(경제·디스플레이·회화) · 형식(전체·뉴스·영상·이디엄).
+//   언어×테마 6조합. general 라벨="회화"(두 언어 글자수 동일 → 세그 폭 안정). :5005가 track+language 를 실제 필터함(확인).
+const LANGS = [["en", "영어"], ["zh", "중국어"]];
+const THEMES = [["economy", "경제"], ["display", "디스플레이"], ["general", "회화"]];
+const FORMATS = [["all", "전체"], ["news", "뉴스"], ["video", "영상"], ["idiom", "이디엄"]];
+const TRACK_KO = { economy: "경제", display: "디스플레이", general: "회화" };
+const TRACK_KO_ZH = { economy: "경제", display: "디스플레이", general: "회화" };
 const SPEEDS = [0.75, 1, 1.25];
 
 // [2026-08-26] 발음 듣기 — 단어를 복사해 다른 곳에서 듣던 번거로움 해소.
@@ -205,43 +200,43 @@ function LessonCard({ lesson, lang }) {
       </div>
 
       <style jsx>{`
-        .lc { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 16px; box-shadow: var(--shadow-card); }
+        .lc { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 16px; box-shadow: var(--shadow-card); }
         .lc-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-        .lc-track { font-size: 11px; font-weight: 800; color: var(--color-on-primary); background: var(--color-primary); border-radius: 999px; padding: 3px 9px; }
-        .lc-src { font-size: 11.5px; font-weight: 600; color: var(--color-ink-3); }
-        .lc-title { font-size: 1rem; font-weight: 800; line-height: 1.4; margin: 0 0 4px; color: var(--color-ink); }
-        .lc-titleko { font-size: .8rem; color: var(--color-ink-2); margin: 0 0 12px; word-break: keep-all; }
+        .lc-track { font-size: var(--fs-1); font-weight: 800; color: var(--color-on-primary); background: var(--color-primary); border-radius: 999px; padding: 3px 9px; }
+        .lc-src { font-size: var(--fs-2); font-weight: 600; color: var(--color-ink-3); }
+        .lc-title { font-size: var(--fs-5); font-weight: 800; line-height: 1.4; margin: 0 0 4px; color: var(--color-ink); }
+        .lc-titleko { font-size: var(--fs-3); color: var(--color-ink-2); margin: 0 0 12px; word-break: keep-all; }
         .lc-audio { margin: 12px 0; }
-        .lc-step { font-size: .74rem; font-weight: 700; color: var(--color-ink-3); margin-bottom: 6px; }
+        .lc-step { font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-3); margin-bottom: 6px; }
         .lc-audio audio { width: 100%; height: 36px; }
         .lc-speed { display: flex; gap: 6px; margin-top: 8px; }
-        .lc-speed button { flex: 0 0 auto; font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--color-line); background: var(--color-bg); color: var(--color-ink-2); cursor: pointer; font-family: var(--font-sans); }
+        .lc-speed button { flex: 0 0 auto; font-size: var(--fs-2); font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--color-line); background: var(--color-bg); color: var(--color-ink-2); cursor: pointer; font-family: var(--font-sans); }
         .lc-speed button.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
-        .lc-noaudio { font-size: .75rem; color: var(--color-ink-3); margin: 10px 0; }
-        .lc-reveal, .lc-again { width: 100%; margin-top: 12px; padding: 12px; border-radius: 10px; border: none; background: var(--color-primary); color: var(--color-on-primary); font-size: .86rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .lc-noaudio { font-size: var(--fs-2); color: var(--color-ink-3); margin: 10px 0; }
+        .lc-reveal, .lc-again { width: 100%; margin-top: 12px; padding: 12px; border-radius: var(--radius-sm); border: none; background: var(--color-primary); color: var(--color-on-primary); font-size: var(--fs-4); font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .lc-again { background: var(--color-bg); color: var(--color-primary); border: 1px solid var(--color-primary); }
         .lc-sec { margin-top: 16px; }
-        .lc-sec h3 { font-size: .74rem; font-weight: 800; color: var(--color-ink-3); letter-spacing: .3px; margin: 0 0 7px; text-transform: uppercase; }
-        .lc-passage { font-size: .92rem; line-height: 1.85; color: var(--color-ink); margin: 0; }
+        .lc-sec h3 { font-size: var(--fs-2); font-weight: 800; color: var(--color-ink-3); letter-spacing: .3px; margin: 0 0 7px; text-transform: uppercase; }
+        .lc-passage { font-size: var(--fs-4); line-height: 1.85; color: var(--color-ink); margin: 0; }
         .lc-dialogue { white-space: pre-line; }
-        .lc-ko { font-size: .82rem; line-height: 1.7; color: var(--color-ink-2); margin: 0; white-space: pre-line; word-break: keep-all; }
+        .lc-ko { font-size: var(--fs-3); line-height: 1.7; color: var(--color-ink-2); margin: 0; white-space: pre-line; word-break: keep-all; }
         .lc-exprs, .lc-words { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 10px; }
         .lc-words { list-style: none; padding-left: 0; }
-        .lc-exprs li, .lc-words li { font-size: .84rem; color: var(--color-ink); line-height: 1.5; }
-        .lc-pos { font-size: .72rem; color: var(--color-ink-3); font-style: normal; }
-        .lc-pinyin { font-size: .78rem; color: var(--color-primary); font-weight: 600; }
-        .lc-speak { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin-left: 4px; padding: 0; border: none; background: var(--color-card-soft); border-radius: 50%; cursor: pointer; font-size: .74rem; vertical-align: middle; }
+        .lc-exprs li, .lc-words li { font-size: var(--fs-3); color: var(--color-ink); line-height: 1.5; }
+        .lc-pos { font-size: var(--fs-2); color: var(--color-ink-3); font-style: normal; }
+        .lc-pinyin { font-size: var(--fs-2); color: var(--color-primary); font-weight: 600; }
+        .lc-speak { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin-left: 4px; padding: 0; border: none; background: var(--color-card-soft); border-radius: 50%; cursor: pointer; font-size: var(--fs-2); vertical-align: middle; }
         .lc-speak.on { background: var(--color-primary-soft); }
-        .vstar { border: none; background: none; cursor: pointer; font-size: 0.9rem; color: var(--color-ink-3); padding: 0 2px; vertical-align: middle; }
+        .vstar { border: none; background: none; cursor: pointer; font-size: var(--fs-4); color: var(--color-ink-3); padding: 0 2px; vertical-align: middle; }
         .vstar.on { color: var(--color-warning-ink, #f59e0b); }
         .lc-mean { color: var(--color-ink-2); }
-        .lc-ex { font-size: .8rem; color: var(--color-ink-2); margin-top: 3px; padding-left: 8px; border-left: 2px solid var(--color-line); }
-        .lc-exko { font-size: .74rem; color: var(--color-ink-3); padding-left: 10px; }
-        .lc-lit { font-size: .76rem; color: var(--color-ink-3); margin-top: 3px; }
-        .lc-nu { font-size: .78rem; color: var(--color-ink-2); margin-top: 2px; }
+        .lc-ex { font-size: var(--fs-3); color: var(--color-ink-2); margin-top: 3px; padding-left: 8px; border-left: 2px solid var(--color-line); }
+        .lc-exko { font-size: var(--fs-2); color: var(--color-ink-3); padding-left: 10px; }
+        .lc-lit { font-size: var(--fs-2); color: var(--color-ink-3); margin-top: 3px; }
+        .lc-nu { font-size: var(--fs-2); color: var(--color-ink-2); margin-top: 2px; }
         .lc-foot { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); display: flex; flex-direction: column; gap: 6px; }
-        .lc-foot a { font-size: .78rem; font-weight: 700; color: var(--color-primary); text-decoration: none; }
-        .lc-warn { font-size: .72rem; color: var(--color-ink-3); }
+        .lc-foot a { font-size: var(--fs-2); font-weight: 700; color: var(--color-primary); text-decoration: none; }
+        .lc-warn { font-size: var(--fs-2); color: var(--color-ink-3); }
       `}</style>
     </article>
   );
@@ -264,7 +259,7 @@ function WeeklyReviewCard({ item, textKey, lang }) {
       <style jsx>{`
         .wr-row { list-style: none; padding: 10px 0; border-bottom: 1px solid var(--color-line); }
         .wr-top { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
-        .wr-date { margin-left: auto; font-size: .66rem; color: var(--color-ink-3); }
+        .wr-date { margin-left: auto; font-size: var(--fs-1); color: var(--color-ink-3); }
       `}</style>
     </li>
   );
@@ -297,7 +292,7 @@ function WeeklyReview({ weekly, lang }) {
         </section>
       )}
       <style jsx>{`
-        .wr-range { font-size: .74rem; color: var(--color-ink-3); margin-bottom: 4px; }
+        .wr-range { font-size: var(--fs-2); color: var(--color-ink-3); margin-bottom: 4px; }
       `}</style>
     </div>
   );
@@ -346,10 +341,10 @@ function Karaoke({ text, lang, onActive, onClear }) {
       <audio ref={audioRef} src={audioSrc} onTimeUpdate={onTime} onEnded={end} preload="none" />
       <style jsx>{`
         .ka { }
-        .ka-text { font-size: 1.5rem; font-weight: 800; line-height: 1.5; color: var(--color-ink); letter-spacing: -.01em; }
-        .ka-text span { transition: color .1s, background .1s; padding: 0 1px; border-radius: 4px; }
+        .ka-text { font-size: var(--fs-7); font-weight: 800; line-height: 1.5; color: var(--color-ink); letter-spacing: -.01em; }
+        .ka-text span { transition: color .1s, background .1s; padding: 0 1px; border-radius: var(--radius-sm); }
         .ka-text span.on { color: var(--color-on-primary); background: var(--color-primary); }
-        .ka-play { margin-top: 10px; border: none; border-radius: 10px; padding: 9px 16px; background: var(--color-primary-soft); color: var(--color-primary); font-weight: 800; font-size: .82rem; cursor: pointer; font-family: inherit; }
+        .ka-play { margin-top: 10px; border: none; border-radius: var(--radius-sm); padding: 9px 16px; background: var(--color-primary-soft); color: var(--color-primary); font-weight: 800; font-size: var(--fs-3); cursor: pointer; font-family: inherit; }
         .ka-play:disabled { opacity: .6; }
       `}</style>
     </div>
@@ -418,22 +413,22 @@ function BbcKaraoke() {
       )}
       <p className="bk-src">BBC Learning English 실제 오디오 + 자동 단어 동기(매일 갱신)</p>
       <style jsx>{`
-        .bk { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 16px; padding: 16px 15px 15px; box-shadow: var(--shadow-card); }
-        .bk-hd { font-size: .9rem; color: var(--color-ink); }
+        .bk { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 16px 15px 15px; box-shadow: var(--shadow-card); }
+        .bk-hd { font-size: var(--fs-4); color: var(--color-ink); }
         .bk-hd b { font-weight: 800; }
-        .bk-sub { font-size: .7rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 8px; margin-left: 5px; }
-        .bk-title { margin-top: 6px; font-size: .82rem; font-weight: 800; color: var(--color-ink-2); }
-        .bk-stage { position: relative; width: 100%; aspect-ratio: 16 / 9; margin: 12px 0 0; border-radius: 12px; overflow: hidden; background: #0b1220 center / cover no-repeat; display: flex; align-items: flex-end; }
-        .bk-cap { width: 100%; box-sizing: border-box; min-height: 3em; max-height: 100%; overflow: hidden; padding: 16px 16px 15px; background: linear-gradient(transparent, rgba(0,0,0,.35), rgba(0,0,0,.82)); color: rgba(255,255,255,.88); font-size: 1.15rem; font-weight: 800; line-height: 1.5; text-align: center; overflow-wrap: break-word; word-break: normal; }
-        .bk-cap span { transition: color .12s, background .12s; padding: 1px 3px; border-radius: 5px; }
+        .bk-sub { font-size: var(--fs-1); font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 8px; margin-left: 5px; }
+        .bk-title { margin-top: 6px; font-size: var(--fs-3); font-weight: 800; color: var(--color-ink-2); }
+        .bk-stage { position: relative; width: 100%; aspect-ratio: 16 / 9; margin: 12px 0 0; border-radius: var(--radius-md); overflow: hidden; background: #0b1220 center / cover no-repeat; display: flex; align-items: flex-end; }
+        .bk-cap { width: 100%; box-sizing: border-box; min-height: 3em; max-height: 100%; overflow: hidden; padding: 16px 16px 15px; background: linear-gradient(transparent, rgba(0,0,0,.35), rgba(0,0,0,.82)); color: rgba(255,255,255,.88); font-size: var(--fs-6); font-weight: 800; line-height: 1.5; text-align: center; overflow-wrap: break-word; word-break: normal; }
+        .bk-cap span { transition: color .12s, background .12s; padding: 1px 3px; border-radius: var(--radius-sm); }
         .bk-cap span.past { color: rgba(255,255,255,.45); }
         .bk-cap span.on { color: #191600; background: #ffe14a; box-shadow: 0 0 0 2px #ffe14a; }
         .bk audio { width: 100%; display: block; margin-top: 10px; }
-        .bk-note { margin-top: 10px; font-size: .76rem; color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; }
+        .bk-note { margin-top: 10px; font-size: var(--fs-2); color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; }
         .bk-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-        .bk-chip { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); border-radius: 999px; padding: 5px 11px; font-size: .72rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .bk-chip { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); border-radius: 999px; padding: 5px 11px; font-size: var(--fs-2); font-weight: 700; cursor: pointer; font-family: inherit; }
         .bk-chip.on { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-primary); }
-        .bk-src { margin-top: 10px; font-size: .64rem; color: var(--color-ink-3); }
+        .bk-src { margin-top: 10px; font-size: var(--fs-1); color: var(--color-ink-3); }
       `}</style>
     </div>
   );
@@ -509,20 +504,20 @@ function LiveEnglish() {
       <p className="live-note">셀럽·BBC 짧은 영어 영상. 영상 플레이어의 <b>자막(CC)</b>을 켜면 화면에 자막이 나옵니다.</p>
       <style jsx>{`
         .live { display: flex; flex-direction: column; gap: 12px; padding: 4px 2px 20px; }
-        .live-vhd { font-size: .82rem; font-weight: 800; color: var(--color-ink); margin-top: 4px; }
-        .live-vhd span { font-size: .66rem; font-weight: 600; color: var(--color-ink-3); margin-left: 5px; }
-        .live-vid { border-radius: 14px; overflow: hidden; box-shadow: var(--shadow-card); }
+        .live-vhd { font-size: var(--fs-3); font-weight: 800; color: var(--color-ink); margin-top: 4px; }
+        .live-vhd span { font-size: var(--fs-1); font-weight: 600; color: var(--color-ink-3); margin-left: 5px; }
+        .live-vid { border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-card); }
         .live-vid iframe { width: 100%; aspect-ratio: 16/9; border: 0; display: block; }
-        .live-vcap { display: flex; align-items: center; gap: 8px; font-size: .76rem; font-weight: 700; color: var(--color-ink); padding: 9px 12px; background: var(--color-card); border-radius: 10px; }
+        .live-vcap { display: flex; align-items: center; gap: 8px; font-size: var(--fs-2); font-weight: 700; color: var(--color-ink); padding: 9px 12px; background: var(--color-card); border-radius: var(--radius-sm); }
         .live-vtitle { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         /* [사용자 지적] 날짜가 없으면 매일 새로 와도 '안 바뀐다'로 읽힌다 — 발행일을 항상 표시. */
-        .live-vdate { flex-shrink: 0; font-size: .66rem; font-weight: 700; color: var(--color-ink-3); }
-        .live-chip-d { font-style: normal; margin-left: 4px; font-size: .62rem; font-weight: 600; opacity: .72; }
-        .live-next { flex-shrink: 0; border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-primary); border-radius: 8px; padding: 5px 9px; font-size: .7rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .live-vdate { flex-shrink: 0; font-size: var(--fs-1); font-weight: 700; color: var(--color-ink-3); }
+        .live-chip-d { font-style: normal; margin-left: 4px; font-size: var(--fs-1); font-weight: 600; opacity: .72; }
+        .live-next { flex-shrink: 0; border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-primary); border-radius: var(--radius-sm); padding: 5px 9px; font-size: var(--fs-1); font-weight: 800; cursor: pointer; font-family: inherit; }
         .live-chips { display: flex; gap: 6px; flex-wrap: wrap; }
-        .live-chip { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); border-radius: 999px; padding: 6px 11px; font-size: .72rem; font-weight: 700; cursor: pointer; font-family: inherit; }
+        .live-chip { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); border-radius: 999px; padding: 6px 11px; font-size: var(--fs-2); font-weight: 700; cursor: pointer; font-family: inherit; }
         .live-chip.on { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-primary); }
-        .live-note { font-size: .68rem; color: var(--color-ink-3); line-height: 1.5; margin: 2px 0 0; word-break: keep-all; }
+        .live-note { font-size: var(--fs-1); color: var(--color-ink-3); line-height: 1.5; margin: 2px 0 0; word-break: keep-all; }
         .live-note b { color: var(--color-primary); }
       `}</style>
     </div>
@@ -746,42 +741,42 @@ function WeekendChat({ lang = "en" }) {
       )}
 
       <style jsx>{`
-        .qz { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 16px; padding: 18px 16px 20px; box-shadow: var(--shadow-card); }
-        .qz-teacher { display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--color-ink); }
-        .qz-av { font-size: 1.4rem; }
+        .qz { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 18px 16px 20px; box-shadow: var(--shadow-card); }
+        .qz-teacher { display: flex; align-items: center; gap: 8px; font-size: var(--fs-4); color: var(--color-ink); }
+        .qz-av { font-size: var(--fs-7); }
         .qz-teacher b { font-weight: 800; }
-        .qz-prog { margin-left: auto; font-size: .72rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 999px; padding: 2px 9px; }
+        .qz-prog { margin-left: auto; font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 999px; padding: 2px 9px; }
         .qz-thread { margin-top: 12px; max-height: 46vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-        .qz-bubble { margin-top: 12px; padding: 12px 14px; border-radius: 14px; }
+        .qz-bubble { margin-top: 12px; padding: 12px 14px; border-radius: var(--radius-md); }
         .qz-bubble:first-child { margin-top: 0; }
         .qz-bubble.tutor { background: var(--color-card-soft); border: 1px solid var(--color-line); border-top-left-radius: 4px; }
         .qz-bubble.me { background: var(--color-primary-soft); border: 1px solid var(--color-primary); border-top-right-radius: 4px; margin-left: 16%; }
-        .qz-say { margin: 0; font-size: 1.0rem; font-weight: 700; line-height: 1.55; color: var(--color-ink); word-break: break-word; white-space: pre-wrap; }
-        .qz-say.sm { margin-top: 6px; font-size: .82rem; font-weight: 600; color: var(--color-ink-2); }
+        .qz-say { margin: 0; font-size: var(--fs-5); font-weight: 700; line-height: 1.55; color: var(--color-ink); word-break: break-word; white-space: pre-wrap; }
+        .qz-say.sm { margin-top: 6px; font-size: var(--fs-3); font-weight: 600; color: var(--color-ink-2); }
         .qz-say.typing { letter-spacing: 3px; color: var(--color-ink-3); }
-        .qz-listen { margin-top: 9px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; padding: 5px 11px; font-size: .72rem; font-weight: 700; cursor: pointer; font-family: inherit; }
-        .qz-input { box-sizing: border-box; padding: 12px 13px; border: 1.5px solid var(--color-line); border-radius: 11px; font-size: 1rem; font-family: inherit; background: var(--color-bg); color: var(--color-ink); }
+        .qz-listen { margin-top: 9px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: var(--radius-sm); padding: 5px 11px; font-size: var(--fs-2); font-weight: 700; cursor: pointer; font-family: inherit; }
+        .qz-input { box-sizing: border-box; padding: 12px 13px; border: 1.5px solid var(--color-line); border-radius: var(--radius-sm); font-size: var(--fs-5); font-family: inherit; background: var(--color-bg); color: var(--color-ink); }
         .qz-input.flex { flex: 1; min-width: 0; }
         .qz-input.full { width: 100%; margin-top: 14px; }
         .qz-input:focus { outline: none; border-color: var(--color-primary); }
         .qz-input:disabled { opacity: .6; }
-        .qz-mic { border: none; border-radius: 12px; padding: 13px; background: var(--color-primary); color: var(--color-on-primary); font-size: .92rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .qz-mic { border: none; border-radius: var(--radius-md); padding: 13px; background: var(--color-primary); color: var(--color-on-primary); font-size: var(--fs-4); font-weight: 800; cursor: pointer; font-family: inherit; }
         .qz-mic.flex { flex: 1; }
         .qz-mic.on { background: var(--color-danger); animation: qzpulse 1s ease-in-out infinite; }
         .qz-mic:disabled { opacity: .6; }
         @keyframes qzpulse { 0%,100% { opacity: 1; } 50% { opacity: .72; } }
-        .qz-rechint { margin-top: 8px; font-size: .76rem; font-weight: 700; color: var(--color-danger); }
+        .qz-rechint { margin-top: 8px; font-size: var(--fs-2); font-weight: 700; color: var(--color-danger); }
         .qz-hint { margin-top: 12px; }
-        .qz-hl { font-size: .72rem; font-weight: 800; color: var(--color-ink-3); margin-bottom: 6px; }
+        .qz-hl { font-size: var(--fs-2); font-weight: 800; color: var(--color-ink-3); margin-bottom: 6px; }
         .qz-chips { display: flex; flex-wrap: wrap; gap: 7px; }
-        .qz-chip { border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink); border-radius: 999px; padding: 7px 13px; font-size: .86rem; font-weight: 700; cursor: pointer; font-family: inherit; }
-        .qz-fb { margin-top: 10px; font-size: .84rem; font-weight: 700; word-break: keep-all; }
+        .qz-chip { border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink); border-radius: 999px; padding: 7px 13px; font-size: var(--fs-4); font-weight: 700; cursor: pointer; font-family: inherit; }
+        .qz-fb { margin-top: 10px; font-size: var(--fs-3); font-weight: 700; word-break: keep-all; }
         .qz-fb.wrong { color: var(--color-danger); }
-        .qz-linkbtn { margin-left: 6px; border: none; background: none; color: var(--color-primary); font-weight: 800; font-size: .82rem; cursor: pointer; font-family: inherit; text-decoration: underline; }
-        .qz-done { margin-top: 14px; font-size: .95rem; font-weight: 800; color: var(--color-ink); }
-        .qz-sub { display: block; margin-top: 8px; font-size: .78rem; font-weight: 600; color: var(--color-ink-3); line-height: 1.5; }
+        .qz-linkbtn { margin-left: 6px; border: none; background: none; color: var(--color-primary); font-weight: 800; font-size: var(--fs-3); cursor: pointer; font-family: inherit; text-decoration: underline; }
+        .qz-done { margin-top: 14px; font-size: var(--fs-5); font-weight: 800; color: var(--color-ink); }
+        .qz-sub { display: block; margin-top: 8px; font-size: var(--fs-2); font-weight: 600; color: var(--color-ink-3); line-height: 1.5; }
         .qz-row { display: flex; gap: 8px; align-items: stretch; margin-top: 12px; }
-        .qz-btn { width: 100%; margin-top: 14px; border: none; border-radius: 12px; padding: 13px; background: var(--color-primary); color: var(--color-on-primary); font-size: .92rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .qz-btn { width: 100%; margin-top: 14px; border: none; border-radius: var(--radius-md); padding: 13px; background: var(--color-primary); color: var(--color-on-primary); font-size: var(--fs-4); font-weight: 800; cursor: pointer; font-family: inherit; }
         .qz-btn.flex2 { width: auto; margin-top: 0; flex-shrink: 0; padding: 12px 16px; }
         .qz-btn:disabled { opacity: .55; }
       `}</style>
@@ -791,8 +786,10 @@ function WeekendChat({ lang = "en" }) {
 
 export default function EnglishPage() {
   const router = useRouter();
-  const [mode, setMode] = useState("en");        // en(경제영어) / zh(중국어) / gen(일반영어)
-  const [tab, setTab] = useState("news");
+  const [lang, setLang] = useState("en");        // [S26-11] 축1 언어: en / zh
+  const [theme, setTheme] = useState("economy"); // [S26-11] 축2 테마: economy / display / general(회화)
+  const [fmt, setFmt] = useState("all");         // [S26-11] 축3 형식: all / news / video / idiom
+  const [showWeekend, setShowWeekend] = useState(false); // 주말복습(WeekendChat) 패널 — 테마 무관 별개 기능
   const [tokBal, setTokBal] = useState(0); // [S24-12] 활동 토큰 잔액
   const [vocabCnt, setVocabCnt] = useState(0); // [S25-7] 내 단어장 개수
   useEffect(() => {
@@ -805,37 +802,43 @@ export default function EnglishPage() {
   const [feed, setFeed] = useState({ loading: true, date: null, items: [], error: null, review: false });
   const [past, setPast] = useState({ open: false, loading: false, items: [] });
 
-  const lang = mode === "zh" ? "zh" : "en";
   const isWeekend = [0, 6].includes(new Date().getDay());
-  const changeMode = (m) => { setMode(m); setTab(SUBTABS[m][0][0]); };
-  // [S25-6] 대메뉴(언어) 좌우 스와이프. 하위 트랙(news·video·idiom)은 칩 유지(스와이프 대상 아님).
-  const MODE_KEYS = MODES.map((m) => m[0]);
-  const langSwipe = useSwipeTabs({ index: Math.max(0, MODE_KEYS.indexOf(mode)), count: MODE_KEYS.length, onChange: (i) => changeMode(MODE_KEYS[i]) });
+  // [S26-11] 마지막으로 본 언어·테마 기억(기기별 — SYNC 대상 아님). 매번 첫 탭 복귀 방지.
+  useEffect(() => {
+    try { const s = JSON.parse(localStorage.getItem("onehub_listen_last") || "null"); if (s) { if (s.lang) setLang(s.lang); if (s.theme) setTheme(s.theme); } } catch (e) {}
+  }, []);
+  useEffect(() => {
+    try { localStorage.setItem("onehub_listen_last", JSON.stringify({ lang, theme })); } catch (e) {}
+  }, [lang, theme]);
+  // [S26-11] 스와이프는 테마 축에만(언어는 세그 클릭). 2단 스와이프(언어+테마)는 손가락이 헷갈림.
+  const THEME_KEYS = THEMES.map((t) => t[0]);
+  const themeSwipe = useSwipeTabs({ index: Math.max(0, THEME_KEYS.indexOf(theme)), count: THEME_KEYS.length, onChange: (i) => setTheme(THEME_KEYS[i]) });
 
   useEffect(() => {
     let alive = true;
-    if (mode === "gen") return () => { alive = false; };   // 라이브/복습(WeekendQuiz)이 자체 로드
-    // 경제영어(en)·중국어(zh) 매체 피드
+    if (showWeekend) return () => { alive = false; };   // 주말복습 패널은 WeekendChat 이 자체 로드
+    // [S26-11] track(테마)+language(언어)+medium(형식) 피드. 전체 형식은 medium 생략.
     setFeed({ loading: true, date: null, items: [], error: null, review: false });
     setPast({ open: false, loading: false, items: [] });
+    const mq = fmt !== "all" ? `&medium=${fmt}` : "";
     if (isWeekend) {
-      fetch(`/api/english/lessons?medium=${tab}&language=${lang}&limit=7`)
+      fetch(`/api/english/lessons?track=${theme}&language=${lang}${mq}&limit=7`)
         .then((r) => r.json())
         .then((d) => { if (alive) setFeed({ loading: false, date: null, items: d.items || [], error: d.error || null, review: true }); })
         .catch(() => alive && setFeed({ loading: false, date: null, items: [], error: "연결 실패", review: true }));
     } else {
-      fetch(`/api/english/today?medium=${tab}&language=${lang}`)
+      fetch(`/api/english/today?track=${theme}&language=${lang}${mq}`)
         .then((r) => r.json())
         .then((d) => { if (alive) setFeed({ loading: false, date: d.date, items: d.items || [], error: d.error || null, review: false }); })
         .catch(() => alive && setFeed({ loading: false, date: null, items: [], error: "연결 실패", review: false }));
     }
     return () => { alive = false; };
-  }, [mode, tab, lang, isWeekend]);
+  }, [lang, theme, fmt, isWeekend, showWeekend]);
 
   const loadPast = () => {
     if (past.open) return setPast((p) => ({ ...p, open: false }));
     setPast({ open: true, loading: true, items: [] });
-    fetch(`/api/english/lessons?medium=${tab}&language=${lang}&limit=12`)
+    fetch(`/api/english/lessons?track=${theme}&language=${lang}${fmt !== "all" ? `&medium=${fmt}` : ""}&limit=12`)
       .then((r) => r.json())
       .then((d) => {
         // 오늘 것은 위에 이미 있으니 뺀다.
@@ -846,62 +849,60 @@ export default function EnglishPage() {
   };
 
   return (
-    <div className="en pwa-shell" onTouchStart={langSwipe.onTouchStart} onTouchMove={langSwipe.onTouchMove} onTouchEnd={langSwipe.onTouchEnd}>
+    <div className="en pwa-shell" onTouchStart={themeSwipe.onTouchStart} onTouchMove={themeSwipe.onTouchMove} onTouchEnd={themeSwipe.onTouchEnd}>
       <AppHeader />
       <div className="en-hd">
-        <h1>🎧 듣는 경제 <span style={{ fontWeight: 400, fontSize: "0.7rem", color: "var(--color-ink-3)" }}>{mode === "gen" ? "일반영어" : mode === "zh" ? "중국어" : "경제영어"}</span></h1>
-        <span className="en-sub">
-          {mode === "gen"
-            ? "생활영어 라이브(셀럽 영상+카라오케) · 주말 복습"
-            : mode === "zh"
-            ? "경제 · 디스플레이 신문/영상 + 구어(HSK4-5)"
-            : "경제 · 디스플레이 뉴스/영상 + 이디엄"}
-        </span>
+        <h1>🎧 듣는 경제</h1>
+        <span className="en-sub">경제 · 디스플레이 · 회화를 영어 · 중국어로 — 매일 아침 6시</span>
       </div>
 
-      {/* 대메뉴 (경제영어/중국어/일반영어) */}
-      <div className="en-langs" role="tablist">
-        {MODES.map(([key, ic, label]) => (
-          <button key={key} type="button" role="tab" aria-selected={mode === key}
-            className={mode === key ? "on" : ""} onClick={() => changeMode(key)}>
-            <span aria-hidden="true">{ic}</span> {label}
-          </button>
-        ))}
-      </div>
+      {/* [S26-11] 축1 언어(세그) */}
+      <SegTabs items={LANGS.map(([k, l]) => ({ key: k, label: l }))} index={Math.max(0, LANGS.findIndex(([k]) => k === lang))} onChange={(i) => setLang(LANGS[i][0])} ariaLabel="언어" />
 
-      {/* [S24-12] 활동 토큰 — 여기(현장경제)와 성적표에만. 잔액을 크게 띄우지 않는다. 현금 가치 없음. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "4px 2px 10px" }}>
+      {/* [S24-12] 활동 토큰 + 내 단어장 + 주말복습(테마 무관) + 테스트 */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "10px 2px 10px" }}>
         <span style={{ fontSize: "0.74rem", fontWeight: 700, color: "var(--color-ink-2)" }}>🪙 {tokBal}토큰 <i style={{ fontStyle: "normal", fontWeight: 400, fontSize: "0.66rem", color: "var(--color-ink-3)", marginLeft: 4 }}>{TOKEN_DISCLAIMER}</i></span>
         <button type="button" onClick={() => router.push("/pwa/vocab")} style={{ border: "1px solid var(--color-line)", color: "var(--color-ink-2)", background: "var(--color-card)", borderRadius: 8, padding: "5px 10px", fontSize: "0.74rem", fontWeight: 700, fontFamily: "var(--font-sans)", cursor: "pointer" }}>⭐ 내 단어장 {vocabCnt || ""}</button>
+        <button type="button" onClick={() => setShowWeekend((v) => !v)} style={{ border: `1px solid ${showWeekend ? "var(--color-primary)" : "var(--color-line)"}`, color: showWeekend ? "var(--color-primary)" : "var(--color-ink-2)", background: "var(--color-card)", borderRadius: 8, padding: "5px 10px", fontSize: "0.74rem", fontWeight: 700, fontFamily: "var(--font-sans)", cursor: "pointer" }}>📝 주말복습</button>
         <button type="button" onClick={() => router.push("/pwa/english-test")} style={{ marginLeft: "auto", border: "1px solid var(--color-primary)", color: "var(--color-primary)", background: "var(--color-card)", borderRadius: 8, padding: "5px 10px", fontSize: "0.74rem", fontWeight: 700, fontFamily: "var(--font-sans)", cursor: "pointer" }}>오늘 들은 내용 테스트 →</button>
       </div>
 
-      {/* 하위 메뉴 — 대메뉴별로 다름(계층). */}
-      <div className="en-subtabs" role="tablist">
-        {SUBTABS[mode].map(([key, ic, label]) => (
-          <button key={key} type="button" role="tab" aria-selected={tab === key}
-            className={tab === key ? "on" : ""} onClick={() => setTab(key)}>
-            <span aria-hidden="true">{ic}</span> {label}
-          </button>
+      {/* [S26-11] 축2 테마(세그 · 스와이프 대상) */}
+      <div style={{ margin: "0 0 12px" }}>
+        <SegTabs items={THEMES.map(([k, l]) => ({ key: k, label: l }))} index={Math.max(0, THEME_KEYS.indexOf(theme))} onChange={(i) => setTheme(THEME_KEYS[i])} ariaLabel="테마" />
+      </div>
+
+      {/* [S26-11] 축3 형식(칩 · 스와이프 아님) */}
+      <div className="en-fmts" role="tablist">
+        {FORMATS.map(([key, label]) => (
+          <button key={key} type="button" role="tab" aria-selected={fmt === key}
+            className={fmt === key ? "on" : ""} onClick={() => setFmt(key)}>{label}</button>
         ))}
       </div>
 
-      {mode === "gen" && tab === "live" ? (
-        <LiveEnglish lang="en" />
-      ) : mode === "gen" && tab === "review" ? (
-        <WeekendChat lang="en" />
+      {showWeekend ? (
+        <>
+          <button type="button" className="en-past" style={{ marginTop: 0 }} onClick={() => setShowWeekend(false)}>← 학습으로 돌아가기</button>
+          <WeekendChat lang="en" />
+        </>
       ) : (
         <>
+          {/* [S26-11] 회화 + 영어 + (영상/전체) = 생활영어 라이브(셀럽 영상+카라오케). live 기능은 없애지 않고 위치만 옮김. */}
+          {theme === "general" && lang === "en" && (fmt === "all" || fmt === "video") && (
+            <div style={{ marginBottom: 14 }}><LiveEnglish lang="en" /></div>
+          )}
           {feed.review && (
-            <div className="en-review-hd">📚 주말 <b>이번 주 복습</b> · {(SUBTABS[mode].find((t) => t[0] === tab) || [, , ""])[2]} — 주말엔 새 학습 대신 이번 주 것을 다시 봐요.</div>
+            <div className="en-review-hd">📚 주말 <b>이번 주 복습</b> — 주말엔 새 학습 대신 이번 주 것을 다시 봐요.</div>
           )}
           {feed.loading ? (
             <div className="en-state">불러오는 중…</div>
           ) : feed.items.length === 0 ? (
+            (theme === "general" && lang === "en" && (fmt === "all" || fmt === "video")) ? null : (
             <div className="en-state">
-              {feed.review ? "이번 주 학습이 아직 없어요." : <>아직 준비된 학습이 없어요.<br />매일 아침 6시에 새 레슨이 올라옵니다.</>}
+              {feed.review ? "이번 주 학습이 아직 없어요." : <>아직 준비된 학습이 없어요 · 다른 테마를 보시겠어요?<br />매일 아침 6시에 새 레슨이 올라옵니다.</>}
               {feed.error && <div className="en-err">({feed.error})</div>}
             </div>
+            )
           ) : (
             <>
               {!feed.review && <div className="en-date">{fmtDate(feed.date)}</div>}
@@ -918,7 +919,7 @@ export default function EnglishPage() {
                 if (!list.length) return null;
                 return (
                   <>
-                    <AudioPlaylist items={list} storageKey={`onehub_listen_pos_${mode}`} title={`${mode === "zh" ? "🇨🇳 중국어" : mode === "gen" ? "🇺🇸 일반영어" : "🇺🇸 경제영어"} 오늘의 듣기 · ${list.length}편 [이어 듣기]`} onComplete={() => { try { earn("listen", getTraderEn()); } catch (e) {} }} />
+                    <AudioPlaylist items={list} storageKey={`onehub_listen_pos_${lang}_${theme}`} title={`${lang === "zh" ? "🇨🇳 중국어" : "🇺🇸 영어"} · ${TRACK_KO[theme] || theme} 오늘의 듣기 · ${list.length}편 [이어 듣기]`} onComplete={() => { try { earn("listen", getTraderEn()); } catch (e) {} }} />
                     {/* [S25-10] 외국어만 듣던 사람이 전체 브리핑으로 넘어오게 */}
                     <button type="button" onClick={() => router.push("/pwa/clip")} style={{ display: "block", width: "100%", marginTop: 10, border: "1px solid var(--color-line)", background: "var(--color-card)", color: "var(--color-primary)", borderRadius: 10, padding: 10, fontSize: "0.8rem", fontWeight: 700, fontFamily: "var(--font-sans)", cursor: "pointer" }}>🎧 오늘 브리핑 전체 듣기(자산·판단·뉴스 포함) →</button>
                   </>
@@ -962,27 +963,21 @@ export default function EnglishPage() {
         .en { max-width: 480px; margin: 0 auto; padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
         /* 제목+설명을 세로로 고정(설명은 항상 한 줄) → 모드가 바뀌어도 아래 버튼 위치가 안 밀림 */
         .en-hd { margin: 6px 2px 12px; }
-        .en-hd h1 { font-size: 22px; font-weight: 800; letter-spacing: -.5px; margin: 0 0 3px; }
-        .en-sub { display: block; font-size: 12px; font-weight: 600; color: var(--color-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .en-langs { display: flex; gap: 8px; margin-bottom: 10px; }
-        .en-langs button { flex: 1 1 0; padding: 8px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
-        .en-langs button.on { background: var(--color-ink); border-color: var(--color-ink); color: var(--color-on-primary); }
-        .en-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
-        .en-tabs button { flex: 1 1 0; padding: 10px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .85rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
-        .en-tabs button.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
-        /* 하위 메뉴 — 대메뉴보다 작게·연하게(계층 구분). 알약형. */
-        .en-subtabs { display: flex; gap: 6px; margin: 0 0 14px; padding-left: 0; }
-        .en-subtabs button { padding: 6px 13px; border-radius: 999px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); font-size: .76rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
-        .en-subtabs button.on { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-primary); }
-        .en-date { font-size: .78rem; font-weight: 700; color: var(--color-ink-3); margin: 0 2px 10px; }
-        .en-pastdate { font-size: .74rem; font-weight: 700; color: var(--color-ink-3); margin: 0 2px 6px; }
+        .en-hd h1 { font-size: var(--fs-7); font-weight: 800; letter-spacing: -.5px; margin: 0 0 3px; }
+        .en-sub { display: block; font-size: var(--fs-2); font-weight: 600; color: var(--color-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        /* [S26-11] 언어·테마는 공용 SegTabs. 형식(전체/뉴스/영상/이디엄)만 칩. */
+        .en-fmts { display: flex; gap: 6px; margin: 0 0 14px; flex-wrap: wrap; }
+        .en-fmts button { padding: 6px 13px; border-radius: 999px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); font-size: var(--fs-2); font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .en-fmts button.on { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-primary); }
+        .en-date { font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-3); margin: 0 2px 10px; }
+        .en-pastdate { font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-3); margin: 0 2px 6px; }
         .en-list { display: flex; flex-direction: column; gap: 14px; }
-        .en-state { font-size: .85rem; color: var(--color-ink-2); text-align: center; padding: 32px 8px; line-height: 1.7; }
-        .en-err { font-size: .72rem; color: var(--color-ink-3); margin-top: 6px; }
-        .en-past { width: 100%; margin-top: 16px; padding: 11px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .82rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
-        .en-weekend { width: 100%; margin: 4px 0 10px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--color-primary-soft); background: var(--color-primary-soft); color: var(--color-ink); font-size: .8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); text-align: left; }
+        .en-state { font-size: var(--fs-4); color: var(--color-ink-2); text-align: center; padding: 32px 8px; line-height: 1.7; }
+        .en-err { font-size: var(--fs-2); color: var(--color-ink-3); margin-top: 6px; }
+        .en-past { width: 100%; margin-top: 16px; padding: 11px; border-radius: var(--radius-sm); border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: var(--fs-3); font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
+        .en-weekend { width: 100%; margin: 4px 0 10px; padding: 12px 14px; border-radius: var(--radius-md); border: 1px solid var(--color-primary-soft); background: var(--color-primary-soft); color: var(--color-ink); font-size: var(--fs-3); font-weight: 700; cursor: pointer; font-family: var(--font-sans); text-align: left; }
         .en-weekend b { color: var(--color-primary); }
-        .en-foot { font-size: .72rem; color: var(--color-ink-3); text-align: center; margin-top: 18px; line-height: 1.6; word-break: keep-all; }
+        .en-foot { font-size: var(--fs-2); color: var(--color-ink-3); text-align: center; margin-top: 18px; line-height: 1.6; word-break: keep-all; }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>
