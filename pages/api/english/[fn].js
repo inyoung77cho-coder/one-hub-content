@@ -13,6 +13,9 @@ const ENDPOINTS = {
   "speak-timed": (q) => `/english/speak-timed${qs(q, ["text", "language"])}`, // [Live] 단어 타이밍(카라오케)
   "live-videos": () => `/english/live-videos`, // [Live] 생활영어 유튜브 채널 최신 영상
   "karaoke-clips": () => `/english/karaoke-clips`, // [Live] BBC 카라오케 클립(오디오+단어 타임스탬프)
+  // [S26-12] 테마별 목표어 통합 클립 — 서버(:5005)가 테마당 하루 한 번 브리지 나레이션을 생성·캐시(비용 서킷브레이커 경유).
+  //   미배포/실패 시 이 프록시 catch 가 {ok:false} 를 주고, 프론트는 브리지 없이 레슨만 이어붙인다.
+  "theme-clip": (q) => `/english/theme-clip${qs(q, ["track", "language", "level"])}`,
 };
 
 function qs(query, allowed) {

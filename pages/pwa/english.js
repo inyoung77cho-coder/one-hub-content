@@ -921,7 +921,9 @@ export default function EnglishPage() {
                   <>
                     <AudioPlaylist items={list} storageKey={`onehub_listen_pos_${lang}_${theme}`} title={`${lang === "zh" ? "🇨🇳 중국어" : "🇺🇸 영어"} · ${TRACK_KO[theme] || theme} 오늘의 듣기 · ${list.length}편 [이어 듣기]`} onComplete={() => { try { earn("listen", getTraderEn()); } catch (e) {} }} />
                     {/* [S25-10] 외국어만 듣던 사람이 전체 브리핑으로 넘어오게 */}
-                    <button type="button" onClick={() => router.push("/pwa/clip")} style={{ display: "block", width: "100%", marginTop: 10, border: "1px solid var(--color-line)", background: "var(--color-card)", color: "var(--color-primary)", borderRadius: 10, padding: 10, fontSize: "0.8rem", fontWeight: 700, fontFamily: "var(--font-sans)", cursor: "pointer" }}>🎧 오늘 브리핑 전체 듣기(자산·판단·뉴스 포함) →</button>
+                    {/* [S26-12] 테마별 목표어 통합 클립 — 그 언어로 설명(브리지)+레슨 오디오 한 편 */}
+                    <button type="button" onClick={() => router.push(`/pwa/clip?track=${theme}&lang=${lang}`)} style={{ display: "block", width: "100%", marginTop: 10, border: "1px solid var(--color-primary)", background: "var(--color-primary-soft)", color: "var(--color-primary)", borderRadius: 10, padding: 10, fontSize: "0.8rem", fontWeight: 800, fontFamily: "var(--font-sans)", cursor: "pointer" }}>🎧 {(THEMES.find(([k]) => k === theme) || [, "이 테마"])[1]} 전체 듣기 · {list.length}편 · {lang === "zh" ? "중국어" : "영어"} 해설 →</button>
+                    <button type="button" onClick={() => router.push("/pwa/clip")} style={{ display: "block", width: "100%", marginTop: 8, border: "1px solid var(--color-line)", background: "var(--color-card)", color: "var(--color-primary)", borderRadius: 10, padding: 10, fontSize: "0.8rem", fontWeight: 700, fontFamily: "var(--font-sans)", cursor: "pointer" }}>🎧 오늘 브리핑 전체 듣기(자산·판단·뉴스 포함) →</button>
                   </>
                 );
               })()}
