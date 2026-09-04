@@ -6,15 +6,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import AudioPlaylist from "../../components/shared/AudioPlaylist"; // [S24-10] 언어별 연속 재생
+import useSwipeTabs from "../../components/shared/useSwipeTabs"; // [S25-6] 언어 대메뉴 스와이프
 import { earn, getTokens, TOKEN_DISCLAIMER } from "../../lib/activityToken"; // [S24-12] 활동 토큰(현장경제)
+import { isSaved as isVocabSaved, toggleSave as toggleVocab, getVocabCount } from "../../lib/vocabNote"; // [S25-7] 내 단어장
 import { getTrader as getTraderEn } from "../../lib/trader";
 import { useRouter } from "next/router";
 
 // 상단 대메뉴 = 경제영어(en) / 중국어(zh) / 일반영어(gen). 각 대메뉴 아래 하위 메뉴로 계층 구분.
+// [S25-6] 사용자 요구 순서: 경제영어 · 일반영어 · 중국어.
 const MODES = [
   ["en", "💼", "경제영어"],
-  ["zh", "🇨🇳", "중국어"],
   ["gen", "🎬", "일반영어"],
+  ["zh", "🇨🇳", "중국어"],
 ];
 // 대메뉴별 하위 메뉴 [키, 아이콘, 라벨]
 const SUBTABS = {
@@ -29,6 +32,15 @@ const SPEEDS = [0.75, 1, 1.25];
 // [2026-08-26] 발음 듣기 — 단어를 복사해 다른 곳에서 듣던 번거로움 해소.
 //   edge-tts(무료·LLM 사용량 한도와 무관)라 lesson.has_audio(LLM으로 만든 지문 낭독)
 //   여부와 상관없이 항상 눌러볼 수 있다.
+// [S25-7] 별 하나로 내 단어장에 담기(★)/빼기(☆). 메모 강요 없음.
+function VocabStar({ lang, text, meaning, source }) {
+  const [saved, setSaved] = useState(() => { try { return isVocabSaved(lang, text); } catch (e) { return false; } });
+  return (
+    <button type="button" className={`vstar${saved ? " on" : ""}`} aria-label={saved ? "단어장에서 빼기" : "단어장에 담기"} title="내 단어장"
+      onClick={() => { try { const r = toggleVocab({ lang, text, meaning, source }); setSaved(r.saved); } catch (e) {} }}>{saved ? "★" : "☆"}</button>
+  );
+}
+
 function SpeakButton({ text, lang }) {
   const [playing, setPlaying] = useState(false);
   const play = (e) => {
@@ -135,6 +147,7 @@ function LessonCard({ lesson, lang }) {
                   <li key={i}>
                     <b>{e.expr}</b>
                     <SpeakButton text={e.expr} lang={lang} />
+                    <VocabStar lang={lang} text={e.expr} meaning={e.meaning_ko} source={lesson.title || lesson.headline || ""} />
                     {e.pinyin && <span className="lc-pinyin"> [{e.pinyin}]</span>}
                     <span className="lc-mean"> — {e.meaning_ko}</span>
                     {/* 아래 2개는 이디엄에서만 온다. 직역을 같이 보여주면
@@ -158,6 +171,7 @@ function LessonCard({ lesson, lang }) {
                   <li key={i}>
                     <b>{w.word}</b>
                     <SpeakButton text={w.word} lang={lang} />
+                    <VocabStar lang={lang} text={w.word} meaning={w.meaning_ko} source={lesson.title || lesson.headline || ""} />
                     {w.pinyin && <span className="lc-pinyin"> [{w.pinyin}]</span>}
                     {w.pos && <i className="lc-pos"> {w.pos}</i>}
                     <span className="lc-mean"> {w.meaning_ko}</span>
@@ -218,6 +232,8 @@ function LessonCard({ lesson, lang }) {
         .lc-pinyin { font-size: .78rem; color: var(--color-primary); font-weight: 600; }
         .lc-speak { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; margin-left: 4px; padding: 0; border: none; background: var(--color-card-soft); border-radius: 50%; cursor: pointer; font-size: .74rem; vertical-align: middle; }
         .lc-speak.on { background: var(--color-primary-soft); }
+        .vstar { border: none; background: none; cursor: pointer; font-size: 0.9rem; color: var(--color-ink-3); padding: 0 2px; vertical-align: middle; }
+        .vstar.on { color: var(--color-warning-ink, #f59e0b); }
         .lc-mean { color: var(--color-ink-2); }
         .lc-ex { font-size: .8rem; color: var(--color-ink-2); margin-top: 3px; padding-left: 8px; border-left: 2px solid var(--color-line); }
         .lc-exko { font-size: .74rem; color: var(--color-ink-3); padding-left: 10px; }
@@ -778,11 +794,13 @@ export default function EnglishPage() {
   const [mode, setMode] = useState("en");        // en(경제영어) / zh(중국어) / gen(일반영어)
   const [tab, setTab] = useState("news");
   const [tokBal, setTokBal] = useState(0); // [S24-12] 활동 토큰 잔액
+  const [vocabCnt, setVocabCnt] = useState(0); // [S25-7] 내 단어장 개수
   useEffect(() => {
-    const read = () => { try { setTokBal(getTokens(getTraderEn())); } catch (e) {} };
+    const read = () => { try { setTokBal(getTokens(getTraderEn())); } catch (e) {} try { setVocabCnt(getVocabCount(getTraderEn())); } catch (e) {} };
     read();
     window.addEventListener("onehub-tokens-change", read);
-    return () => window.removeEventListener("onehub-tokens-change", read);
+    window.addEventListener("onehub-vocab-change", read);
+    return () => { window.removeEventListener("onehub-tokens-change", read); window.removeEventListener("onehub-vocab-change", read); };
   }, []);
   const [feed, setFeed] = useState({ loading: true, date: null, items: [], error: null, review: false });
   const [past, setPast] = useState({ open: false, loading: false, items: [] });
@@ -790,6 +808,9 @@ export default function EnglishPage() {
   const lang = mode === "zh" ? "zh" : "en";
   const isWeekend = [0, 6].includes(new Date().getDay());
   const changeMode = (m) => { setMode(m); setTab(SUBTABS[m][0][0]); };
+  // [S25-6] 대메뉴(언어) 좌우 스와이프. 하위 트랙(news·video·idiom)은 칩 유지(스와이프 대상 아님).
+  const MODE_KEYS = MODES.map((m) => m[0]);
+  const langSwipe = useSwipeTabs({ index: Math.max(0, MODE_KEYS.indexOf(mode)), count: MODE_KEYS.length, onChange: (i) => changeMode(MODE_KEYS[i]) });
 
   useEffect(() => {
     let alive = true;
@@ -825,10 +846,10 @@ export default function EnglishPage() {
   };
 
   return (
-    <div className="en pwa-shell">
+    <div className="en pwa-shell" onTouchStart={langSwipe.onTouchStart} onTouchMove={langSwipe.onTouchMove} onTouchEnd={langSwipe.onTouchEnd}>
       <AppHeader />
       <div className="en-hd">
-        <h1>{mode === "gen" ? "🎬 일반 영어" : mode === "zh" ? "🇨🇳 매일 중국어" : "💼 경제 영어"}</h1>
+        <h1>🎧 듣는 경제 <span style={{ fontWeight: 400, fontSize: "0.7rem", color: "var(--color-ink-3)" }}>{mode === "gen" ? "일반영어" : mode === "zh" ? "중국어" : "경제영어"}</span></h1>
         <span className="en-sub">
           {mode === "gen"
             ? "생활영어 라이브(셀럽 영상+카라오케) · 주말 복습"
@@ -851,6 +872,7 @@ export default function EnglishPage() {
       {/* [S24-12] 활동 토큰 — 여기(현장경제)와 성적표에만. 잔액을 크게 띄우지 않는다. 현금 가치 없음. */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", margin: "4px 2px 10px" }}>
         <span style={{ fontSize: "0.74rem", fontWeight: 700, color: "var(--color-ink-2)" }}>🪙 {tokBal}토큰 <i style={{ fontStyle: "normal", fontWeight: 400, fontSize: "0.66rem", color: "var(--color-ink-3)", marginLeft: 4 }}>{TOKEN_DISCLAIMER}</i></span>
+        <button type="button" onClick={() => router.push("/pwa/vocab")} style={{ border: "1px solid var(--color-line)", color: "var(--color-ink-2)", background: "var(--color-card)", borderRadius: 8, padding: "5px 10px", fontSize: "0.74rem", fontWeight: 700, fontFamily: "var(--font-sans)", cursor: "pointer" }}>⭐ 내 단어장 {vocabCnt || ""}</button>
         <button type="button" onClick={() => router.push("/pwa/english-test")} style={{ marginLeft: "auto", border: "1px solid var(--color-primary)", color: "var(--color-primary)", background: "var(--color-card)", borderRadius: 8, padding: "5px 10px", fontSize: "0.74rem", fontWeight: 700, fontFamily: "var(--font-sans)", cursor: "pointer" }}>오늘 들은 내용 테스트 →</button>
       </div>
 

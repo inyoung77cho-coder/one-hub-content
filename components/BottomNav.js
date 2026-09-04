@@ -10,7 +10,7 @@ const TABS = [
   ["today", "🎯", "오늘", "/pwa/today"],
   ["assets", "💼", "자산", "/pwa/assets"],
   ["story", "💬", "이야기", "/pwa/story"],
-  ["english", "🎙️", "현장경제", "/pwa/english"],
+  ["english", "🎧", "듣는 경제", "/pwa/english"],
   ["ai", "🛡️", "AI", "/pwa?tab=report"],
 ];
 
