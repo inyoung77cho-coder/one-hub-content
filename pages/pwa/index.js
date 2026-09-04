@@ -1136,7 +1136,7 @@ export default function PWADashboard({ latestReport }) {
                     style={{
                       padding: '6px 12px', fontSize: '0.74rem', fontWeight: 700,
                       borderRadius: 999, border: 'none', cursor: pushBusy ? 'default' : 'pointer',
-                      background: 'var(--accent-buy)', color: '#fff', opacity: pushBusy ? 0.6 : 1,
+                      background: 'var(--accent-buy)', color: 'var(--color-on-primary)', opacity: pushBusy ? 0.6 : 1,
                     }}
                   >
                     {pushBusy ? '처리 중...' : '켜기'}
@@ -3050,7 +3050,7 @@ export default function PWADashboard({ latestReport }) {
               <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>주문 방법 · {buyNotice.name} <span style={{ color: 'var(--color-ink-3)', fontWeight: 500 }}>({buyNotice.code})</span></div>
               <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.55, wordBreak: 'keep-all' }}>실주문 자동연동은 준비 중입니다. <b>증권사 앱에서 매수 주문</b>을 완료하신 뒤 아래 <b>‘샀어요로 기록’</b>을 누르면 <b>나 vs AI</b> 채점에 반영됩니다.</div>
               <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-                <button onClick={() => { logDecision(buyNotice.code, buyNotice.name, 'take'); setBuyNotice(null); }} style={{ flex: 1, border: 'none', borderRadius: 10, padding: '11px 0', fontWeight: 800, background: 'var(--color-primary)', color: '#fff', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>샀어요로 기록</button>
+                <button onClick={() => { logDecision(buyNotice.code, buyNotice.name, 'take'); setBuyNotice(null); }} style={{ flex: 1, border: 'none', borderRadius: 10, padding: '11px 0', fontWeight: 800, background: 'var(--color-primary)', color: 'var(--color-on-primary)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>샀어요로 기록</button>
                 <button onClick={() => setBuyNotice(null)} style={{ flex: '0 0 auto', border: '1px solid var(--color-line)', borderRadius: 10, padding: '11px 16px', fontWeight: 700, background: 'var(--color-card)', color: 'var(--color-ink-2)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>닫기</button>
               </div>
             </div>
@@ -3346,20 +3346,20 @@ export default function PWADashboard({ latestReport }) {
         /* [v10 UI] 헤더 아이콘 = 공유 TopNav(.tn-ic button)와 동일 규격(34px·그림자·무테두리) */
         .pwa-search-toggle, .pwa-theme-toggle { width: 34px; height: 34px; border-radius: 50%; background: var(--color-card); border: none; display: grid; place-items: center; font-size: 15px; cursor: pointer; box-shadow: var(--shadow-card); flex-shrink: 0; }
         /* [S3] 빠른입력 */
-        .pwa-quickadd-toggle { width: 34px; height: 34px; border-radius: 50%; background: var(--color-primary); color: #fff; border: none; display: grid; place-items: center; font-size: 20px; font-weight: 700; cursor: pointer; box-shadow: var(--shadow-card); flex-shrink: 0; line-height: 1; }
+        .pwa-quickadd-toggle { width: 34px; height: 34px; border-radius: 50%; background: var(--color-primary); color: var(--color-on-primary); border: none; display: grid; place-items: center; font-size: 20px; font-weight: 700; cursor: pointer; box-shadow: var(--shadow-card); flex-shrink: 0; line-height: 1; }
         .qa-dim { position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 8999; }
         .qa-sheet { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; z-index: 9000; background: var(--card-bg); border-radius: 20px 20px 0 0; padding: 22px 20px calc(env(safe-area-inset-bottom, 0px) + 28px); box-shadow: 0 -4px 32px rgba(0,0,0,0.18); }
         .qa-head { display: flex; align-items: center; justify-content: space-between; font-size: 1rem; font-weight: 800; color: var(--text-primary); margin-bottom: 16px; }
         .qa-x { background: none; border: none; font-size: 1.2rem; color: var(--text-secondary); cursor: pointer; }
         .qa-chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
         .qa-chip { padding: 10px 4px; border: 1px solid var(--border); background: var(--card-bg); border-radius: 10px; font-size: 0.78rem; font-weight: 700; color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); }
-        .qa-chip.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+        .qa-chip.on { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); }
         .qa-input-row { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
         .qa-input { flex: 1; border: 1px solid var(--border); background: var(--inset-bg); border-radius: 12px; padding: 13px 14px; font-size: 1.1rem; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); }
         .qa-input:focus { outline: none; border-color: var(--color-primary); }
         .qa-unit { font-size: 1rem; font-weight: 700; color: var(--text-secondary); }
         .qa-hint { font-size: 0.72rem; color: var(--text-tertiary); margin-top: 10px; line-height: 1.5; word-break: keep-all; }
-        .qa-save { width: 100%; margin-top: 16px; background: var(--color-primary); color: #fff; border: none; border-radius: 12px; padding: 13px 0; font-size: 0.92rem; font-weight: 800; cursor: pointer; font-family: var(--font-body); }
+        .qa-save { width: 100%; margin-top: 16px; background: var(--color-primary); color: var(--color-on-primary); border: none; border-radius: 12px; padding: 13px 0; font-size: 0.92rem; font-weight: 800; cursor: pointer; font-family: var(--font-body); }
         .pwa-search-toggle.active { color: var(--color-primary); }
         .pwa-trader-toggle { display: flex; gap: 3px; background: var(--inset-bg); padding: 3px; border-radius: var(--radius-pill); }
         .pwa-trader-toggle button { background: none; border: none; color: var(--text-secondary); padding: 5px 13px; border-radius: var(--radius-pill); cursor: pointer; font-family: var(--font-display); font-size: 0.75rem; font-weight: 700; }
@@ -3373,7 +3373,7 @@ export default function PWADashboard({ latestReport }) {
            보여 상단 메뉴 폭이 바뀌는 것처럼 보였다. */
         .pwa-subtabs { display: flex; gap: 6px; margin: 0 2px 12px; background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 4px; box-shadow: var(--card-shadow); }
         .pwa-subtab { flex: 1; min-height: 36px; padding: 0; background: none; border: none; border-radius: 9px; cursor: pointer; color: var(--text-secondary); font-family: var(--font-sans); font-size: 0.8rem; font-weight: 700; }
-        .pwa-subtab.active { background: var(--color-primary); color: #fff; }
+        .pwa-subtab.active { background: var(--color-primary); color: var(--color-on-primary); }
 
         /* Layout */
         .pwa-main { padding: 0 0 12px; display: flex; flex-direction: column; gap: 12px; }
@@ -3414,7 +3414,7 @@ export default function PWADashboard({ latestReport }) {
         .hh-foot { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
         .hh-chip { background: var(--hero-fill); border: 1px solid var(--hero-fill-line); padding: 6px 11px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; color: var(--hero-ink-soft); display: flex; align-items: center; gap: 5px; }
         .hh-chip .v { color: var(--hero-accent); font-weight: 700; }
-        .hh-cta { margin-top: 14px; width: 100%; background: #fff; color: var(--hero-grad-1); border: none; font-family: var(--font-body); font-weight: 700; font-size: 0.86rem; padding: 13px; border-radius: 14px; cursor: pointer; }
+        .hh-cta { margin-top: 14px; width: 100%; background: var(--color-on-primary); color: var(--hero-grad-1); border: none; font-family: var(--font-body); font-weight: 700; font-size: 0.86rem; padding: 13px; border-radius: 14px; cursor: pointer; }
 
         /* [v10 UI 시안] 홈 카드 — onehub-home-redesign.html 구조 일치 */
         .card.v10 { background: var(--color-card); border-radius: var(--radius-hero); padding: 18px; box-shadow: var(--shadow-card); }
@@ -3536,7 +3536,7 @@ export default function PWADashboard({ latestReport }) {
         .pf-assume { color: var(--color-ink-3); font-weight: 500; font-size: 11.5px; }
         .pf-ctas { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
         .pf-cta { flex: 1; min-width: 130px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink); border-radius: 10px; padding: 10px 12px; font-size: 12.5px; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
-        .pf-cta.primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .pf-cta.primary { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
         /* [#3 알림 피드] */
         /* [알림카드 #5·#6] 오늘 알림 상세 카드 */
         .noti-card { margin-bottom: 12px; }
@@ -3597,7 +3597,7 @@ export default function PWADashboard({ latestReport }) {
         .tp-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; border-top: 1px solid var(--color-line); }
         .tp-row:first-of-type { border-top: none; }
         .tp-l { display: flex; align-items: center; gap: 11px; min-width: 0; }
-        .tp-medal { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0; }
+        .tp-medal { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: var(--color-on-primary); flex-shrink: 0; }
         .tp-meta { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
         .tp-name { font-size: 14px; font-weight: 700; color: var(--color-ink); display: flex; align-items: center; gap: 6px; }
         .tp-buy { font-size: 10px; font-weight: 700; color: var(--color-success); background: var(--color-success-soft); padding: 2px 6px; border-radius: 6px; }
@@ -3619,7 +3619,7 @@ export default function PWADashboard({ latestReport }) {
         .v10-pick-row { display: flex; align-items: center; justify-content: space-between; padding: 11px 0; border-top: 1px solid var(--color-line); }
         .v10-pick-row:first-of-type { border-top: none; }
         .v10-pick-l { display: flex; align-items: center; gap: 11px; }
-        .v10-medal { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0; }
+        .v10-medal { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 800; color: var(--color-on-primary); flex-shrink: 0; }
         .v10-pick-name { font-size: 14px; font-weight: 700; display: flex; flex-direction: column; gap: 2px; line-height: 1.2; color: var(--color-ink); }
         .v10-tie { font-size: 11px; color: var(--color-ink-3); font-weight: 500; }
         .v10-pick-r { display: flex; align-items: center; gap: 10px; }
@@ -3703,7 +3703,7 @@ export default function PWADashboard({ latestReport }) {
         .onboarding-opt-label { font-size: 0.88rem; font-weight: 700; color: var(--text-primary); }
         .onboarding-opt-desc { font-size: 0.76rem; color: var(--text-secondary); line-height: 1.4; }
         .onboarding-opt-sub { font-size: 0.7rem; color: var(--text-tertiary); font-style: italic; }
-        .onboarding-confirm { width: 100%; padding: 12px; background: var(--color-primary); color: #fff; border: none; border-radius: var(--radius-md); font-size: 0.9rem; font-weight: 700; cursor: pointer; font-family: var(--font-body); }
+        .onboarding-confirm { width: 100%; padding: 12px; background: var(--color-primary); color: var(--color-on-primary); border: none; border-radius: var(--radius-md); font-size: 0.9rem; font-weight: 700; cursor: pointer; font-family: var(--font-body); }
 
         /* [v9.0] Hero 카드 v9 — Regime 크게 + AI Confidence + 오늘행동 + 버튼2 */
         .hero-v9 { background: var(--hero-bg); border: 2px solid var(--border); border-radius: var(--radius-card); padding: 22px 20px 18px; box-shadow: var(--card-shadow); display: flex; flex-direction: column; gap: 12px; }
@@ -3723,7 +3723,7 @@ export default function PWADashboard({ latestReport }) {
         .hero-v9-regime-compact { font-family: var(--font-display); font-size: 1.05rem; font-weight: 800; line-height: 1.2; }
         .hero-v9-compact .hero-v9-btns { grid-template-columns: repeat(2, 1fr); }
         .hero-v9-btn { width: 100%; padding: 10px 4px; border-radius: var(--radius-md); font-size: 0.78rem; font-weight: 700; cursor: pointer; border: none; font-family: var(--font-body); text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .hero-v9-btn.primary { background: var(--color-primary); color: #fff; }
+        .hero-v9-btn.primary { background: var(--color-primary); color: var(--color-on-primary); }
         .hero-v9-btn.secondary { background: var(--inset-bg); color: var(--text-secondary); border: 1px solid var(--border); }
 
         /* [v8.7] Top3 Hero Cards */
@@ -3747,8 +3747,8 @@ export default function PWADashboard({ latestReport }) {
         .dec-mini.lg { gap: 8px; }
         .dec-b { flex: 1 1 0; min-width: 0; font-size: 0.64rem; font-weight: 700; padding: 5px 4px; border-radius: 7px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text-secondary); cursor: pointer; font-family: var(--font-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: background .12s, color .12s, border-color .12s; }
         .dec-mini.lg .dec-b { font-size: 0.8rem; padding: 9px 6px; border-radius: 9px; }
-        .dec-b.take.on { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
-        .dec-b.pass.on { background: var(--color-ink-2, var(--text-secondary)); color: #fff; border-color: var(--color-ink-2, var(--text-secondary)); }
+        .dec-b.take.on { background: var(--color-primary); color: var(--color-on-primary); border-color: var(--color-primary); }
+        .dec-b.pass.on { background: var(--color-ink-2, var(--text-secondary)); color: var(--color-on-primary); border-color: var(--color-ink-2, var(--text-secondary)); }
         .dec-b.held { display: inline-flex; align-items: center; justify-content: center; cursor: default; color: var(--color-success, #0E9E6A); border-color: var(--color-success, #0E9E6A); background: color-mix(in srgb, var(--color-success, #0E9E6A) 10%, var(--card-bg)); }
         .dec-b:active { transform: scale(0.97); }
         .rec-def { font-size: 0.72rem; color: var(--text-secondary); background: var(--inset-bg); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; margin-bottom: 12px; line-height: 1.5; }
@@ -3757,7 +3757,7 @@ export default function PWADashboard({ latestReport }) {
         .rec-sort-chip { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 999px; padding: 6px 13px; font-size: 0.74rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         /* [N4] 정렬 근거 한 줄 — 칩 바로 아래, 목록보다 먼저 읽히게 */
         .rec-sort-basis { font-size: 0.68rem; color: var(--color-ink-3); line-height: 1.4; margin: 4px 0 8px; word-break: keep-all; }
-        .rec-sort-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .rec-sort-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
         .rec-micro { font-size: 0.68rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 9px; padding: 8px 11px; margin-bottom: 12px; line-height: 1.5; word-break: keep-all; }
         .rec-micro b { color: var(--color-ink); font-weight: 700; }
         .rec-micro-link { border: none; background: none; color: var(--color-primary); font-weight: 800; font-size: 0.68rem; cursor: pointer; font-family: var(--font-sans); padding: 0 0 0 3px; }
@@ -3785,7 +3785,7 @@ export default function PWADashboard({ latestReport }) {
         .rec-confirm-t b { color: var(--color-primary); font-weight: 800; }
         .rec-confirm-t.quiet { color: var(--color-ink-3); }
         .rec-confirm-t.quiet b { color: var(--color-ink-2); }
-        .rec-confirm-cta { width: 100%; margin-top: 11px; min-height: 46px; border: none; border-radius: 11px; background: var(--color-primary); color: #fff; font-size: 0.84rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .rec-confirm-cta { width: 100%; margin-top: 11px; min-height: 46px; border: none; border-radius: 11px; background: var(--color-primary); color: var(--color-on-primary); font-size: 0.84rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .rec-confirm-cta:active { opacity: 0.9; }
         .rec-rest-list { display: flex; flex-direction: column; gap: 6px; }
         .rec-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: var(--inset-bg); border-radius: 10px; }
@@ -3803,7 +3803,7 @@ export default function PWADashboard({ latestReport }) {
         .vs-teaser { font-size: 0.64rem; font-weight: 700; color: var(--text-secondary); margin-top: 2px; }
         .vs-teaser b { font-weight: 800; }
         /* [S-6] 바로 매수(Primary) + 자동 관망 알림 */
-        .buy-now-btn { width: 100%; margin-top: 4px; border: none; border-radius: 9px; padding: 8px 0; font-size: 0.74rem; font-weight: 800; background: var(--color-primary); color: #fff; cursor: pointer; font-family: var(--font-body); }
+        .buy-now-btn { width: 100%; margin-top: 4px; border: none; border-radius: 9px; padding: 8px 0; font-size: 0.74rem; font-weight: 800; background: var(--color-primary); color: var(--color-on-primary); cursor: pointer; font-family: var(--font-body); }
         /* ───────── [S11-M4] 추천 Top3 · 모바일 1열 가로형(A안) ─────────
            115px 3열은 폭 부족(필요 225px) → 모바일은 카드당 전폭 1열, 번호-내용 가로 배치.
            데스크톱(≥431px)은 기존 3열 유지. WO의 area 겹침(verdict·buy 중복)은 각 요소
@@ -3854,7 +3854,7 @@ export default function PWADashboard({ latestReport }) {
         .vs-cta-h { font-size: 0.88rem; font-weight: 800; color: var(--color-ink); line-height: 1.35; word-break: keep-all; }
         .vs-cta-sub { font-size: 0.72rem; color: var(--text-secondary); margin-top: 3px; line-height: 1.4; word-break: keep-all; }
         .dec-dday { font-size: 0.62rem; font-weight: 800; color: var(--color-primary); margin-top: 4px; }
-        .dec-feedback { position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%); z-index: 1200; display: flex; align-items: center; gap: 10px; max-width: 92vw; background: var(--color-ink, #1f2a37); color: #fff; padding: 11px 16px; border-radius: 12px; font-size: 0.76rem; font-weight: 600; box-shadow: 0 8px 30px rgba(0,0,0,.3); cursor: pointer; word-break: keep-all; line-height: 1.4; }
+        .dec-feedback { position: fixed; left: 50%; bottom: 74px; transform: translateX(-50%); z-index: 1200; display: flex; align-items: center; gap: 10px; max-width: 92vw; background: var(--color-ink, #1f2a37); color: var(--color-on-primary); padding: 11px 16px; border-radius: 12px; font-size: 0.76rem; font-weight: 600; box-shadow: 0 8px 30px rgba(0,0,0,.3); cursor: pointer; word-break: keep-all; line-height: 1.4; }
         .dec-feedback b { font-weight: 800; }
         .dec-feedback .df-link { flex-shrink: 0; font-weight: 800; color: var(--color-primary); }
         .rec-reason { font-size: 0.7rem; color: var(--text-secondary); margin-top: 3px; line-height: 1.4; word-break: keep-all; }
@@ -4295,7 +4295,7 @@ export default function PWADashboard({ latestReport }) {
         .sp-input:focus { outline: none; border-color: var(--color-primary); }
         .sp-err { font-size: 0.74rem; color: var(--color-danger); font-weight: 600; margin-bottom: 10px; }
         .sp-row2 { display: flex; gap: 8px; margin-top: 4px; }
-        .sp-btn { flex: 1; border: none; border-radius: 12px; padding: 13px 0; font-size: 0.88rem; font-weight: 800; color: #fff; background: var(--color-primary); cursor: pointer; font-family: var(--font-body); }
+        .sp-btn { flex: 1; border: none; border-radius: 12px; padding: 13px 0; font-size: 0.88rem; font-weight: 800; color: var(--color-on-primary); background: var(--color-primary); cursor: pointer; font-family: var(--font-body); }
         .sp-btn:disabled { opacity: 0.6; }
         .sp-btn.ghost { background: var(--inset-bg); color: var(--text-secondary); }
         .sp-btn.warn { background: var(--color-danger); }

@@ -117,7 +117,7 @@ export default function EnglishTest() {
         .et-q { font-size: 0.84rem; color: var(--color-ink-2); }
         .et-msg { font-size: 0.8rem; color: var(--color-danger, #dc2626); margin: 8px 0; }
         .et-b { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 10px; padding: 11px 16px; font-size: 0.84rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; margin-top: 12px; }
-        .et-b.p { border-color: var(--color-primary); background: var(--color-primary); color: #fff; }
+        .et-b.p { border-color: var(--color-primary); background: var(--color-primary); color: var(--color-on-primary); }
         .et-b:disabled { opacity: 0.5; cursor: default; }
         .et-item { margin-bottom: 16px; }
         .et-item-q { font-size: 0.86rem; color: var(--color-ink); margin-bottom: 8px; }

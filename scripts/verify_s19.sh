@@ -85,4 +85,19 @@ grep -q "LIVE_MAX_AGE_DAYS" pages/pwa/english.js;             chk "오래된 영
 grep -q "live-vdate" pages/pwa/english.js;                    chk "영상 발행일 화면 표기" $?
 grep -q "zh-CN-YunxiNeural" pages/api/english/speak.js;       chk "중국어 기본 음성 남성" $?
 
+echo "── [S26-3] 디자인 통일 계측 (FAIL 아님 · 숫자만 · 0/목표로 수렴하는지 추적) ──"
+# 집계 대상: pages/pwa/*.js 에서 백업(*.bak*)·고아(pwa_index_new.js) 제외.
+#   pwa_index_new.js 는 앱 코드 어디서도 import/route 되지 않는 고아 파일이라 뺀다(2026-09-04 확인).
+PWA=$(ls pages/pwa/*.js 2>/dev/null | grep -vE '\.bak|pwa_index_new\.js')
+M1=$(grep -hoE "font-size:\s*[0-9.]+(rem|px)" $PWA | grep -oE "[0-9.]+(rem|px)" | sort -u | wc -l)
+M2=$(grep -hoE "border-radius:\s*[0-9][0-9.]*(px|rem)" $PWA | wc -l)
+M3=$(grep -hoiE "\.[a-z0-9_-]*card[a-z0-9_-]*\s*\{" $PWA | sort -u | wc -l)
+M4=$(grep -hoE "\.(td-seg|as-stocktabs|etf-subtab|re-tab-btn|pwa-subtab|en-subtabs|en-tabs|en-langs|vc-seg|seg3|itab|mv-tabs|mf-tabs|alloc-seg|af-seg|tn-tabs|rp-aitab|ba-tabs|pwa-tabs|story-chip|scope-chip)\b" $PWA | sort -u | wc -l)
+M5=0; for f in $PWA; do if grep -q "BottomNav" "$f" && ! grep -q -- "--nav-clearance" "$f"; then M5=$((M5+1)); fi; done
+printf "[측정] font-size 리터럴 고유값   : %s  (목표 8)\n" "$M1"
+printf "[측정] border-radius 리터럴 선언 : %s  (목표 0)\n" "$M2"
+printf "[측정] 카드 클래스 정의(이름 card): %s  (목표 1)\n" "$M3"
+printf "[측정] 탭 구현체(클래스 루트)     : %s  (목표 1)\n" "$M4"
+printf "[측정] 하단여백 토큰 미적용 페이지: %s  (목표 0)\n" "$M5"
+
 echo "FAIL=$F"; [ "$F" -eq 0 ]

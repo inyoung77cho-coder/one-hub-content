@@ -92,10 +92,10 @@ export default function ConsentPage() {
         .cs-item { display: flex; align-items: center; gap: 10px; flex: 1; padding: 11px 4px; background: none; border: none; text-align: left; cursor: pointer; font-family: inherit; }
         .cs-label { font-size: 0.88rem; color: #46566E; font-weight: 600; }
         .cs-box { flex-shrink: 0; width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid #CBD5E1; color: transparent; display: inline-flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 900; }
-        .cs-box.on { background: #2F6BFF; border-color: #2F6BFF; color: #fff; }
+        .cs-box.on { background: #2F6BFF; border-color: #2F6BFF; color: var(--color-on-primary); }
         .cs-view { font-size: 0.78rem; color: #2F6BFF; font-weight: 700; flex-shrink: 0; padding: 4px 6px; }
         .cs-err { font-size: 0.82rem; color: #E5484D; margin: 0 0 12px; }
-        .cs-submit { width: 100%; padding: 15px; border: none; border-radius: 12px; background: #2F6BFF; color: #fff; font-size: 1rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .cs-submit { width: 100%; padding: 15px; border: none; border-radius: 12px; background: #2F6BFF; color: var(--color-on-primary); font-size: 1rem; font-weight: 800; cursor: pointer; font-family: inherit; }
         .cs-submit:disabled { background: #CBD5E1; cursor: not-allowed; }
         .cs-note { font-size: 0.76rem; color: #94A3B8; line-height: 1.6; margin: 14px 0 0; }
       `}</style>

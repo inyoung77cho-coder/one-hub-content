@@ -53,7 +53,7 @@ export default function SystemHealth() {
         .gate { max-width: 360px; margin: 80px auto; padding: 0 20px; font-family: var(--font-sans); text-align: center; color: var(--color-ink); }
         h1 { font-size: 1.1rem; margin-bottom: 20px; }
         input { width: 100%; padding: 12px; border: 1px solid var(--color-line); border-radius: 10px; margin-bottom: 10px; font-size: 0.9rem; box-sizing: border-box; background: var(--color-card); color: var(--color-ink); }
-        button { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--color-primary); color: #fff; font-weight: 700; }
+        button { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--color-primary); color: var(--color-on-primary); font-weight: 700; }
         .e { color: var(--color-danger); font-size: 0.82rem; margin-top: 10px; }
       `}</style>
     </div>

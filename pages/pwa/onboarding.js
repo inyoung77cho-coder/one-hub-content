@@ -415,12 +415,12 @@ export default function Onboarding() {
         .opt.sel { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-primary); }
         .opt.sel .osub { color: var(--color-primary); }
         .opt .check { width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--color-line); flex-shrink: 0; display: grid; place-items: center; font-size: 11px; color: transparent; }
-        .opt.sel .check { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .opt.sel .check { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
 
         .preview { background: var(--hero-grad-1); border-radius: 16px; padding: 16px; color: var(--hero-ink); margin-bottom: 8px; animation: fade .4s ease; }
         .pt { font-size: 12px; color: var(--hero-ink-sub); font-weight: 600; margin-bottom: 12px; }
         .alloc-bar { display: flex; height: 26px; border-radius: 8px; overflow: hidden; margin-bottom: 10px; }
-        .alloc-seg { display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; color: #fff; }
+        .alloc-seg { display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 700; color: var(--color-on-primary); }
         .alloc-legend { display: flex; flex-wrap: wrap; gap: 10px; }
         .lg { display: flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--hero-ink-soft); }
         .lg i { width: 9px; height: 9px; border-radius: 3px; }
@@ -431,7 +431,7 @@ export default function Onboarding() {
         .field input:focus { outline: none; border-color: var(--color-primary); }
         .frow { display: flex; gap: 9px; }
         .frow .field { flex: 1; }
-        .add-btn { width: 100%; font-family: inherit; font-size: 14px; font-weight: 700; color: #fff; background: var(--color-primary); border: none; padding: 13px; border-radius: 12px; cursor: pointer; margin-top: 3px; }
+        .add-btn { width: 100%; font-family: inherit; font-size: 14px; font-weight: 700; color: var(--color-on-primary); background: var(--color-primary); border: none; padding: 13px; border-radius: 12px; cursor: pointer; margin-top: 3px; }
         .added { margin-top: 14px; }
         .added-t { font-size: 12px; font-weight: 700; color: var(--color-ink-2); margin-bottom: 9px; }
         .arow2 { display: flex; align-items: center; justify-content: space-between; background: var(--color-success-soft); border-radius: 12px; padding: 11px 13px; margin-bottom: 7px; }
@@ -470,7 +470,7 @@ export default function Onboarding() {
         .foot { display: flex; gap: 10px; margin-top: 20px; }
         .foot button { font-family: inherit; font-weight: 700; font-size: 15px; border-radius: 14px; padding: 15px; cursor: pointer; border: none; }
         .btn-prev { background: var(--color-card-soft); color: var(--color-ink-2); flex: 0 0 88px; }
-        .btn-next { background: var(--color-primary); color: #fff; flex: 1; }
+        .btn-next { background: var(--color-primary); color: var(--color-on-primary); flex: 1; }
 
         .final-hero { text-align: center; padding: 6px 0 18px; }
         .emoji { font-size: 44px; margin-bottom: 10px; }

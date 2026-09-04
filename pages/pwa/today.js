@@ -1198,7 +1198,7 @@ export default function TodayPage({ announcements = [] }) {
         .td-seg { display: flex; gap: 4px; width: 100%; background: var(--inset-bg, var(--color-card-soft, rgba(0,0,0,0.04))); border: 1px solid var(--color-line); border-radius: 12px; padding: 3px; }
         .td-seg-b { flex: 1 1 0; display: inline-flex; align-items: center; justify-content: center; gap: 5px; border: none; background: transparent; color: var(--color-ink-2); border-radius: 9px; padding: 8px 4px; font-size: 0.82rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .td-seg-b.on { background: var(--color-card); color: var(--color-ink); box-shadow: var(--shadow-card); }
-        .td-seg-badge { min-width: 16px; height: 16px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.62rem; font-weight: 800; color: #fff; background: var(--color-primary); border-radius: 999px; }
+        .td-seg-badge { min-width: 16px; height: 16px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 0.62rem; font-weight: 800; color: var(--color-on-primary); background: var(--color-primary); border-radius: 999px; }
         .td-market { display: flex; align-items: center; gap: 10px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 8px 12px; margin: 0 2px 14px; box-shadow: var(--shadow-card); }
         .td-fresh3 { margin-left: auto; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
@@ -1326,14 +1326,14 @@ export default function TodayPage({ announcements = [] }) {
         .etf1-mv-h { font-size: 0.76rem; font-weight: 800; color: var(--color-ink); margin-bottom: 7px; }
         .etf1-mv-h span { font-size: 0.62rem; font-weight: 600; color: var(--color-ink-3); margin-left: 5px; }
         .etf1-mv { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: var(--color-card-soft); border: none; border-radius: 10px; padding: 9px 11px; margin-bottom: 6px; cursor: pointer; font-family: var(--font-sans); }
-        .etf1-mv-k { flex-shrink: 0; font-size: 0.62rem; font-weight: 800; color: #fff; background: var(--color-ink-3); border-radius: 5px; padding: 2px 6px; }
+        .etf1-mv-k { flex-shrink: 0; font-size: 0.62rem; font-weight: 800; color: var(--color-on-primary); background: var(--color-ink-3); border-radius: 5px; padding: 2px 6px; }
         .etf1-mv-nm { flex: 1; min-width: 0; font-size: 0.78rem; font-weight: 700; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .etf1-mv-pct { flex-shrink: 0; font-size: 0.82rem; font-weight: 800; font-family: ui-monospace, monospace; }
         .etf1-mv-pct.up { color: var(--color-danger); } .etf1-mv-pct.dn { color: var(--color-primary); }
         .sc-list { display: flex; flex-direction: column; }
         .sc-row { display: flex; align-items: flex-start; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--color-line); }
         .sc-row:last-child { border-bottom: none; }
-        .sc-check { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 7px; border: 1.5px solid var(--color-line); background: var(--color-card-soft); color: #fff; font-size: 13px; font-weight: 900; display: grid; place-items: center; cursor: pointer; }
+        .sc-check { flex: none; width: 22px; height: 22px; margin-top: 1px; border-radius: 7px; border: 1.5px solid var(--color-line); background: var(--color-card-soft); color: var(--color-on-primary); font-size: 13px; font-weight: 900; display: grid; place-items: center; cursor: pointer; }
         .sc-row.done .sc-check { background: var(--color-success); border-color: var(--color-success); }
         .sc-body { flex: 1; min-width: 0; text-align: left; background: none; border: none; padding: 0; display: flex; flex-direction: column; gap: 2px; cursor: pointer; font-family: var(--font-sans); }
         .sc-t { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); }
@@ -1378,7 +1378,7 @@ export default function TodayPage({ announcements = [] }) {
         .tile-more { width: 100%; margin-top: 4px; border: none; background: none; color: var(--color-primary); font-size: 0.74rem; font-weight: 800; cursor: pointer; padding: 4px 2px; text-align: left; font-family: var(--font-sans); }
 
         /* [이관] 내 세금 링크 */
-        .re-tax-nav { display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg, var(--color-primary-soft, #EAF1FF), var(--color-card, #fff)); border: 1px solid var(--color-line, #E8EEF7); border-radius: var(--radius-card, 14px); box-shadow: var(--shadow-card); padding: 20px; margin-bottom: 12px; text-decoration: none; }
+        .re-tax-nav { display: flex; align-items: center; gap: 14px; background: linear-gradient(135deg, var(--color-primary-soft), var(--color-card)); border: 1px solid var(--color-line, #E8EEF7); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 20px; margin-bottom: 12px; text-decoration: none; }
         .re-tax-ic { font-size: 30px; flex: none; }
         .re-tax-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
         .re-tax-t { font-size: 1.05rem; font-weight: 800; color: var(--color-ink, #12213B); }

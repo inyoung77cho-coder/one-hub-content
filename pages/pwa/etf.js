@@ -1741,7 +1741,7 @@ export default function EtfDashboard() {
         /* [ETF 재구성 Phase1] 보유|추천 상위 탭 (index.js .pwa-subtabs 패턴 복제) */
         .etf-subtabs { display: flex; gap: 6px; margin: 8px 0 6px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 4px; box-shadow: var(--shadow-card); }
         .etf-subtab { flex: 1; min-height: 36px; padding: 0; background: none; border: none; border-radius: 9px; cursor: pointer; color: var(--color-ink-2); font-family: var(--font-sans); font-size: 0.8rem; font-weight: 700; }
-        .etf-subtab.active { background: var(--color-primary); color: #fff; }
+        .etf-subtab.active { background: var(--color-primary); color: var(--color-on-primary); }
         /* [ETF 재구성 Phase1] 종목 추천 카드 */
         .etf-reco .reco-list { display: flex; flex-direction: column; gap: 8px; }
         .reco-item { border-left: 3px solid var(--color-primary); background: var(--color-card-soft); border-radius: 10px; padding: 10px 12px; }
@@ -1750,7 +1750,7 @@ export default function EtfDashboard() {
         .reco-nm { font-size: 0.84rem; font-weight: 800; color: var(--color-ink); }
         .reco-axis { font-size: 0.62rem; font-weight: 800; color: var(--color-ink-3); background: var(--color-card); border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
         .reco-why { font-size: 0.76rem; color: var(--color-ink-2); line-height: 1.55; margin-top: 5px; word-break: keep-all; }
-        .reco-ai { display: inline-block; font-size: 0.56rem; font-weight: 800; color: #fff; background: var(--color-primary); border-radius: 4px; padding: 1px 5px; margin-right: 6px; vertical-align: middle; letter-spacing: .3px; }
+        .reco-ai { display: inline-block; font-size: 0.56rem; font-weight: 800; color: var(--color-on-primary); background: var(--color-primary); border-radius: 4px; padding: 1px 5px; margin-right: 6px; vertical-align: middle; letter-spacing: .3px; }
         .reco-note { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 12px; line-height: 1.5; word-break: keep-all; }
         .reco-note b { color: var(--color-ink-2); }
         /* [ETF 재구성 Phase1] 연금운영/절세 카드 소제목 */
@@ -1762,7 +1762,7 @@ export default function EtfDashboard() {
         .oa-add { display: grid; grid-template-columns: 1.6fr 1fr; gap: 6px; margin-bottom: 12px; }
         .oa-in { border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 9px; padding: 9px 10px; font-size: 0.82rem; font-family: var(--font-sans); color: var(--color-ink); min-width: 0; }
         .oa-in:focus { outline: none; border-color: var(--color-primary); }
-        .oa-add-btn { grid-column: 1 / -1; border: none; border-radius: 10px; padding: 10px 0; background: var(--color-primary); color: #fff; font-size: 0.82rem; font-weight: 800; font-family: var(--font-sans); cursor: pointer; }
+        .oa-add-btn { grid-column: 1 / -1; border: none; border-radius: 10px; padding: 10px 0; background: var(--color-primary); color: var(--color-on-primary); font-size: 0.82rem; font-weight: 800; font-family: var(--font-sans); cursor: pointer; }
         .oa-add-btn:disabled { opacity: 0.5; cursor: default; }
         .oa-groups { display: flex; flex-direction: column; gap: 14px; }
         .oa-grp-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
@@ -1776,7 +1776,7 @@ export default function EtfDashboard() {
         .oa-btn.del { margin-left: auto; color: var(--color-danger); border-color: var(--color-danger); }
         .oa-edit { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
         .oa-edit .oa-in { flex: 1 1 120px; }
-        .oa-commit { border: none; background: var(--color-primary); color: #fff; border-radius: 8px; padding: 8px 12px; font-size: 0.74rem; font-weight: 800; font-family: var(--font-sans); cursor: pointer; }
+        .oa-commit { border: none; background: var(--color-primary); color: var(--color-on-primary); border-radius: 8px; padding: 8px 12px; font-size: 0.74rem; font-weight: 800; font-family: var(--font-sans); cursor: pointer; }
         .oa-cancel { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 8px; padding: 8px 12px; font-size: 0.74rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         /* [D4] 접기 헤더 — 라벨 전체가 44px 타깃 */
         .etf-acc-h { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); text-align: left; }
@@ -1849,7 +1849,7 @@ export default function EtfDashboard() {
         .rz-form { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
         .rz-in { flex: 1 1 100%; border: 1px solid var(--color-line); border-radius: 8px; padding: 8px 10px; font-size: 0.82rem; font-family: var(--font-sans); background: var(--color-card); color: var(--color-ink); }
         .rz-in.num { flex: 1 1 45%; }
-        .rz-save { flex: 1 1 100%; border: none; background: var(--color-primary); color: #fff; border-radius: 8px; padding: 9px 0; font-size: 0.8rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .rz-save { flex: 1 1 100%; border: none; background: var(--color-primary); color: var(--color-on-primary); border-radius: 8px; padding: 9px 0; font-size: 0.8rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .rz-list { display: flex; flex-direction: column; margin-bottom: 4px; }
         .rz-row { display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--color-line); font-size: 0.8rem; }
         .rz-t { flex: 1; font-weight: 800; color: var(--color-ink); font-family: ui-monospace, monospace; }
@@ -1963,12 +1963,12 @@ export default function EtfDashboard() {
         .myetf .me-total { float: right; font-size: 0.72rem; font-weight: 800; color: var(--color-primary); }
         .me-toggle { display: flex; gap: 4px; background: var(--color-card-soft); border-radius: 10px; padding: 3px; margin-bottom: 10px; }
         .me-toggle button { flex: 1; border: none; background: none; padding: 8px 0; border-radius: 8px; font-family: var(--font-sans); font-size: 0.82rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
-        .me-toggle button.on.buy { background: var(--color-primary); color: #fff; }
-        .me-toggle button.on.sell { background: var(--color-danger); color: #fff; }
+        .me-toggle button.on.buy { background: var(--color-primary); color: var(--color-on-primary); }
+        .me-toggle button.on.sell { background: var(--color-danger); color: var(--color-on-primary); }
         /* [E1] 국내/해외 구분 세그먼트 */
         .me-mkt { display: flex; gap: 4px; background: var(--color-card-soft); border-radius: 10px; padding: 3px; margin-bottom: 8px; }
         .me-mkt button { flex: 1; border: none; background: none; padding: 7px 0; border-radius: 8px; font-family: var(--font-sans); font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); cursor: pointer; }
-        .me-mkt button.on { background: var(--color-primary); color: #fff; }
+        .me-mkt button.on { background: var(--color-primary); color: var(--color-on-primary); }
         .me-form { display: flex; gap: 6px; flex-wrap: wrap; }
         .me-in { flex: 1 1 70px; min-width: 0; border: 1px solid var(--color-line); background: var(--color-bg); border-radius: 9px; padding: 9px 10px; font-size: 0.84rem; font-family: var(--font-sans); color: var(--color-ink); }
         .me-in.tk { flex: 2 1 120px; text-transform: uppercase; }
@@ -1984,7 +1984,7 @@ export default function EtfDashboard() {
         .me-acct-badge.isa { background: var(--color-primary-soft); color: var(--color-primary); }
         .me-grp-sum { font-size: 0.74rem; font-weight: 700; color: var(--color-ink-2); }
         .me-tax { margin-top: 8px; font-size: 0.68rem; color: var(--color-ink-2); background: var(--color-card-soft); border-radius: 9px; padding: 8px 11px; line-height: 1.5; word-break: keep-all; }
-        .me-submit { width: 100%; margin-top: 8px; border: none; border-radius: 10px; padding: 11px 0; font-size: 0.88rem; font-weight: 800; color: #fff; cursor: pointer; font-family: var(--font-sans); }
+        .me-submit { width: 100%; margin-top: 8px; border: none; border-radius: 10px; padding: 11px 0; font-size: 0.88rem; font-weight: 800; color: var(--color-on-primary); cursor: pointer; font-family: var(--font-sans); }
         .me-submit.buy { background: var(--color-primary); } .me-submit.sell { background: var(--color-danger); }
         .me-msg { font-size: 0.76rem; font-weight: 600; color: var(--color-ink-2); margin-top: 8px; text-align: center; }
         .me-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
@@ -2031,11 +2031,11 @@ export default function EtfDashboard() {
         .tk-opt-tk { font-size: 0.7rem; font-weight: 800; color: var(--color-primary); font-family: ui-monospace, monospace; flex-shrink: 0; }
         .tk-opt-nm { flex: 1 1 0; font-size: 0.72rem; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .tk-opt-kind { font-size: 0.6rem; font-weight: 700; color: var(--color-ink-3); background: var(--color-card-soft); border-radius: 999px; padding: 1px 6px; flex-shrink: 0; }
-        .bulk-submit { width: 100%; margin-top: 12px; padding: 11px; border-radius: 10px; border: none; background: var(--color-primary); color: #fff; font-size: 0.84rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .bulk-submit { width: 100%; margin-top: 12px; padding: 11px; border-radius: 10px; border: none; background: var(--color-primary); color: var(--color-on-primary); font-size: 0.84rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .bulk-msg { margin-top: 9px; font-size: 0.74rem; color: var(--color-ink-2); line-height: 1.6; word-break: keep-all; }
         .bulk-fund { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
         .bulk-fund-val { font-size: 0.72rem; font-weight: 700; color: var(--color-ink-2); font-family: ui-monospace, monospace; }
-        .bulk-fund-btn { font-size: 0.7rem; font-weight: 800; padding: 5px 10px; border-radius: 7px; border: none; background: var(--color-primary); color: #fff; cursor: pointer; font-family: var(--font-sans); }
+        .bulk-fund-btn { font-size: 0.7rem; font-weight: 800; padding: 5px 10px; border-radius: 7px; border: none; background: var(--color-primary); color: var(--color-on-primary); cursor: pointer; font-family: var(--font-sans); }
         .bulk-fund-done { font-size: 0.72rem; font-weight: 700; color: var(--color-success, #0E9E6A); }
         /* [2026-08-23] 기타 금융자산 목록 */
         .other-assets { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-line); }
@@ -2059,18 +2059,18 @@ export default function EtfDashboard() {
         .mf-f.mf-tk { grid-column: 1 / -1; }
         .mf-f span { font-size: 0.68rem; font-weight: 700; color: var(--color-ink-3); }
         .mf-f input, .mf-f select { width: 100%; min-height: 40px; box-sizing: border-box; border: 1px solid var(--color-line); border-radius: 9px; padding: 8px 10px; font-size: 0.82rem; font-family: var(--font-sans); background: var(--color-card); color: var(--color-ink); }
-        .mf-submit { width: 100%; min-height: 44px; margin-top: 10px; border: none; border-radius: 10px; background: var(--color-primary); color: var(--color-on-primary, #fff); font-size: 0.85rem; font-weight: 800; font-family: var(--font-sans); cursor: pointer; }
+        .mf-submit { width: 100%; min-height: 44px; margin-top: 10px; border: none; border-radius: 10px; background: var(--color-primary); color: var(--color-on-primary); font-size: 0.85rem; font-weight: 800; font-family: var(--font-sans); cursor: pointer; }
         .mf-msg { margin-top: 8px; font-size: 0.74rem; line-height: 1.5; color: var(--color-ink-2); word-break: keep-all; }
         .me-foot { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 12px; line-height: 1.5; word-break: keep-all; }
         .foot { font-size: 0.68rem; color: var(--color-ink-3); text-align: center; margin-top: 16px; line-height: 1.5; }
         /* [S4] 계좌 유형 필터 칩 */
         .acct-filter { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
         .acct-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 999px; padding: 7px 14px; font-size: 0.78rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
-        .acct-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .acct-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
         .acct-chip.on.pension { background: var(--color-success); border-color: var(--color-success); }
         .acct-chip.on.isa { background: var(--color-primary); border-color: var(--color-primary); }
         .acct-chip-n { font-size: 0.66rem; font-weight: 800; background: var(--color-card-soft); color: var(--color-ink-2); border-radius: 999px; padding: 1px 6px; }
-        .acct-chip.on .acct-chip-n { background: rgba(255,255,255,0.25); color: #fff; }
+        .acct-chip.on .acct-chip-n { background: rgba(255,255,255,0.25); color: var(--color-on-primary); }
         /* [E2·E3] 해야 할 일 · 리밸런싱 카드 */
         .todo-card { border-left: 4px solid var(--color-primary); }
         .todo-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }

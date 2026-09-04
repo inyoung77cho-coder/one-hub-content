@@ -587,7 +587,7 @@ export default function RealEstateDashboard() {
         /* [재구성] 분석 | 시나리오 세그먼트 — assets.js .as-stocktabs 패턴 */
         .re-tabs { display: flex; gap: 6px; margin: 0 2px 12px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 4px; box-shadow: var(--shadow-card); }
         .re-tab-btn { flex: 1; min-height: 36px; border: none; background: none; border-radius: 9px; color: var(--color-ink-2); font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
-        .re-tab-btn.on { background: var(--color-primary); color: #fff; }
+        .re-tab-btn.on { background: var(--color-primary); color: var(--color-on-primary); }
         .partner-cta { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-decoration: none; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 14px 16px; margin: 4px 0 14px; box-shadow: var(--shadow-card); }
         .partner-cta .pc-l { display: flex; align-items: center; gap: 10px; }
         .partner-cta .pc-ic { font-size: 20px; }
@@ -644,7 +644,7 @@ export default function RealEstateDashboard() {
         .pv-h { font-size: 13.5px; font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
         .pv-list { margin: 0 0 12px; padding-left: 18px; }
         .pv-list li { font-size: 12.5px; color: var(--color-ink-2); line-height: 1.75; word-break: keep-all; }
-        .pv-cta { width: 100%; border: none; background: var(--color-primary); color: #fff; font-size: 13.5px; font-weight: 800; padding: 12px 0; border-radius: 11px; cursor: pointer; font-family: var(--font-sans); }
+        .pv-cta { width: 100%; border: none; background: var(--color-primary); color: var(--color-on-primary); font-size: 13.5px; font-weight: 800; padding: 12px 0; border-radius: 11px; cursor: pointer; font-family: var(--font-sans); }
         .cta-slim .arr { color: var(--color-primary); font-weight: 800; flex-shrink: 0; }
         /* [S5] 갈아타기 갭 트래커 */
         .gap-selects { display: flex; align-items: flex-end; gap: 8px; }
@@ -681,7 +681,7 @@ export default function RealEstateDashboard() {
         .mp-edit { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 8px; padding: 5px 12px; font-size: 0.72rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .mp-actions { display: flex; gap: 6px; flex-shrink: 0; }
         .mp-del { border: 1px solid var(--color-danger); background: var(--color-card); color: var(--color-danger); border-radius: 8px; padding: 5px 12px; font-size: 0.72rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; white-space: nowrap; }
-        .mp-del.confirm { background: var(--color-danger); color: #fff; }
+        .mp-del.confirm { background: var(--color-danger); color: var(--color-on-primary); }
         .scr-anom { font-size: 0.6rem; font-weight: 800; color: var(--color-warning-ink, var(--color-warning)); background: var(--color-warning-soft); padding: 1px 6px; border-radius: 6px; margin-left: 5px; white-space: nowrap; }
         .scr-rep { font-size: 0.66rem; font-weight: 500; color: var(--color-ink-3); }
         .scr-n { font-size: 0.64rem; font-weight: 600; color: var(--color-ink-3); }
@@ -705,13 +705,13 @@ export default function RealEstateDashboard() {
         .mp-trust-h { font-size: 0.86rem; font-weight: 800; color: var(--color-warning-ink, var(--color-warning)); margin-bottom: 6px; }
         .mp-trust-b { font-size: 0.76rem; color: var(--color-ink-2); line-height: 1.55; word-break: keep-all; }
         .mp-trust-btns { display: flex; gap: 8px; margin-top: 11px; flex-wrap: wrap; }
-        .mp-trust-primary { border: none; background: var(--color-primary); color: #fff; border-radius: 9px; padding: 8px 15px; font-size: 0.78rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .mp-trust-primary { border: none; background: var(--color-primary); color: var(--color-on-primary); border-radius: 9px; padding: 8px 15px; font-size: 0.78rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .mp-trust-second { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 9px; padding: 8px 15px; font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         /* [AI-3] 내 시세 직접입력 인라인 */
         .mp-avm-edit { display: flex; align-items: center; gap: 7px; margin-top: 10px; flex-wrap: wrap; background: var(--color-card-soft); border-radius: 10px; padding: 9px 11px; }
         .mp-avm-lbl { font-size: 0.7rem; font-weight: 700; color: var(--color-ink-2); }
         .mp-avm-in { flex: 1; min-width: 90px; border: 1px solid var(--color-line); border-radius: 8px; padding: 7px 10px; font-size: 0.86rem; font-family: var(--font-sans); background: var(--color-card); color: var(--color-ink); }
-        .mp-avm-save { border: none; background: var(--color-primary); color: #fff; border-radius: 8px; padding: 7px 13px; font-size: 0.76rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .mp-avm-save { border: none; background: var(--color-primary); color: var(--color-on-primary); border-radius: 8px; padding: 7px 13px; font-size: 0.76rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .mp-avm-cancel { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 8px; padding: 7px 11px; font-size: 0.76rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
         .mp-note { font-size: 0.64rem; color: var(--color-ink-3); margin-top: 10px; line-height: 1.5; word-break: keep-all; }
         /* [#1 다수 부동산] 추가 보유 목록 */
@@ -730,7 +730,7 @@ export default function RealEstateDashboard() {
         .rp-form { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
         .rp-in { flex: 1 1 100%; border: 1px solid var(--color-line); border-radius: 8px; padding: 8px 10px; font-size: 0.82rem; font-family: var(--font-sans); background: var(--color-card); color: var(--color-ink); }
         .rp-in.num { flex: 1 1 40%; }
-        .rp-save { flex: 1 1 100%; border: none; background: var(--color-primary); color: #fff; border-radius: 8px; padding: 9px 0; font-size: 0.8rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .rp-save { flex: 1 1 100%; border: none; background: var(--color-primary); color: var(--color-on-primary); border-radius: 8px; padding: 9px 0; font-size: 0.8rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .rp-total { display: flex; align-items: center; justify-content: space-between; margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--color-line); }
         .rp-total span { font-size: 0.78rem; font-weight: 700; color: var(--color-ink-2); }
         .rp-total em { font-style: normal; font-size: 0.58rem; font-weight: 800; color: var(--color-success); background: var(--color-success-soft); padding: 1px 6px; border-radius: 4px; margin-left: 5px; }
@@ -754,10 +754,10 @@ export default function RealEstateDashboard() {
         .scope-chip b { font-size: 0.8rem; font-weight: 800; color: var(--color-ink-2); }
         .scope-chip span { font-size: 0.6rem; font-weight: 600; color: var(--color-ink-3); white-space: nowrap; }
         .scope-chip.on { background: var(--color-primary); border-color: var(--color-primary); }
-        .scope-chip.on b, .scope-chip.on span { color: #fff; }
+        .scope-chip.on b, .scope-chip.on span { color: var(--color-on-primary); }
         .scr-py { font-size: 0.66rem; font-weight: 600; color: var(--color-ink-3); }
         .scr-mine { font-size: 0.58rem; font-weight: 800; background: var(--color-primary-soft); color: var(--color-primary); padding: 1px 6px; border-radius: 5px; }
-        .scr-reg { display: block; margin-top: 10px; border: none; background: var(--color-primary); color: #fff; border-radius: 10px; padding: 9px 14px; font-size: 0.78rem; font-weight: 800; font-family: var(--font-sans); cursor: pointer; }
+        .scr-reg { display: block; margin-top: 10px; border: none; background: var(--color-primary); color: var(--color-on-primary); border-radius: 10px; padding: 9px 14px; font-size: 0.78rem; font-weight: 800; font-family: var(--font-sans); cursor: pointer; }
         .scr-inputs { display: flex; gap: 8px; margin-bottom: 12px; }
         /* [모바일 정렬] flex:1 + min-width:0 로 숫자 input이 좁은 화면에서 균등 축소되게(오버플로우 방지) */
         .scr-in { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 0.68rem; color: var(--color-ink-3); font-weight: 700; }
@@ -801,7 +801,7 @@ export default function RealEstateDashboard() {
         .wiz-f select:focus { outline: none; border-color: var(--color-primary); }
         .wiz-f input:focus { outline: none; border-color: var(--color-primary); }
         .wiz-row { display: flex; gap: 10px; }
-        .wiz-save { width: 100%; margin-top: 6px; border: none; border-radius: 12px; padding: 13px 0; font-size: 0.92rem; font-weight: 800; color: #fff; background: var(--color-primary); cursor: pointer; font-family: var(--font-sans); }
+        .wiz-save { width: 100%; margin-top: 6px; border: none; border-radius: 12px; padding: 13px 0; font-size: 0.92rem; font-weight: 800; color: var(--color-on-primary); background: var(--color-primary); cursor: pointer; font-family: var(--font-sans); }
         .wiz-save:disabled { opacity: 0.5; cursor: not-allowed; }
         .wiz-note { font-size: 0.66rem; color: var(--color-ink-3); margin-top: 11px; line-height: 1.5; word-break: keep-all; text-align: center; }
         .wiz-note b { color: var(--color-ink-2); font-weight: 700; }
@@ -903,7 +903,7 @@ export default function RealEstateDashboard() {
         .pb-step { display: flex; gap: 9px; padding: 5px 0; font-size: 12.5px; line-height: 1.5; word-break: keep-all; }
         .pb-k { flex-shrink: 0; font-weight: 800; color: var(--color-primary); font-size: 11.5px; padding-top: 1px; }
         .pb-v { color: var(--color-ink-2); } .pb-v .up { color: var(--color-success); } .pb-v .dn { color: var(--color-danger); }
-        .pb-cta { border: none; background: var(--color-primary); color: #fff; font-size: 12px; font-weight: 800; padding: 6px 12px; border-radius: 9px; cursor: pointer; font-family: var(--font-sans); margin-left: 4px; }
+        .pb-cta { border: none; background: var(--color-primary); color: var(--color-on-primary); font-size: 12px; font-weight: 800; padding: 6px 12px; border-radius: 9px; cursor: pointer; font-family: var(--font-sans); margin-left: 4px; }
         /* [R-7] 미구현 로드맵 배지 */
         /* [거시 해석] 규칙 기반 방향성 카드 */
         .macro-read { margin-top: 11px; background: var(--color-card-soft); border: 1px solid var(--color-line); border-radius: 10px; padding: 11px 13px; }

@@ -49,7 +49,7 @@ export default function PwaDaily({ posts, postsB }) {
       <style jsx>{`
         .tt { display: flex; gap: 6px; margin-bottom: 14px; }
         .tt button { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: 999px; padding: 7px 16px; font-size: 0.8rem; font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
-        .tt button.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .tt button.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
         .rp-empty { text-align: center; color: var(--color-ink-3); padding: 40px 0; font-size: 0.85rem; }
         .dc { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); margin-bottom: 10px; overflow: hidden; }
         .dc-top { width: 100%; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 13px 15px; background: none; border: none; cursor: pointer; font-family: var(--font-sans); text-align: left; }

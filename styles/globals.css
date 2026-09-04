@@ -78,9 +78,22 @@
   --shadow-card:  0 6px 20px rgba(31,63,120,.06);
   --shadow-float: 0 20px 50px rgba(15,33,62,.18);
 
-  /* ---- 간격 스케일 (선택) ---- */
+  /* ---- 간격 스케일 (S26-1: 이미 1~7단 존재 → 값 보존. 기존 소비자 회귀 방지) ---- */
   --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px;  --sp-4: 14px;
   --sp-5: 16px; --sp-6: 18px; --sp-7: 22px;
+
+  /* ---- [S26-1] 활자 스케일 8단 — rem 고정(핀치 줌 차단 후 OS 글자크기 존중). 하드코딩 91종을 이 8단으로 수렴시킨다 ---- */
+  --fs-1: 0.6875rem;   /* 11px  라벨·배지 */
+  --fs-2: 0.75rem;     /* 12px  캡션·보조 */
+  --fs-3: 0.8125rem;   /* 13px  작은 본문 */
+  --fs-4: 0.875rem;    /* 14px  본문 */
+  --fs-5: 1rem;        /* 16px  강조 본문 */
+  --fs-6: 1.1875rem;   /* 19px  카드 제목 */
+  --fs-7: 1.4375rem;   /* 23px  섹션 제목 */
+  --fs-8: 1.875rem;    /* 30px  숫자 헤드라인 */
+
+  /* ---- [S26-2] 유색 표면 위 흰 글자 — 양 테마 공통 흰색(다크에서도 덮어쓰지 않음). #fff 하드코딩 정본 ---- */
+  --color-on-primary: #FFFFFF;
 }
 
 /* =========================================================
@@ -195,17 +208,18 @@
   --purple:      #A855F7;
   --purple-soft: rgba(168,85,247,.16);   /* [나 vs AI] AI 진영 색(초록=나 와 짝) 소프트 배경 */
 
-  /* Backgrounds */
-  --bg-base:     #F4F9FF;
-  --bg-surface:  #FFFFFF;
-  --bg-card:     #EAF3FC;
+  /* Backgrounds — [S26-2] 정본(--color-*) 별칭. 지우지 않고 가리켜 다크모드가 자동 반영되게.
+     ※ 값이 바뀌는 화면은 홈/레거시 대시보드(비-PWA)뿐 — PWA 는 .pwa-wrapper 스코프가 이미 --color-* 로 재별칭. */
+  --bg-base:     var(--color-bg);      /* 홈 배경 #F4F9FF → #EAF1FA (거의 동일) */
+  --bg-surface:  var(--color-card);    /* #FFFFFF → 동일(라이트) */
+  --bg-card:     var(--color-card);    /* 레거시 대시보드 카드 #EAF3FC → #FFFFFF (백지화) */
   --bg-hover:    #DCE9F7;
   --bg-border:   #DCE9F7;
 
-  /* Text */
-  --text-primary: #16213D;
-  --text-secondary: #5B7088;
-  --text-dim:     #93A6BC;
+  /* Text — [S26-2] 정본 별칭 */
+  --text-primary: var(--color-ink);    /* #16213D → #1E293B (동급 네이비) */
+  --text-secondary: var(--color-ink-2);/* #5B7088 → #64748B */
+  --text-dim:     var(--color-ink-3);  /* #93A6BC → #94A3B8 (거의 동일) */
 
   /* [v10 UI] 레거시 위젯 별칭 — v10 디자인 토큰에 매핑(단일 소스). 다크모드 자동 반전.
      ※ --color-bg / --color-card 는 위 v10 :root/[data-theme] 정의가 소유하므로 여기서 재정의하지 않는다

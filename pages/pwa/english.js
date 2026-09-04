@@ -207,7 +207,7 @@ function LessonCard({ lesson, lang }) {
       <style jsx>{`
         .lc { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 14px; padding: 16px; box-shadow: var(--shadow-card); }
         .lc-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
-        .lc-track { font-size: 11px; font-weight: 800; color: #fff; background: var(--color-primary); border-radius: 999px; padding: 3px 9px; }
+        .lc-track { font-size: 11px; font-weight: 800; color: var(--color-on-primary); background: var(--color-primary); border-radius: 999px; padding: 3px 9px; }
         .lc-src { font-size: 11.5px; font-weight: 600; color: var(--color-ink-3); }
         .lc-title { font-size: 1rem; font-weight: 800; line-height: 1.4; margin: 0 0 4px; color: var(--color-ink); }
         .lc-titleko { font-size: .8rem; color: var(--color-ink-2); margin: 0 0 12px; word-break: keep-all; }
@@ -216,9 +216,9 @@ function LessonCard({ lesson, lang }) {
         .lc-audio audio { width: 100%; height: 36px; }
         .lc-speed { display: flex; gap: 6px; margin-top: 8px; }
         .lc-speed button { flex: 0 0 auto; font-size: .72rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--color-line); background: var(--color-bg); color: var(--color-ink-2); cursor: pointer; font-family: var(--font-sans); }
-        .lc-speed button.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .lc-speed button.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
         .lc-noaudio { font-size: .75rem; color: var(--color-ink-3); margin: 10px 0; }
-        .lc-reveal, .lc-again { width: 100%; margin-top: 12px; padding: 12px; border-radius: 10px; border: none; background: var(--color-primary); color: #fff; font-size: .86rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .lc-reveal, .lc-again { width: 100%; margin-top: 12px; padding: 12px; border-radius: 10px; border: none; background: var(--color-primary); color: var(--color-on-primary); font-size: .86rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .lc-again { background: var(--color-bg); color: var(--color-primary); border: 1px solid var(--color-primary); }
         .lc-sec { margin-top: 16px; }
         .lc-sec h3 { font-size: .74rem; font-weight: 800; color: var(--color-ink-3); letter-spacing: .3px; margin: 0 0 7px; text-transform: uppercase; }
@@ -348,7 +348,7 @@ function Karaoke({ text, lang, onActive, onClear }) {
         .ka { }
         .ka-text { font-size: 1.5rem; font-weight: 800; line-height: 1.5; color: var(--color-ink); letter-spacing: -.01em; }
         .ka-text span { transition: color .1s, background .1s; padding: 0 1px; border-radius: 4px; }
-        .ka-text span.on { color: #fff; background: var(--color-primary); }
+        .ka-text span.on { color: var(--color-on-primary); background: var(--color-primary); }
         .ka-play { margin-top: 10px; border: none; border-radius: 10px; padding: 9px 16px; background: var(--color-primary-soft); color: var(--color-primary); font-weight: 800; font-size: .82rem; cursor: pointer; font-family: inherit; }
         .ka-play:disabled { opacity: .6; }
       `}</style>
@@ -765,7 +765,7 @@ function WeekendChat({ lang = "en" }) {
         .qz-input.full { width: 100%; margin-top: 14px; }
         .qz-input:focus { outline: none; border-color: var(--color-primary); }
         .qz-input:disabled { opacity: .6; }
-        .qz-mic { border: none; border-radius: 12px; padding: 13px; background: var(--color-primary); color: #fff; font-size: .92rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .qz-mic { border: none; border-radius: 12px; padding: 13px; background: var(--color-primary); color: var(--color-on-primary); font-size: .92rem; font-weight: 800; cursor: pointer; font-family: inherit; }
         .qz-mic.flex { flex: 1; }
         .qz-mic.on { background: var(--color-danger); animation: qzpulse 1s ease-in-out infinite; }
         .qz-mic:disabled { opacity: .6; }
@@ -781,7 +781,7 @@ function WeekendChat({ lang = "en" }) {
         .qz-done { margin-top: 14px; font-size: .95rem; font-weight: 800; color: var(--color-ink); }
         .qz-sub { display: block; margin-top: 8px; font-size: .78rem; font-weight: 600; color: var(--color-ink-3); line-height: 1.5; }
         .qz-row { display: flex; gap: 8px; align-items: stretch; margin-top: 12px; }
-        .qz-btn { width: 100%; margin-top: 14px; border: none; border-radius: 12px; padding: 13px; background: var(--color-primary); color: #fff; font-size: .92rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+        .qz-btn { width: 100%; margin-top: 14px; border: none; border-radius: 12px; padding: 13px; background: var(--color-primary); color: var(--color-on-primary); font-size: .92rem; font-weight: 800; cursor: pointer; font-family: inherit; }
         .qz-btn.flex2 { width: auto; margin-top: 0; flex-shrink: 0; padding: 12px 16px; }
         .qz-btn:disabled { opacity: .55; }
       `}</style>
@@ -966,10 +966,10 @@ export default function EnglishPage() {
         .en-sub { display: block; font-size: 12px; font-weight: 600; color: var(--color-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .en-langs { display: flex; gap: 8px; margin-bottom: 10px; }
         .en-langs button { flex: 1 1 0; padding: 8px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
-        .en-langs button.on { background: var(--color-ink); border-color: var(--color-ink); color: #fff; }
+        .en-langs button.on { background: var(--color-ink); border-color: var(--color-ink); color: var(--color-on-primary); }
         .en-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
         .en-tabs button { flex: 1 1 0; padding: 10px; border-radius: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: .85rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
-        .en-tabs button.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .en-tabs button.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
         /* 하위 메뉴 — 대메뉴보다 작게·연하게(계층 구분). 알약형. */
         .en-subtabs { display: flex; gap: 6px; margin: 0 0 14px; padding-left: 0; }
         .en-subtabs button { padding: 6px 13px; border-radius: 999px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); font-size: .76rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }

@@ -552,7 +552,7 @@ export default function AssetsMapPage() {
         /* [사용자 지시] "주식" 뷰 전용 보유/추천 탭 — 상위 메뉴바(타이틀) 바로 아래 */
         .as-stocktabs { display: flex; gap: 6px; margin: 0 2px 12px; background: var(--color-card); border: 1px solid var(--color-line); border-radius: 12px; padding: 4px; box-shadow: var(--shadow-card); }
         .as-st-btn { flex: 1; min-height: 36px; border: none; background: none; border-radius: 9px; color: var(--color-ink-2); font-size: 0.8rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
-        .as-st-btn.on { background: var(--color-primary); color: #fff; }
+        .as-st-btn.on { background: var(--color-primary); color: var(--color-on-primary); }
         /* [사용자 지적] 탭 전용 한 줄 — 탭을 눌렀을 때 첫 화면에서 무엇이 달라졌는지 보여주는 유일한 줄 */
         .as-tabnote { margin: -6px 4px 12px; font-size: 0.72rem; line-height: 1.5; color: var(--color-ink-2); word-break: keep-all; }
         .as-tabnote b { color: var(--color-ink); font-weight: 800; }

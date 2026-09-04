@@ -128,7 +128,7 @@ export default function PwaStory() {
         .story-picker-h2 { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--color-line); }
         .story-picker-list { display: flex; flex-wrap: wrap; gap: 8px; }
         .story-chip { border: 1px solid var(--color-line); background: var(--color-card-soft); color: var(--color-ink-2); font-size: 12.5px; font-weight: 700; padding: 7px 13px; border-radius: 999px; cursor: pointer; font-family: var(--font-sans); }
-        .story-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+        .story-chip.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
       `}</style>
       <style jsx global>{`body { background: var(--color-bg); margin: 0; }`}</style>
     </div>

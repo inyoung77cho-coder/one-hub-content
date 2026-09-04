@@ -605,12 +605,12 @@ export default function Settings() {
         .badge { font-size: 0.72rem; font-weight: 800; border: 1px solid; border-radius: 8px; padding: 3px 10px; }
         .sw { width: 46px; height: 26px; border-radius: 13px; border: none; background: var(--color-line); position: relative; transition: background .2s; padding: 0; cursor: pointer; }
         .sw.on { background: var(--color-primary); } .sw:disabled { opacity: 0.6; }
-        .knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .2s; }
+        .knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--color-on-primary); transition: left .2s; }
         .sw.on .knob { left: 23px; }
         .tbtn { background: none; border: 1px solid var(--color-line); border-radius: 8px; padding: 6px 12px; font-size: 0.82rem; font-weight: 700; cursor: pointer; color: inherit; }
         .tt { display: flex; gap: 3px; background: var(--color-card-soft); padding: 3px; border-radius: var(--radius-pill); }
         .tt button { border: none; background: none; color: var(--color-ink-2); padding: 5px 14px; border-radius: var(--radius-pill); cursor: pointer; font-weight: 700; font-size: 0.8rem; }
-        .tt button.on { background: var(--color-primary); color: #fff; }
+        .tt button.on { background: var(--color-primary); color: var(--color-on-primary); }
         .usage-total { display: flex; align-items: baseline; justify-content: space-between; font-size: 0.82rem; color: var(--color-ink-2); font-weight: 700; padding-bottom: 12px; border-bottom: 1px solid var(--color-line); }
         .usage-total b { font-size: 1.3rem; font-weight: 800; color: var(--color-ink); font-family: var(--font-display, var(--font-sans)); }
         .ubreak { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 12px; }

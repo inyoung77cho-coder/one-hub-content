@@ -229,13 +229,13 @@ export default function BoardAdmin() {
         .ba-head h1 { font-size: 1.35rem; font-weight: 800; margin: 10px 0 6px; letter-spacing: -.4px; }
         .ba-sub { font-size: 0.86rem; color: #64748B; margin: 0; line-height: 1.6; }
         .ba-tabs { display: flex; gap: 8px; margin: 20px 0 16px; }
-        .ba-tabs button { flex: 1; padding: 11px; border: 1px solid #E1E9F5; background: #fff; border-radius: 12px;
+        .ba-tabs button { flex: 1; padding: 11px; border: 1px solid #E1E9F5; background: var(--color-card); border-radius: 12px;
           font-size: 0.9rem; font-weight: 800; color: #64748B; cursor: pointer; }
-        .ba-tabs button.on { background: #2F6BFF; border-color: #2F6BFF; color: #fff; }
+        .ba-tabs button.on { background: #2F6BFF; border-color: #2F6BFF; color: var(--color-on-primary); }
         .ba-err { background: #FEF2F2; border: 1px solid #FECACA; color: #B91C1C; padding: 12px 14px; border-radius: 10px; font-size: 0.86rem; margin-bottom: 14px; }
         .ba-list { display: grid; gap: 14px; }
         .ba-empty { text-align: center; color: #94A3B8; padding: 40px 0; font-size: 0.9rem; }
-        .ba-toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); background: #12213B; color: #fff;
+        .ba-toast { position: fixed; left: 50%; bottom: 84px; transform: translateX(-50%); background: #12213B; color: var(--color-on-primary);
           padding: 11px 20px; border-radius: 999px; font-size: 0.86rem; font-weight: 700; box-shadow: 0 8px 24px rgba(0,0,0,.25); z-index: 50; }
       `}</style>
     </div>
@@ -414,18 +414,18 @@ function UserCard({ item, onChangeStatus }) {
 }
 
 const cardCss = `
-  .card { background: #fff; border: 1px solid #E1E9F5; border-radius: 16px; padding: 18px; display: grid; gap: 12px;
+  .card { background: var(--color-card); border: 1px solid #E1E9F5; border-radius: 16px; padding: 18px; display: grid; gap: 12px;
     box-shadow: 0 6px 20px rgba(31,63,120,.06); }
   .row3 { display: grid; grid-template-columns: 1.4fr .8fr 1fr; gap: 10px; }
   .card input, .card select, .card textarea { width: 100%; box-sizing: border-box; border: 1px solid #DDE6F3;
-    border-radius: 9px; padding: 9px 11px; font-size: 0.9rem; font-family: inherit; color: #12213B; background: #fff; }
+    border-radius: 9px; padding: 9px 11px; font-size: 0.9rem; font-family: inherit; color: #12213B; background: var(--color-card); }
   .card textarea { resize: vertical; line-height: 1.55; }
   .card input:focus, .card select:focus, .card textarea:focus { outline: 2px solid #2F6BFF; outline-offset: 0; border-color: #2F6BFF; }
   .meta { font-size: 0.72rem; color: #A3AFC2; font-variant-numeric: tabular-nums; }
   .acts { display: flex; justify-content: space-between; gap: 10px; }
-  .acts .del { background: #fff; border: 1px solid #FBC9C9; color: #DC2626; font-weight: 800; font-size: 0.84rem;
+  .acts .del { background: var(--color-card); border: 1px solid #FBC9C9; color: #DC2626; font-weight: 800; font-size: 0.84rem;
     padding: 9px 14px; border-radius: 10px; cursor: pointer; }
-  .acts .save { background: #2F6BFF; border: none; color: #fff; font-weight: 800; font-size: 0.84rem;
+  .acts .save { background: #2F6BFF; border: none; color: var(--color-on-primary); font-weight: 800; font-size: 0.84rem;
     padding: 9px 20px; border-radius: 10px; cursor: pointer; }
   .acts .save:disabled { background: #C7D4EC; cursor: default; }
 `;

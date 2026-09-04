@@ -203,12 +203,12 @@ export default function TaxPage() {
         .toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 4px 0 14px; font-size: 0.86rem; font-weight: 700; color: var(--color-ink); }
         .toggle { width: 44px; height: 26px; border-radius: 999px; border: none; background: var(--color-line); position: relative; cursor: pointer; padding: 0; }
         .toggle.on { background: var(--color-primary); }
-        .toggle-dot { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .15s; }
+        .toggle-dot { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--color-on-primary); transition: transform .15s; }
         .toggle.on .toggle-dot { transform: translateX(18px); }
         .seg3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
         .seg3 button { padding: 9px 0; border-radius: 9px; border: 1px solid var(--color-line); background: var(--color-card-soft, var(--color-bg)); color: var(--color-ink-2); font-size: 0.78rem; font-weight: 700; cursor: pointer; font-family: var(--font-sans); }
-        .seg3 button.on { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
-        .calc-btn { width: 100%; min-height: 48px; border: none; border-radius: 12px; background: var(--color-primary); color: #fff; font-size: 0.92rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
+        .seg3 button.on { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-on-primary); }
+        .calc-btn { width: 100%; min-height: 48px; border: none; border-radius: 12px; background: var(--color-primary); color: var(--color-on-primary); font-size: 0.92rem; font-weight: 800; cursor: pointer; font-family: var(--font-sans); }
         .calc-btn:disabled { opacity: .45; cursor: default; }
         .result-big { font-size: 1.7rem; font-weight: 800; font-family: ui-monospace, monospace; color: var(--color-ink); letter-spacing: -.3px; }
         .result-big.small { font-size: 1.1rem; color: var(--color-ink-2); }

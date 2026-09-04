@@ -478,14 +478,14 @@ export default function AIAdvisor() {
         .realty-banner.entered { background: var(--color-card-soft); border: 1px solid var(--color-line); color: var(--color-ink-2); }
         .realty-banner.entered b { color: var(--color-ink); }
         .realty-banner.none { background: var(--color-warning-soft); border: 1px solid var(--color-warning); color: var(--color-warning-ink); display: flex; align-items: center; gap: 10px; justify-content: space-between; }
-        .realty-cta { flex-shrink: 0; background: var(--color-warning); color: #fff; border: none; border-radius: 10px; padding: 9px 12px; font-family: var(--font-sans); font-size: 0.76rem; font-weight: 800; cursor: pointer; }
+        .realty-cta { flex-shrink: 0; background: var(--color-warning); color: var(--color-on-primary); border: none; border-radius: 10px; padding: 9px 12px; font-family: var(--font-sans); font-size: 0.76rem; font-weight: 800; cursor: pointer; }
         .sub .b { height: 6px; border-radius: 5px; background: rgba(255,255,255,.16); overflow: hidden; }
         .sub .b > i { display: block; height: 100%; border-radius: 5px; }
         .hero-pending { font-size: 1.15rem; font-weight: 800; color: var(--hero-ink); opacity: .8; margin-top: 4px; }
 
         .onboard { background: var(--ob-soft); border-radius: var(--radius-card); padding: 16px 18px; margin-bottom: 16px; }
         .ob-top { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 14px; margin-bottom: 12px; color: var(--ob-ink); }
-        .ob-tag { margin-left: auto; font-size: 11px; font-weight: 800; color: #fff; background: var(--ob); padding: 4px 11px; border-radius: 8px; }
+        .ob-tag { margin-left: auto; font-size: 11px; font-weight: 800; color: var(--color-on-primary); background: var(--ob); padding: 4px 11px; border-radius: 8px; }
         .ob-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 12px; }
         .ob-grid > div { font-size: 12.5px; color: var(--color-ink); }
         .obk { display: block; font-size: 11px; color: var(--ob); font-weight: 700; margin-bottom: 1px; }
@@ -495,7 +495,7 @@ export default function AIAdvisor() {
         .risk { background: var(--color-card); border: 1px solid var(--color-line); border-left: 5px solid var(--color-warning); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 18px 20px; margin-bottom: 16px; }
         .risk-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
         .risk-top .t { font-weight: 800; font-size: 15px; }
-        .risk-badge { margin-left: auto; font-size: 11px; font-weight: 800; color: #fff; background: var(--color-warning); padding: 4px 10px; border-radius: 8px; }
+        .risk-badge { margin-left: auto; font-size: 11px; font-weight: 800; color: var(--color-on-primary); background: var(--color-warning); padding: 4px 10px; border-radius: 8px; }
         .risk-badge.g-낮음 { background: var(--color-success); }
         .risk-badge.g-중간 { background: var(--color-warning); }
         .risk-badge.g-높음 { background: var(--color-danger); }
