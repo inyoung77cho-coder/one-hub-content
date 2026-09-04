@@ -1,10 +1,10 @@
 // [S29-7] 이번 주 회차 카드 — 제목·앱 안 재생(임베드)·3줄 요약·근거 숫자·지난 회차.
 //   ★유튜브로 내보내지 않는다: 앱 안에서 재생하고, "유튜브에서 보기"는 작은 보조 링크만.
 //   회차가 없으면 이 카드를 렌더하지 않음(빈 카드 금지) — 부모가 '쉬어갑니다'를 대신 보여준다.
-export default function EpisodeCard({ ep, past = [], onOpenPast }) {
+export default function EpisodeCard({ ep, past = [], onOpenPast, bare = false }) {
   if (!ep) return null;
   return (
-    <section className="ec">
+    <section className={`ec${bare ? " ec-bare" : ""}`}>
       <div className="ec-badge">📺 이번 주 회차 · {ep.week || ep.date}</div>
       <h2 className="ec-title">{ep.title}</h2>
 
@@ -42,6 +42,7 @@ export default function EpisodeCard({ ep, past = [], onOpenPast }) {
 
       <style jsx>{`
         .ec { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 16px; margin-bottom: 12px; }
+        .ec-bare { background: none; border: 0; border-radius: 0; box-shadow: none; padding: 0; margin-bottom: 0; }
         .ec-badge { font-size: var(--fs-1); font-weight: 800; color: var(--color-primary); }
         .ec-title { font-size: var(--fs-6); font-weight: 800; color: var(--color-ink); margin: 6px 0 12px; line-height: 1.35; word-break: keep-all; }
         .ec-embed { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-md); overflow: hidden; background: var(--color-card-soft); }

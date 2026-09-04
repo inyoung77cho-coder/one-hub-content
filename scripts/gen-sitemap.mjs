@@ -17,6 +17,7 @@ const staticRoutes = [
   { path: '/weekly', changefreq: 'weekly', priority: '0.8' },
   { path: '/blog', changefreq: 'weekly', priority: '0.7' },
   { path: '/story', changefreq: 'monthly', priority: '0.7' },
+  { path: '/episodes', changefreq: 'weekly', priority: '0.7' },
   { path: '/board/realestate', changefreq: 'daily', priority: '0.6' },
   { path: '/strategies', changefreq: 'weekly', priority: '0.6' },
   { path: '/engines', changefreq: 'weekly', priority: '0.6' },
@@ -57,6 +58,7 @@ const entries = [
   ...collect('weekly', '/weekly', { changefreq: 'never', priority: '0.6' }),
   ...collect('blog', '/blog', { changefreq: 'monthly', priority: '0.5' }),
   ...collect('story', '/story', { changefreq: 'weekly', priority: '0.6' }),
+  ...collect('episodes', '/episodes', { changefreq: 'weekly', priority: '0.7' }),
 ];
 
 const xml =

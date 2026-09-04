@@ -9,6 +9,8 @@ import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import Comments from "../../components/Comments";
 import EpisodeCard from "../../components/EpisodeCard"; // [S29-7] 이번 주 회차
+import EpisodeReactions from "../../components/EpisodeReactions"; // [S29-9] 반응·투표
+import ShareButton from "../../components/ShareButton"; // [S29-10] 공유는 공개판(www)으로
 import { buildEpisodeDraft } from "../../lib/episodeDraft"; // [S29-8] 대본 초안
 import { getIsOperator } from "../../lib/isOperator"; // [S29-8] 운영자만
 import { getStoryRegionOverride, setStoryRegionOverride, guessMyDong, guOf, REGIONS } from "../../lib/storyRegion";
@@ -82,7 +84,20 @@ export default function PwaStory({ episodes = [] }) {
 
       {/* [S29-7] 이번 주 회차 — 없으면 '쉬어갑니다'(빈 카드 금지) */}
       {latestEp ? (
-        <EpisodeCard ep={latestEp} past={pastEps} onOpenPast={() => setPastOpen((v) => !v)} />
+        <section className="card">
+          <EpisodeCard ep={latestEp} past={pastEps} onOpenPast={() => setPastOpen((v) => !v)} bare />
+          {/* [S29-9] 회차 → 반응 → (YE에서 댓글) 순서 */}
+          <EpisodeReactions episode={latestEp.slug} />
+          {/* [S29-10] 공유는 공개판(www)으로 — 받는 사람이 로그인 벽을 안 만나게 */}
+          <div className="story-share">
+            <ShareButton
+              title={`${latestEp.title} | ONE-HUB`}
+              text={Array.isArray(latestEp.summary) ? latestEp.summary[0] : ""}
+              url={`https://www.one-hub.kr/episodes/${latestEp.slug}`}
+              label="이 회차 공유"
+            />
+          </div>
+        </section>
       ) : (
         <section className="card"><div className="story-rest">이번 주는 쉬어갑니다 · 아래 <b>지난 이야기</b>를 보세요</div></section>
       )}
@@ -159,6 +174,7 @@ export default function PwaStory({ episodes = [] }) {
       <style jsx>{`
         .story { max-width: 480px; margin: 0 auto; padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
         .story-rest { font-size: var(--fs-3); color: var(--color-ink-2); line-height: 1.6; word-break: keep-all; }
+        .story-share { margin-top: 12px; }
         .story-past-row { font-size: var(--fs-2); color: var(--color-ink-2); padding: 6px 0; border-top: 1px solid var(--color-line); }
         .story-draft-row { font-size: var(--fs-2); color: var(--color-ink-2); line-height: 1.6; padding: 6px 0; border-top: 1px solid var(--color-line); word-break: keep-all; }
         .story-draft-row b { color: var(--color-ink); }
