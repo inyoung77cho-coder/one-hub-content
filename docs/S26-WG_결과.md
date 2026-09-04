@@ -20,8 +20,11 @@
 3. **`pages/pwa/clip.js`** — `?track=&lang=` 이면 **테마 모드**: 레슨(`today?track=&language=`) + 나레이션(`theme-clip`) → `assembleThemeClip`. **AudioPlaylist 재사용(재생목록 하나·다음 한 편만 preload·자동재생 없음)**. 한국어 요약 **토글**(`onehub_clip_kosummary`, 기본 켜짐). `AI 해설` 로 명시(레슨 원문인 척 안 함).
 4. **`pages/pwa/english.js`** — 각 테마 화면 하단에 진입 링크 `🎧 {테마} 전체 듣기 · N편 · {언어} 해설 →` (`/pwa/clip?track=&lang=`).
 
-## 서버(:5005)에서 해야 할 것 — ⚠️ 사용자 배포 + 비용 검증 (이 세션 미배포)
-LLM 비용이 걸린 항목이라(지시서: "비용이 가장 중요"), **서킷브레이커 통과·캐시·비용 확인이 필요해 블라인드로 배포하지 않았습니다.** 아래 엔드포인트를 `onehub-english`(app.main)에 추가하고 배포하면 프론트가 자동으로 브리지를 붙입니다(현재는 레슨만 이어짐 — 안전 저하 상태).
+## 서버(:5005) — ✅ 배포·검증 완료 (2026-09-04, S27 세션)
+`app/api/lessons.py` 에 `@router.get("/theme-clip")` 추가·배포(`onehub-english` restart, active). **`llm.chat_json`(guard+log_usage=비용 서킷브레이커 내장) 경유**, `data/theme_clip/{lang}_{track}_{date}.json` **파일 캐시(테마당 하루 1회)**.
+검증: `economy/en` 1차 생성 ok=True(intro·bridges 2·한국어 요약), 2차 1.8s 캐시(LLM 미호출). 프론트가 이제 실제 목표어 브리지를 받는다.
+
+<details><summary>배포한 라우트(참고)</summary>
 
 ### 추가할 라우트 `/english/theme-clip` (FastAPI, 개념 코드)
 ```python
@@ -59,17 +62,16 @@ def theme_clip(track: str, language: str = "en", level: str = "basic"):
     _THEME_CLIP_CACHE[key] = payload
     return payload
 ```
-- **캐시**는 프로세스 메모리보다 SQLite 테이블(재시작 견딤) 권장. 크론으로 매일 아침 6시(레슨 생성 후) 3테마×2언어 프리생성해 두면 첫 사용자 지연도 없음.
-- 배포: `onehub-autotrade-deploy-gotchas` 원칙(서버서 원본 새로 scp → 편집 → py_compile → `sudo systemctl restart onehub-english` → 백업). :5005 는 이미 개방됨.
-- **검증**: `curl :5005/english/theme-clip?track=economy&language=en` → `ok:true` + 로그에 **하루·테마당 1회** 생성만 찍히는지(같은 날 두 번째 호출은 캐시). 서킷브레이커 트립 시 `ok:false`.
+실제 배포본은 파일 캐시를 씀(SQLite 대신 `data/theme_clip/*.json` — 재시작 견딤, 구현 단순). 첫 사용자가 테마·언어별 하루 첫 조회 시 1회 생성, 이후 캐시. (원하면 아침 6시 레슨 생성 뒤 6조합 프리생성 크론 추가 가능 — 현재는 온디맨드.)
+</details>
 
 ## 합격선 점검
 - [x] 경제·디스플레이·회화 각각에 목표어 해설 클립 진입(테마별 링크 + clip 테마 모드)
 - [x] 브리지가 목표어, 본문은 기존 레슨 오디오 그대로(assembleThemeClip)
 - [x] 생성 실패/미배포 시 레슨만으로 재생(안전 저하) · 자동재생 없음 · `AI 해설` 명시 · 재생목록 하나
 - [x] 설정에서 한국어 요약 끄기(토글)
-- [ ] **나레이션 하루 한 번·테마당 한 번(로그 확인)** — 서버 엔드포인트 배포 후 검증(⚠️ 사용자)
-- [~] 하루 한 클립(S25-10)의 ⑥ 외국어 구간을 이 테마 클립으로 **완전 교체** — 현재는 전용 테마 클립으로 목표어 해설 제공, daily ⑥ 병합은 서버 배포 후 후속(sync 조립을 async 로 바꿔야 함). ⚠️ 후속.
+- [x] **나레이션 하루 한 번·테마당 한 번** — 파일 캐시로 검증(2차 호출 LLM 미호출·1.8s)
+- [~] 하루 한 클립(S25-10)의 ⑥ 외국어 구간을 이 테마 클립으로 **완전 교체** — 현재는 전용 테마 클립으로 목표어 해설 제공, daily ⑥ 병합은 후속(sync 조립을 async 로 바꿔야 함). ⚠️ 후속.
 
 ## 커밋
 - `S26 WG: 테마별 목표어 통합 클립 프론트(clipNarration+clip 테마모드+진입링크). 서버 엔드포인트는 배포용 제공`
