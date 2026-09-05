@@ -32,6 +32,7 @@ import { getSnapshots as getDuelSnapshots } from "../../lib/portfolioDuel"; // [
 import { getTodayDecision, getLedger as getVerdictLedger } from "../../lib/verdictLedger"; // [S23 T-1/T-5] 판단 기록·재등장 판정
 import { getVerdictScorecard } from "../../lib/verdictStats"; // [S24-8] 성적표 상시 진입 요약
 import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S23 T-1] 가격 확보→기록(추천 카드와 공유)
+import { getAllStockPositions } from "../../lib/allHoldings"; // [S30-1] KIS + 직접입력 통합(오늘 화면이 직접입력도 보게)
 import { cachedJson } from "../../lib/quoteCache"; // [S20-3] /api/pwa-ai-daily 중복 GET dedup
 import TraderBadge from "../../components/shared/TraderBadge";
 import AppHeader from "../../components/AppHeader";
@@ -98,6 +99,7 @@ export default function TodayPage({ announcements = [] }) {
   const router = useRouter();
   const [trader] = useTrader();
   const [dash, setDash] = useState(null);
+  const [allPos, setAllPos] = useState(null); // [S30-1] KIS + 직접입력 통합 보유(비동기 — 로드 전엔 KIS만 폴백)
   const [pend, setPend] = useState(null);
   const [feed, setFeed] = useState(null);
   const [ledger, setLedger] = useState(null);
@@ -186,6 +188,8 @@ export default function TodayPage({ announcements = [] }) {
     ]).then(([d, p, L]) => {
       setDash(d); setPend(p); setLedger(L); setAt(new Date()); // [S23 T-8] re/feed 는 부동산 화면 지연 로드로 이동
       setStatus(d || L ? "ok" : "error");
+      // [S30-1/2] KIS + 직접입력 통합(직접입력 시세·등락은 여기서 채움). dash 를 넘겨 요청 중복 방지.
+      getAllStockPositions(tr, { dash: d }).then((ap) => setAllPos(ap)).catch(() => {});
       // [S20-3] 총자산이 유효할 때만 오늘치 스냅샷 적립 후 전일 대비 계산(assets.js 와 동일 규칙).
       if (L && L.ok && L.total_uk != null) { recordAssetSnapshot(tr, L); setAssetDelta(getAssetDelta(tr)); }
     });
@@ -268,8 +272,11 @@ export default function TodayPage({ announcements = [] }) {
     setNewRegions([]);
   }, []);
 
-  const positions = parsePositions(dash);
+  // [S30-1] 통합 보유(KIS+직접입력) 로드 후엔 그걸, 로드 전엔 KIS만 폴백(KIS 사용자 무깜빡·무회귀).
+  const positions = allPos != null ? allPos : parsePositions(dash);
   const pendItems = pend?.ok ? (pend.items ?? []) : [];
+  // [S30-1] 직접입력·ETF 임을 배지로 — "내가 넣은 게 여기 있구나". KIS 는 배지 없음(기본).
+  const srcBadge = (src) => src === "manual" ? <span className="sc-src">직접입력</span> : src === "etf" ? <span className="sc-src etf">ETF</span> : null;
 
   // ── 결정 대기: 승인 대기 + 손절선 임박(주식 · 나 vs AI 도메인의 액션 항목)
   const nearStop = positions.filter((p) => {
@@ -423,6 +430,21 @@ export default function TodayPage({ announcements = [] }) {
   // [S23 T-1/T-5] '할 일' = 판단을 요구하는 주식 항목만. 각 행에서 그 자리에서 매도/보유/관망을 기록한다.
   //   손절 임박·승인 대기가 판단 대상. 뉴스는 '읽을 거리'로 분리(아래), 알림은 정보 행으로 남긴다.
   const RETRIGGER_DROP_PCT = -4; // 어제 판단 이후 이만큼 더 빠지면 '판단 재검토'로 다시 올린다(하드코딩 상수 단일화)
+  // [S30-2] 당일 급변(deriveUrgency rank 2 = change_1d ≥ 임계) — 손절선·목표가가 없어도 시세만으로 판정.
+  //   ★사슬이 여기서 켜진다: 직접입력 종목이 급변하면 3버튼 판단 목록에 오르고, [보유]/[관망]이 원장에 쌓인다.
+  //   KIS·직접입력 동일 적용(경계 없이 전부 동일). nearStop(손절)·pendItems(AI) 와 code 로 중복 제거됨(todoStock).
+  const spikeActionable = positions
+    .filter((p) => p.code && deriveUrgency(p).rank === 2)
+    .slice(0, 5)
+    .map((p) => {
+      const cur = Number(p.current_price) || 0;
+      const day = Number(p.change_1d);
+      return {
+        kind: "stock", code: p.code, name: p.name, entry: cur > 0 ? cur : null, source: p.source,
+        title: `${p.name}${Number.isFinite(day) ? ` ${pctTxt(day)}` : ""}`,
+        sub: `당일 ${day >= 0 ? "급등" : "급락"} ${Math.abs(day || 0).toFixed(1)}% — 점검 필요`,
+      };
+    });
   const stockActionable = [
     ...nearStop.slice(0, 3).map((p, i) => {
       const sl = Number(p.stop_loss) || 0;
@@ -430,13 +452,14 @@ export default function TodayPage({ announcements = [] }) {
       const breached = sl > 0 && cur > 0 && cur < sl;
       const distPct = sl > 0 && cur > 0 ? (cur / sl - 1) * 100 : null;
       return {
-        kind: "stock", code: p.code, name: p.name, entry: cur > 0 ? cur : null,
+        kind: "stock", code: p.code, name: p.name, entry: cur > 0 ? cur : null, source: p.source,
         title: `${p.name} ${pctTxt(p.pnl_rate)}`,
         sub: breached ? `손절선 ${sl.toLocaleString()}원 이탈 — 매도 검토 필요` : (distPct != null ? `손절선까지 ${Math.abs(distPct).toFixed(1)}% 남음` : "손절 근접"),
       };
     }),
+    ...spikeActionable,
     ...pendItems.slice(0, 3).map((p) => ({
-      kind: "stock", code: p.code, name: p.name || p.stock || p.code, entry: null,
+      kind: "stock", code: p.code, name: p.name || p.stock || p.code, entry: null, source: "kis",
       title: p.name || p.stock || p.code,
       sub: p.reason || "AI 매수 제안 — 매수/관망 판단",
     })),
@@ -639,7 +662,7 @@ export default function TodayPage({ announcements = [] }) {
                   return (
                     <button type="button" className="tds-actrow" key={p.code || i} onClick={() => router.push("/pwa?tab=portfolio")}>
                       <span className="tds-badge" style={{ color: u.color, borderColor: u.color }}>{u.badge}</span>
-                      <span className="tds-nm">{p.name}</span>
+                      <span className="tds-nm">{srcBadge(p.source)}{p.name}</span>
                       <span className="tds-stance" style={{ color: st.color }}>{st.label}</span>
                       <span className="tds-reason">{actionReason(p)}</span>
                     </button>
@@ -866,7 +889,7 @@ export default function TodayPage({ announcements = [] }) {
                 return (
                   <div className={`sc-drow ${t.recheck ? "recheck" : ""}`} key={t.code}>
                     <div className="sc-dbody">
-                      <span className="sc-t">{t.title}</span>
+                      <span className="sc-t">{srcBadge(t.source)}{t.title}</span>
                       {t.sub && <span className="sc-s">{t.sub}</span>}
                       {decErr[t.code] && <span className="sc-err">{decErr[t.code]}</span>}
                     </div>
@@ -1369,6 +1392,9 @@ export default function TodayPage({ announcements = [] }) {
         .sc-row.done .sc-check { background: var(--color-success); border-color: var(--color-success); }
         .sc-body { flex: 1; min-width: 0; text-align: left; background: none; border: none; padding: 0; display: flex; flex-direction: column; gap: 2px; cursor: pointer; font-family: var(--font-sans); }
         .sc-t { font-size: var(--fs-3); font-weight: 800; color: var(--color-ink); }
+        .sc-src { display: inline-block; font-size: var(--fs-1); font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: var(--radius-sm); padding: 1px 6px; margin-right: 6px; vertical-align: middle; }
+        .sc-src.etf { color: var(--color-warning-ink, var(--color-warning)); background: var(--color-warning-soft, var(--color-card-soft)); }
+        .tds-nm .sc-src { font-size: 10px; padding: 0 5px; margin-right: 4px; }
         .sc-s { font-size: var(--fs-2); color: var(--color-ink-2); word-break: keep-all; line-height: 1.4; }
         .sc-row.done .sc-t, .sc-row.done .sc-s { text-decoration: line-through; color: var(--color-ink-3); }
 

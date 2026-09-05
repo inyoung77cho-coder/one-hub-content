@@ -57,7 +57,12 @@ async function fromYahoo(ysym) {
   }
   if (!Number.isFinite(price) || price <= 0) return null;
   const date = ts ? new Date(ts * 1000).toISOString().slice(0, 10) : null;
-  return { price, date, currency: meta?.currency || null, marketState: state || null };
+  // [S30-2] 전일 종가 — meta.chartPreviousClose(정규장 기준 전일 종가) 우선. 등락률 계산용.
+  //   추가 요청 없이 이미 받은 range=5d 응답의 meta 에서 그대로 읽는다.
+  let prevClose = Number(meta?.chartPreviousClose);
+  if (!Number.isFinite(prevClose) || prevClose <= 0) prevClose = Number(meta?.previousClose);
+  if (!Number.isFinite(prevClose) || prevClose <= 0) prevClose = null;
+  return { price, date, currency: meta?.currency || null, marketState: state || null, prevClose };
 }
 
 // 단일 티커 해석 — Yahoo(시간외 포함) 1차, Stooq 폴백. { price, currency, date, symbol, source } | null
@@ -88,7 +93,7 @@ async function resolveOne(rawIn, market) {
     try { q = await fromStooq(stooqSym); if (q) source = "stooq.com"; } catch (e) { /* graceful */ }
   }
   if (!q) return null;
-  return { price: q.price, currency: q.currency || ccy, date: q.date, symbol: stooqSym, source, ticker: raw.toUpperCase() };
+  return { price: q.price, currency: q.currency || ccy, date: q.date, prevClose: q.prevClose ?? null, symbol: stooqSym, source, ticker: raw.toUpperCase() };
 }
 
 export default async function handler(req, res) {
@@ -101,7 +106,7 @@ export default async function handler(req, res) {
     const quotes = {};
     await Promise.all(list.map(async (tk) => {
       const one = await resolveOne(tk, market);
-      if (one) quotes[one.ticker] = { price: one.price, currency: one.currency, date: one.date, source: one.source };
+      if (one) quotes[one.ticker] = { price: one.price, currency: one.currency, date: one.date, prevClose: one.prevClose ?? null, source: one.source };
     }));
     // [S21-7] 부분 실패를 조용히 넘기지 않도록 못 가져온 티커를 missing 으로 알린다.
     //   키 정규화는 resolveOne 과 동일(소문자·영숫자/점만·대문자). 클라는 missing 만 개별 재조회한다.
@@ -122,7 +127,7 @@ export default async function handler(req, res) {
     res.setHeader("Cache-Control", "s-maxage=300, stale-while-revalidate=900");
     return res.status(200).json({
       ok: true, ticker: one.ticker, symbol: one.symbol,
-      price: one.price, currency: one.currency, date: one.date, source: one.source,
+      price: one.price, currency: one.currency, date: one.date, prevClose: one.prevClose ?? null, source: one.source,
     });
   }
   return res.status(200).json({ ok: false, ticker: raw0.toUpperCase(), error: "시세 소스 연결 실패(Yahoo·Stooq)" });

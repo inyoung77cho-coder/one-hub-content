@@ -4,8 +4,9 @@
 //   ★ 시세는 이 컴포넌트가 직접 조회한다(lib/stockLive) — 부모마다 다른 값을 넘겨 두 화면의
 //     숫자가 갈라지는 일을 막기 위해서다. 저장/삭제 후에는 즉시 재조회한다.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getStockHoldings, removeStock } from "../../lib/stockHoldings";
+import { getStockHoldings, removeStock, setStockRisk, dismissStopHint } from "../../lib/stockHoldings";
 import { fetchStockQuotes } from "../../lib/stockLive";
+import { suggestStop, suggestTarget, RISK_DEFAULTS } from "../../lib/allHoldings";
 import { StockForm } from "./AssetForms";
 
 export default function ManualHoldingsCard({ trader = "A", onChanged }) {
@@ -14,6 +15,9 @@ export default function ManualHoldingsCard({ trader = "A", onChanged }) {
   const [tick, setTick] = useState(0);
   const [quotes, setQuotes] = useState({});
   const [confirmId, setConfirmId] = useState(null);
+  const [riskId, setRiskId] = useState(null);   // [S30-3] 손절·목표 편집 중인 종목
+  const [slVal, setSlVal] = useState("");
+  const [tgVal, setTgVal] = useState("");
   const alive = useRef(true);
 
   useEffect(() => { setMounted(true); return () => { alive.current = false; }; }, []);
@@ -37,6 +41,23 @@ export default function ManualHoldingsCard({ trader = "A", onChanged }) {
     try { window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {}
     if (onChanged) onChanged();
   }, [onChanged]);
+
+  // [S30-3] 손절선·목표가 — 선택 입력. 앱이 자동으로 채우지 않는다(버튼을 눌러야 들어간다).
+  const openRisk = (h) => {
+    if (riskId === h.id) { setRiskId(null); return; }
+    setRiskId(h.id);
+    setSlVal(h.stopLoss != null ? String(h.stopLoss) : "");
+    setTgVal(h.target != null ? String(h.target) : "");
+  };
+  const saveRisk = (h) => {
+    setStockRisk({ id: h.id, stopLoss: slVal === "" ? null : Number(slVal), target: tgVal === "" ? null : Number(tgVal), trader });
+    setRiskId(null); changed();
+  };
+  const applySuggest = (h) => {
+    setStockRisk({ id: h.id, stopLoss: suggestStop(h.avgPrice), target: suggestTarget(h.avgPrice), trader });
+    setRiskId(null); changed();
+  };
+  const dismiss = (h) => { dismissStopHint({ id: h.id, trader }); changed(); };
 
   const del = (h) => {
     if (confirmId !== h.id) {
@@ -115,6 +136,36 @@ export default function ManualHoldingsCard({ trader = "A", onChanged }) {
                 >
                   {confirmId === h.id ? "삭제?" : "✕"}
                 </button>
+
+                {/* [S30-3] 손절선·목표가 — 오늘 화면 '손절 임박/익절 검토' 판정에 쓰인다. 선택 입력. */}
+                <div className="mhc-risk">
+                  {(h.stopLoss != null || h.target != null) ? (
+                    <span className="mhc-risk-set">
+                      {h.stopLoss != null && <>손절 <b>{Number(h.stopLoss).toLocaleString()}{isUsd ? "" : "원"}</b></>}
+                      {h.stopLoss != null && h.target != null && " · "}
+                      {h.target != null && <>목표 <b>{Number(h.target).toLocaleString()}{isUsd ? "" : "원"}</b></>}
+                      <button type="button" className="mhc-risk-edit" onClick={() => openRisk(h)}>{riskId === h.id ? "닫기" : "수정"}</button>
+                    </span>
+                  ) : h.stopHintDismissed ? (
+                    <button type="button" className="mhc-risk-edit" onClick={() => openRisk(h)}>＋ 손절·목표 설정</button>
+                  ) : (
+                    <span className="mhc-risk-hint">
+                      손절선을 정해두면 가까워졌을 때 오늘 화면에서 알려드립니다
+                      <span className="mhc-risk-btns">
+                        {buy > 0 && <button type="button" className="mhc-risk-b primary" onClick={() => applySuggest(h)}>평단 {RISK_DEFAULTS.stopPct}%로 설정</button>}
+                        <button type="button" className="mhc-risk-b" onClick={() => openRisk(h)}>직접 입력</button>
+                        <button type="button" className="mhc-risk-b ghost" onClick={() => dismiss(h)}>안 할래요</button>
+                      </span>
+                    </span>
+                  )}
+                  {riskId === h.id && (
+                    <div className="mhc-risk-edit-box">
+                      <label>손절선<input type="number" inputMode="decimal" value={slVal} onChange={(e) => setSlVal(e.target.value)} placeholder={buy > 0 ? String(suggestStop(h.avgPrice)) : "선택"} /></label>
+                      <label>목표가<input type="number" inputMode="decimal" value={tgVal} onChange={(e) => setTgVal(e.target.value)} placeholder={buy > 0 ? String(suggestTarget(h.avgPrice)) : "선택"} /></label>
+                      <button type="button" className="mhc-risk-b primary" onClick={() => saveRisk(h)}>저장</button>
+                    </div>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -131,7 +182,19 @@ export default function ManualHoldingsCard({ trader = "A", onChanged }) {
         .mhc-empty { font-size: 0.76rem; color: var(--color-ink-3); line-height: 1.6; }
         .mhc-list { display: flex; flex-direction: column; gap: 8px; }
         /* 2행 그리드: 1행 = 종목명 + 삭제, 2행 = 숫자(전체 폭). 좁은 폭에서도 칸이 짓눌리지 않는다. */
-        .mhc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name del" "nums nums"; align-items: center; column-gap: 8px; row-gap: 6px; background: var(--color-card-soft, var(--inset-bg, rgba(0,0,0,.02))); border: 1px solid var(--color-line); border-radius: 12px; padding: 9px 11px; }
+        .mhc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name del" "nums nums" "risk risk"; align-items: center; column-gap: 8px; row-gap: 6px; background: var(--color-card-soft, var(--inset-bg, rgba(0,0,0,.02))); border: 1px solid var(--color-line); border-radius: 12px; padding: 9px 11px; }
+        .mhc-risk { grid-area: risk; display: flex; flex-direction: column; gap: 6px; border-top: 1px dashed var(--color-line); padding-top: 7px; }
+        .mhc-risk-set { font-size: 0.7rem; color: var(--color-ink-3); font-variant-numeric: tabular-nums; }
+        .mhc-risk-set b { color: var(--color-ink); font-weight: 800; }
+        .mhc-risk-hint { font-size: 0.7rem; color: var(--color-ink-3); line-height: 1.5; word-break: keep-all; }
+        .mhc-risk-btns { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+        .mhc-risk-b { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); font-size: 0.68rem; font-weight: 700; padding: 4px 9px; border-radius: 999px; cursor: pointer; font-family: var(--font-sans); }
+        .mhc-risk-b.primary { border-color: var(--color-primary); background: var(--color-primary); color: var(--color-on-primary, #fff); }
+        .mhc-risk-b.ghost { color: var(--color-ink-3); }
+        .mhc-risk-edit { margin-left: 8px; border: none; background: none; color: var(--color-primary); font-size: 0.68rem; font-weight: 700; cursor: pointer; text-decoration: underline; font-family: var(--font-sans); }
+        .mhc-risk-edit-box { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px; }
+        .mhc-risk-edit-box label { display: flex; flex-direction: column; gap: 3px; font-size: 0.66rem; font-weight: 700; color: var(--color-ink-3); }
+        .mhc-risk-edit-box input { width: 96px; border: 1px solid var(--color-line); border-radius: 8px; padding: 6px 8px; font-size: 0.74rem; font-family: inherit; background: var(--color-card); color: var(--color-ink); }
         .mhc-row.anom { border-color: var(--color-warning); }
         .mhc-l { grid-area: name; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
         .mhc-name { font-size: 0.82rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
