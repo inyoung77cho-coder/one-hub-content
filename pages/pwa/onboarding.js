@@ -2,7 +2,7 @@
 //   §5② 배선: 성향 결과 → 목표 자산배분(%)을 localStorage(onehub_target_alloc)에 저장하여
 //   AI자산운영 탭의 "목표 %" 단일 소스로 사용한다. 완료 시 홈으로 이동.
 //   색상은 디자인 토큰(var(--…))만 사용. 다크모드는 <html data-theme>.
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { setTargetClass, CLASS_PRESETS } from "../../lib/targetClass"; // [S22-4] 자산군 목표 배분 프리셋
 import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S30-6] 온보딩 마지막 첫 판단(공용 함수)
@@ -48,7 +48,20 @@ export default function Onboarding() {
   const [customRE, setCustomRE] = useState({ name: "", area: "", price: "" });
   const [customOpen, setCustomOpen] = useState(false);
   const [cashInput, setCashInput] = useState(""); // 보유 현금(억)
+  const [fromEstimate, setFromEstimate] = useState(null); // [S31-3] 공개 도구 유입(방금 본 단지)
   const USD_FX = 1350; // ETF($) 환산 환율(근사)
+
+  // [S31-3] 공개 도구(estimate)에서 넘어왔으면 그 단지를 이어서 채워준다("방금 본 그 단지").
+  useEffect(() => {
+    try {
+      const f = JSON.parse(localStorage.getItem("onehub_from") || "null");
+      if (f && f.from === "estimate" && f.apt) {
+        setFromEstimate(f);
+        setCustomRE((c) => (c.name ? c : { ...c, name: f.apt }));
+        setCustomOpen(true);
+      }
+    } catch (e) {}
+  }, []);
 
   const alloc = personality.goal ? ALLOC_MAP[personality.goal] : null;
   const num = (v) => { const n = Number(String(v).replace(/[,\s]/g, "")); return isFinite(n) ? n : 0; };
@@ -150,6 +163,13 @@ export default function Onboarding() {
       markFunnel("signup", tr); // 온보딩까지 왔으면 가입은 이미 일어남(미기록 대비 보강)
       markFunnel("onboard_done", tr);
       if (stockList.length > 0 || etfList.length > 0) markFunnel("first_holding", tr);
+      // [S31-3] 공개 도구 유입 전환 — 1회만(플래그 소비). 서버 카운터 +1 + per-user 관문.
+      if (fromEstimate) {
+        markFunnel("public_tool_view", tr);
+        markFunnel("public_tool_signup", tr);
+        fetch("/api/pwa/public-signup", { method: "POST" }).catch(() => {});
+        try { localStorage.removeItem("onehub_from"); } catch (e) {}
+      }
     } catch (e) {}
     router.push("/pwa");
   };
@@ -180,6 +200,9 @@ export default function Onboarding() {
           {/* STEP 0 — WELCOME */}
           {step === 0 && (
             <div className="step">
+              {fromEstimate && (
+                <div className="from-note">📍 방금 보신 <b>{fromEstimate.apt}</b>을(를) 이어서 넣어드릴게요 · 부동산 단계에 미리 채워뒀어요</div>
+              )}
               <h1>3가지만 넣으면<br /><em>내 자산으로 판단</em>합니다</h1>
               <p className="lead">지금 보이는 건 샘플이에요. 내 주식·ETF·부동산과 투자 성향을 넣으면, AI가 당신에게 맞는 자산 배분과 리밸런싱을 계산해 드립니다. 각 30초면 충분해요.</p>
               <div className="why">
@@ -540,6 +563,8 @@ export default function Onboarding() {
         .cmp-tgt { position: absolute; top: 0; height: 100%; width: 3px; background: var(--color-ink); }
         .cmp-val { width: 92px; text-align: right; font-size: var(--fs-2); font-weight: 600; color: var(--color-ink-2); }
         .cmp-note { font-size: var(--fs-2); color: var(--color-ink-3); margin-top: 12px; line-height: 1.5; }
+        .from-note { background: var(--color-primary-soft); color: var(--color-ink-2); border-radius: var(--radius-md, 12px); padding: 11px 13px; font-size: var(--fs-2, 13px); line-height: 1.5; margin-bottom: 14px; word-break: keep-all; }
+        .from-note b { color: var(--color-primary); }
         .fv { border: 1px solid var(--color-primary); }
         .fv-t { font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-3); }
         .fv-q { font-size: var(--fs-4); font-weight: 700; color: var(--color-ink); margin: 4px 0 12px; word-break: keep-all; }

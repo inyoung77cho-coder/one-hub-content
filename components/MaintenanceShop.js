@@ -55,6 +55,10 @@ export default function MaintenanceShop() {
           ) : (
             <div className="ms-foot" style={{ marginTop: 6 }}>아직 이탈 구간을 판단할 데이터가 부족합니다.</div>
           )}
+          {/* [S31-3] 공개 도구(로그인 밖) 조회·전환 — 익명 서버 카운터 */}
+          {funnel.public && (
+            <div className="ms-fpub">🌐 공개 도구 조회 <b>{funnel.public.tool_view}</b> · 가입 전환 <b>{funnel.public.tool_signup}</b></div>
+          )}
           <div className="ms-fsync">user_state 마지막 동기화: {syncAgo(funnel.last_sync)}</div>
         </div>
       )}
@@ -124,6 +128,8 @@ export default function MaintenanceShop() {
         .ms-fdrop { margin-top: 10px; font-size: var(--fs-2); color: var(--color-ink-2); word-break: keep-all; }
         .ms-fdrop b { color: var(--color-danger, #dc2626); }
         .ms-fsync { margin-top: 8px; font-size: var(--fs-1); color: var(--color-ink-3); }
+        .ms-fpub { margin-top: 8px; font-size: var(--fs-2); color: var(--color-ink-2); }
+        .ms-fpub b { color: var(--color-ink); font-weight: 800; }
       `}</style>
     </section>
   );

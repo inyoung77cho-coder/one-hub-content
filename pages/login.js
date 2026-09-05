@@ -1,6 +1,7 @@
 // pages/login.js — 로그인 게이트 화면(NI-2/3). 카카오로 로그인한다.
 import Head from "next/head";
 import { useRouter } from "next/router";
+import { useEffect } from "react";
 
 export default function Login() {
   const router = useRouter();
@@ -8,6 +9,22 @@ export default function Login() {
   const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/pwa";
   const error = typeof router.query.error === "string" ? router.query.error : "";
   const href = `/api/auth/kakao/start?next=${encodeURIComponent(next)}`;
+
+  // [S31-3] 공개 도구(www)에서 넘어온 유입을 앱 origin 에 저장 — OAuth 왕복 뒤 온보딩이 읽어
+  //   그 단지를 미리 채우고, 가입 전환을 기록한다. 개인정보 아님(단지명·출처만).
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (router.query.from === "estimate") {
+      try {
+        localStorage.setItem("onehub_from", JSON.stringify({
+          from: "estimate",
+          apt: typeof router.query.apt === "string" ? router.query.apt : "",
+          region: typeof router.query.region === "string" ? router.query.region : "",
+          ts: Date.now(),
+        }));
+      } catch (e) {}
+    }
+  }, [router.isReady, router.query.from, router.query.apt, router.query.region]);
 
   return (
     <>
