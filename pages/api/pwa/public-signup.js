@@ -5,9 +5,14 @@ const RE_KEY = process.env.RE_ACCESS_KEY || "";
 
 export default async function handler(req, res) {
   try {
-    await fetch(`${RE_API}/api/v2/public-metric?name=tool_signup${RE_KEY ? `&key=${encodeURIComponent(RE_KEY)}` : ""}`, {
-      method: "POST", headers: { "X-API-Key": RE_KEY }, signal: AbortSignal.timeout(4000),
-    }).catch(() => {});
+    // [출처 분리] src(youtube 등)가 오면 tool_signup(전체)와 tool_signup_<src> 둘 다 +1.
+    const src = String(req.query.src || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16);
+    const names = src ? ["tool_signup", `tool_signup_${src}`] : ["tool_signup"];
+    await Promise.all(names.map((nm) =>
+      fetch(`${RE_API}/api/v2/public-metric?name=${nm}${RE_KEY ? `&key=${encodeURIComponent(RE_KEY)}` : ""}`, {
+        method: "POST", headers: { "X-API-Key": RE_KEY }, signal: AbortSignal.timeout(4000),
+      }).catch(() => {})
+    ));
     return res.status(200).json({ ok: true });
   } catch (e) {
     return res.status(200).json({ ok: false });

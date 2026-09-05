@@ -171,7 +171,9 @@ export default function Onboarding() {
       if (fromEstimate) {
         markFunnel("public_tool_view", tr);
         markFunnel("public_tool_signup", tr);
-        fetch("/api/pwa/public-signup", { method: "POST" }).catch(() => {});
+        // [출처 분리] 공개 도구에서 온 소스(youtube 등)를 전환 카운터에 함께 기록.
+        const src = (fromEstimate.src || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16);
+        fetch(`/api/pwa/public-signup${src ? `?src=${encodeURIComponent(src)}` : ""}`, { method: "POST" }).catch(() => {});
         try { localStorage.removeItem("onehub_from"); } catch (e) {}
       }
     } catch (e) {}

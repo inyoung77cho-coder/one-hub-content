@@ -59,6 +59,14 @@ export default function MaintenanceShop() {
           {funnel.public && (
             <div className="ms-fpub">🌐 공개 도구 조회 <b>{funnel.public.tool_view}</b> · 가입 전환 <b>{funnel.public.tool_signup}</b>{funnel.public.partner_click != null && <> · 제휴 클릭 <b>{funnel.public.partner_click}</b></>}</div>
           )}
+          {/* [출처 분리] ?from=youtube 등 소스별 조회·전환 */}
+          {funnel.public && funnel.public.by_source && (Object.keys(funnel.public.by_source.tool_view || {}).length > 0 || Object.keys(funnel.public.by_source.tool_signup || {}).length > 0) && (
+            <div className="ms-fsrc">
+              {Object.keys({ ...(funnel.public.by_source.tool_view || {}), ...(funnel.public.by_source.tool_signup || {}) }).sort().map((s) => (
+                <span className="ms-fsrc-i" key={s}>· {s}: 조회 <b>{(funnel.public.by_source.tool_view || {})[s] || 0}</b> / 가입 <b>{(funnel.public.by_source.tool_signup || {})[s] || 0}</b></span>
+              ))}
+            </div>
+          )}
           <div className="ms-fsync">user_state 마지막 동기화: {syncAgo(funnel.last_sync)}</div>
         </div>
       )}
@@ -130,6 +138,8 @@ export default function MaintenanceShop() {
         .ms-fsync { margin-top: 8px; font-size: var(--fs-1); color: var(--color-ink-3); }
         .ms-fpub { margin-top: 8px; font-size: var(--fs-2); color: var(--color-ink-2); }
         .ms-fpub b { color: var(--color-ink); font-weight: 800; }
+        .ms-fsrc { margin-top: 4px; font-size: var(--fs-1); color: var(--color-ink-3); display: flex; flex-wrap: wrap; gap: 4px 10px; }
+        .ms-fsrc-i b { color: var(--color-ink-2); font-weight: 800; }
       `}</style>
     </section>
   );

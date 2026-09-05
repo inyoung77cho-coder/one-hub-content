@@ -20,6 +20,7 @@ export default function Login() {
           from: "estimate",
           apt: typeof router.query.apt === "string" ? router.query.apt : "",
           region: typeof router.query.region === "string" ? router.query.region : "",
+          src: typeof router.query.src === "string" ? router.query.src.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16) : "",
           ts: Date.now(),
         }));
       } catch (e) {}

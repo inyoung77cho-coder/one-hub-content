@@ -48,8 +48,13 @@ export default async function handler(req, res) {
     const empty = areas.length === 0 && trend.length === 0;
     // [S31-3] 공개 도구 조회 집계 — 익명·서버 카운터(교차출처라 로컬 불가). fire-and-forget(응답 지연 없음).
     //   CDN 캐시(s-maxage) 덕에 이 함수는 캐시 미스에서만 실행 → 대략 순수 조회만 카운트.
+    //   [출처 분리] ?from=youtube 면 tool_view(전체)와 tool_view_youtube(소스) 둘 다 +1.
     if (!empty) {
-      try { fetch(`${RE_API}/api/v2/public-metric?name=tool_view${RE_KEY ? `&key=${encodeURIComponent(RE_KEY)}` : ""}`, { method: "POST", headers: { "X-API-Key": RE_KEY }, signal: AbortSignal.timeout(3000) }).catch(() => {}); } catch (e) {}
+      const src = String(req.query.from || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16);
+      const names = src ? ["tool_view", `tool_view_${src}`] : ["tool_view"];
+      for (const nm of names) {
+        try { fetch(`${RE_API}/api/v2/public-metric?name=${nm}${RE_KEY ? `&key=${encodeURIComponent(RE_KEY)}` : ""}`, { method: "POST", headers: { "X-API-Key": RE_KEY }, signal: AbortSignal.timeout(3000) }).catch(() => {}); } catch (e) {}
+      }
     }
     // 단지 시세는 하루 단위로 바뀐다 → 같은 단지 재요청이 백엔드까지 안 가게 강한 캐시.
     res.setHeader("Cache-Control", empty
