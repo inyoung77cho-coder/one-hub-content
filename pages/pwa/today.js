@@ -33,6 +33,7 @@ import { getTodayDecision, getLedger as getVerdictLedger } from "../../lib/verdi
 import { getVerdictScorecard } from "../../lib/verdictStats"; // [S24-8] 성적표 상시 진입 요약
 import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S23 T-1] 가격 확보→기록(추천 카드와 공유)
 import { getAllStockPositions, getAllEtfPositions } from "../../lib/allHoldings"; // [S30-1/4] KIS+직접입력 통합·ETF 판단 대상
+import { markFunnel, checkD7Return } from "../../lib/funnel"; // [S30-8] 가입 깔때기 이정표
 import { cachedJson } from "../../lib/quoteCache"; // [S20-3] /api/pwa-ai-daily 중복 GET dedup
 import TraderBadge from "../../components/shared/TraderBadge";
 import AppHeader from "../../components/AppHeader";
@@ -179,6 +180,7 @@ export default function TodayPage({ announcements = [] }) {
 
   const load = useCallback(() => {
     const tr = getTrader();
+    try { markFunnel("signup", tr); checkD7Return(tr); } catch (e) {} // [S30-8] 첫 로드=가입 관문 + 7일 재방문
     setStatus((s) => (dash ? "stale" : "loading"));
     let myProp = null;
     try { myProp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); setMyComplex(myProp?.name || ""); setReMyProp(myProp || null); } catch (e) {}
@@ -190,9 +192,12 @@ export default function TodayPage({ announcements = [] }) {
       setDash(d); setPend(p); setLedger(L); setAt(new Date()); // [S23 T-8] re/feed 는 부동산 화면 지연 로드로 이동
       setStatus(d || L ? "ok" : "error");
       // [S30-1/2] KIS + 직접입력 통합(직접입력 시세·등락은 여기서 채움). dash 를 넘겨 요청 중복 방지.
-      getAllStockPositions(tr, { dash: d }).then((ap) => setAllPos(ap)).catch(() => {});
+      getAllStockPositions(tr, { dash: d }).then((ap) => {
+        setAllPos(ap);
+        try { if ((ap || []).some((p) => p.code)) markFunnel("first_holding", tr); } catch (e) {} // [S30-8] KIS·직접입력 보유 관문
+      }).catch(() => {});
       // [S30-4] ETF 보유도 판단 대상(당일 급변). ETF 시세는 자체 배치(주식과 같은 /api/etf/quote 캐시 공유).
-      getAllEtfPositions(tr).then((ep) => setEtfPos(ep)).catch(() => {});
+      getAllEtfPositions(tr).then((ep) => { setEtfPos(ep); try { if ((ep || []).length) markFunnel("first_holding", tr); } catch (e) {} }).catch(() => {});
       // [S20-3] 총자산이 유효할 때만 오늘치 스냅샷 적립 후 전일 대비 계산(assets.js 와 동일 규칙).
       if (L && L.ok && L.total_uk != null) { recordAssetSnapshot(tr, L); setAssetDelta(getAssetDelta(tr)); }
     });

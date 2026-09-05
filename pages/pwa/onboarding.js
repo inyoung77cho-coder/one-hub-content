@@ -7,6 +7,7 @@ import { useRouter } from "next/router";
 import { setTargetClass, CLASS_PRESETS } from "../../lib/targetClass"; // [S22-4] 자산군 목표 배분 프리셋
 import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S30-6] 온보딩 마지막 첫 판단(공용 함수)
 import { getTrader } from "../../lib/trader";
+import { markFunnel } from "../../lib/funnel"; // [S30-8] 가입 깔때기 이정표
 
 // 성향(goal) → 목표 배분(%) 매핑 — AI자산 목표% 소스
 const ALLOC_MAP = {
@@ -141,7 +142,17 @@ export default function Onboarding() {
     } catch (e) {}
   };
 
-  const finish = () => { persist(); router.push("/pwa"); };
+  const finish = () => {
+    persist();
+    // [S30-8] 이정표 — 온보딩 완료 + (종목/ETF 를 넣었다면) 보유 입력. signup 은 첫 로드에서(_app).
+    try {
+      const tr = getTrader();
+      markFunnel("signup", tr); // 온보딩까지 왔으면 가입은 이미 일어남(미기록 대비 보강)
+      markFunnel("onboard_done", tr);
+      if (stockList.length > 0 || etfList.length > 0) markFunnel("first_holding", tr);
+    } catch (e) {}
+    router.push("/pwa");
+  };
   const go = (n) => { if (n >= 5) persist(); setStep(n); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
 
   return (

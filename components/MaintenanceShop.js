@@ -10,12 +10,26 @@ import EngineProposals from "./EngineProposals";
 export default function MaintenanceShop() {
   const router = useRouter();
   const [data, setData] = useState(null);
+  const [funnel, setFunnel] = useState(null); // [S30-9] 가입 깔때기
   useEffect(() => {
     fetch("/api/pwa/accuracy?trader_id=A")
       .then((r) => r.json())
       .then((d) => setData(d))
       .catch(() => setData({ ok: false }));
+    fetch("/api/pwa/funnel-agg")
+      .then((r) => r.json())
+      .then((d) => setFunnel(d))
+      .catch(() => setFunnel({ ok: false }));
   }, []);
+
+  // [S30-9] 사용자 10명 미만이면 백분율 대신 건수(S29-9 규칙과 동일).
+  const syncAgo = (ts) => {
+    if (!ts) return "기록 없음";
+    const m = Math.floor((Date.now() - Number(ts)) / 60000);
+    if (m < 60) return `${m}분 전`;
+    const h = Math.floor(m / 60);
+    return h < 24 ? `⚠️ ${h}시간째 · 확인 필요` : `⚠️ ${Math.floor(h / 24)}일째 · 확인 필요`;
+  };
 
   const s = data && data.ok ? data.summary : null;
   const cats = data && data.ok ? aggregateByCategory(data.by_reason) : [];
@@ -23,6 +37,27 @@ export default function MaintenanceShop() {
   return (
     <section className="ms">
       <div className="ms-lead">🔧 <b>정비소</b> · 엔진이 지난달보다 나아졌나 · 다음에 무엇을 고칠까 <span className="ms-op">운영자 전용</span></div>
+
+      {/* [S30-9] 가입 깔때기 — 다섯 관문 인원 + 최대 이탈 구간. 10명 미만은 건수(백분율 금지). */}
+      {funnel && funnel.ok && (
+        <div className="ms-card">
+          <div className="ms-h">가입 깔때기 <span className="ms-sub">동기화 사용자 {funnel.users}명 · 건수</span></div>
+          <div className="ms-funnel">
+            {funnel.steps.map((s, i) => (
+              <span key={s} className="ms-fstep">
+                <b>{funnel.counts[s]}</b><i>{funnel.labels[s]}</i>
+                {i < funnel.steps.length - 1 && <span className="ms-farrow">→</span>}
+              </span>
+            ))}
+          </div>
+          {funnel.biggest_drop ? (
+            <div className="ms-fdrop">가장 큰 이탈: <b>{funnel.biggest_drop.from_label} → {funnel.biggest_drop.to_label}</b> ({funnel.biggest_drop.from_n}명 중 {funnel.biggest_drop.drop}명 이탈)</div>
+          ) : (
+            <div className="ms-foot" style={{ marginTop: 6 }}>아직 이탈 구간을 판단할 데이터가 부족합니다.</div>
+          )}
+          <div className="ms-fsync">user_state 마지막 동기화: {syncAgo(funnel.last_sync)}</div>
+        </div>
+      )}
 
       {/* 승인 대기 제안(백테스트·근거·한계 포함) */}
       <EngineProposals />
@@ -81,6 +116,14 @@ export default function MaintenanceShop() {
         .ms-hold { font-size: var(--fs-1); font-weight: 700; color: var(--color-ink-3); }
         .ms-link { margin-top: 12px; width: 100%; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-primary); border-radius: var(--radius-sm); padding: 10px; font-size: var(--fs-3); font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .ms-foot { font-size: var(--fs-1); color: var(--color-ink-3); line-height: 1.55; word-break: keep-all; margin: 0 2px; }
+        .ms-funnel { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 4px 2px; }
+        .ms-fstep { display: inline-flex; align-items: baseline; gap: 4px; }
+        .ms-fstep b { font-size: var(--fs-5); font-weight: 800; color: var(--color-ink); }
+        .ms-fstep i { font-size: var(--fs-1); font-style: normal; color: var(--color-ink-3); }
+        .ms-farrow { color: var(--color-ink-3); margin: 0 4px; }
+        .ms-fdrop { margin-top: 10px; font-size: var(--fs-2); color: var(--color-ink-2); word-break: keep-all; }
+        .ms-fdrop b { color: var(--color-danger, #dc2626); }
+        .ms-fsync { margin-top: 8px; font-size: var(--fs-1); color: var(--color-ink-3); }
       `}</style>
     </section>
   );
