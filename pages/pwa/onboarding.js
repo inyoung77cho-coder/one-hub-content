@@ -9,6 +9,7 @@ import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S30-6] �
 import { getTrader } from "../../lib/trader";
 import { markFunnel } from "../../lib/funnel"; // [S30-8] 가입 깔때기 이정표
 import { setLifeStage, getLifeStage, STAGE_LABEL } from "../../lib/withdrawPlan"; // [S31-4] 생애 단계
+import PartnerCard from "../../components/PartnerCard"; // [S31-6] 증권 계좌 개설 제휴(계약 전 렌더 안 됨)
 
 // 성향(goal) → 목표 배분(%) 매핑 — AI자산 목표% 소스
 const ALLOC_MAP = {
@@ -311,6 +312,8 @@ export default function Onboarding() {
                 </div>
                 <div className="tax-note" style={{ marginTop: 10 }}>💡 입력한 현금은 <b>주식계좌 예수금</b>과 <b>합산</b>되어 총자산 '현금'에 반영됩니다.</div>
               </div>
+              {/* [S31-6] 증권 계좌 개설 제휴 — 계약 전에는 렌더 안 됨(active:false) */}
+              <PartnerCard place="onboarding" />
               <div className="foot"><button className="btn-prev" onClick={() => go(1)}>이전</button><button className="btn-next" onClick={() => go(3)}>다음 →</button></div>
             </div>
           )}

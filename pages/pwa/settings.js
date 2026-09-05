@@ -8,6 +8,7 @@ import Link from "next/link";
 import BottomNav from "../../components/BottomNav";
 import { setTraderGlobal } from "../../lib/trader";
 import QuickAddSheet from "../../components/shared/QuickAddSheet";
+import PartnerCard from "../../components/PartnerCard"; // [S31-6] 증권 계좌 개설 제휴
 import { APP_VERSION, BUILD_STAMP } from "../../lib/version";
 import { logout } from "../../lib/session";
 import ExitScreen from "../../components/ExitScreen";
@@ -354,6 +355,8 @@ export default function Settings() {
               </span>
             </div>
             <div className="hint">매매신호와 리포트를 텔레그램으로도 받습니다. 승인·주문은 앱에서 하세요.</div>
+            {/* [S31-6] 증권 계좌 개설 제휴 — 계약 전에는 렌더 안 됨(active:false) */}
+            <PartnerCard place="settings" />
           </div>
 
           {/* 약관 · 개인정보 · 면책 — 정식 페이지 열람 + 동의 항목 관리 */}

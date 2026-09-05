@@ -37,6 +37,7 @@ import { markFunnel, checkD7Return } from "../../lib/funnel"; // [S30-8] 가입 
 import { getLifeStage, getWithdrawInputs, computeWithdrawPlan } from "../../lib/withdrawPlan"; // [S31-4/5] 생애 단계·인출 계획
 import dynamic from "next/dynamic";
 const WithdrawCard = dynamic(() => import("../../components/WithdrawCard"), { ssr: false }); // [S31-4] 인출 계획(인출 모드만)
+import PartnerCard from "../../components/PartnerCard"; // [S31-6] 제휴(보유0·KIS미연동일 때만·계약 전 렌더 안 됨)
 import { cachedJson } from "../../lib/quoteCache"; // [S20-3] /api/pwa-ai-daily 중복 GET dedup
 import TraderBadge from "../../components/shared/TraderBadge";
 import AppHeader from "../../components/AppHeader";
@@ -634,6 +635,10 @@ export default function TodayPage({ announcements = [] }) {
         {/* [S31-4] 인출기 — 이번 달 인출 계획을 맨 위(order 0). 축적기 사용자에겐 안 뜸(회귀 없음). */}
         {lifeStage === "withdraw" && (
           <div style={{ order: 0 }}><WithdrawCard operatingUk={headUk != null ? headUk : (totalUk != null ? totalUk : null)} /></div>
+        )}
+        {/* [S31-6] 보유 0건(KIS 미연동+직접입력 없음)일 때만 제휴 자리 — 계약 전엔 렌더 안 됨. AI 판단 화면 아님. */}
+        {positions.length === 0 && (
+          <div style={{ order: 2 }}><PartnerCard place="today" compact /></div>
         )}
         {/* [S24-6] 화면 위계 — flex order 로 재배치(JSX 이동 없이): ①요약 ②판단 ③주기훅 ④읽을거리. */}
         {/* [S23 T-6] 주기 훅 — 발동한 날에만(월/월초/분기초/11월) 카드 1장. 매일은 안 뜬다. */}

@@ -57,7 +57,7 @@ export default function MaintenanceShop() {
           )}
           {/* [S31-3] 공개 도구(로그인 밖) 조회·전환 — 익명 서버 카운터 */}
           {funnel.public && (
-            <div className="ms-fpub">🌐 공개 도구 조회 <b>{funnel.public.tool_view}</b> · 가입 전환 <b>{funnel.public.tool_signup}</b></div>
+            <div className="ms-fpub">🌐 공개 도구 조회 <b>{funnel.public.tool_view}</b> · 가입 전환 <b>{funnel.public.tool_signup}</b>{funnel.public.partner_click != null && <> · 제휴 클릭 <b>{funnel.public.partner_click}</b></>}</div>
           )}
           <div className="ms-fsync">user_state 마지막 동기화: {syncAgo(funnel.last_sync)}</div>
         </div>
