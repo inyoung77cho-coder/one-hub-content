@@ -267,6 +267,8 @@ export default function Settings() {
             </div>
             {pushMsg && <div className="msg">{pushMsg}</div>}
             <div className="hint">텔레그램 알림·매매신호·리포트를 폰 푸시로 동시 수신합니다.</div>
+            {/* [S30-7] 주간 리포트가 왜 아직 안 오는지 — 빈 상태를 설명(판단이 쌓여야 시작). */}
+            <div className="hint">📅 주간 리포트는 <b>판단 기록이 쌓이면 월요일 아침</b>에 보내드립니다.</div>
           </div>
 
           {/* 테마 */}

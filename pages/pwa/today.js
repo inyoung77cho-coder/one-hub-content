@@ -688,7 +688,8 @@ export default function TodayPage({ announcements = [] }) {
                 <div className="tds-none">
                   {positions.length > 0
                     ? `${positions.length}종목 모두 유지 구간${nearestToStop != null ? ` · 손절선 최근접 ${nearestToStop.toFixed(1)}%` : ""}`
-                    : "증권사 연동 보유 종목이 없어요 — 조치할 주식이 없습니다."}
+                    : /* [S30-7] 직접 입력 사용자에게 '증권사 연동' 은 틀린 말 — 빠른 입력으로 안내 */
+                      (<button type="button" className="tds-emptylink" onClick={() => router.push("/pwa/input")}>보유 종목을 넣으면 매일 조치할 것을 알려드립니다 → 빠른 입력</button>)}
                 </div>
               )}
               {/* 자산군 확장 — ETF 리밸런싱 · 부동산 대장 대비(주식만이 아닌 3축 통합) */}
@@ -894,8 +895,11 @@ export default function TodayPage({ announcements = [] }) {
                   })}
                   <div className="sc-note-quiet">자세한 근거는 AI 페이지에서 볼 수 있어요.</div>
                 </>
+              ) : positions.length > 0 ? (
+                <div className="sc-empty">오늘은 특별히 할 일이 없어요</div>
               ) : (
-                <div className="sc-empty">{positions.length > 0 ? "오늘은 특별히 할 일이 없어요" : "증권사 계좌를 연동하면 보유 종목의 조치·판단이 여기 올라옵니다."}</div>
+                /* [S30-7] 직접 입력이든 KIS든 — 보유를 넣으면 조치가 올라온다. '증권사 연동' 전제 제거. */
+                <button type="button" className="sc-empty sc-emptylink" onClick={() => router.push("/pwa/input")}>보유 종목을 넣으면 매일 조치·판단이 여기 올라옵니다 → 빠른 입력</button>
               )}
             </div>
           ) : (
@@ -1319,6 +1323,7 @@ export default function TodayPage({ announcements = [] }) {
         .tds-stance { flex-shrink: 0; font-size: var(--fs-2); font-weight: 700; }
         .tds-reason { margin-left: auto; font-size: var(--fs-1); color: var(--color-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
         .tds-none { font-size: var(--fs-2); color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; }
+        .tds-emptylink { border: none; background: none; color: var(--color-primary); font-size: var(--fs-2); font-weight: 700; text-align: left; padding: 0; cursor: pointer; font-family: var(--font-sans); line-height: 1.5; word-break: keep-all; }
         .tds-more { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; padding-top: 8px; border-top: 1px dashed var(--color-line); }
         .tds-morerow { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: none; padding: 0; cursor: pointer; font-family: var(--font-sans); text-align: left; }
         .tds-mk { flex-shrink: 0; font-size: var(--fs-1); font-weight: 800; color: var(--color-ink-2); width: 62px; }
@@ -1364,6 +1369,7 @@ export default function TodayPage({ announcements = [] }) {
         /* ══ 카드3: 오늘의 할 일 · 주식(체크리스트, 매일 자정 초기화) ══ */
         .sc-h { font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); margin-bottom: 10px; }
         .sc-empty { font-size: var(--fs-3); color: var(--color-ink-2); padding: 6px 2px; word-break: keep-all; }
+        .sc-emptylink { display: block; width: 100%; border: none; background: none; color: var(--color-primary); font-weight: 700; text-align: left; cursor: pointer; font-family: var(--font-sans); }
         /* [S23 T-1] 판단 기록 행 */
         .sc-drow { display: flex; align-items: center; gap: 10px; padding: 9px 2px; border-bottom: 1px solid var(--color-line); }
         .sc-drow:last-child { border-bottom: none; }

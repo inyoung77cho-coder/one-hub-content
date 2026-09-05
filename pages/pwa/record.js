@@ -84,7 +84,8 @@ export default function RecordPage() {
             </div>
 
             {sc.scored === 0 ? (
-              <div className="rec-card"><p className="rec-quiet">아직 채점된 판단이 없습니다 — 3거래일이 지나면 결과가 쌓입니다.</p></div>
+              /* [S30-7] 빈 화면이 아니라 '진행 중'임을 보인다 — 기록은 됐고 채점을 기다리는 상태. */
+              <div className="rec-card"><p className="rec-quiet"><b>{sc.total}건</b> 기록됨 · 첫 채점까지 판단 시점부터 3거래일이 지나면 결과가 쌓입니다.</p></div>
             ) : (
               <>
                 {learning && (

@@ -5,6 +5,8 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
 import { setTargetClass, CLASS_PRESETS } from "../../lib/targetClass"; // [S22-4] 자산군 목표 배분 프리셋
+import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S30-6] 온보딩 마지막 첫 판단(공용 함수)
+import { getTrader } from "../../lib/trader";
 
 // 성향(goal) → 목표 배분(%) 매핑 — AI자산 목표% 소스
 const ALLOC_MAP = {
@@ -81,22 +83,38 @@ export default function Onboarding() {
   const pick = (q, val) => setPersonality((p) => ({ ...p, [q]: val }));
 
   const [stockBusy, setStockBusy] = useState(false);
+  // [S30-6] 완료 화면 첫 판단 — 가장 비중 큰(코드 있는) 종목 하나. 건너뛸 수 있음.
+  const [verdictState, setVerdictState] = useState(null); // null=미기록 | "skip" | {label}
+  const [verdictBusy, setVerdictBusy] = useState(false);
+  const firstStock = [...stockList].filter((s) => s.code).sort((a, b) => (b.uk || 0) - (a.uk || 0))[0] || null;
+  const recordFirstVerdict = async (choice) => {
+    if (!firstStock || verdictBusy) return;
+    setVerdictBusy(true);
+    const decision = choice === "hold" ? "take" : "pass";
+    try {
+      await recordDecisionWithPrice({ code: firstStock.code, name: firstStock.name, decision, trader: getTrader(), source: "onboarding", priceHint: firstStock.price || null });
+      setVerdictState({ label: choice });
+    } catch (e) { setVerdictState({ label: choice, err: true }); }
+    setVerdictBusy(false);
+  };
   const addStock = async () => {
     let price = num(stockForm.price);
     let nm = stockForm.name;
+    let code = "";
     // [현재가 자동] 평균 매수가를 비우면 마스터에서 종목을 해석해 현재가로 추정 → 종목+수량만 입력.
-    if (!(price > 0) && nm.trim()) {
+    //   [S30-6] 종목코드도 함께 잡는다 — 완료 화면의 '첫 판단' 기록에 쓴다(코드가 있어야 채점 체인이 붙는다).
+    if (nm.trim()) {
       setStockBusy(true);
       try {
         const d = await fetch(`/api/input/master-search?q=${encodeURIComponent(nm.trim())}`).then((r) => r.json());
         const first = (d?.results || [])[0];
-        if (Number(first?.close_price) > 0) { price = Number(first.close_price); nm = first.name || nm; }
+        if (first) { code = String(first.code || first.symbol || first.ticker || first.종목코드 || "").trim(); nm = first.name || nm; if (!(price > 0) && Number(first.close_price) > 0) price = Number(first.close_price); }
       } catch (e) {}
       setStockBusy(false);
     }
     const uk = uk1(num(stockForm.qty) * price);
     if (uk <= 0 && !stockForm.name) return;
-    setStockList((l) => [...l, { name: nm || "종목", uk }]);
+    setStockList((l) => [...l, { name: nm || "종목", uk, code, price: price || null }]);
     setStockForm({ name: "", qty: "", price: "" });
   };
   const addEtf = () => {
@@ -354,6 +372,31 @@ export default function Onboarding() {
                   <div className="cmp-note">세로선 = 성향 기반 목표 비중. AI 자산운영 탭에서 리밸런싱 플랜이 자동 생성됩니다.</div>
                 </div>
               )}
+              {/* [S30-6] 마지막 첫 판단 — 심판석·주간 리포트가 첫 판단이 있어야 채워진다. 보유 종목 없으면 안 나옴. */}
+              {firstStock && (
+                <div className="card fv">
+                  {verdictState == null ? (
+                    <>
+                      <div className="fv-t">마지막으로 하나만 —</div>
+                      <div className="fv-q">방금 넣은 <b>{firstStock.name}</b>, 지금 어떻게 보시나요?</div>
+                      <div className="fv-btns">
+                        <button className="fv-b hold" disabled={verdictBusy} onClick={() => recordFirstVerdict("hold")}>계속 보유</button>
+                        <button className="fv-b sell" disabled={verdictBusy} onClick={() => recordFirstVerdict("sell")}>줄일까 고민</button>
+                        <button className="fv-b pass" disabled={verdictBusy} onClick={() => recordFirstVerdict("pass")}>관망</button>
+                      </div>
+                      <button className="fv-skip" onClick={() => setVerdictState("skip")}>건너뛰기</button>
+                    </>
+                  ) : verdictState === "skip" ? (
+                    <div className="fv-done quiet">첫 판단은 나중에 오늘 화면에서 남겨도 됩니다.</div>
+                  ) : (
+                    <div className="fv-done">
+                      ✓ 첫 판단이 기록됐습니다
+                      <span className="fv-sub">3거래일 뒤 결과가 채점돼 성적표에 쌓입니다 · 월요일마다 요약을 보내드려요</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* [PP-6] 첫 사용 가이드 — 베타 테스터가 바로 해볼 3가지(실제 기능으로 안내) */}
               <div className="card guide3">
                 <div className="g3-t">🚀 이제 이 3가지부터 해보세요</div>
@@ -486,6 +529,17 @@ export default function Onboarding() {
         .cmp-tgt { position: absolute; top: 0; height: 100%; width: 3px; background: var(--color-ink); }
         .cmp-val { width: 92px; text-align: right; font-size: var(--fs-2); font-weight: 600; color: var(--color-ink-2); }
         .cmp-note { font-size: var(--fs-2); color: var(--color-ink-3); margin-top: 12px; line-height: 1.5; }
+        .fv { border: 1px solid var(--color-primary); }
+        .fv-t { font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-3); }
+        .fv-q { font-size: var(--fs-4); font-weight: 700; color: var(--color-ink); margin: 4px 0 12px; word-break: keep-all; }
+        .fv-btns { display: flex; gap: 8px; }
+        .fv-b { flex: 1; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink); font-size: var(--fs-2); font-weight: 700; padding: 11px 6px; border-radius: var(--radius-md); cursor: pointer; font-family: var(--font-sans); }
+        .fv-b.hold { border-color: var(--color-primary); color: var(--color-primary); }
+        .fv-b:disabled { opacity: .6; }
+        .fv-skip { margin-top: 10px; width: 100%; background: none; border: none; color: var(--color-ink-3); font-size: var(--fs-2); cursor: pointer; font-family: var(--font-sans); text-decoration: underline; }
+        .fv-done { font-size: var(--fs-3); font-weight: 700; color: var(--color-success); display: flex; flex-direction: column; gap: 4px; }
+        .fv-done.quiet { color: var(--color-ink-3); font-weight: 600; }
+        .fv-sub { font-size: var(--fs-1); font-weight: 500; color: var(--color-ink-3); line-height: 1.5; word-break: keep-all; }
         .g3-t { font-size: var(--fs-4); font-weight: 700; margin-bottom: 13px; }
         .g3-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 13px; }
         .g3-list li { display: flex; align-items: flex-start; gap: 11px; }
