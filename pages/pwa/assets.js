@@ -505,7 +505,7 @@ export default function AssetsMapPage() {
                     <span className="ks-cs">{sPct < 100 ? `비중 ${(100 - sPct).toFixed(0)}%` : "—"}</span>
                   </div>
                 </div>
-                <div className="ks-note">증권사(KIS) 연동 계좌 기준입니다. 종목별 상세는 아래 목록에서, 직접입력 보유는 그 아래 카드에서 확인하세요.</div>
+                <div className="ks-note">증권사(KIS) 연동은 <b>계좌 하나</b>를 불러옵니다. <b>다른 증권사·개인연금·퇴직연금·ISA 계좌는 아래 '직접 입력 보유'</b>로 넣으면 종목·계좌 라벨과 함께 총자산·판단에 똑같이 반영됩니다.</div>
               </section>
             );
           })()}
