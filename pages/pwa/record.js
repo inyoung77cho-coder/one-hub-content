@@ -91,6 +91,11 @@ export default function RecordPage() {
                   <div className="rec-note">📚 아직 <b>판단하기 이릅니다</b> — 채점 {sc.scored}건(30건 미만)이라 승패를 단정하지 않고 추이만 보여드립니다.</div>
                 )}
 
+                {/* [S30-5] 관망 중심 사용자에게 성향을 먼저 밝힌다 — 수익률보다 회피율로 보는 게 맞다. */}
+                {sc.tendency === "신중형" && (
+                  <div className="rec-note tend">🧭 당신은 <b>신중형</b>입니다 · 관망 중심 투자자의 성적은 수익률보다 <b>회피율</b>로 보는 편이 맞습니다.</div>
+                )}
+
                 {/* 나 vs AI */}
                 <div className="rec-card">
                   <div className="rec-card-h">나 vs AI <span className="rec-sub">채점 {sc.scored}건 평균</span></div>
@@ -99,7 +104,13 @@ export default function RecordPage() {
                     <div className="rec-vs-c"><span>AI(전부 매매)</span><b className={sc.aiRet > 0 ? "pos" : sc.aiRet < 0 ? "neg" : ""}>{pct(sc.aiRet)}</b></div>
                   </div>
                   {pol.declareWinner ? (
-                    <p className="rec-verdict">{sc.winner === "tie" ? "AI와 막상막하입니다." : sc.winner === "me" ? `내 판단이 AI보다 ${pct(Math.abs(sc.diff))} 앞섭니다.` : `AI가 ${pct(Math.abs(sc.diff))} 앞섭니다.`}</p>
+                    <p className="rec-verdict">
+                      {sc.winner === "tie" ? "AI와 막상막하입니다." : sc.winner === "me" ? `내 판단이 AI보다 ${pct(Math.abs(sc.diff))} 앞섭니다.` : `AI가 ${pct(Math.abs(sc.diff))} 앞섭니다.`}
+                      {/* [S30-5] 절반만 말하지 않는다 — 관망이 피한 손실을 근거로 함께. 위로가 아니라 사실. */}
+                      {sc.winner === "ai" && sc.avoidedCount > 0 && (
+                        <span className="rec-verdict-add"> · 다만 관망 {sc.avoidedCount}건이 평균 {pct(sc.avoidedAvg)} 손실을 피했습니다.</span>
+                      )}
+                    </p>
                   ) : (
                     <p className="rec-verdict quiet">아직 승패를 단정하긴 이릅니다.</p>
                   )}
@@ -109,7 +120,9 @@ export default function RecordPage() {
                 <div className="rec-grid">
                   <div className="rec-kpi"><span>승률</span><b>{sc.winRate == null ? "–" : `${sc.winRate}%`}</b><i>산 건 오르고, 관망한 건 내렸으면 정답</i></div>
                   <div className="rec-kpi"><span>관망 비율</span><b>{sc.passRate == null ? "–" : `${sc.passRate}%`}</b><i>{sc.passRate != null ? `10번 중 ${Math.round(sc.passRate / 10)}번 관망` : ""}</i></div>
-                  <div className="rec-kpi"><span>놓친 수익</span><b className={sc.missedAvg > 0 ? "neg" : ""}>{sc.missedAvg == null ? "–" : pct(sc.missedAvg)}</b><i>관망한 {sc.missedCount}건이 그 뒤 평균만큼 올랐습니다</i></div>
+                  <div className="rec-kpi"><span>놓친 수익</span><b className={sc.missedAvg > 0 ? "neg" : ""}>{sc.missedAvg == null ? "–" : pct(sc.missedAvg)}</b><i>관망 {sc.missedCount}건이 그 뒤 올랐습니다</i></div>
+                  {/* [S30-5] 놓친 수익의 대칭 — 관망이 피한 손실. 관망 채점을 공정하게. */}
+                  <div className="rec-kpi"><span>피한 손실</span><b className={sc.avoidedAvg < 0 ? "pos" : ""}>{sc.avoidedAvg == null ? "–" : pct(sc.avoidedAvg)}</b><i>관망 {sc.avoidedCount}건이 그 뒤 내렸습니다</i></div>
                   <div className="rec-kpi"><span>판단 성향</span><b>{sc.tendency || "–"}</b><i>관망 비율로 본 내 스타일</i></div>
                 </div>
 
@@ -154,7 +167,9 @@ export default function RecordPage() {
         .rec-vs-c { flex: 1; background: var(--inset-bg, var(--color-card-soft, rgba(0,0,0,0.03))); border-radius: var(--radius-sm); padding: 12px; text-align: center; }
         .rec-vs-c span { display: block; font-size: var(--fs-2); color: var(--color-ink-3); margin-bottom: 4px; }
         .rec-vs-c b { font-size: var(--fs-6); font-variant-numeric: tabular-nums; }
+        .rec-note.tend { background: var(--color-primary-soft); }
         .rec-verdict { font-size: var(--fs-3); font-weight: 700; color: var(--color-ink); margin: 10px 0 0; }
+        .rec-verdict-add { font-weight: 600; color: var(--color-ink-2); }
         .rec-verdict.quiet { font-weight: 500; color: var(--color-ink-3); }
         .rec-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         .rec-kpi { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-md); padding: 12px; }

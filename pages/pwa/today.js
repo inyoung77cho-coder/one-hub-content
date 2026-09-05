@@ -32,7 +32,7 @@ import { getSnapshots as getDuelSnapshots } from "../../lib/portfolioDuel"; // [
 import { getTodayDecision, getLedger as getVerdictLedger } from "../../lib/verdictLedger"; // [S23 T-1/T-5] 판단 기록·재등장 판정
 import { getVerdictScorecard } from "../../lib/verdictStats"; // [S24-8] 성적표 상시 진입 요약
 import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S23 T-1] 가격 확보→기록(추천 카드와 공유)
-import { getAllStockPositions } from "../../lib/allHoldings"; // [S30-1] KIS + 직접입력 통합(오늘 화면이 직접입력도 보게)
+import { getAllStockPositions, getAllEtfPositions } from "../../lib/allHoldings"; // [S30-1/4] KIS+직접입력 통합·ETF 판단 대상
 import { cachedJson } from "../../lib/quoteCache"; // [S20-3] /api/pwa-ai-daily 중복 GET dedup
 import TraderBadge from "../../components/shared/TraderBadge";
 import AppHeader from "../../components/AppHeader";
@@ -100,6 +100,7 @@ export default function TodayPage({ announcements = [] }) {
   const [trader] = useTrader();
   const [dash, setDash] = useState(null);
   const [allPos, setAllPos] = useState(null); // [S30-1] KIS + 직접입력 통합 보유(비동기 — 로드 전엔 KIS만 폴백)
+  const [etfPos, setEtfPos] = useState([]); // [S30-4] ETF 보유(판단 대상) — 당일 급변 신호
   const [pend, setPend] = useState(null);
   const [feed, setFeed] = useState(null);
   const [ledger, setLedger] = useState(null);
@@ -190,6 +191,8 @@ export default function TodayPage({ announcements = [] }) {
       setStatus(d || L ? "ok" : "error");
       // [S30-1/2] KIS + 직접입력 통합(직접입력 시세·등락은 여기서 채움). dash 를 넘겨 요청 중복 방지.
       getAllStockPositions(tr, { dash: d }).then((ap) => setAllPos(ap)).catch(() => {});
+      // [S30-4] ETF 보유도 판단 대상(당일 급변). ETF 시세는 자체 배치(주식과 같은 /api/etf/quote 캐시 공유).
+      getAllEtfPositions(tr).then((ep) => setEtfPos(ep)).catch(() => {});
       // [S20-3] 총자산이 유효할 때만 오늘치 스냅샷 적립 후 전일 대비 계산(assets.js 와 동일 규칙).
       if (L && L.ok && L.total_uk != null) { recordAssetSnapshot(tr, L); setAssetDelta(getAssetDelta(tr)); }
     });
@@ -445,7 +448,20 @@ export default function TodayPage({ announcements = [] }) {
         sub: `당일 ${day >= 0 ? "급등" : "급락"} ${Math.abs(day || 0).toFixed(1)}% — 점검 필요`,
       };
     });
+  // [S30-4] ETF 판단 — 손절/목표 대신 '당일 급변'(rank 2)을 주 신호로. 배분 이탈은 오늘 조치의 ETF 리밸런싱 링크로 안내(중복 규칙 안 만듦).
+  const etfActionable = etfPos
+    .filter((p) => p.code && deriveUrgency(p).rank === 2)
+    .slice(0, 3)
+    .map((p) => {
+      const day = Number(p.change_1d);
+      return {
+        kind: "stock", code: p.code, name: p.name, entry: Number(p.current_price) || null, source: "etf",
+        title: `${p.name}${Number.isFinite(day) ? ` ${pctTxt(day)}` : ""}`,
+        sub: `당일 ${day >= 0 ? "급등" : "급락"} ${Math.abs(day || 0).toFixed(1)}% — 비중 점검`,
+      };
+    });
   const stockActionable = [
+    ...etfActionable,
     ...nearStop.slice(0, 3).map((p, i) => {
       const sl = Number(p.stop_loss) || 0;
       const cur = Number(p.current_price) || 0;
@@ -894,11 +910,12 @@ export default function TodayPage({ announcements = [] }) {
                       {decErr[t.code] && <span className="sc-err">{decErr[t.code]}</span>}
                     </div>
                     {rec ? (
-                      <span className="sc-recorded">✓ {rec.label === "sell" ? "매도" : rec.label === "hold" ? "보유" : "관망"} 기록됨 · {rec.at}</span>
+                      <span className="sc-recorded">✓ {(t.source === "etf" ? { sell: "비중 줄임", hold: "유지" } : { sell: "매도", hold: "보유" })[rec.label] || "관망"} 기록됨 · {rec.at}</span>
                     ) : (
                       <div className="sc-decbtns">
-                        <button type="button" className="sc-decb sell" onClick={() => recordTodo(t, "sell")}>매도</button>
-                        <button type="button" className="sc-decb hold" onClick={() => recordTodo(t, "hold")}>보유</button>
+                        {/* [S30-4] ETF 는 [비중 줄임][유지][관망], 주식은 [매도][보유][관망] — 저장은 동일(take/pass) */}
+                        <button type="button" className="sc-decb sell" onClick={() => recordTodo(t, "sell")}>{t.source === "etf" ? "비중 줄임" : "매도"}</button>
+                        <button type="button" className="sc-decb hold" onClick={() => recordTodo(t, "hold")}>{t.source === "etf" ? "유지" : "보유"}</button>
                         <button type="button" className="sc-decb pass" onClick={() => recordTodo(t, "pass")}>관망</button>
                       </div>
                     )}
