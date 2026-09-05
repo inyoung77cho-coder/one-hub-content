@@ -8,6 +8,7 @@ import { setTargetClass, CLASS_PRESETS } from "../../lib/targetClass"; // [S22-4
 import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S30-6] 온보딩 마지막 첫 판단(공용 함수)
 import { getTrader } from "../../lib/trader";
 import { markFunnel } from "../../lib/funnel"; // [S30-8] 가입 깔때기 이정표
+import { setLifeStage, getLifeStage, STAGE_LABEL } from "../../lib/withdrawPlan"; // [S31-4] 생애 단계
 
 // 성향(goal) → 목표 배분(%) 매핑 — AI자산 목표% 소스
 const ALLOC_MAP = {
@@ -49,6 +50,8 @@ export default function Onboarding() {
   const [customOpen, setCustomOpen] = useState(false);
   const [cashInput, setCashInput] = useState(""); // 보유 현금(억)
   const [fromEstimate, setFromEstimate] = useState(null); // [S31-3] 공개 도구 유입(방금 본 단지)
+  const [lifeStage, setLifeStageState] = useState("accumulate"); // [S31-4] 생애 단계
+  const pickStage = (v) => { setLifeStageState(v); try { setLifeStage(v); } catch (e) {} };
   const USD_FX = 1350; // ETF($) 환산 환율(근사)
 
   // [S31-3] 공개 도구(estimate)에서 넘어왔으면 그 단지를 이어서 채워준다("방금 본 그 단지").
@@ -233,6 +236,22 @@ export default function Onboarding() {
                   </div>
                 </div>
               ))}
+              {/* [S31-4] 생애 단계 — 은퇴/인출 층을 위한 질문. 기본 축적(회귀 없음). */}
+              <div className="q">
+                <div className="q-t">4. 언제쯤 이 돈을 쓰기 시작하실 계획인가요?</div>
+                <div className="opts">
+                  {[
+                    { v: "accumulate", t: "아직 한참 남았어요 · 불리는 중", sub: "축적기" },
+                    { v: "transition", t: "5년 안에 은퇴/인출 예정", sub: "전환기" },
+                    { v: "withdraw", t: "이미 이 돈으로 생활합니다", sub: "인출기" },
+                  ].map((o) => (
+                    <button key={o.v} className={`opt ${lifeStage === o.v ? "sel" : ""}`} onClick={() => pickStage(o.v)}>
+                      <span className="opt-label">{o.t}<span className="osub">{o.sub}</span></span>
+                      <span className="check">✓</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               {alloc && (
                 <div className="preview">
                   <div className="pt">✨ 당신의 목표 자산 배분</div>

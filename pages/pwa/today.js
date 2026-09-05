@@ -34,6 +34,9 @@ import { getVerdictScorecard } from "../../lib/verdictStats"; // [S24-8] 성적�
 import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S23 T-1] 가격 확보→기록(추천 카드와 공유)
 import { getAllStockPositions, getAllEtfPositions } from "../../lib/allHoldings"; // [S30-1/4] KIS+직접입력 통합·ETF 판단 대상
 import { markFunnel, checkD7Return } from "../../lib/funnel"; // [S30-8] 가입 깔때기 이정표
+import { getLifeStage, getWithdrawInputs, computeWithdrawPlan } from "../../lib/withdrawPlan"; // [S31-4/5] 생애 단계·인출 계획
+import dynamic from "next/dynamic";
+const WithdrawCard = dynamic(() => import("../../components/WithdrawCard"), { ssr: false }); // [S31-4] 인출 계획(인출 모드만)
 import { cachedJson } from "../../lib/quoteCache"; // [S20-3] /api/pwa-ai-daily 중복 GET dedup
 import TraderBadge from "../../components/shared/TraderBadge";
 import AppHeader from "../../components/AppHeader";
@@ -101,7 +104,9 @@ export default function TodayPage({ announcements = [] }) {
   const [trader] = useTrader();
   const [dash, setDash] = useState(null);
   const [allPos, setAllPos] = useState(null); // [S30-1] KIS + 직접입력 통합 보유(비동기 — 로드 전엔 KIS만 폴백)
-  const [etfPos, setEtfPos] = useState([]); // [S30-4] ETF 보유(판단 대상) — 당일 급변 신호
+  const [etfPos, setEtfPos] = useState([]); // [S30-4] ETF 보유(판단 대상) — 당일 급변
+  const [lifeStage, setLifeStage] = useState("accumulate"); // [S31-4] 생애 단계(인출 모드면 상단이 바뀜)
+  useEffect(() => { try { setLifeStage(getLifeStage()); } catch (e) {} }, []);
   const [pend, setPend] = useState(null);
   const [feed, setFeed] = useState(null);
   const [ledger, setLedger] = useState(null);
@@ -364,7 +369,16 @@ export default function TodayPage({ announcements = [] }) {
     if (classMsg && classMsg.tone === "warn") etfRebalMsg = classMsg.text;
   } catch (e) {}
   // [S23 T-6] 주간·월간·분기 훅 — 발동한 날에만 카드 1장. 기존 소스만 사용, 데이터 없으면 빈 배열.
-  const cadenceHooks = (() => { try { return getTodayCadence({ trader, opClass, engine }); } catch (e) { return []; } })();
+  // [S31-5] 인출기면 커버율·지속연수를 월초 훅으로(월 1회). 축적기엔 withdraw=null(회귀 없음).
+  const withdrawCadence = (() => {
+    if (lifeStage !== "withdraw") return null;
+    try {
+      const w = getWithdrawInputs();
+      const plan = computeWithdrawPlan({ operatingUk: headUk != null ? headUk : totalUk, monthlyExpense: Number(w.expense) || 0, monthlyPension: Number(w.pension) || 0, monthlyDividend: Number(w.dividend) || 0 });
+      return { stage: "withdraw", coverRate: plan.coverRate, years: plan.years };
+    } catch (e) { return null; }
+  })();
+  const cadenceHooks = (() => { try { return getTodayCadence({ trader, opClass, engine, withdraw: withdrawCadence }); } catch (e) { return []; } })();
   // ── 행3: AI 변화 한 줄(AI 탭과 동일 규칙 — lib/aiFreshness)
   const aiFreshness = computeAiFreshness(aiDaily, dash);
   // ── 대결 결과 배너 — 오늘 스냅샷이 찍힌 날에만 노출(없으면 렌더 안 함).
@@ -617,6 +631,10 @@ export default function TodayPage({ announcements = [] }) {
 
         {/* ══ "오늘의 대결" — 카드1(대결) · 카드2(주식 뉴스) · 카드3(주식 할일) 3장으로 통일 ══ */}
         {view === 0 && (<div className="td-v0">
+        {/* [S31-4] 인출기 — 이번 달 인출 계획을 맨 위(order 0). 축적기 사용자에겐 안 뜸(회귀 없음). */}
+        {lifeStage === "withdraw" && (
+          <div style={{ order: 0 }}><WithdrawCard operatingUk={headUk != null ? headUk : (totalUk != null ? totalUk : null)} /></div>
+        )}
         {/* [S24-6] 화면 위계 — flex order 로 재배치(JSX 이동 없이): ①요약 ②판단 ③주기훅 ④읽을거리. */}
         {/* [S23 T-6] 주기 훅 — 발동한 날에만(월/월초/분기초/11월) 카드 1장. 매일은 안 뜬다. */}
         {cadenceHooks.length > 0 && (
