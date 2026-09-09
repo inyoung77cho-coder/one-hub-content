@@ -7,6 +7,8 @@ const TARGETS = [
   { name: "engine",     url: process.env.ENGINE_API_URL || "http://54.180.54.132:5001", critical: true },
   { name: "realestate", url: process.env.RE_API_URL     || "http://54.180.54.132:5002", critical: false },
   { name: "etf",        url: process.env.ETF_API_URL    || "http://54.180.54.132:5003", critical: false },
+  // [S33-4] news(:5004) 추가 — 오늘 3시간 죽어 있었는데 감시가 못 잡았다. non-critical(앱 핵심은 돎 → 503 아닌 degraded).
+  { name: "news",       url: process.env.NEWS_API_URL   || "http://54.180.54.132:5004", critical: false },
 ];
 
 async function probe(t) {
