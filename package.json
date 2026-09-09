@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "prebuild": "node scripts/gen-sitemap.mjs",
+    "prebuild": "node scripts/gen-sitemap.mjs && node scripts/gen-weekly-manifest.mjs",
     "build": "next build --webpack",
     "start": "next start",
     "gen:sitemap": "node scripts/gen-sitemap.mjs",

@@ -1,0 +1,566 @@
+{
+  "generatedAt": "2026-09-09T13:02:43.408Z",
+  "made": [
+    {
+      "file": "S33_결과.md",
+      "date": "2026-09-09",
+      "sprint": "S33",
+      "headline": "감시와 복원력"
+    },
+    {
+      "file": "S31-AA_결과.md",
+      "date": "2026-09-06",
+      "sprint": "S31-AA",
+      "headline": "로그인 없이 쓰는 공개 도구"
+    },
+    {
+      "file": "S31-AB_결과.md",
+      "date": "2026-09-06",
+      "sprint": "S31-AB",
+      "headline": "은퇴·인출 축"
+    },
+    {
+      "file": "S31-AC_결과.md",
+      "date": "2026-09-06",
+      "sprint": "S31-AC",
+      "headline": "첫 현금: 증권 계좌 개설 제휴"
+    },
+    {
+      "file": "S31-AD_결과.md",
+      "date": "2026-09-06",
+      "sprint": "S31-AD",
+      "headline": "계좌별 보기 (전제 확인 후 정리)"
+    },
+    {
+      "file": "S29-followup_결과.md",
+      "date": "2026-09-05",
+      "sprint": "S29 후속",
+      "headline": ":5002 배포 검증 + cachedJson 확대"
+    },
+    {
+      "file": "S30-ZA_결과.md",
+      "date": "2026-09-05",
+      "sprint": "S30-ZA",
+      "headline": "오늘 화면이 직접 입력을 보게 (본체)"
+    },
+    {
+      "file": "S30-ZB_결과.md",
+      "date": "2026-09-05",
+      "sprint": "S30-ZB",
+      "headline": "ETF도 판단 대상에 · 관망을 공정하게 채점"
+    },
+    {
+      "file": "S30-ZC_결과.md",
+      "date": "2026-09-05",
+      "sprint": "S30-ZC",
+      "headline": "첫 주에 떠나지 않게 (온보딩 첫 판단 · 빈 화면 다음 걸음)"
+    },
+    {
+      "file": "S30-ZD_결과.md",
+      "date": "2026-09-05",
+      "sprint": "S30-ZD",
+      "headline": "계기판과 마감 (이탈 측정 · 운영자 화면 · 회귀/문구/entitlement)"
+    },
+    {
+      "file": "S26-WA_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S26-WA",
+      "headline": "기반 세우기 (토큰·색 정본·계측기)"
+    },
+    {
+      "file": "S26-WB_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S26-WB",
+      "headline": "부품 제작 (공용 Card · 공용 SegTabs)"
+    },
+    {
+      "file": "S26-WC_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S26-WC",
+      "headline": "내비게이션 통일 (★버그 수정 포함)"
+    },
+    {
+      "file": "S26-WD_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S26-WD",
+      "headline": "오늘 · 종합자산 이관"
+    },
+    {
+      "file": "S26-WE_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S26-WE",
+      "headline": "AI · 듣는 경제 이관 + 듣는 경제 분류 축 전환(S26-11)"
+    },
+    {
+      "file": "S26-WF_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S26-WF",
+      "headline": "ETF · 부동산 이관 + 잔여 페이지 토큰화"
+    },
+    {
+      "file": "S26-WG_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S26-WG",
+      "headline": "테마별 목표어 통합 클립 (S26-12 · 유일한 기능 추가)"
+    },
+    {
+      "file": "S27_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S27",
+      "headline": "서버 작업 2건 (일별 시세 수집 · WG 테마클립 엔드포인트)"
+    },
+    {
+      "file": "S28-XA_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S28-XA",
+      "headline": "원장부터 (엔진 변경 원장 · 정확도 서버 일별 적립)"
+    },
+    {
+      "file": "S28-XB_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S28-XB",
+      "headline": "발굴 (규칙별 성적표 · 제안 생성기)"
+    },
+    {
+      "file": "S28-XC_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S28-XC",
+      "headline": "검증과 사람의 한 칸 (제안 백테스트 · 승인 화면)"
+    },
+    {
+      "file": "S28-XD_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S28-XD",
+      "headline": "화면화 (심판석 ＋ 정비소 · 오늘 페이지 연결)"
+    },
+    {
+      "file": "S28-XE_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S28-XE",
+      "headline": "다른 엔진과 정보 (부동산·ETF 관측 확장 · 신고가 정기 탐색)"
+    },
+    {
+      "file": "S29-YA_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S29-YA",
+      "headline": "성능 (계측기 · 코드 분할 · 요청 지연/캐시)"
+    },
+    {
+      "file": "S29-YB_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S29-YB",
+      "headline": "진입점 (헤더 재배치 · 맥락 검색 · 설정 정리)"
+    },
+    {
+      "file": "S29-YC_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S29-YC",
+      "headline": "이야기 발행 (이번 주 회차 · 발행 초안 · 공개 연재 연결)"
+    },
+    {
+      "file": "S29-YD_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S29-YD",
+      "headline": "이야기 층 2·4 (낮은 문턱 반응 · 공개판 연결)"
+    },
+    {
+      "file": "S29-YE_결과.md",
+      "date": "2026-09-04",
+      "sprint": "S29-YE",
+      "headline": "이야기 층 3 정비 (공지·댓글 정리 · 댓글 저장소 이전)"
+    },
+    {
+      "file": "S24-UA_결과.md",
+      "date": "2026-09-03",
+      "sprint": "S24 UA",
+      "headline": "틀린 숫자부터 (S24-1·2·3)"
+    },
+    {
+      "file": "S24-UB_결과.md",
+      "date": "2026-09-03",
+      "sprint": "S24 UB",
+      "headline": "손에 닿는 느낌 (S24-4·5·6)"
+    },
+    {
+      "file": "S24-UC_결과.md",
+      "date": "2026-09-03",
+      "sprint": "S24 UC",
+      "headline": "조용한 날에도 할 말이 있게 (S24-7·8)"
+    },
+    {
+      "file": "S24-UD_결과.md",
+      "date": "2026-09-03",
+      "sprint": "S24 UD",
+      "headline": "듣기 (S24-9·10)"
+    },
+    {
+      "file": "S24-UE_결과.md",
+      "date": "2026-09-03",
+      "sprint": "S24 UE",
+      "headline": "주기와 보상 (S24-11·12)"
+    },
+    {
+      "file": "S25-VA_결과.md",
+      "date": "2026-09-03",
+      "sprint": "S25 VA",
+      "headline": "AI 페이지를 심판석으로 (S25-1·2·3)"
+    },
+    {
+      "file": "S25-VB_결과.md",
+      "date": "2026-09-03",
+      "sprint": "S25 VB",
+      "headline": "조작감 일관화 (S25-4·5)"
+    },
+    {
+      "file": "S25-VC_결과.md",
+      "date": "2026-09-03",
+      "sprint": "S25 VC",
+      "headline": "현장경제 재편 (S25-6·7)"
+    },
+    {
+      "file": "S25-VD_결과.md",
+      "date": "2026-09-03",
+      "sprint": "S25 VD",
+      "headline": "ETF 심화 (S25-8·9) · 예측 아닌 관찰"
+    },
+    {
+      "file": "S25-VE_결과.md",
+      "date": "2026-09-03",
+      "sprint": "S25 VE",
+      "headline": "하루 한 클립 (S25-10)"
+    },
+    {
+      "file": "S22-10_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S22-10",
+      "headline": "교차 인사이트"
+    },
+    {
+      "file": "S22-1_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S22-1",
+      "headline": "ETF 시세·평단 정합성"
+    },
+    {
+      "file": "S22-2_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S22-2",
+      "headline": "판단 원장 통합"
+    },
+    {
+      "file": "S22-3_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S22-3",
+      "headline": "총자산 곡선 적립"
+    },
+    {
+      "file": "S22-4_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S22-4",
+      "headline": "목표 배분 온보딩"
+    },
+    {
+      "file": "S22-5_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S22-5",
+      "headline": "내 판단 성적표"
+    },
+    {
+      "file": "S22-6_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S22-6",
+      "headline": "주간 리포트"
+    },
+    {
+      "file": "S22-7_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S22-7",
+      "headline": "종합자산 위계 전환"
+    },
+    {
+      "file": "S22-8_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S22-8",
+      "headline": "ETF 세금 달력 (시기 민감)"
+    },
+    {
+      "file": "S22-9_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S22-9",
+      "headline": "부동산 내 집 중심 재구성"
+    },
+    {
+      "file": "S23-TA_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S23 TA",
+      "headline": "오늘 1행을 운용자산으로 (T-2)"
+    },
+    {
+      "file": "S23-TB_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S23 TB",
+      "headline": "세그먼트 탭 + 지연 로드 (T-3 · T-8)"
+    },
+    {
+      "file": "S23-TC_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S23 TC",
+      "headline": "할 일에서 바로 판단 기록 + 할 일 재정의 (T-1 · T-5)"
+    },
+    {
+      "file": "S23-TD_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S23 TD",
+      "headline": "절세 달력 연결 + 곡선 마감 (T-7 · T-4)"
+    },
+    {
+      "file": "S23-TE_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S23 TE",
+      "headline": "주기 훅 + 이야기 축소 (T-6 · T-9)"
+    },
+    {
+      "file": "S23-TF_결과.md",
+      "date": "2026-09-02",
+      "sprint": "S23 TF",
+      "headline": "재방문 측정 (T-10)"
+    },
+    {
+      "file": "S21-1_결과.md",
+      "date": "2026-09-01",
+      "sprint": "S21-1",
+      "headline": "부동산 브리핑 첫 화면에서 분리"
+    },
+    {
+      "file": "S21-2_결과.md",
+      "date": "2026-09-01",
+      "sprint": "S21-2",
+      "headline": "ETF \"보유 ETF가 없어\" 오문구"
+    },
+    {
+      "file": "S21-3_결과.md",
+      "date": "2026-09-01",
+      "sprint": "S21-3",
+      "headline": "오늘 탭 제목 \"오늘의 대결\" → \"오늘의 자산\""
+    },
+    {
+      "file": "S21-4_결과.md",
+      "date": "2026-09-01",
+      "sprint": "S21-4",
+      "headline": "종목 마스터 한글명 (백엔드)"
+    },
+    {
+      "file": "S21-5_결과.md",
+      "date": "2026-09-01",
+      "sprint": "S21-5",
+      "headline": "남은 중복 호출 → cachedJson"
+    },
+    {
+      "file": "S21-6_결과.md",
+      "date": "2026-09-01",
+      "sprint": "S21-6",
+      "headline": "캐시 레이스(세대 카운터)"
+    },
+    {
+      "file": "S21-7_결과.md",
+      "date": "2026-09-01",
+      "sprint": "S21-7",
+      "headline": "배치 부분 실패 무시 해소"
+    },
+    {
+      "file": "S20-1_결과.md",
+      "date": "2026-08-31",
+      "sprint": "S20-1",
+      "headline": "API 호출 정리"
+    },
+    {
+      "file": "S20-2_결과.md",
+      "date": "2026-08-31",
+      "sprint": "S20-2",
+      "headline": "추천 종목명 한/영 혼재 정정"
+    },
+    {
+      "file": "S20-3_결과.md",
+      "date": "2026-08-31",
+      "sprint": "S20-3",
+      "headline": "오늘 탭 1화면 재구성"
+    },
+    {
+      "file": "S16_RESULT.md",
+      "date": "2026-07-17",
+      "sprint": "S16 결과 리포트",
+      "headline": "S16 결과 리포트"
+    },
+    {
+      "file": "S17-0_Part0_결과.md",
+      "date": "2026-07-17",
+      "sprint": "S17-0 Part 0",
+      "headline": "좌표 대조 및 사실 확정"
+    },
+    {
+      "file": "S18_Part5_RECHECK_RESULT.md",
+      "date": "2026-07-17",
+      "sprint": "거래일 재검증 결과 (S18 Part5 E-4)",
+      "headline": "거래일 재검증 결과 (S18 Part5 E-4)"
+    },
+    {
+      "file": "S18_RESULT.md",
+      "date": "2026-07-17",
+      "sprint": "S18 결과 리포트",
+      "headline": "S18 결과 리포트"
+    }
+  ],
+  "workorders": [
+    {
+      "file": "S33_결과.md",
+      "date": "2026-09-09",
+      "sprint": "S33",
+      "title": "S33 긴급 작업지시서 결과 — 감시와 복원력",
+      "batches": [
+        {
+          "id": "HA",
+          "title": "앱이 죽어 보이지 않게 (프론트)"
+        },
+        {
+          "id": "HB",
+          "title": "밖에서 보는 감시"
+        },
+        {
+          "id": "HC",
+          "title": "서버 (Lightsail)"
+        }
+      ],
+      "firstItem": "백엔드 장애 전역 감지 + 정직한 배너"
+    },
+    {
+      "file": "S33_긴급_작업지시서.md",
+      "date": "2026-09-09",
+      "sprint": "S33 긴급 작업지시서",
+      "title": "S33 긴급 작업지시서 — 감시와 복원력",
+      "batches": [
+        {
+          "id": "HA",
+          "title": "앱이 죽어 보이지 않게 (프론트)"
+        },
+        {
+          "id": "HB",
+          "title": "밖에서 보는 감시"
+        },
+        {
+          "id": "HC",
+          "title": "서버 강화 · ★원인 확정됨"
+        },
+        {
+          "id": "HD",
+          "title": "검증"
+        }
+      ],
+      "firstItem": "백엔드 장애를 전역으로 감지하고 정직하게 말한다"
+    },
+    {
+      "file": "S31_작업지시서.md",
+      "date": "2026-09-06",
+      "sprint": "S31 작업지시서",
+      "title": "S31 작업지시서 — 사람을 들이고, 낼 사람을 열고, 첫 현금",
+      "batches": [],
+      "firstItem": "공개 API 경로"
+    },
+    {
+      "file": "S32_작업지시서.md",
+      "date": "2026-09-06",
+      "sprint": "S32 작업지시서",
+      "title": "S32 작업지시서 — 주간 리포트 제작 자동화",
+      "batches": [
+        {
+          "id": "BA",
+          "title": "주차 데이터 집계"
+        },
+        {
+          "id": "BB",
+          "title": "녹화용 한 화면"
+        },
+        {
+          "id": "BC",
+          "title": "주간 소재 묶음 자동 생성"
+        },
+        {
+          "id": "BD",
+          "title": "발행과 검증"
+        }
+      ],
+      "firstItem": "`lib/weeklyDigest.js` 신설"
+    },
+    {
+      "file": "S30_작업지시서.md",
+      "date": "2026-09-05",
+      "sprint": "S30 작업지시서",
+      "title": "S30 작업지시서 — 문턱 낮추기 + 계기판",
+      "batches": [],
+      "firstItem": "보유 소스 통합"
+    },
+    {
+      "file": "S28_작업지시서.md",
+      "date": "2026-09-04",
+      "sprint": "S28 작업지시서",
+      "title": "S28 작업지시서 — AI 페이지를 정비소로 · 엔진이 스스로 나아지는 고리",
+      "batches": [],
+      "firstItem": "엔진 변경 원장"
+    },
+    {
+      "file": "S29_작업지시서.md",
+      "date": "2026-09-04",
+      "sprint": "S29 작업지시서",
+      "title": "S29 작업지시서 — 이야기를 방송국으로 · 성능과 진입점 정리",
+      "batches": [],
+      "firstItem": "성능 계측기"
+    },
+    {
+      "file": "S24_작업지시서.md",
+      "date": "2026-09-03",
+      "sprint": "S24 작업지시서",
+      "title": "S24 작업지시서 — 앱처럼 · 매일 할 말이 있게",
+      "batches": [],
+      "firstItem": "자산 곡선 절벽 수정 ★가장 급함"
+    },
+    {
+      "file": "S25_작업지시서.md",
+      "date": "2026-09-03",
+      "sprint": "S25 작업지시서",
+      "title": "S25 작업지시서 — AI 페이지를 심판석으로 · 3개 페이지 보완",
+      "batches": [],
+      "firstItem": "정체성 분리"
+    },
+    {
+      "file": "S26_작업지시서.md",
+      "date": "2026-09-03",
+      "sprint": "S26 작업지시서",
+      "title": "S26 작업지시서 — 하나의 앱처럼 보이게 (디자인 시스템 통일)",
+      "batches": [],
+      "firstItem": "토큰 세우기"
+    },
+    {
+      "file": "S22_작업지시서.md",
+      "date": "2026-09-02",
+      "sprint": "S22 작업지시서",
+      "title": "S22 작업지시서 — 사업화 전환",
+      "batches": [],
+      "firstItem": "ETF 시세·평단 정합성"
+    },
+    {
+      "file": "S23_작업지시서.md",
+      "date": "2026-09-02",
+      "sprint": "S23 작업지시서",
+      "title": "S23 작업지시서 — \"오늘\" 페이지: 신문에서 장부로",
+      "batches": [],
+      "firstItem": null
+    },
+    {
+      "file": "S21_handoff.md",
+      "date": "2026-09-01",
+      "sprint": "S21 작업지시서",
+      "title": "S21 작업지시서 — 2차 점검 후속",
+      "batches": [],
+      "firstItem": null
+    }
+  ]
+}

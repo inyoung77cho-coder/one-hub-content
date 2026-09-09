@@ -20,6 +20,8 @@ export default function App({ Component, pageProps }) {
   const router = useRouter();
   const isPWARoute = router.pathname.startsWith("/pwa");
   const isHome = router.pathname === "/"; // 홈은 자체 네이비 nav 사용 → 전역 Nav 숨김
+  // [S32-4] 주간 리포트 녹화 모드 — 촬영에 방해되는 전역 요소(배너·설치유도)를 끈다.
+  const isRecording = router.pathname === "/pwa/weekly-report" && router.query.record === "1";
 
   // [S24-4] PWA 화면 앱 느낌 — 핀치 확대 차단(user-scalable=no). 단 설정의 '화면 확대 허용' 토글로 되살릴 수 있게
   //   런타임 viewport 를 바꾼다(WCAG 1.4.4 탈출구). 마케팅 페이지는 각자 viewport 를 선언하므로 영향 없음.
@@ -112,13 +114,13 @@ export default function App({ Component, pageProps }) {
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="ONE-HUB" />
       </Head>
-      {isPWARoute && <SplashScreen />}
+      {isPWARoute && !isRecording && <SplashScreen />}
       {!isPWARoute && <Nav />}
-      {/* [S33-1] 백엔드 도달 실패(밖에서 안 닿음)를 PWA 전 화면 상단에 먼저 알린다. */}
-      {isPWARoute && <BackendHealthBanner />}
+      {/* [S33-1] 백엔드 도달 실패(밖에서 안 닿음)를 PWA 전 화면 상단에 먼저 알린다. [S32-4] 녹화 중엔 끈다. */}
+      {isPWARoute && !isRecording && <BackendHealthBanner />}
       {/* [S17-0 Part3] 엔진 API 계약 불일치 전용(도달 실패는 위 배너가 전담 — S33-3). */}
-      {isPWARoute && <EngineVersionBanner />}
-      {isPWARoute && <InstallPrompt />}
+      {isPWARoute && !isRecording && <EngineVersionBanner />}
+      {isPWARoute && !isRecording && <InstallPrompt />}
       <Component {...pageProps} />
       <Analytics />
     </BackendHealthProvider>

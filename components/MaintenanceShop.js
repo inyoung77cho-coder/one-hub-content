@@ -38,6 +38,9 @@ export default function MaintenanceShop() {
     <section className="ms">
       <div className="ms-lead">🔧 <b>정비소</b> · 엔진이 지난달보다 나아졌나 · 다음에 무엇을 고칠까 <span className="ms-op">운영자 전용</span></div>
 
+      {/* [S32-3] 주간 리포트 녹화 화면으로 가는 유일한 링크(탭에 넣지 않음) */}
+      <button type="button" className="ms-link" style={{ marginBottom: 12 }} onClick={() => router.push("/pwa/weekly-report")}>🎬 주간 리포트 만들기 · 다섯 블록 한 화면 →</button>
+
       {/* [S30-9] 가입 깔때기 — 다섯 관문 인원 + 최대 이탈 구간. 10명 미만은 건수(백분율 금지). */}
       {funnel && funnel.ok && (
         <div className="ms-card">

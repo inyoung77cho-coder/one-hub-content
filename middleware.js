@@ -31,11 +31,12 @@ const PROTECTED_API_PREFIXES = [
   "/api/ops",         // NI-5: 운영자 전용(사용금액·리소스·트레이더 관리)
   "/api/feedback",    // NI-6: 피드백 제출(로그인 필수, 신원은 서버 세션에서 기록)
   "/api/english",     // [ENG] 매일 영어 — 개인 학습용이라 로그인 뒤에 둔다(오디오 프록시 포함)
+  "/api/weekly/",     // [S32-2] 주간 리포트 다이제스트 — 운영 내부 숫자(운영자 전용, 아래 ADMIN_ONLY_API 도)
 ];
 
 // NI-5-c: 운영자(admin) 전용 — 지인(beta)은 접근 불가(서버 강제).
-const ADMIN_ONLY_PAGES = ["/pwa/system-health", "/pwa/board-admin"];
-const ADMIN_ONLY_API = ["/api/ops"];
+const ADMIN_ONLY_PAGES = ["/pwa/system-health", "/pwa/board-admin", "/pwa/weekly-report"]; // [S32-3] 주간 리포트 화면
+const ADMIN_ONLY_API = ["/api/ops", "/api/weekly/"]; // [S32-2] 주간 다이제스트
 
 function isProtectedApi(path) {
   return PROTECTED_API_PREFIXES.some((p) => path === p || path.startsWith(p));
