@@ -1,6 +1,8 @@
 import "../styles/globals.css";
 import Nav from "../components/Nav";
 import EngineVersionBanner from "../components/EngineVersionBanner";
+import BackendHealthBanner from "../components/BackendHealthBanner"; // [S33-1] 백엔드 도달 실패 전역 배너
+import { BackendHealthProvider } from "../lib/backendHealth";
 import SplashScreen from "../components/SplashScreen";
 import InstallPrompt from "../components/InstallPrompt"; // [S24-4] 홈 화면 추가 유도(3일차 1회)
 import Head from "next/head";
@@ -96,7 +98,7 @@ export default function App({ Component, pageProps }) {
   }, [router.events, router.pathname]);
 
   return (
-    <>
+    <BackendHealthProvider>
       <Head>
         {/* [S24-4] PWA 화면만 앱 뷰포트(핀치 차단·safe-area). 마케팅 페이지는 자체 viewport 로 override. */}
         {isPWARoute && <meta name="viewport" content={vpContent} />}
@@ -112,12 +114,13 @@ export default function App({ Component, pageProps }) {
       </Head>
       {isPWARoute && <SplashScreen />}
       {!isPWARoute && <Nav />}
-      {/* [S17-0 Part3] 엔진 버전·계약 불일치를 PWA 전 화면에서 알린다.
-          한 화면만 정직하면 의미가 없다. 정상이면 아무것도 그리지 않는다. */}
+      {/* [S33-1] 백엔드 도달 실패(밖에서 안 닿음)를 PWA 전 화면 상단에 먼저 알린다. */}
+      {isPWARoute && <BackendHealthBanner />}
+      {/* [S17-0 Part3] 엔진 API 계약 불일치 전용(도달 실패는 위 배너가 전담 — S33-3). */}
       {isPWARoute && <EngineVersionBanner />}
       {isPWARoute && <InstallPrompt />}
       <Component {...pageProps} />
       <Analytics />
-    </>
+    </BackendHealthProvider>
   );
 }

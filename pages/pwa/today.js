@@ -45,6 +45,7 @@ import SegTabs from "../../components/shared/SegTabs";
 import SyncStatus from "../../components/SyncStatus";
 import BottomNav from "../../components/BottomNav";
 import DataState from "../../components/DataState";
+import { saveLastGood, loadLastGood, agoLabel } from "../../lib/lastGood"; // [S33-2] 마지막 값 보존(침묵 금지)
 import LastUpdated from "../../components/LastUpdated";
 import MarketStatusBadge from "../../components/MarketStatusBadge";
 import RotatingPageTitle from "../../components/RotatingPageTitle";
@@ -140,6 +141,8 @@ export default function TodayPage({ announcements = [] }) {
   const [regionDelta, setRegionDelta] = useState(null); // [이야기 탭] 지역별 이야기 건수 증감(참석자 추적 불가 — 건수로 대체, 확인 완료)
   const [newRegions, setNewRegions] = useState([]); // [이야기 탭] REGIONS에 새로 추가된 동(로컬 "본 목록" 대비)
   const [news, setNews] = useState(null); // [뉴스 통합] 오늘의 뉴스 — 부모가 한 번 fetch 해 카테고리별로 나눠 쓴다
+  const [newsStale, setNewsStale] = useState(null); // [S33-2] 마지막 값 표시 중이면 그 시각(ts)
+  const [newsFailed, setNewsFailed] = useState(false); // [S33-2] 못 받아왔고 마지막 값도 없음 → 자리표시자
   const [brief, setBrief] = useState(null); // [시황 브리핑] 텔레그램 "ONE-HUB Market Brief"와 같은 스냅샷 — 대결 탭 카드용
   const [briefOpen, setBriefOpen] = useState(false); // [시황 브리핑] 전체 지표 더보기 토글
   const [newsBrief, setNewsBrief] = useState(null); // [시황 브리핑] 텔레그램 "Today News"/"보유종목 관련 뉴스" 원문 스냅샷
@@ -195,10 +198,16 @@ export default function TodayPage({ announcements = [] }) {
       fetch(`/api/pwa-pending?trader=${tr}`).then((r) => r.json()).catch(() => null),
       getAssetLedger(tr).catch(() => null),
     ]).then(([d, p, L]) => {
-      setDash(d); setPend(p); setLedger(L); setAt(new Date()); // [S23 T-8] re/feed 는 부동산 화면 지연 로드로 이동
-      setStatus(d || L ? "ok" : "error");
+      // [S33-2] 성공하면 저장, 못 받았으면 마지막 값으로 복원 — 빈 화면 대신 마지막 값을 보여준다.
+      //   (전역 배너가 "마지막으로 확인한 값" 이라고 이미 말한다.) 실패를 0/빈값으로 위장하지 않는다.
+      let dd = d, LL = L, fresh = !!(d || L);
+      if (dd) saveLastGood("dash", dd); else { const lg = loadLastGood("dash"); if (lg) dd = lg.data; }
+      if (LL) saveLastGood("ledger", LL); else { const lg = loadLastGood("ledger"); if (lg) LL = lg.data; }
+      setDash(dd); setPend(p); setLedger(LL); setAt(new Date()); // [S23 T-8] re/feed 는 부동산 화면 지연 로드로 이동
+      // 새 값이 하나라도 오면 ok. 새 값은 없지만 마지막 값이 있으면 stale(이전 데이터 표시). 둘 다 없으면 error.
+      setStatus(fresh ? "ok" : (dd || LL) ? "stale" : "error");
       // [S30-1/2] KIS + 직접입력 통합(직접입력 시세·등락은 여기서 채움). dash 를 넘겨 요청 중복 방지.
-      getAllStockPositions(tr, { dash: d }).then((ap) => {
+      getAllStockPositions(tr, { dash: dd }).then((ap) => {
         setAllPos(ap);
         try { if ((ap || []).some((p) => p.code)) markFunnel("first_holding", tr); } catch (e) {} // [S30-8] KIS·직접입력 보유 관문
       }).catch(() => {});
@@ -211,8 +220,19 @@ export default function TodayPage({ announcements = [] }) {
     cachedJson(`/api/pwa-ai-daily?trader=${tr}`).then((d) => { if (d && d.ok) setAiDaily(d); }).catch(() => {});
     fetch(`/api/notifications?trader=${tr}`).then((r) => r.json())
       .then((n) => { if (n?.ok && Array.isArray(n.items)) setNotis(dedupBy(n.items, (x) => x.id ?? `${x.title || ""}|${x.body || ""}|${x.sent_at || x.created_at || ""}`)); }).catch(() => {});
+    // [S33-2] 뉴스: 성공→저장 / 실패→마지막 값+"N시간 전 기준" / 마지막 값도 없으면→자리표시자.
+    //   cachedJson 은 미도달 시 null 을 준다(throw 안 함). ★setNews([]) 로 '못 받아옴'을 '뉴스 없음'으로 위장하지 않는다.
+    const restoreNews = () => {
+      const lg = loadLastGood("news");
+      if (lg && Array.isArray(lg.data)) { setNews(lg.data); setNewsStale(lg.ts); setNewsFailed(false); }
+      else { setNews(null); setNewsFailed(true); }
+    };
     cachedJson(`/api/today/news`) // [S21-5] HoldingsNews 와 같은 URL → 중복 GET dedup
-      .then((d) => { setNews(Array.isArray(d?.items) ? d.items : []); }).catch(() => setNews([]));
+      .then((d) => {
+        if (Array.isArray(d?.items)) { setNews(d.items); setNewsStale(null); setNewsFailed(false); saveLastGood("news", d.items); }
+        else restoreNews();
+      })
+      .catch(restoreNews);
     fetch(`/api/pwa-market-brief`).then((r) => r.json())
       .then((d) => { if (d?.ok && d.brief) setBrief(d.brief); }).catch(() => {});
     fetch(`/api/pwa-today-news-brief`).then((r) => r.json())
@@ -768,9 +788,15 @@ export default function TodayPage({ announcements = [] }) {
         <button type="button" className="card td-readhead td-demote" style={{ order: 5 }} onClick={() => setReadOpen((o) => !o)}>
           <span className="td-readhead-t">📰 읽을 거리</span>
           {(() => { const n = (stockNews?.length || 0) + (brief ? 1 : 0) + (newsBrief ? 1 : 0); return n > 0 ? <span className="td-readhead-n">오늘 {n}건</span> : null; })()}
+          {/* [S33-2] 실패를 '없음'으로 위장하지 않는다 — 마지막 값이면 시각 꼬리표, 못 받았으면 그대로 말한다. */}
+          {newsStale && <span className="td-readhead-stale">{agoLabel(newsStale)}</span>}
+          {newsFailed && <span className="td-readhead-stale">지금 불러오지 못함</span>}
           <span className="td-readhead-x">{readOpen ? "접기 ▲" : "펼치기 ▼"}</span>
         </button>
         {readOpen && (<div style={{ order: 5 }}>
+        {newsFailed && (
+          <section className="card"><div className="td-readfail">읽을 거리를 지금 불러오지 못했습니다 — 잠시 후 다시 시도합니다. <button type="button" className="td-readfail-btn" onClick={load}>다시 시도</button></div></section>
+        )}
 
         {/* 카드1.5 — 시황 브리핑. 텔레그램 "ONE-HUB Market Brief"와 같은 스냅샷을
             /api/pwa-market-brief로 받아 압축 요약. 데이터가 아직 없으면(신규 배포 직후 등)
@@ -1332,6 +1358,9 @@ export default function TodayPage({ announcements = [] }) {
         .td-readhead { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 12px 14px; font-family: var(--font-sans); cursor: pointer; }
         .td-readhead-t { font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); }
         .td-readhead-n { font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-3); }
+        .td-readhead-stale { font-size: var(--fs-1); font-weight: 700; color: var(--color-warning-ink, var(--color-warning)); background: var(--color-warning-soft); border-radius: var(--radius-sm); padding: 2px 7px; }
+        .td-readfail { font-size: var(--fs-2); color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+        .td-readfail-btn { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-primary); border-radius: var(--radius-sm); padding: 5px 11px; font-size: var(--fs-1); font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .td-readhead-x { margin-left: auto; font-size: var(--fs-2); color: var(--color-ink-3); }
         /* [S23 T-6] 주기 훅 카드 */
         .td-cadence { border-left: 3px solid var(--color-primary); padding: 6px 12px; }

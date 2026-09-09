@@ -24,8 +24,10 @@ export default function EngineVersionBanner() {
     cachedJson("/api/version") // [S21-5] FeedbackButton 과 같은 URL → 중복 GET dedup
       .then((d) => {
         if (dead) return;
+        // [S33-3] 도달 실패(ok:false)는 전역 BackendHealthBanner 가 전담한다 — 여기선 조용히.
+        //   과거엔 "엔진 버전을 확인하지 못했습니다"를 띄워 사용자가 '버전 문제'로 오진·신고했다.
         if (!d?.ok) {
-          setState({ kind: "unreachable", msg: "엔진 버전을 확인하지 못했습니다 — 일부 정보가 최신이 아닐 수 있습니다." });
+          setState(null);
           return;
         }
         if (d.api_contract !== EXPECTED_CONTRACT) {
@@ -40,7 +42,8 @@ export default function EngineVersionBanner() {
         setState(null); // 정상 — 조용히 있는다
       })
       .catch(() => {
-        if (!dead) setState({ kind: "unreachable", msg: "엔진 버전을 확인하지 못했습니다 — 일부 정보가 최신이 아닐 수 있습니다." });
+        // [S33-3] 도달 실패는 전역 배너가 전담 — 이 배너는 계약 불일치일 때만 뜬다.
+        if (!dead) setState(null);
       });
     return () => { dead = true; };
   }, []);
