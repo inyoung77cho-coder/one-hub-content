@@ -17,13 +17,28 @@ export default function Estimate() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [src, setSrc] = useState(""); // [출처 분리] ?from=youtube 등 — 조회·전환을 소스별로 집계
+  const [vid, setVid] = useState(""); // [S34-2] ?v=<영상id> — 영상별 집계
 
   useEffect(() => {
-    // 랜딩(next router 미사용)이라 URL 에서 직접 읽는다. 소문자·영숫자 1~16자만(안전).
+    // 랜딩(next router 미사용)이라 URL 에서 직접 읽는다. 소문자·영숫자만(안전).
     try {
       const q = new URLSearchParams(window.location.search);
       const raw = (q.get("from") || q.get("src") || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16);
+      const v = (q.get("v") || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 3);
       if (raw) setSrc(raw);
+      if (v) setVid(v);
+      // [S34-3] 첫 접점(first-touch) 보존 — 이미 값이 있으면 덮어쓰지 않는다. 유효기간 30일.
+      //   출처 문자열 하나만("youtube:u1"). 방문이력·식별자 안 쌓는다.
+      if (raw) {
+        const KEY = "onehub_first_src";
+        let cur = null;
+        try { cur = JSON.parse(localStorage.getItem(KEY) || "null"); } catch (e) {}
+        const fresh = cur && cur.ts && (Date.now() - Number(cur.ts) < 30 * 86400000);
+        if (!fresh) {
+          const value = v ? `${raw}:${v}` : raw;
+          try { localStorage.setItem(KEY, JSON.stringify({ src: value, ts: Date.now() })); } catch (e) {}
+        }
+      }
     } catch (e) {}
   }, []);
 
@@ -40,7 +55,7 @@ export default function Estimate() {
     if (!q) return;
     setLoading(true); setErr(""); setResult(null); setArea(null);
     try {
-      const r = await fetch(`/api/public/re/estimate?apt=${encodeURIComponent(q)}&region=${encodeURIComponent(region)}${src ? `&from=${encodeURIComponent(src)}` : ""}`);
+      const r = await fetch(`/api/public/re/estimate?apt=${encodeURIComponent(q)}&region=${encodeURIComponent(region)}${src ? `&from=${encodeURIComponent(src)}` : ""}${vid ? `&v=${encodeURIComponent(vid)}` : ""}`);
       if (r.status === 429) { setErr("잠시 후 다시 시도해 주세요 (요청이 많습니다)"); setLoading(false); return; }
       const d = await r.json();
       setResult(d);
@@ -134,7 +149,7 @@ export default function Estimate() {
             <div className="est-disc">규칙 기반 참고 정보 · 투자자문이나 특정 종목 권유가 아닙니다. 실거래 신고 자료 기반 통계이며 실제 거래가와 다를 수 있습니다.</div>
 
             {/* [S31-3] 결과를 본 뒤에만 가입 유도 */}
-            <a className="est-cta" href={`${APP}/login?from=estimate&apt=${encodeURIComponent(result.apt)}&region=${encodeURIComponent(result.region)}${src ? `&src=${encodeURIComponent(src)}` : ""}`}>
+            <a className="est-cta" href={`${APP}/login?from=estimate&apt=${encodeURIComponent(result.apt)}&region=${encodeURIComponent(result.region)}${src ? `&src=${encodeURIComponent(src)}` : ""}${vid ? `&v=${encodeURIComponent(vid)}` : ""}`}>
               이 단지를 내 자산에 넣고 매주 추적하려면 → 시작하기
             </a>
             <div className="est-cta-sub">가입하면 내 단지 추적·갈아타기 비용·세금·대장 대비 추이를 볼 수 있어요.</div>
@@ -144,7 +159,7 @@ export default function Estimate() {
         {result && result.ok && result.empty && (
           <section className="est-card">
             <div className="est-empty">아직 <b>{result.apt}</b>은(는) 실거래 데이터가 부족합니다.</div>
-            <a className="est-cta" href={`${APP}/login?from=estimate&apt=${encodeURIComponent(result.apt)}&region=${encodeURIComponent(result.region)}${src ? `&src=${encodeURIComponent(src)}` : ""}`}>
+            <a className="est-cta" href={`${APP}/login?from=estimate&apt=${encodeURIComponent(result.apt)}&region=${encodeURIComponent(result.region)}${src ? `&src=${encodeURIComponent(src)}` : ""}${vid ? `&v=${encodeURIComponent(vid)}` : ""}`}>
               관심 단지로 등록하면 데이터가 쌓일 때 알려드립니다 → 시작하기
             </a>
           </section>

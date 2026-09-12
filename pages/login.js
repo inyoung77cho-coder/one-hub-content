@@ -14,18 +14,29 @@ export default function Login() {
   //   그 단지를 미리 채우고, 가입 전환을 기록한다. 개인정보 아님(단지명·출처만).
   useEffect(() => {
     if (!router.isReady) return;
+    const clean = (s, n) => (typeof s === "string" ? s.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, n) : "");
+    const src = clean(router.query.src, 16);
+    const vid = clean(router.query.v, 3);
     if (router.query.from === "estimate") {
       try {
         localStorage.setItem("onehub_from", JSON.stringify({
           from: "estimate",
           apt: typeof router.query.apt === "string" ? router.query.apt : "",
           region: typeof router.query.region === "string" ? router.query.region : "",
-          src: typeof router.query.src === "string" ? router.query.src.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16) : "",
-          ts: Date.now(),
+          src, ts: Date.now(),
         }));
       } catch (e) {}
     }
-  }, [router.isReady, router.query.from, router.query.apt, router.query.region]);
+    // [S34-3] 첫 접점(first-touch)을 앱 origin 에 심는다 — 교차출처(www→app) 우회. ★이미 신선한 값이 있으면 덮지 않음, 30일.
+    //   funnel.js 가 signup·first_verdict 때 이 값으로 출처를 서버 집계에 보낸다. 출처 문자열 하나만.
+    if (src) {
+      try {
+        const cur = JSON.parse(localStorage.getItem("onehub_first_src") || "null");
+        const fresh = cur && cur.ts && (Date.now() - Number(cur.ts) < 30 * 86400000);
+        if (!fresh) localStorage.setItem("onehub_first_src", JSON.stringify({ src: vid ? `${src}:${vid}` : src, ts: Date.now() }));
+      } catch (e) {}
+    }
+  }, [router.isReady, router.query.from, router.query.apt, router.query.region, router.query.src, router.query.v]);
 
   return (
     <>

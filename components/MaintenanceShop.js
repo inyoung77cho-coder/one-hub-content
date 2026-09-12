@@ -6,6 +6,7 @@ import { useRouter } from "next/router";
 import { samplePolicy } from "../lib/sampleSize";
 import { aggregateByCategory } from "../lib/ruleMap";
 import EngineProposals from "./EngineProposals";
+import { videoTitle } from "../lib/videos"; // [S34-4] 영상 제목
 
 export default function MaintenanceShop() {
   const router = useRouter();
@@ -74,6 +75,35 @@ export default function MaintenanceShop() {
         </div>
       )}
 
+      {/* [S34-4] 유튜브 경유 — 어느 영상이 사람을 데려오는가. 영상별 조회→가입→전환율. */}
+      {(() => {
+        const bs = funnel && funnel.ok && funnel.public && funnel.public.by_source;
+        if (!bs) return null;
+        const tv = bs.tool_view || {}, ts = bs.tool_signup || {};
+        const ytViews = tv.youtube || 0, ytSignups = ts.youtube || 0;
+        // 영상별 키: youtube_<id>
+        const vids = {};
+        for (const k of Object.keys(tv)) { const m = k.match(/^youtube_([a-z0-9]{1,3})$/); if (m) (vids[m[1]] = vids[m[1]] || {}).views = tv[k]; }
+        for (const k of Object.keys(ts)) { const m = k.match(/^youtube_([a-z0-9]{1,3})$/); if (m) (vids[m[1]] = vids[m[1]] || {}).signups = ts[k]; }
+        const ids = Object.keys(vids).sort();
+        if (ytViews === 0 && ids.length === 0) return null;
+        const pct = (s, v) => (v > 0 ? `${Math.round((s / v) * 1000) / 10}%` : "—");
+        return (
+          <div className="ms-card">
+            <div className="ms-h">유튜브 경유 <span className="ms-sub">어느 영상이 데려오나</span></div>
+            <div className="ms-yttop">도구 조회 <b>{ytViews}건</b> · 가입 <b>{ytSignups}명</b> · 전환 <b>{pct(ytSignups, ytViews)}</b></div>
+            {ids.map((id) => (
+              <div className="ms-ytrow" key={id}>
+                <span className="ms-ytid">{id}</span>
+                <span className="ms-ytt">{videoTitle(id)}</span>
+                <span className="ms-ytn">{vids[id].views || 0}건 → {vids[id].signups || 0}명 · {pct(vids[id].signups || 0, vids[id].views || 0)}</span>
+              </div>
+            ))}
+            <div className="ms-foot" style={{ marginTop: 8 }}>전환율이 낮은 영상은 영상이 나쁜 게 아니라 그 영상이 데려온 사람에게 앱이 안 맞는다는 뜻일 수 있습니다(가입 대비 첫 판단을 함께 보세요 · 주간 리포트).</div>
+          </div>
+        );
+      })()}
+
       {/* 승인 대기 제안(백테스트·근거·한계 포함) */}
       <EngineProposals />
 
@@ -139,6 +169,12 @@ export default function MaintenanceShop() {
         .ms-fdrop { margin-top: 10px; font-size: var(--fs-2); color: var(--color-ink-2); word-break: keep-all; }
         .ms-fdrop b { color: var(--color-danger, #dc2626); }
         .ms-fsync { margin-top: 8px; font-size: var(--fs-1); color: var(--color-ink-3); }
+        .ms-yttop { font-size: var(--fs-3); color: var(--color-ink-2); margin-bottom: 10px; }
+        .ms-yttop b { color: var(--color-ink); font-weight: 800; }
+        .ms-ytrow { display: flex; align-items: baseline; gap: 8px; padding: 6px 0; border-top: 1px solid var(--color-line); font-size: var(--fs-2); }
+        .ms-ytid { font-family: var(--font-mono, monospace); font-weight: 700; color: var(--color-primary); flex: none; width: 28px; }
+        .ms-ytt { color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ms-ytn { margin-left: auto; flex: none; color: var(--color-ink-2); font-weight: 700; white-space: nowrap; }
         .ms-fpub { margin-top: 8px; font-size: var(--fs-2); color: var(--color-ink-2); }
         .ms-fpub b { color: var(--color-ink); font-weight: 800; }
         .ms-fsrc { margin-top: 4px; font-size: var(--fs-1); color: var(--color-ink-3); display: flex; flex-wrap: wrap; gap: 4px 10px; }
