@@ -9,6 +9,8 @@ import BottomNav from "../../components/BottomNav";
 import { setTraderGlobal } from "../../lib/trader";
 import QuickAddSheet from "../../components/shared/QuickAddSheet";
 import PartnerCard from "../../components/PartnerCard"; // [S31-6] 증권 계좌 개설 제휴
+import VideoLink from "../../components/VideoLink"; // [S34-6] 사용법 영상 모아보기
+import { VIDEOS, isKnownVideo } from "../../lib/videos";
 import { APP_VERSION, BUILD_STAMP } from "../../lib/version";
 import { logout } from "../../lib/session";
 import ExitScreen from "../../components/ExitScreen";
@@ -31,6 +33,8 @@ const mmss = (s) => {
 
 export default function Settings() {
   const router = useRouter();
+  // [S34-6] 발행된 사용법 영상만(미발행이면 빈 배열 → 목록 안 뜸)
+  const usageVideos = Object.keys(VIDEOS).filter((id) => VIDEOS[id].series === "usage" && isKnownVideo(id));
   const [health, setHealth] = useState(null);
   const [tokenSec, setTokenSec] = useState(null);
   const [theme, setTheme] = useState("light");
@@ -338,6 +342,13 @@ export default function Settings() {
               <button className="tbtn" onClick={() => router.push("/pwa/onboarding")}>시작</button>
             </div>
             <div className="hint">어려운 용어는 용어사전에서 쉬운 말로 확인할 수 있어요. 화면 곳곳의 ⓘ도 같은 설명을 보여줍니다.</div>
+            {/* [S34-6] 사용법 영상 모아보기 — 발행된 것만(미발행이면 이 목록 자체가 안 뜸) */}
+            {usageVideos.length > 0 && (
+              <div style={{ marginTop: 10 }}>
+                <span className="l" style={{ display: "block", marginBottom: 6 }}>사용법 영상</span>
+                {usageVideos.map((id) => <div key={id}><VideoLink id={id} /></div>)}
+              </div>
+            )}
             {/* [V1] 빌드 스탬프 — 지금 보는 화면이 최신 배포인지 확인용 */}
             <div className="row" style={{ marginTop: 8 }}>
               <span className="l">버전</span>

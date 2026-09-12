@@ -10,6 +10,7 @@ import { getTrader } from "../../lib/trader";
 import { markFunnel } from "../../lib/funnel"; // [S30-8] 가입 깔때기 이정표
 import { setLifeStage, getLifeStage, STAGE_LABEL } from "../../lib/withdrawPlan"; // [S31-4] 생애 단계
 import PartnerCard from "../../components/PartnerCard"; // [S31-6] 증권 계좌 개설 제휴(계약 전 렌더 안 됨)
+import VideoLink from "../../components/VideoLink"; // [S34-6] 처음 쓰는 법 영상
 
 // 성향(goal) → 목표 배분(%) 매핑 — AI자산 목표% 소스
 const ALLOC_MAP = {
@@ -463,6 +464,8 @@ export default function Onboarding() {
                   <li><span className="g3-ic">🎮</span><div className="g3-b"><b>나 vs AI 가상대결</b><span className="g3-d">같은 종목을 나와 AI가 각자 굴려 누가 이기나 봐요 (가상머니)</span></div></li>
                   <li><span className="g3-ic">💬</span><div className="g3-b"><b>불편하면 바로 알려주기</b><span className="g3-d">화면 왼쪽 아래 💬 버튼으로 한마디 남겨주시면 큰 도움이 돼요</span></div></li>
                 </ol>
+                {/* [S34-6] 처음 쓰는 법 영상(미발행이면 안 뜸) */}
+                <VideoLink id="u1" label="처음 쓰는 법 다시 보기 (4분)" />
               </div>
               <div className="foot"><button className="btn-next" onClick={finish}>홈에서 내 자산 보기 →</button></div>
             </div>

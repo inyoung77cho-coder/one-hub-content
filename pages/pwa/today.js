@@ -38,6 +38,7 @@ import { getLifeStage, getWithdrawInputs, computeWithdrawPlan } from "../../lib/
 import dynamic from "next/dynamic";
 const WithdrawCard = dynamic(() => import("../../components/WithdrawCard"), { ssr: false }); // [S31-4] 인출 계획(인출 모드만)
 import PartnerCard from "../../components/PartnerCard"; // [S31-6] 제휴(보유0·KIS미연동일 때만·계약 전 렌더 안 됨)
+import VideoLink from "../../components/VideoLink"; // [S34-6] 막힌 지점 사용법 영상(미발행이면 안 뜸)
 import { cachedJson } from "../../lib/quoteCache"; // [S20-3] /api/pwa-ai-daily 중복 GET dedup
 import TraderBadge from "../../components/shared/TraderBadge";
 import AppHeader from "../../components/AppHeader";
@@ -953,7 +954,11 @@ export default function TodayPage({ announcements = [] }) {
                 <div className="sc-empty">오늘은 특별히 할 일이 없어요</div>
               ) : (
                 /* [S30-7] 직접 입력이든 KIS든 — 보유를 넣으면 조치가 올라온다. '증권사 연동' 전제 제거. */
-                <button type="button" className="sc-empty sc-emptylink" onClick={() => router.push("/pwa/input")}>보유 종목을 넣으면 매일 조치·판단이 여기 올라옵니다 → 빠른 입력</button>
+                <>
+                  <button type="button" className="sc-empty sc-emptylink" onClick={() => router.push("/pwa/input")}>보유 종목을 넣으면 매일 조치·판단이 여기 올라옵니다 → 빠른 입력</button>
+                  {/* [S34-6] S33 '다음 걸음' 아래 한 줄(미발행이면 안 뜸) */}
+                  <VideoLink id="u2" label="종목을 직접 넣는 방법 (2분)" />
+                </>
               )}
             </div>
           ) : (

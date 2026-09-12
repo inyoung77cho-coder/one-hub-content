@@ -1,14 +1,25 @@
 // [S29-7] 이번 주 회차 카드 — 제목·앱 안 재생(임베드)·3줄 요약·근거 숫자·지난 회차.
 //   ★유튜브로 내보내지 않는다: 앱 안에서 재생하고, "유튜브에서 보기"는 작은 보조 링크만.
 //   회차가 없으면 이 카드를 렌더하지 않음(빈 카드 금지) — 부모가 '쉬어갑니다'를 대신 보여준다.
+//   [S34-7] frontmatter video(=lib/videos.js id)가 있고 발행됐으면 ★썸네일+링크(iframe 자동재생 금지).
+import { videoThumb, videoUrl, isKnownVideo } from "../lib/videos";
+
 export default function EpisodeCard({ ep, past = [], onOpenPast, bare = false }) {
   if (!ep) return null;
+  const vThumb = ep.video && isKnownVideo(ep.video) ? videoThumb(ep.video) : null;
+  const vUrl = ep.video && isKnownVideo(ep.video) ? videoUrl(ep.video, "app") : null;
   return (
     <section className={`ec${bare ? " ec-bare" : ""}`}>
       <div className="ec-badge">📺 이번 주 회차 · {ep.week || ep.date}</div>
       <h2 className="ec-title">{ep.title}</h2>
 
-      {ep.youtube_id ? (
+      {vThumb ? (
+        // [S34-7] 썸네일 + 재생 링크(새 탭). iframe 임베드 안 함(앱 무거워짐·데이터).
+        <a className="ec-vthumb" href={vUrl} target="_blank" rel="noopener noreferrer" title="영상 보기">
+          <img src={vThumb} alt={ep.title} loading="lazy" />
+          <span className="ec-vplay" aria-hidden="true">▶</span>
+        </a>
+      ) : ep.youtube_id ? (
         <div className="ec-embed">
           <iframe
             src={`https://www.youtube-nocookie.com/embed/${ep.youtube_id}`}
@@ -45,6 +56,9 @@ export default function EpisodeCard({ ep, past = [], onOpenPast, bare = false })
         .ec-bare { background: none; border: 0; border-radius: 0; box-shadow: none; padding: 0; margin-bottom: 0; }
         .ec-badge { font-size: var(--fs-1); font-weight: 800; color: var(--color-primary); }
         .ec-title { font-size: var(--fs-6); font-weight: 800; color: var(--color-ink); margin: 6px 0 12px; line-height: 1.35; word-break: keep-all; }
+        .ec-vthumb { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-md); overflow: hidden; background: var(--color-card-soft); }
+        .ec-vthumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .ec-vplay { position: absolute; inset: 0; margin: auto; width: 54px; height: 54px; border-radius: 50%; background: rgba(0,0,0,.55); color: #fff; display: grid; place-items: center; font-size: 20px; padding-left: 3px; }
         .ec-embed { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: var(--radius-md); overflow: hidden; background: var(--color-card-soft); }
         .ec-embed :global(iframe) { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
         .ec-embed-empty { display: grid; place-items: center; text-align: center; padding: 16px; font-size: var(--fs-2); color: var(--color-ink-3); word-break: keep-all; aspect-ratio: auto; min-height: 96px; }

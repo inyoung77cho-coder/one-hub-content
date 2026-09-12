@@ -6,6 +6,7 @@ import { buyStock, STOCK_BROKERS } from "../../lib/stockHoldings";
 import { getTrader } from "../../lib/trader";
 import { validateStockInput, validateRealtyInput } from "../../lib/validateAsset";
 import { fetchStockQuote } from "../../lib/stockLive";
+import VideoLink from "../VideoLink"; // [S34-6] 직접입력 상단 사용법 영상
 
 function readOnb() { try { return JSON.parse(localStorage.getItem("onehub_onboard_assets") || "{}") || {}; } catch { return {}; } }
 function writeOnb(n) { try { localStorage.setItem("onehub_onboard_assets", JSON.stringify(n)); } catch {} }
@@ -150,6 +151,8 @@ export function StockForm({ onSaved, autofocusName = false }) {
 
   return (
     <div className="af"><AfStyles />
+      {/* [S34-6] 직접입력 화면 상단 사용법 영상(미발행이면 안 뜸) */}
+      <VideoLink id="u3" label="손절선·목표가 정하는 법" />
       <div className="af-seg" role="group" aria-label="국내/해외">
         {[["kr", "🇰🇷 국내"], ["us", "🇺🇸 해외"]].map(([v, l]) => (
           <button key={v} type="button" className={market === v ? "on" : ""} onClick={() => { setMarket(v); setSel(null); setName(""); setCode(""); }}>{l}</button>

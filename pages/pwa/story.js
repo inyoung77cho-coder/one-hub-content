@@ -227,6 +227,7 @@ export async function getStaticProps() {
           return {
             slug: f.replace(/\.md$/, ""), title: data.title || f, date: data.date || "",
             week: data.week || "", youtube_id: data.youtube_id || "", duration: data.duration || "",
+            video: data.video || "", // [S34-7] lib/videos.js 의 id(w12 등)
             summary: Array.isArray(data.summary) ? data.summary : [], figures: Array.isArray(data.figures) ? data.figures : [],
             published: data.published !== false,
           };
