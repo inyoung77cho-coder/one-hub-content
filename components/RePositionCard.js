@@ -846,7 +846,7 @@ export function MoveDifficultyCard({ myRegion = "서현동" }) {
         .md-mini { font-size: 0.62rem; font-weight: 700; color: var(--color-primary); background: var(--color-primary-soft); border-radius: 999px; padding: 1px 7px; margin-left: 5px; vertical-align: middle; }
         .md-rows { display: flex; flex-direction: column; gap: 6px; margin-top: 12px; }
         .md-row { display: flex; align-items: center; gap: 9px; padding: 9px 11px; border-radius: 10px; background: var(--color-card-soft); }
-        .md-arrow { font-size: 1rem; font-weight: 900; width: 16px; text-align: center; flex-shrink: 0; }
+        .md-arrow { font-size: 1rem; font-weight: 900; min-width: 1.3em; width: auto; text-align: center; flex-shrink: 0; } /* [S35-3] 규칙A — 고정16px 가 큰글씨(137%)에서 화살표를 자름. em 기반 min-width 로 글자 따라 늘어나게 */
         .md-row.easy .md-arrow, .md-row.easy .md-mean { color: var(--color-success); }
         .md-row.hard .md-arrow, .md-row.hard .md-mean { color: var(--color-danger); }
         .md-dong { font-size: 0.82rem; font-weight: 800; color: var(--color-ink); min-width: 62px; flex-shrink: 0; }

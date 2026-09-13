@@ -168,7 +168,7 @@ export default function EtfAllocationPie({ items = [], overlap = null, perfMap =
         .an-vb-track i.flat { background: var(--color-ink-3); }
         .an-vb-pnl { font-size: 0.58rem; font-weight: 800; font-family: ui-monospace, monospace; }
         .an-vb-pnl.up { color: var(--color-danger); } .an-vb-pnl.dn { color: var(--color-primary); }
-        .an-vb-nm { font-size: 0.6rem; font-weight: 700; color: var(--color-ink-3); max-width: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .an-vb-nm { font-size: 0.6rem; font-weight: 700; color: var(--color-ink-3); max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* [S35-2] 규칙B — 고정44px→칸폭(가로스크롤 컨테이너 내). an-vbars 는 .an-vwrap overflow-x:auto 의도된 가로스크롤이라 유지 */
         .an-vlegend { font-size: 0.64rem; color: var(--color-ink-3); margin-bottom: 12px; }
         .an-vlegend b { font-weight: 800; } .an-vlegend b.up { color: var(--color-danger); } .an-vlegend b.dn { color: var(--color-primary); }
         .an-wt { font-size: 0.66rem; font-weight: 700; color: var(--color-ink-3); font-family: ui-monospace, monospace; }

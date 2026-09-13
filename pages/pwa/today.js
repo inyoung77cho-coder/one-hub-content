@@ -1383,7 +1383,7 @@ export default function TodayPage({ announcements = [] }) {
         .tds-badge { flex-shrink: 0; font-size: var(--fs-1); font-weight: 800; border: 1px solid; border-radius: 999px; padding: 1px 6px; }
         .tds-nm { flex-shrink: 0; font-size: var(--fs-3); font-weight: 800; color: var(--color-ink); max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .tds-stance { flex-shrink: 0; font-size: var(--fs-2); font-weight: 700; }
-        .tds-reason { margin-left: auto; font-size: var(--fs-1); color: var(--color-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .tds-reason { margin-left: auto; font-size: var(--fs-1); color: var(--color-ink-3); font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; max-width: 100%; } /* [S35-3] 규칙A+B */
         .tds-none { font-size: var(--fs-2); color: var(--color-ink-2); line-height: 1.5; word-break: keep-all; }
         .tds-emptylink { border: none; background: none; color: var(--color-primary); font-size: var(--fs-2); font-weight: 700; text-align: left; padding: 0; cursor: pointer; font-family: var(--font-sans); line-height: 1.5; word-break: keep-all; }
         .tds-more { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; padding-top: 8px; border-top: 1px dashed var(--color-line); }

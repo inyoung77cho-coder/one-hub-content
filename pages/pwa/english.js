@@ -966,7 +966,7 @@ export default function EnglishPage() {
         /* 제목+설명을 세로로 고정(설명은 항상 한 줄) → 모드가 바뀌어도 아래 버튼 위치가 안 밀림 */
         .en-hd { margin: 6px 2px 12px; }
         .en-hd h1 { font-size: var(--fs-7); font-weight: 800; letter-spacing: -.5px; margin: 0 0 3px; }
-        .en-sub { display: block; font-size: var(--fs-2); font-weight: 600; color: var(--color-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .en-sub { display: block; font-size: var(--fs-2); font-weight: 600; color: var(--color-ink-3); white-space: normal; overflow-wrap: anywhere; word-break: keep-all; } /* [S35-3] 규칙C — 설명문은 줄바꿈 */
         /* [S26-11] 언어·테마는 공용 SegTabs. 형식(전체/뉴스/영상/이디엄)만 칩. */
         .en-fmts { display: flex; gap: 6px; margin: 0 0 14px; flex-wrap: wrap; }
         .en-fmts button { padding: 6px 13px; border-radius: 999px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-3); font-size: var(--fs-2); font-weight: 700; cursor: pointer; font-family: var(--font-sans); }

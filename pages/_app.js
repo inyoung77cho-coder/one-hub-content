@@ -90,6 +90,38 @@ export default function App({ Component, pageProps }) {
     };
   }, [router.events]);
 
+  // [S35-6] 개발 모드 전용 넘침 감지기 — 라우트 변경 1초 뒤 검사, 넘친 요소에 빨간 테두리 + 콘솔 경고.
+  //   ★프로덕션 번들엔 들어가지 않는다: NODE_ENV 가드가 상수라 아래 본문 전체가 DCE(dead-code elimination)로 제거됨.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    let t;
+    const scan = () => {
+      const W = document.documentElement.clientWidth;
+      document.querySelectorAll("[data-oh-of]").forEach((el) => { el.style.outline = ""; el.removeAttribute("data-oh-of"); });
+      const hits = [];
+      document.querySelectorAll("body *").forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.width <= 0 || r.height <= 0) return;
+        if (r.right - W > 1) {
+          const p = el.parentElement, pr = p && p.getBoundingClientRect();
+          if (!(pr && pr.right - W > 1)) {
+            el.style.outline = "2px solid red";
+            el.setAttribute("data-oh-of", "1");
+            hits.push({ 넘침: Math.round(r.right - W) + "px", 클래스: String(el.className || ""), 내용: (el.textContent || "").trim().slice(0, 30) });
+          }
+        }
+      });
+      if (hits.length) {
+        console.warn(`[overflow] ${location.pathname} 페이지폭 ${document.documentElement.scrollWidth}/${W}`);
+        console.table(hits);
+      }
+    };
+    const onDone = () => { clearTimeout(t); t = setTimeout(scan, 1000); };
+    onDone();
+    router.events.on("routeChangeComplete", onDone);
+    return () => { clearTimeout(t); router.events.off("routeChangeComplete", onDone); };
+  }, [router.events]);
+
   // [S29-4] 설정으로 들어갈 때 '직전 화면' 경로를 기억 — 설정의 의견 보내기가 정확한 화면 이름을 첨부하도록.
   useEffect(() => {
     const onStart = (url) => {

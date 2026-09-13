@@ -186,7 +186,7 @@ export default function PwaStory({ episodes = [] }) {
         /* [사용자 지시] 상위 메뉴 고정 */
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
         .story-title { display: flex; align-items: center; gap: 8px; font-size: var(--fs-6); font-weight: 800; letter-spacing: -.4px; margin: 6px 2px 14px; }
-        .story-fixed { flex-shrink: 0; }
+        .story-fixed { min-width: 0; } /* [S35-3] 규칙A — flex-shrink:0(안줄어듦)이 +74px 원인. 제목이 줄어들며 줄바꿈되게(버튼 story-change 는 그대로 유지) */
         .story-rd-h { font-size: var(--fs-4); font-weight: 800; color: var(--color-ink); margin-bottom: 8px; }
         .story-rd-sub { font-size: var(--fs-1); font-weight: 600; color: var(--color-ink-3); margin-left: 6px; }
         .story-rd-list { display: flex; flex-direction: column; gap: 5px; }

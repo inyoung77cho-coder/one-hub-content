@@ -1763,7 +1763,7 @@ export default function EtfDashboard() {
         .oa-row { background: var(--color-card-soft); border-radius: var(--radius-sm); padding: 9px 12px; margin-bottom: 6px; }
         .oa-main { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
         .oa-name { font-size: var(--fs-3); font-weight: 700; color: var(--color-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-        .oa-kind { margin-left: 6px; font-size: var(--fs-1); font-weight: 700; color: var(--color-ink-3); background: var(--color-card); border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 7px; }
+        .oa-kind { margin-left: 6px; font-size: var(--fs-1); font-weight: 700; color: var(--color-ink-3); background: var(--color-card); border: 1px solid var(--color-line); border-radius: 999px; padding: 1px 7px; display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; } /* [S35-2] 규칙B */
         .oa-val { font-size: var(--fs-3); font-weight: 700; color: var(--color-ink); font-family: ui-monospace, monospace; white-space: nowrap; flex-shrink: 0; }
         .oa-act { display: flex; gap: 6px; margin-top: 8px; }
         .oa-btn { border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: var(--radius-sm); padding: 4px 9px; font-size: var(--fs-1); font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
@@ -1989,7 +1989,7 @@ export default function EtfDashboard() {
         .me-region { font-size: var(--fs-1); font-weight: 800; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
         .me-region.os { color: #2F6BFF; background: #EAF1FF; border: 1px solid #CFE0FF; }
         .me-region.dm { color: #0E9E6A; background: #E7FAF2; border: 1px solid #C7EFDD; }
-        .me-qty { font-size: var(--fs-1); color: var(--color-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .me-qty { font-size: var(--fs-1); color: var(--color-ink-3); white-space: normal; overflow-wrap: anywhere; word-break: keep-all; min-width: 0; } /* [S35-2] 규칙C — 수량·평단 두 줄 허용(잘림 방지) */
         .me-r { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
         .me-px { font-size: var(--fs-3); font-weight: 700; color: var(--color-ink); font-family: ui-monospace, monospace; }
         .me-sub2 { display: flex; align-items: center; gap: 8px; }

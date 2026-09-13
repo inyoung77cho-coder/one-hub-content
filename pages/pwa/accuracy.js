@@ -267,7 +267,7 @@ export default function AccuracyPage() {
         .ac-reason { margin-bottom: 13px; }
         .ac-reason:last-child { margin-bottom: 0; }
         .ac-reason-top { display: flex; justify-content: space-between; align-items: center; font-size: var(--fs-2); margin-bottom: 5px; }
-        .ac-reason-k { color: var(--color-ink); font-weight: 500; max-width: 62%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .ac-reason-k { color: var(--color-ink); font-weight: 500; min-width: 0; white-space: normal; overflow-wrap: anywhere; word-break: keep-all; } /* [S35-3] 규칙C — 규칙명은 잘리면 뜻이 사라짐 → 줄바꿈 */
         .ac-reason-p { font-weight: 800; white-space: nowrap; }
         .ac-reason-n { color: var(--color-ink-2); font-weight: 500; margin-left: 4px; font-size: var(--fs-1); }
         .ac-reason-hold { font-size: var(--fs-1); font-weight: 700; color: var(--color-ink-3); white-space: nowrap; }

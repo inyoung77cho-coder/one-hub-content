@@ -418,8 +418,8 @@ export default function AssetsMapPage() {
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                   {classDrift.map((d) => (
                     <div key={d.key} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.78rem" }}>
-                      <span style={{ width: 52, color: "var(--color-ink-2)" }}>{d.label}</span>
-                      <span style={{ fontVariantNumeric: "tabular-nums", width: 44 }}>{d.curPct}%</span>
+                      <span style={{ minWidth: 52, color: "var(--color-ink-2)" }}>{d.label}</span>
+                      <span style={{ fontVariantNumeric: "tabular-nums", minWidth: 44 }}>{d.curPct}%</span>{/* [S35-3] 규칙A — 고정width→minWidth(137%에서 퍼센트 잘림 방지) */}
                       <span style={{ color: "var(--color-ink-3)" }}>목표 {d.tgtPct}%</span>
                       <span style={{ marginLeft: "auto", fontWeight: 700, color: Math.abs(d.drift) < 3 ? "var(--color-ink-3)" : d.drift > 0 ? "var(--color-danger)" : "var(--color-primary)" }}>{d.drift > 0 ? "+" : ""}{d.drift}%p</span>
                     </div>
