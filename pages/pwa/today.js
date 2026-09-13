@@ -367,7 +367,7 @@ export default function TodayPage({ announcements = [] }) {
     const u = deriveUrgency(p);
     if (u.rank === 0 && sl > 0 && cur > 0) return `손절선까지 ${((sl / cur - 1) * 100).toFixed(1)}%`;
     if (u.rank === 1 && tgt > 0 && cur > 0) return `목표가까지 +${((tgt / cur - 1) * 100).toFixed(1)}%`;
-    if (p.change_1d != null) return `당일 ${Number(p.change_1d) >= 0 ? "+" : ""}${Number(p.change_1d)}% 급변`;
+    if (p.change_1d != null) { const d = Number(p.change_1d); return `당일 ${d >= 0 ? "+" : ""}${d.toFixed(1)}% 급변`; } // [S35-1] 반올림 누락 수정(소수점 15자리 넘침)
     return deriveStance(p).reason;
   };
   // 조치가 없을 때도 근거와 함께 — '손절선 최근접 −X.X%'(KisHoldingsCard toStop 과 동일 부호).

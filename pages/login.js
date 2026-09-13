@@ -1,14 +1,39 @@
 // pages/login.js — 로그인 게이트 화면(NI-2/3). 카카오로 로그인한다.
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+
+// [S36-3] 사유별 문구. "문제가 있었습니다"(무엇이 안 됐는지 모름)를 쓰지 않는다 — 무엇이 안 됐고 지금 뭘 하면 되는지.
+//   bad_sig·expired·state_mismatch 는 callback 이 1회 자동 재시도하므로 보통 화면에 안 나온다(재시도도 실패하면 기본 문구).
+const MSG = {
+  no_code: "로그인이 취소되었습니다.",
+  token: "카카오 서버와 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  profile: "카카오 정보를 받아오지 못했습니다. 잠시 후 다시 시도해 주세요.",
+  server: "일시적인 문제가 있었습니다. 잠시 후 다시 시도해 주세요.",
+};
+const DEFAULT_MSG = "로그인에 실패했습니다. 다시 시도해 주세요.";
 
 export default function Login() {
   const router = useRouter();
   const rawNext = typeof router.query.next === "string" ? router.query.next : "/pwa";
   const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/pwa";
-  const error = typeof router.query.error === "string" ? router.query.error : "";
   const href = `/api/auth/kakao/start?next=${encodeURIComponent(next)}`;
+
+  // [S36-3] 오류 문구는 state 로 옮기고(재렌더에도 유지) URL 의 error 는 지운다 — 성공 후 뒤로가기 시 오류 재노출 방지.
+  const [errMsg, setErrMsg] = useState("");
+  // [S36-3c] 카카오 버튼 중복 클릭 방지(start 중복 호출이 쿠키 유실 후보 중 하나).
+  const [going, setGoing] = useState(false);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    const e = typeof router.query.error === "string" ? router.query.error : "";
+    if (!e) return;
+    setErrMsg(MSG[e] || DEFAULT_MSG);
+    // URL 정리(next 는 보존). shallow 로 라우팅 없이 주소만 교체.
+    const q = typeof router.query.next === "string" ? `?next=${encodeURIComponent(next)}` : "";
+    router.replace(`/login${q}`, undefined, { shallow: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.query.error]);
 
   // [S31-3] 공개 도구(www)에서 넘어온 유입을 앱 origin 에 저장 — OAuth 왕복 뒤 온보딩이 읽어
   //   그 단지를 미리 채우고, 가입 전환을 기록한다. 개인정보 아님(단지명·출처만).
@@ -50,10 +75,18 @@ export default function Login() {
           <p className="tagline">주식·ETF·부동산을 AI와 함께 운영하는 통합 자산관리</p>
           <p className="lead">로그인하고 내 자산을 시작하세요.</p>
 
-          {error && <p className="err">로그인에 문제가 있었습니다. 다시 시도해 주세요.</p>}
+          {errMsg && <p className="err">{errMsg}</p>}
 
-          <a className="kakao" href={href}>
-            <span className="ic" aria-hidden>💬</span> 카카오로 시작하기
+          <a
+            className={`kakao${going ? " going" : ""}`}
+            href={href}
+            aria-disabled={going}
+            onClick={(e) => {
+              if (going) { e.preventDefault(); return; } // 두 번째 클릭은 막는다
+              setGoing(true);
+            }}
+          >
+            <span className="ic" aria-hidden>💬</span> {going ? "이동 중…" : "카카오로 시작하기"}
           </a>
 
           <p className="note">
@@ -116,6 +149,10 @@ export default function Login() {
         .kakao:active {
           filter: brightness(0.96);
         }
+        .kakao.going {
+          pointer-events: none;
+          opacity: 0.65;
+        }
         .ic {
           font-size: 1.05rem;
         }
@@ -126,13 +163,19 @@ export default function Login() {
         }
         .note {
           margin: 16px 0 0;
-          font-size: 0.7rem;
-          color: #94a3b8;
+          font-size: 0.72rem;
+          color: #64748b; /* [S36 별건] 약관 안내는 표시 의무 — #94a3b8 은 흰 배경 대비 부족(≈2.6:1)이라 #64748b(≈4.9:1, AA)로 */
           line-height: 1.5;
         }
+        /* [S36 별건] 약관·개인정보 링크: 흰 배경에서 확실히 보이게 대비 강화(#4338ca ≈ 8.6:1) + 굵게.
+           전역 a{color:inherit} 와 a{user-select:none}(styles/globals.css) 때문에 흐릿하고 복사도 안 됐다 —
+           표시 의무가 있는 링크이므로 선택·복사도 허용한다. */
         .note a {
-          color: #6366f1;
+          color: #4338ca;
+          font-weight: 600;
           text-decoration: underline;
+          -webkit-user-select: text;
+          user-select: text;
         }
       `}</style>
     </>

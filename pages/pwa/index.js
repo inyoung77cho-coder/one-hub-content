@@ -1810,7 +1810,7 @@ export default function PWADashboard({ latestReport }) {
                       { text: `ML 매수 신호 ${sc.ml}%`, positive: sc.ml > 50 },
                       ...(s.rsi != null ? [{ text: `RSI ${s.rsi}`, positive: s.rsi < 70 }] : []),
                       ...(s.vol_ratio != null ? [{ text: `거래량 평소 대비 ${s.vol_ratio.toFixed(1)}배`, positive: s.vol_ratio >= 1 }] : []),
-                      ...(s.change_5d != null ? [{ text: `5일 수익률 ${s.change_5d >= 0 ? '+' : ''}${s.change_5d}%`, positive: s.change_5d >= 0 }] : []),
+                      ...(s.change_5d != null ? [{ text: `5일 수익률 ${s.change_5d >= 0 ? '+' : ''}${Number(s.change_5d).toFixed(1)}%`, positive: s.change_5d >= 0 }] : []),
                     ].slice(0, 5),
                   });
                 };
@@ -2052,7 +2052,7 @@ export default function PWADashboard({ latestReport }) {
                         <div className="recent-search-chips">
                           {sec.items.map((s,i) => (
                             <button key={i} className="recent-search-chip" onClick={() => runAnalyze(s.code, s.name)}>
-                              {s.name}{s.change_1d != null ? ` +${s.change_1d}%` : ''}
+                              {s.name}{s.change_1d != null ? ` +${Number(s.change_1d).toFixed(1)}%` : ''}
                             </button>
                           ))}
                         </div>

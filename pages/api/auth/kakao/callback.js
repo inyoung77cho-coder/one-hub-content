@@ -1,6 +1,10 @@
 // pages/api/auth/kakao/callback.js — 카카오 redirect 콜백.
 // code→access_token 교환 → 사용자 프로필 조회 → 서명 세션 쿠키 발급 → next로 이동.
+// [S36-1] state 는 서명 토큰(lib/kakaoState) — 쿠키 유실돼도 검증되고 next 복원. 쿠키는 보조 방어.
+// [S36-2] 복구 가능한 실패(bad_sig·expired·state_mismatch)는 오류를 보여주기 전에 1회 조용히 재시도.
+// [S36-4] 실패를 구조화해서 남긴다(PII 없이) — 며칠 뒤 로그로 진짜 원인 확정.
 import { createSession, SESSION_COOKIE, SESSION_MAX_AGE } from "../../../../lib/auth";
+import { verifyState } from "../../../../lib/kakaoState";
 
 function parseCookies(header) {
   const out = {};
@@ -13,18 +17,47 @@ function parseCookies(header) {
 
 export default async function handler(req, res) {
   const { code, state } = req.query;
-  if (!code) return res.redirect("/login?error=no_code");
-
-  // CSRF: start에서 심은 state·next 확인
   const cookies = parseCookies(req.headers.cookie);
-  const raw = cookies["oh_oauth"] || "";
-  const dot = raw.indexOf(".");
-  const savedState = dot > -1 ? raw.slice(0, dot) : "";
-  const savedNext = dot > -1 ? decodeURIComponent(raw.slice(dot + 1)) : "/pwa";
-  if (!savedState || savedState !== state) {
-    return res.redirect("/login?error=bad_state");
-  }
-  const next = savedNext.startsWith("/") && !savedNext.startsWith("//") ? savedNext : "/pwa";
+  const cookieState = cookies["oh_oauth"] || "";
+  const isRetry = !!req.query.retry;
+
+  // [S36-4] 구조화 로그(★PII 금지: 카카오 id·닉네임·이메일·토큰 절대 안 남김)
+  // [S36-2] recoverable 이고 아직 재시도 전이면 오류 화면 대신 start 로 1회 되돌린다.
+  //   ★retry 파라미터가 이미 있으면 절대 다시 시도하지 않는다(무한 루프 방지).
+  const fail = (reason, recoverable, nextForRetry, extra) => {
+    console.error(
+      "[kakao] fail",
+      JSON.stringify({
+        reason,
+        hasCookie: !!cookieState,
+        host: req.headers.host,
+        ua: (req.headers["user-agent"] || "").slice(0, 80),
+        retry: isRetry,
+        ...(extra || {}),
+      })
+    );
+    if (recoverable && !isRetry) {
+      const n =
+        nextForRetry && nextForRetry.startsWith("/") && !nextForRetry.startsWith("//")
+          ? nextForRetry
+          : "/pwa";
+      return res.redirect(`/api/auth/kakao/start?next=${encodeURIComponent(n)}&retry=1`);
+    }
+    return res.redirect(`/login?error=${reason}`);
+  };
+
+  // 사용자가 카카오에서 취소 → code 없음. 재시도해도 같으니 그냥 /login.
+  if (!code) return fail("no_code", false);
+
+  // [S36-1] 서명된 state 검증. 쿠키가 없어도 여기서 위조 여부·목적지가 판별된다.
+  const v = verifyState(state);
+  if (!v.ok) return fail(v.reason, true, v.next); // bad_sig | expired → 복구 가능(1회 재시도)
+
+  // [S36-1] 쿠키는 보조 방어(심층 방어): 오면 서명 대상 body 와 대조, 안 오면 서명만으로 통과.
+  //   ★'쿠키 없으면 그냥 통과'가 아니다 — 서명이 이미 위조를 막았다. 쿠키가 있는데 다르면 진짜 이상.
+  if (cookieState && cookieState !== v.body) return fail("state_mismatch", true, v.next);
+
+  const next = v.next;
 
   try {
     // 1) 토큰 교환
@@ -43,8 +76,8 @@ export default async function handler(req, res) {
     });
     const tokenJson = await tokenRes.json();
     if (!tokenRes.ok || !tokenJson.access_token) {
-      console.error("[kakao] token exchange failed", tokenJson);
-      return res.redirect("/login?error=token");
+      // 카카오 API 오류 — 재시도해도 같으니 오류 표시. err 코드만 남긴다(설명·토큰=PII 제외).
+      return fail("token", false, next, { kakaoErr: tokenJson?.error || tokenRes.status });
     }
 
     // 2) 프로필 조회
@@ -53,8 +86,8 @@ export default async function handler(req, res) {
     });
     const me = await meRes.json();
     if (!meRes.ok || !me.id) {
-      console.error("[kakao] profile failed", me);
-      return res.redirect("/login?error=profile");
+      // 프로필 조회 실패 — 재시도해도 같음. 상태코드만 남긴다(프로필 본문=PII 제외).
+      return fail("profile", false, next, { status: meRes.status });
     }
 
     const nickname = me.properties?.nickname || me.kakao_account?.profile?.nickname || "";
@@ -101,7 +134,7 @@ export default async function handler(req, res) {
     ]);
     return res.redirect(dest);
   } catch (e) {
-    console.error("[kakao] callback error", e);
-    return res.redirect("/login?error=server");
+    // 예외 — 재시도해도 같을 수 있으니 오류 표시. 메시지만(스택·PII 제외).
+    return fail("server", false, next, { msg: (e?.message || "").slice(0, 80) });
   }
 }
