@@ -30,6 +30,19 @@ const THEME_FORMATS = {
   display: ["all", "news", "video"],
   general: ["all", "video", "idiom"],
 };
+// [동적 형식 필터] 형식 버튼을 보일지 판정.
+//   · 테마 설계상 없는 형식(경제의 이디엄 등)은 항상 숨김
+//   · '전체'는 항상, 회화 '영상'은 LiveEnglish(피드 무관 상시 콘텐츠)라 유지
+//   · 그 외(뉴스·이디엄·경제/디스플레이 영상)는 '오늘 피드에 그 medium 이 있을 때만'
+//   · availMediums=null(로딩 전·주말)이면 정적 매핑대로 노출(깜빡임 방지)
+function isFormatAvailable(k, theme, availMediums) {
+  const staticSet = THEME_FORMATS[theme] || ["all"];
+  if (!staticSet.includes(k)) return false;
+  if (k === "all") return true;
+  if (k === "video" && theme === "general") return true;
+  if (availMediums == null) return true;
+  return availMediums.has(k);
+}
 const TRACK_KO = { economy: "경제", display: "디스플레이", general: "회화" };
 const TRACK_KO_ZH = { economy: "경제", display: "디스플레이", general: "회화" };
 const SPEEDS = [0.75, 1, 1.25];
@@ -815,22 +828,34 @@ export default function EnglishPage() {
   const isWeekend = [0, 6].includes(new Date().getDay());
   // [S26-11] 마지막으로 본 언어·테마 기억(기기별 — SYNC 대상 아님). 매번 첫 탭 복귀 방지.
   useEffect(() => {
-    try { const s = JSON.parse(localStorage.getItem("onehub_listen_last") || "null"); if (s) { if (s.lang) setLang(s.lang); if (s.theme) setTheme(s.theme); } } catch (e) {}
+    try { const s = JSON.parse(localStorage.getItem("onehub_listen_last") || "null"); if (s) { if (s.lang) setLang(s.lang); if (s.theme) setTheme(s.theme); if (s.fmt) setFmt(s.fmt); } } catch (e) {}
   }, []);
   useEffect(() => {
-    try { localStorage.setItem("onehub_listen_last", JSON.stringify({ lang, theme })); } catch (e) {}
-  }, [lang, theme]);
+    try { localStorage.setItem("onehub_listen_last", JSON.stringify({ lang, theme, fmt })); } catch (e) {}
+  }, [lang, theme, fmt]);
   // [S26-11] 스와이프는 테마 축에만(언어는 세그 클릭). 2단 스와이프(언어+테마)는 손가락이 헷갈림.
   const THEME_KEYS = THEMES.map((t) => t[0]);
   const themeSwipe = useSwipeTabs({ index: Math.max(0, THEME_KEYS.indexOf(theme)), count: THEME_KEYS.length, onChange: (i) => setTheme(THEME_KEYS[i]) });
 
-  // [형식 버튼 정리] 이 테마에 실제로 있는 형식만 노출(예: 경제의 '이디엄', 회화의 '뉴스' 숨김).
-  const availFormats = FORMATS.filter(([k]) => (THEME_FORMATS[theme] || ["all"]).includes(k));
-  // 테마를 바꿨는데 현재 선택된 형식이 그 테마에 없으면 '전체'로 되돌린다(빈 화면 방지).
+  // [형식 버튼 정리 + 동적 필터] 테마 설계상 + 오늘 실제 콘텐츠가 있는 형식만 노출.
+  const [availMediums, setAvailMediums] = useState(null); // null=미정(정적매핑) · Set=오늘 있는 medium
+  // 오늘 '전체' 피드를 한 번 받아 어떤 medium(뉴스/영상/이디엄)이 실제 있는지 파악(버튼 표시용).
   useEffect(() => {
-    if (!(THEME_FORMATS[theme] || ["all"]).includes(fmt)) setFmt("all");
+    if (showWeekend || isWeekend) { setAvailMediums(null); return; } // 주말/복습은 정적매핑
+    let alive = true;
+    setAvailMediums(null);
+    cachedJson(`/api/english/today?track=${theme}&language=${lang}`)
+      .then((d) => { if (alive) setAvailMediums(new Set((d.items || []).map((i) => i.medium).filter(Boolean))); })
+      .catch(() => { if (alive) setAvailMediums(null); });
+    return () => { alive = false; };
+  }, [theme, lang, showWeekend, isWeekend]);
+
+  const availFormats = FORMATS.filter(([k]) => isFormatAvailable(k, theme, availMediums));
+  // 선택된 형식이 (테마 변경/오늘 콘텐츠 없음으로) 사라지면 '전체'로 되돌린다(빈 화면 방지).
+  useEffect(() => {
+    if (!isFormatAvailable(fmt, theme, availMediums)) setFmt("all");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [theme]);
+  }, [theme, availMediums]);
 
   useEffect(() => {
     let alive = true;
