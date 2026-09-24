@@ -21,6 +21,15 @@ import { useRouter } from "next/router";
 const LANGS = [["en", "영어"], ["zh", "중국어"]];
 const THEMES = [["economy", "경제"], ["display", "디스플레이"], ["general", "회화"]];
 const FORMATS = [["all", "전체"], ["news", "뉴스"], ["video", "영상"], ["idiom", "이디엄"]];
+// [테마별 형식] 콘텐츠가 있는 형식만 버튼을 보인다.
+//   경제·디스플레이 = 뉴스 지문 + 유튜브 영상 (★이디엄 없음)
+//   회화(general)  = 이디엄 대화 + 영상 (★뉴스 없음)
+//   '전체'·'영상'은 공통. '전체'가 항상 있으니 형식 버튼을 숨겨도 콘텐츠 접근 손실은 없다.
+const THEME_FORMATS = {
+  economy: ["all", "news", "video"],
+  display: ["all", "news", "video"],
+  general: ["all", "video", "idiom"],
+};
 const TRACK_KO = { economy: "경제", display: "디스플레이", general: "회화" };
 const TRACK_KO_ZH = { economy: "경제", display: "디스플레이", general: "회화" };
 const SPEEDS = [0.75, 1, 1.25];
@@ -815,6 +824,14 @@ export default function EnglishPage() {
   const THEME_KEYS = THEMES.map((t) => t[0]);
   const themeSwipe = useSwipeTabs({ index: Math.max(0, THEME_KEYS.indexOf(theme)), count: THEME_KEYS.length, onChange: (i) => setTheme(THEME_KEYS[i]) });
 
+  // [형식 버튼 정리] 이 테마에 실제로 있는 형식만 노출(예: 경제의 '이디엄', 회화의 '뉴스' 숨김).
+  const availFormats = FORMATS.filter(([k]) => (THEME_FORMATS[theme] || ["all"]).includes(k));
+  // 테마를 바꿨는데 현재 선택된 형식이 그 테마에 없으면 '전체'로 되돌린다(빈 화면 방지).
+  useEffect(() => {
+    if (!(THEME_FORMATS[theme] || ["all"]).includes(fmt)) setFmt("all");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme]);
+
   useEffect(() => {
     let alive = true;
     if (showWeekend) return () => { alive = false; };   // 주말복습 패널은 WeekendChat 이 자체 로드
@@ -874,7 +891,7 @@ export default function EnglishPage() {
 
       {/* [S26-11] 축3 형식(칩 · 스와이프 아님) */}
       <div className="en-fmts" role="tablist">
-        {FORMATS.map(([key, label]) => (
+        {availFormats.map(([key, label]) => (
           <button key={key} type="button" role="tab" aria-selected={fmt === key}
             className={fmt === key ? "on" : ""} onClick={() => setFmt(key)}>{label}</button>
         ))}
