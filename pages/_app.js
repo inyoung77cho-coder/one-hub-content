@@ -11,7 +11,7 @@ import { useRouter } from "next/router";
 import { Analytics } from "@vercel/analytics/react";
 import { initSync } from "../lib/syncManager";
 import { getTrader } from "../lib/trader";
-import { enforceUserBoundary } from "../lib/session";
+import { enforceUserBoundary, clearApiCaches } from "../lib/session";
 
 // 페이지 로드당 1회만 로그인 경계 검사(사용자 전환 시 로컬 상태 초기화).
 let boundaryChecked = false;
@@ -46,7 +46,8 @@ export default function App({ Component, pageProps }) {
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
         if (d && d.authenticated && d.user && d.user.id) {
-          if (enforceUserBoundary(d.user.id)) window.location.reload();
+          // [S37-6] 사용자 전환 감지 시 API 캐시(SW)까지 지운 뒤 새로고침 — 이전 사용자의 금융 응답 노출 차단.
+          if (enforceUserBoundary(d.user.id)) clearApiCaches().finally(() => window.location.reload());
         }
       })
       .catch(() => {});

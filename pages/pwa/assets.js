@@ -327,6 +327,9 @@ export default function AssetsMapPage() {
             <span>{hasResidence ? <>운용자산 <span style={{ fontWeight: 600, fontSize: "0.62rem", color: "var(--color-ink-3)" }}>실거주 제외</span></> : "총자산"}</span>
             <b>{uk(hasResidence ? opTotal : total)}</b>
             {at && <span className="as-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
+            {/* [S37-3] 총자산 정의 명시 — 자산군별로 억 단위 소수 둘째 자리에서 반올림해 합산(J4). */}
+            <span style={{ display: "block", fontSize: "0.62rem", fontWeight: 600, color: "var(--color-ink-3)", marginTop: 2 }}
+              title="주식·ETF·부동산·현금 각각을 억 단위 소수 둘째 자리에서 반올림한 뒤 더합니다. 자산군별 반올림 오차가 총액에 미세하게 쌓일 수 있습니다.">억 단위 표시 · 자산군별 반올림</span>
           </div>
           {hasResidence && (
             <div className="as-subtotals" style={{ display: "flex", gap: 12, flexWrap: "wrap", margin: "2px 0 4px", fontSize: "0.74rem", color: "var(--color-ink-3)" }}>
@@ -359,6 +362,10 @@ export default function AssetsMapPage() {
           {(assets?.warnings || []).some((w) => w.code === "BACKEND_UNAVAILABLE") && (
             <p className="as-incomplete">⚠ 증권사 연동 자산을 불러오지 못했습니다 — 이 총자산은 <b>실제보다 적습니다</b>. 잠시 후 다시 시도해 주세요.</p>
           )}
+          {/* [S37-2] 일부 ETF 시세를 못 받아 합산에서 빠졌으면 숫자와 같은 카드에서 바로 알린다(예전엔 조용히 과소표시됐다). */}
+          {(assets?.warnings || []).filter((w) => w.code === "ETF_PRICE_MISSING").map((w, i) => (
+            <p className="as-incomplete" key={`etfmiss${i}`}>⚠ ETF {w.count}종목의 시세를 받지 못했습니다 — 이 총자산은 <b>실제보다 적습니다</b>.</p>
+          ))}
           {/* [S19-1] 기기 동기화가 아직 안 끝난 채로 확정된 총자산이면 숫자 옆에서 바로 말한다.
               (이 경고가 뜨는 상태에서는 다른 기기 입력분이 빠져 있을 수 있다.) */}
           {(assets?.warnings || []).some((w) => w.code === "SYNC_PENDING") && (
