@@ -98,6 +98,10 @@ done
 echo '  서비스 3종 active'
 curl -s http://localhost:5001/api/version | head -c 120
 "@
+# [2026-09-25 버그수정] PowerShell here-string(@"..."@)은 CRLF 라 서버 bash 가 '\r' 에서 깨진다
+#   (실측: "cd: /home/ubuntu/one-hub/auto_trade\r: No such file or directory", "syntax error near `do\r'").
+#   → 원격 전송 전에 CRLF 를 LF 로 변환한다. (이 버그로 재기동·검증·롤백이 통째로 안 돌았음.)
+$restart = $restart -replace "`r`n", "`n"
 ssh -i $KEY $SRV $restart
 if ($LASTEXITCODE -ne 0) { Write-Host "[중단] 배포 후 검증 실패 — 서버에서 롤백됨"; exit 1 }
 
