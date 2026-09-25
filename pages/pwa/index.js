@@ -156,7 +156,7 @@ function deriveRecMeta(s) {
   let reason;
   if (vol != null && vol >= 2.5) reason = `거래량 급증(${vol.toFixed(1)}배) · ${(mom ?? 0) >= 0 ? '상승' : '조정'} 모멘텀`;
   else if (rsi != null && rsi <= 35) reason = `과매도 반등 구간 · 저가 매수 관심`;
-  else if (mom != null && mom >= 10) reason = `5일 +${mom}% 강세 · 추세 지속 관심`;
+  else if (mom != null && mom >= 10) reason = `5일 +${Number(mom).toFixed(1)}% 강세 · 추세 지속 관심`; // [S35-5] change_5d 미반올림 → 1자리
   else if (rsi != null && rsi >= 45 && rsi <= 62) reason = `RSI 중립 · 수급 개선 관찰`;
   else if (vol != null && vol >= 1.3) reason = `거래량 ${vol.toFixed(1)}배 · 관심 유입`;
   else reason = `기술 지표 상위 관심 후보`;
@@ -1482,7 +1482,7 @@ export default function PWADashboard({ latestReport }) {
                           </span>
                           <span className="bf-re-r">
                             <b className="bf-re-px">{f.거래금액_억}억</b>
-                            {f.변동률 != null && <span className={`bf-re-chg ${f.변동률 > 0 ? 'up' : f.변동률 < 0 ? 'dn' : 'fl'}`}>{f.변동률 > 0 ? `▲${f.변동률}% 신고가` : f.변동률 < 0 ? `▼${Math.abs(f.변동률)}%` : '−'}</span>}
+                            {f.변동률 != null && <span className={`bf-re-chg ${f.변동률 > 0 ? 'up' : f.변동률 < 0 ? 'dn' : 'fl'}`}>{f.변동률 > 0 ? `▲${Number(f.변동률).toFixed(1)}% 신고가` : f.변동률 < 0 ? `▼${Math.abs(Number(f.변동률)).toFixed(1)}%` : '−'}</span>}
                           </span>
                         </button>
                       ))}
