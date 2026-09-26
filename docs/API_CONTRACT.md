@@ -202,7 +202,7 @@ AI 유동자산 진단(`/pwa/ai-advisor`)은 **예시 데이터를 계산에 넣
 - **서버 확인(읽기 전용)**: `auto_trade/main.py` — `total_asset = int(out2.get("tot_evlu_amt", 0))`(주석: `tot_evlu_amt = prvs_rcdl_excc_amt + scts_evlu_amt`), `balance.cash = dnca_tot_amt`. 즉 **KIS 예수금(dnca)은 `tot_evlu_amt`(=총평가금액)에 이미 포함**. 프록시 `/api/realestate/v2/total-asset` 가 `stock_uk = total_asset/1e8` 로 매핑하므로 **`ledger.total_uk` 는 예수금을 이미 1회 포함**한다.
 - **결론**: 홈(`index.js`)·AI(`ai-advisor.js`)가 `ledger.total_uk` 에 `dash.balance.cash`(예수금)를 **또 더한 것이 이중계상**. 자산(`assets.js`)·오늘(`today.js`)이 `ledger.total_uk`만 쓴 것이 옳음.
 - **수정(2026-09-26)**: 홈 2블록(히어로·자산 구성)·AI `buildAssets` 에서 예수금 가산 제거 → 네 화면 모두 총자산 = `ledger.total_uk` 단일 소스. 자산 구성 아코디언의 '현금' 행은 `breakdown.cash_uk`(온보딩 현금)만 표시(예수금은 '주식' 행=KIS 총액 안에 있으므로 현금 행에 중복 표시 안 함).
-- **영향**: KIS 예수금이 있던 사용자는 홈/AI 총자산이 예수금만큼 **감소**(이중계상 교정, KIS 앱 tot_evlu_amt 기준과 일치). 자산 곡선 스냅샷이 옛 값으로 저장돼 있으면 교정 시점에 1회 하향 계단이 생길 수 있음(정상). 예수금 0/미연동 사용자는 무변화.
+- **영향**: KIS 예수금이 있던 사용자는 홈/AI 총자산 표시가 예수금만큼 **감소**(이중계상 교정, KIS 앱 tot_evlu_amt 기준과 일치). ★자산 곡선(assetHistory)은 영향 없음 — `recordSnapshot(tr, ledger)` 가 항상 `ledger.total_uk`(단일 소스)로 적립해 왔으므로 곡선 값은 처음부터 옳았고, 이번에 홈/AI '표시값'이 곡선·자산·오늘과 일치하게 될 뿐이다(하향 계단 없음). 예수금 0/미연동 사용자는 무변화.
 - 권고(후속): 백엔드가 예수금을 `cash` 축으로 분리 노출(`scts_evlu_amt` 별도 필드)하면 '주식' 행에서 예수금을 빼고 '현금' 행으로 정확히 옮길 수 있음(현재는 프론트에서 분리 불가라 KIS 총액을 주식 행에 유지).
 
 ### C-3 · 계정 전환 경쟁 상태 — 부분 조치, 나머지 미재현
