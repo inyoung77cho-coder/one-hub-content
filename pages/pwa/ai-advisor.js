@@ -33,16 +33,17 @@ const sColor = (t) => SECTOR_COLOR[t] || "var(--color-ink-3)";
 
 // [N1] 단일 소스 스냅샷 — ta(getLedger)는 '이미' 단일 원장이 낸 결과다.
 //   여기서 온보딩값을 또 더하면 이중(주식·ETF·부동산은 삼중) 합산이 된다. 그대로 사용한다.
-//   예수금(주식계좌 cash)만 원장에 없으므로 별도 합산.
+// [C-2 2026-09-26] ★예수금(dash.balance.cash=dnca)은 이미 KIS total_asset(tot_evlu_amt)에 포함 →
+//   ledger.stock_uk 안에 있다. 여기서 또 더하면 총자산이 예수금만큼 이중계상돼 홈·자산·오늘과 어긋난다.
+//   cash 는 ledger.cash_uk(온보딩 현금)만. (dash 파라미터는 하위호환용으로 남기되 미사용)
 function buildAssets(ta, dash) {
   const b = ta?.breakdown || {};
   const won = (uk) => (uk != null ? Number(uk) * UK : 0);
-  const acctCash = dash?.balance?.cash != null ? Number(dash.balance.cash) : 0;
   return {
     stock: won(b.stock_uk),
     etf: won(b.etf_uk),
     realestate: won(b.realestate_uk),
-    cash: won(b.cash_uk) + acctCash,
+    cash: won(b.cash_uk),
   };
 }
 

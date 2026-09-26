@@ -1225,9 +1225,10 @@ export default function PWADashboard({ latestReport }) {
               {/* [v11-ux] 홈 히어로 — 오늘의 '통합' AI 판단(cross-asset). 근거는 버튼 대신 인라인 '왜?' 아코디언 */}
               {(() => {
                 // 총자산 스냅샷(홈 = 총자산 소유 페이지). 부동산 비중이 최상위 판단 축.
-                const acctCashUk = data?.balance?.cash != null ? Math.round((data.balance.cash / 1e8) * 100) / 100 : 0;
+                // [C-2 2026-09-26] KIS 예수금(dnca)은 balance.total_asset(tot_evlu_amt)에 이미 포함 → ledger.stock_uk 안에 있다.
+                //   acctCash 를 또 더하면 예수금 이중계상 → 제거. 총자산은 ledger 단일 소스(자산·오늘 화면과 일치).
                 const b = assetSum?.breakdown || {};
-                const totalUk = assetSum?.total_uk != null ? Math.round((assetSum.total_uk + acctCashUk) * 100) / 100 : null;
+                const totalUk = assetSum?.total_uk != null ? Math.round(Number(assetSum.total_uk) * 100) / 100 : null;
                 const reUk = b.realestate_uk;
                 const rePct = (totalUk && reUk != null) ? Math.round((reUk / totalUk) * 1000) / 10 : null;
                 const etfPct = (totalUk && b.etf_uk != null) ? Math.round((b.etf_uk / totalUk) * 1000) / 10 : null;
@@ -1369,18 +1370,12 @@ export default function PWADashboard({ latestReport }) {
 
               {/* [v10 UI 시안] ② 총자산 — 라벨/금액 + 자산별 행(부동산 미입력 CTA) */}
               {(() => {
-                // 현금 = 주식계좌 예수금(원→억) + 온보딩 입력 보유 현금(억)
-                const acctCashUk = data?.balance?.cash != null
-                  ? Math.round((Number(data.balance.cash) / 1e8) * 100) / 100 : null;
-                const onbCashUk = assetSum?.breakdown?.cash_uk ?? null;
-                const cashUk = (acctCashUk == null && onbCashUk == null)
-                  ? null
-                  : Math.round(((acctCashUk || 0) + (onbCashUk || 0)) * 100) / 100;
-                // 표시 총자산 = 온보딩 병합 합계 + 주식계좌 예수금(병합에는 미포함)
+                // [C-2 2026-09-26] KIS 예수금(dnca)은 balance.total_asset(tot_evlu_amt)에 이미 포함 →
+                //   ledger.stock_uk(=주식 행) 안에 있다. 현금 행은 온보딩 입력 현금(cash_uk)만 쓴다
+                //   (예수금을 현금 행에 또 넣으면 주식+현금 이중표시). 총자산도 ledger 단일 소스만(자산·오늘과 일치).
+                const cashUk = assetSum?.breakdown?.cash_uk ?? null;
                 const baseTotal = assetSum?.total_uk ?? null;
-                const totalUk = (baseTotal == null && acctCashUk == null)
-                  ? null
-                  : Math.round(((baseTotal || 0) + (acctCashUk || 0)) * 100) / 100;
+                const totalUk = baseTotal == null ? null : Math.round(Number(baseTotal) * 100) / 100;
                 const rePctA = totalUk && assetSum?.breakdown?.realestate_uk != null ? Math.round((Number(assetSum.breakdown.realestate_uk) / totalUk) * 1000) / 10 : null;
                 return (
                   <>

@@ -197,11 +197,13 @@ AI 유동자산 진단(`/pwa/ai-advisor`)은 **예시 데이터를 계산에 넣
 - `partial`: **`missing`만** 반영(`missing.length>0`). ★**`partial=false` 를 '모든 보유 평가 완료'와 동일시하지 말 것** — excluded/suspect 가 남아 있어도 partial=false 다.
 - **`fully_evaluated`**: 모든 보유가 신뢰값으로 합산됐는가 = `missing·excluded·suspect 전부 비었고 live`. '전부 평가됐나'는 이 값으로 판정한다. 검증: `node scripts/etfLive.state.test.mjs`(로직) — partial=false·excluded 있음 → fully_evaluated=false 확인.
 
-### C-2 · 화면 간 합계 일치 — ★검증 결과: 현금(KIS 예수금) 기준 불일치 발견
-자산군(주식·ETF·부동산)은 모든 화면이 `lib/ledger.js` `getLedger().breakdown` 단일 소스를 읽어 일치. 그러나 **현금 기준이 갈린다**:
-- **홈(`index.js`)·AI(`ai-advisor.js`)**: 총자산 = `ledger.total_uk` **+ `dash.balance.cash`(KIS 예수금)**.
-- **자산(`assets.js`)·오늘(`today.js`)**: 총자산 = `ledger.total_uk`만(예수금 미가산).
-→ `ledger.cash_uk`(온보딩/백엔드 cash)에 KIS 예수금이 **이미 포함돼 있으면 홈/AI 이중계상**, 아니면 **자산/오늘 과소**. 어느 쪽이 맞는지는 백엔드 `beUk.cash` 정의 확인이 필요(서버 읽기전용 대조 대상). **이번엔 코드 변경 없이 발견 사항으로 남긴다** — 총자산 정의 변경은 별도 결정. 권고: `ledger` 가 예수금까지 포함해 단일 총자산을 내고 모든 화면이 그대로 쓰도록 통일(N1 확장).
+### C-2 · 화면 간 합계 일치 — ★서버 확인 후 수정 완료(현금/예수금 이중계상 제거)
+자산군(주식·ETF·부동산)은 모든 화면이 `lib/ledger.js` `getLedger().breakdown` 단일 소스를 읽어 일치. 현금(KIS 예수금) 기준만 갈렸던 것을 **서버 정의 확인 후 통일**.
+- **서버 확인(읽기 전용)**: `auto_trade/main.py` — `total_asset = int(out2.get("tot_evlu_amt", 0))`(주석: `tot_evlu_amt = prvs_rcdl_excc_amt + scts_evlu_amt`), `balance.cash = dnca_tot_amt`. 즉 **KIS 예수금(dnca)은 `tot_evlu_amt`(=총평가금액)에 이미 포함**. 프록시 `/api/realestate/v2/total-asset` 가 `stock_uk = total_asset/1e8` 로 매핑하므로 **`ledger.total_uk` 는 예수금을 이미 1회 포함**한다.
+- **결론**: 홈(`index.js`)·AI(`ai-advisor.js`)가 `ledger.total_uk` 에 `dash.balance.cash`(예수금)를 **또 더한 것이 이중계상**. 자산(`assets.js`)·오늘(`today.js`)이 `ledger.total_uk`만 쓴 것이 옳음.
+- **수정(2026-09-26)**: 홈 2블록(히어로·자산 구성)·AI `buildAssets` 에서 예수금 가산 제거 → 네 화면 모두 총자산 = `ledger.total_uk` 단일 소스. 자산 구성 아코디언의 '현금' 행은 `breakdown.cash_uk`(온보딩 현금)만 표시(예수금은 '주식' 행=KIS 총액 안에 있으므로 현금 행에 중복 표시 안 함).
+- **영향**: KIS 예수금이 있던 사용자는 홈/AI 총자산이 예수금만큼 **감소**(이중계상 교정, KIS 앱 tot_evlu_amt 기준과 일치). 자산 곡선 스냅샷이 옛 값으로 저장돼 있으면 교정 시점에 1회 하향 계단이 생길 수 있음(정상). 예수금 0/미연동 사용자는 무변화.
+- 권고(후속): 백엔드가 예수금을 `cash` 축으로 분리 노출(`scts_evlu_amt` 별도 필드)하면 '주식' 행에서 예수금을 빼고 '현금' 행으로 정확히 옮길 수 있음(현재는 프론트에서 분리 불가라 KIS 총액을 주식 행에 유지).
 
 ### C-3 · 계정 전환 경쟁 상태 — 부분 조치, 나머지 미재현
 - **조치됨(CD)**: `session.js clearApiCaches()` 가 전환/로그아웃 시 SW `onehub-*-api` 캐시 삭제 → 이전 사용자 GET 응답이 다음 사용자에게 남는 경로 차단. 또 middleware 가 세션 tenant 로 `trader` 를 강제 덮어써(클라 trader 무시) 네트워크 응답 자체는 항상 현재 세션 데이터.
