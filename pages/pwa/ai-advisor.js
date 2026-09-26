@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import TopNav from "../../components/TopNav";
-import { computeSummary, toManwon } from "../../lib/aiAssets";
+import { computeSummary, toManwon, realRegion } from "../../lib/aiAssets";
 import { getTrader } from "../../lib/trader";
 import { getLedger } from "../../lib/ledger";
 import { recordSnapshot } from "../../lib/assetHistory"; // [S22-3] AI 탭 진입 시에도 총자산 곡선 적립
@@ -18,39 +18,12 @@ import { getHoldings as getEtfHoldings } from "../../lib/etfHoldings";
 
 const UK = 1e8; // 억 → 원
 
-// [2026-08-10] §6 데모 해제(지역만) — 백엔드 종목 검색 API(/api/stocks/search)의 theme 필드를
-//   실제 확인해보니 삼성전자조차 검색이 안 되고 다른 종목도 theme:"" 로 비어 있어(스크리너가
-//   훑는 소수 종목만 분류됨, 임의 보유종목 커버리지 없음) 섹터는 데모 유지 — 잘못된 빈 데이터로
-//   "실데이터"라고 보여주는 게 데모 배지보다 나쁘다고 판단. 지역(국내/해외)은 보유 종목의
-//   market/ccy 필드로 완전히 로컬 계산 가능해(백엔드 의존 없음) 실데이터로 교체.
-const DEMO_SECTORS = [
-  { theme: "반도체", pct: 37 },
-  { theme: "방산", pct: 22 },
-  { theme: "시장대표", pct: 21 },
-  { theme: "2차전지", pct: 18 },
-  { theme: "IT", pct: 2 },
-];
+// [2026-09-26 사실성] 이전엔 여기 DEMO_SECTORS(예시 섹터 비중)를 만들어 개인 진단 계산에 넣었다.
+//   그 예시 값이 분산 점수·테마 쏠림 경고·희석 금액을 만들어(값을 바꾸면 진단이 바뀜) 사실성 결함이었다.
+//   → 예시 섹터를 계산 입력에서 완전히 제거했다. 섹터는 백엔드 테마 분류가 연결되기 전까지 '미측정'으로
+//     표시하고 점수·경고·희석에서 제외한다. 지역(국내/해외)만 보유 종목 market/ccy 로 로컬 실계산한다.
 
-// 보유 주식·ETF의 market/ccy 필드로 국내/해외 실비중 계산(평단×수량 기준, 라이브시세 아님 —
-//   stockHoldingsValueKrw()와 동일한 간이 환산 규칙). 환율 없으면 해외분 제외(과소평가 대신 누락).
-function realRegion(stocks, etfs, fxRate) {
-  let dom = 0, ovs = 0;
-  for (const h of stocks || []) {
-    const isUsd = h.ccy === "USD";
-    if (isUsd && !fxRate) continue;
-    const v = (Number(h.avgPrice) || 0) * (Number(h.shares) || 0) * (isUsd ? fxRate : 1);
-    if (isUsd || h.market === "us") ovs += v; else dom += v;
-  }
-  for (const h of etfs || []) {
-    const isUsd = h.avgCcy === "USD";
-    if (isUsd && !fxRate) continue;
-    const v = (Number(h.avgPrice) || 0) * (Number(h.shares) || 0) * (isUsd ? fxRate : 1);
-    if (isUsd || h.market === "us") ovs += v; else dom += v;
-  }
-  const total = dom + ovs;
-  if (total <= 0) return null;
-  return { domestic: Math.round((dom / total) * 1000) / 10, overseas: Math.round((ovs / total) * 1000) / 10 };
-}
+// realRegion(지역 실비중·평단×수량·환율누락 부분측정)은 lib/aiAssets.js 로 이동(테스트 가능한 순수함수).
 
 const SECTOR_COLOR = {
   반도체: "var(--color-primary)", 방산: "var(--ob)", 시장대표: "var(--color-ink-3)",
@@ -94,11 +67,23 @@ export default function AIAdvisor() {
       ]).then(([a, dash, fxj]) => {
         if (a && a.ok && a.total_uk != null) recordSnapshot(tr, a); // [S22-3] 곡선 적립(같은 날 병합)
         setRealtyState(a?.realty_state || null);
+        // [2026-09-26 사실성] 원장 실패(a 없음/ok=false)를 0원 정상자산으로 두지 않는다 → ledgerFailed 로 전달.
+        const ledgerFailed = !(a && a.ok);
         const assets = buildAssets(a, dash);
         const fxRate = fxj?.ok ? fxj.rate : null;
-        const region = realRegion(getStockHoldings(tr), getEtfHoldings(tr), fxRate);
-        const equityMeta = { demo: false, region, sectors: DEMO_SECTORS };
-        setS(computeSummary({ as_of: new Date().toISOString(), assets, tendencyOrStyle: goal, equityMeta }));
+        const rr = realRegion(getStockHoldings(tr), getEtfHoldings(tr), fxRate);
+        // [2026-09-26 사실성] 지역=실데이터(평단×수량, 부분/완전 상태 포함), 섹터=백엔드 분류 미연결이라 미측정.
+        //   ★DEMO_SECTORS 는 계산에 넣지 않는다(예시 값이 점수·경고·희석액을 만들던 결함 제거).
+        const equityMeta = {
+          region: rr && rr.domestic != null ? { domestic: rr.domestic, overseas: rr.overseas } : null,
+          region_status: rr?.status || "unmeasured",
+          region_basis: "평단×수량(라이브 시세 아님)",
+          region_dropped: rr?.dropped || 0,
+          sectors: [],
+          sector_status: "unmeasured",
+          sector_note: "섹터 분류 데이터 미연결 — 개별 보유종목의 테마를 아직 판별하지 못합니다.",
+        };
+        setS(computeSummary({ as_of: new Date().toISOString(), assets, tendencyOrStyle: goal, equityMeta, ledgerFailed }));
       }).catch(() => setErr(true));
     };
     load();
@@ -123,26 +108,31 @@ export default function AIAdvisor() {
     : s.liquid_score >= 80 ? "var(--color-success)"
     : s.liquid_score >= 50 ? "var(--color-warning)" : "var(--color-danger)";
 
-  // 파생 표시값(§5 리밸런싱·오늘할일 금액 — equity + 데모 메타 기반)
-  const overseasSwapWon = p && eq?.region ? Math.max(0, s.equity_won * ((p.overseas - eq.region.overseas) / 100)) : 0;
-  const maxTheme = eq?.sectors?.[0];
+  // 파생 표시값(§5 리밸런싱·오늘할일 금액). [2026-09-26] 각 축이 '완전'할 때만 금액/이슈를 만든다.
+  const regionComplete = eq?.region_status === "complete";
+  const sectorComplete = eq?.sector_status === "complete";
+  const overseasSwapWon = p && regionComplete && eq?.region ? Math.max(0, s.equity_won * ((p.overseas - eq.region.overseas) / 100)) : 0;
+  const maxTheme = sectorComplete ? eq?.sectors?.[0] : null;
   const diluteWon = p && maxTheme && maxTheme.pct > p.theme_cap ? s.equity_won * ((maxTheme.pct - p.theme_cap) / 100) : 0;
   const cashFloorTgtPct = p ? p.cash_floor : 0; // §5 현금 목표 = liquid × cash_floor (하한 유지)
   const curCashPct = s && s.liquid > 0 ? (s.assets.cash / s.liquid) * 100 : 0;
   const cashDeltaWon = s ? s.liquid * (cashFloorTgtPct / 100) - s.assets.cash : 0;
   const pctOfTotal = (v) => (s && s.total > 0 ? Math.round((v / s.total) * 1000) / 10 : 0);
 
-  // [§3-2 피드백6] 지금 가장 큰 문제 한 줄(top_issue) — 점수 바로 아래 최상단 노출
+  // [§3-2 피드백6] 지금 가장 큰 문제 한 줄(top_issue). [2026-09-26] 데이터 상태를 지킨다:
+  //   · 테마/지역 이슈는 해당 축이 '완전'할 때만  · 현금 이슈는 배분적합도 기반이라 유지
+  //   · '균형 양호'는 분산도까지 측정됐을 때만(미측정을 양호로 표기 금지)  · 원장 실패면 진단 안 냄
   const curCashPctR = Math.round(curCashPct * 10) / 10;
   const topIssue = (() => {
-    if (!measured || !p) return null;
-    if (maxTheme && maxTheme.pct > p.theme_cap)
+    if (!p || !s?.data_ok || !(s?.liquid > 0)) return null;
+    if (sectorComplete && maxTheme && maxTheme.pct > p.theme_cap)
       return { txt: `${maxTheme.theme} ${maxTheme.pct}% 쏠림`, sub: `단일 테마 상한 ${p.theme_cap}% 초과 — 신규 매수를 타섹터로 희석하세요.`, color: "var(--color-danger)" };
-    if (eq?.region && eq.region.domestic >= 100)
+    if (regionComplete && eq?.region && eq.region.domestic >= 100)
       return { txt: `주식형 국내 100% 쏠림`, sub: `목표 국내 ${p.domestic}% — 해외상장 ETF로 지역 분산이 필요합니다.`, color: "var(--color-danger)" };
     if (Math.abs(curCashPctR - p.cash_floor) > 3)
       return { txt: `현금 비중 ${curCashPctR}%`, sub: `현금 하한 ${p.cash_floor}% 대비 ${curCashPctR > p.cash_floor ? "초과 — 저노출 자산에 배치" : "부족 — 확보 권장"}.`, color: "var(--color-warning)" };
-    return { txt: `배분 균형 양호`, sub: `유동자산 배분이 목표 범위 안에 있습니다.`, color: "var(--color-success)" };
+    if (measured) return { txt: `배분 균형 양호`, sub: `유동자산 배분이 목표 범위 안에 있습니다.`, color: "var(--color-success)" };
+    return null; // 분산도 미측정 → '양호'라고 단정하지 않는다
   })();
   // [§3-2] 부동산 입력/미입력 상태 — 점수 스코프 오해(이미지1↔6) 방지 배너
   // [S1.1] 단일소스 realty_state 우선, 없으면 계산값 폴백 → 배너·총자산 일치
@@ -187,11 +177,25 @@ export default function AIAdvisor() {
       <section className="hero">
         <div className="hero-top"><span className="t">🩺 AI 유동자산 배분 건강도</span></div>
         <div className="hero-cap">부동산(실물) 제외 · 유동자산 <span className="num">{s ? toManwon(s.liquid) : "—"}</span> 만원 기준 · 내 배분이 건강한지 진단합니다</div>
-        {measured ? (
+        {!s ? (
+          <div className="hero-pending">측정 준비 중…</div>
+        ) : !s.data_ok ? (
+          <div className="hero-pending">자산을 불러오지 못했습니다 — 진단을 낼 수 없습니다. 잠시 후 다시 시도하세요.</div>
+        ) : !p ? (
+          <div className="hero-pending">온보딩 미완료 → 목표 산출 불가 · <Link href="/pwa/onboarding">설정하기</Link></div>
+        ) : !(s.liquid > 0) ? (
+          <div className="hero-pending">유동자산 없음 → 측정 불가</div>
+        ) : (
           <>
             <div className="score-row">
-              <div className="score" style={{ color: scoreColor }}>{s.liquid_score}<small>점</small></div>
-              <div className="score-def">배분적합도 <b>{s.subscores.allocation}</b> × 분산도 <b>{s.subscores.diversification}</b> 결합</div>
+              <div className="score" style={{ color: scoreColor }}>
+                {s.liquid_score != null ? <>{s.liquid_score}<small>점</small></> : <span className="unmeasured">미측정</span>}
+              </div>
+              <div className="score-def">
+                {s.liquid_score != null
+                  ? <>배분적합도 <b>{s.subscores.allocation}</b> × 분산도 <b>{s.subscores.diversification}</b> 결합</>
+                  : <>배분적합도 <b>{s.subscores.allocation}</b> 측정됨 · <b>분산도 미측정</b>이라 종합점수 보류</>}
+              </div>
             </div>
             <div className="subscores">
               <div className="sub">
@@ -199,13 +203,13 @@ export default function AIAdvisor() {
                 <div className="b"><i style={{ width: `${s.subscores.allocation}%`, background: "var(--color-warning)" }} /></div>
               </div>
               <div className="sub">
-                <div className="k"><span>분산도 <em>쏠림 없음</em></span><b>{s.subscores.diversification}</b></div>
-                <div className="b"><i style={{ width: `${s.subscores.diversification}%`, background: "var(--color-danger)" }} /></div>
+                <div className="k"><span>분산도 <em>쏠림 없음</em></span><b>{s.subscores.diversification != null ? s.subscores.diversification : "미측정"}</b></div>
+                {s.subscores.diversification != null
+                  ? <div className="b"><i style={{ width: `${s.subscores.diversification}%`, background: "var(--color-danger)" }} /></div>
+                  : <div className="sub-note">{!s.equity_measured ? "주식형 자산 없음 — 분산 평가 대상 없음" : `섹터 분류 미연결${eq?.region_status !== "complete" ? " · 지역 부분측정" : ""} — 쏠림 판정 보류`}</div>}
               </div>
             </div>
           </>
-        ) : (
-          <div className="hero-pending">{!s ? "측정 준비 중…" : !p ? "온보딩 미완료 → 목표 산출 불가" : "유동자산 없음 → 측정 불가"}</div>
         )}
       </section>
 
@@ -328,28 +332,41 @@ export default function AIAdvisor() {
         <div className="card">
           <div className="sec-title">🧭 주식형 자산 균형</div>
           <div className="eq-head"><div className="l">주식 + ETF 합산 (주식형)</div><div className="v num">{toManwon(s.equity_won)}</div></div>
+          {!s.equity_measured ? (
+            <div className="axis-note">주식형(주식+ETF) 자산이 없어 <b>분산 평가 대상이 없습니다.</b> 종목을 추가하면 지역·섹터 균형을 진단합니다.</div>
+          ) : (
+          <>
           <div className="eq-note">ETF도 주식형이라 개별주식과 합쳐 하나의 주식 노출로 봅니다. 축소가 아니라 <b>국내/해외·섹터 균형</b>이 목표.</div>
 
-          {eq.region && (
+          {/* 🌏 지역 — 평단×수량 기준(라이브 시세 아님). 환율 없는 해외분 제외 시 '부분 측정'으로 고지. */}
+          <div className="mini-h">🌏 지역{eq.region_status === "partial" && <span className="stat-badge partial">부분측정</span>}{eq.region_status === "unmeasured" && <span className="stat-badge unmeas">미측정</span>}{p && <span className="goal">온보딩 · 국내{p.domestic} 해외{p.overseas}</span>}</div>
+          {eq.region ? (
             <>
-              <div className="mini-h">🌏 지역{p && <span className="goal">온보딩 · 국내{p.domestic} 해외{p.overseas}</span>}</div>
               <div className="seg"><span style={{ width: `${eq.region.domestic}%`, background: "var(--color-primary)" }} /><span style={{ width: `${eq.region.overseas}%`, background: "var(--color-warning)" }} /></div>
               <div className="legend"><span className="it"><i style={{ background: "var(--color-primary)" }} />국내 <b>{eq.region.domestic}%</b></span><span className="it"><i style={{ background: "var(--color-warning)" }} />해외 <b>{eq.region.overseas}%</b></span></div>
+              <div className="axis-note">기준: {eq.region_basis || "평단×수량"}{eq.region_dropped > 0 ? ` · ⚠️ 환율 정보 없는 해외 보유 ${eq.region_dropped}건 제외 — 부분 측정이라 완전한 지역 비중으로 판정하지 않습니다.` : ""}</div>
               {eq.warnings.includes("region_concentration") && (
                 <div className="callout down"><div className="h">🚨 지역 쏠림</div>주식형 전액 국내. 원화·국내 경기 단일 리스크에 노출. 해외상장 ETF로 <b>{p ? p.overseas : 30}%p 분산</b> 필요.</div>
               )}
             </>
+          ) : (
+            <div className="axis-note">🌏 지역 미측정 — {eq.region_dropped > 0 ? `보유 전부 환율 정보가 없어(${eq.region_dropped}건) 지역 비중을 낼 수 없습니다.` : "주식형 보유가 없습니다."}</div>
           )}
 
-          {eq.sectors?.length > 0 && (
+          {/* 🎯 섹터 — 백엔드 테마 분류 미연결이라 '미측정'. 예시 섹터를 점수·희석 계산에 넣지 않습니다. */}
+          <div className="mini-h">🎯 섹터 (합산){eq.sector_status !== "complete" && <span className="stat-badge unmeas">미측정</span>}{p && <span className="goal">온보딩 · 단일테마 ≤{p.theme_cap}%</span>}</div>
+          {eq.sector_status === "complete" && eq.sectors.length > 0 ? (
             <>
-              <div className="mini-h">🎯 섹터 (합산)<span className="demo">데모 데이터</span>{p && <span className="goal">온보딩 · 단일테마 ≤{p.theme_cap}%</span>}</div>
               <div className="seg">{eq.sectors.map((x) => <span key={x.theme} style={{ width: `${x.pct}%`, background: sColor(x.theme) }} />)}</div>
               <div className="legend">{eq.sectors.filter((x) => x.pct >= 5).map((x) => <span className="it" key={x.theme}><i style={{ background: sColor(x.theme) }} />{x.theme} <b>{x.pct}%</b></span>)}</div>
               {maxTheme && p && maxTheme.pct > p.theme_cap && (
                 <div className="callout warn"><div className="h">⚠️ 섹터 쏠림</div>{maxTheme.theme} <b>{maxTheme.pct}%</b>가 상한({p.theme_cap}%) 초과. ETF와 개별주식이 {maxTheme.theme}에 겹쳐 실질 분산 낮음.</div>
               )}
             </>
+          ) : (
+            <div className="axis-note">{eq.sector_note || "섹터 분류 데이터 미연결 — 테마 쏠림을 아직 판정하지 못합니다."} 이 상태에선 섹터 경고·희석 제안·분산 점수를 만들지 않습니다.</div>
+          )}
+          </>
           )}
 
           <div className="tax">
@@ -384,7 +401,7 @@ export default function AIAdvisor() {
       )}
 
       {/* [S6] 배분 제안 실행 카드 — 목표비중 슬라이더 + 실시간 세금·환효과(추정) */}
-      {s && p && eq && ovTarget != null && (
+      {s && p && eq && ovTarget != null && regionComplete && eq.region && (
         <div className="card exec-card">
           <div className="sec-title">🎚️ 배분 제안 실행 <span className="sec-sub">해외 목표비중 · 실시간 세금·환</span></div>
           <div className="exec-lead">주식형 <b>{toManwon(s.equity_won)}</b> 중 해외 노출을 조정합니다. 현재 국내 {curOverseasPct === 0 ? 100 : 100 - curOverseasPct}% · 해외 {curOverseasPct}%.</div>
@@ -450,6 +467,13 @@ export default function AIAdvisor() {
         .sec-title { font-size: var(--fs-5); font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 7px; }
         .sec-sub { font-size: var(--fs-2); color: var(--color-ink-2); font-weight: 600; background: var(--color-bg); padding: 3px 9px; border-radius: var(--radius-sm); margin-left: auto; }
         .demo { font-size: var(--fs-1); font-weight: 800; color: var(--color-warning-ink); background: var(--color-warning-soft); padding: 3px 8px; border-radius: var(--radius-sm); margin-left: auto; letter-spacing: .3px; }
+        /* [2026-09-26 사실성] 데이터 상태 배지·미측정 주석 — 모바일 360/390 에서 넘침/잘림 없게 keep-all + anywhere */
+        .stat-badge { font-size: var(--fs-1); font-weight: 800; padding: 2px 8px; border-radius: var(--radius-sm); margin-left: 6px; letter-spacing: .2px; }
+        .stat-badge.unmeas { color: var(--color-ink-2); background: var(--color-card-soft); }
+        .stat-badge.partial { color: var(--color-warning-ink); background: var(--color-warning-soft); }
+        .axis-note { font-size: var(--fs-1); color: var(--color-ink-2); line-height: 1.55; margin: 6px 0 2px; word-break: keep-all; overflow-wrap: anywhere; }
+        .sub-note { font-size: var(--fs-1); color: var(--color-ink-2); margin-top: 4px; word-break: keep-all; overflow-wrap: anywhere; }
+        .score .unmeasured { font-size: var(--fs-5); font-weight: 800; color: var(--color-ink-3); }
 
         .hero { background: linear-gradient(160deg, var(--hero-grad-1), var(--hero-grad-2)); color: var(--hero-ink); border-radius: var(--radius-hero); padding: 22px; margin-bottom: 16px; box-shadow: var(--shadow-float); }
         .hero-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }

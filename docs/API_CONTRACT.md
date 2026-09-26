@@ -171,3 +171,15 @@ S17 백로그로 넘깁니다(우선순위 낮음: 집행 경로가 하나라 �
 - **반올림**: `lib/ledger.js:23` `round2`가 자산군(주식·ETF·부동산·현금)을 **각각 억 단위 소수 둘째 자리(0.01억=100만원)에서 반올림**한 뒤 더한다. 자산군별 반올림 오차가 총액에 미세하게 쌓일 수 있다. 이 사실을 `/pwa/assets` 총자산 옆에 "억 단위 표시 · 자산군별 반올림"으로 고지한다.
 - **원 단위 원장 전환**(중간 반올림 제거)은 회귀 위험이 커 이번 범위 밖 — 정의 명시만 먼저 한다.
 - 전세·월세 **보증금**은 부채성 항목이라 부동산 평가액에서 차감한다(`ledger.js` `onehub_re_properties`의 `deposit`). 이는 "순자산"이 아니라 총자산 내 부동산 값 보정이다.
+
+---
+
+## AI 진단 데이터 상태 계약 (2026-09-26 · `lib/aiAssets.js` `computeSummary`)
+
+AI 유동자산 진단(`/pwa/ai-advisor`)은 **예시 데이터를 계산에 넣지 않고, 축별로 측정 상태를 구분**한다.
+
+- **equityMeta**(입력): `region`, `region_status`(`complete`|`partial`|`unmeasured`), `region_basis`, `region_dropped`, `sectors`, `sector_status`(`complete`|`unmeasured`), `sector_note`. ★지역은 보유 종목 `market/ccy` 로컬 실계산(**평단×수량 기준**, 라이브 시세 아님); 환율 없는 USD 보유는 제외하고 `region_dropped>0` → `partial`. ★섹터는 백엔드 테마 분류 미연결이라 현재 항상 `unmeasured`(예시 섹터 계산 투입 금지).
+- **점수 규칙**: 배분 적합도(`subscores.allocation`)는 equity/cash 로 항상 계산. **분산도(`subscores.diversification`)와 종합 유동점수(`liquid_score`)는 지역·섹터가 '모두 complete'일 때만 산출**하고, 아니면 `null`(미측정) — 데이터 부재를 100점/‘균형 양호’로 표현하지 않는다.
+- **경고·리밸런싱**: `region_concentration`(국내 100%)·해외 스왑액은 `region_status==='complete'`일 때만, 테마 상한 경고·희석액은 `sector_status==='complete'`일 때만 생성. 부분/미측정 축으로 확정 경고·금액을 만들지 않는다.
+- **실패 상태**: 원장 실패(`getLedger` 반환 없음/`ok=false`) → `ledgerFailed` 전달 → `data_ok=false`·`measurable=false`. 0원 정상 자산·정상 진단을 만들지 않는다. `equity_measured=false`(주식형 0)면 ‘분산 평가 대상 없음’으로 구분.
+- 소비자: `pages/pwa/ai-advisor.js` 단일. 검증: `node scripts/aiAdvisor.dataquality.test.mjs`.
