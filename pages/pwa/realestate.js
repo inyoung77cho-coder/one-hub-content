@@ -15,6 +15,7 @@ import SegTabs from "../../components/shared/SegTabs"; // [S26-5] 공용 세그�
 import ReNewHigh from "../../components/ReNewHigh"; // [S28-10] 신고가(없으면 안 뜸)
 import { estimateSellCost, MOVE_COST_DISCLAIMER } from "../../lib/moveCost"; // [S22-9] 갈아타기 거래비용
 import ReIncomeSummaryCard from "../../components/ReIncomeSummaryCard";
+import { markDeleted } from "../../lib/recordSync"; // [C-4] 삭제 시 tombstone(기기 간 삭제 반영)
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -58,10 +59,11 @@ export default function RealEstateDashboard() {
     const deposit = Math.max(0, Number(pDeposit) || 0);
     const monthly = Math.max(0, Number(pMonthly) || 0);
     const buyUk = Number(pBuy) > 0 ? Number(pBuy) : null; // [수익] 매수가(선택) — 있으면 평가손익 집계
-    saveReProps([...reProps, { id: Date.now(), name, valueUk: v, buyUk, deposit, monthly, memo: String(pMemo || "").trim() }]);
+    const now = Date.now();
+    saveReProps([...reProps, { id: now, name, valueUk: v, buyUk, deposit, monthly, memo: String(pMemo || "").trim(), ts: now, updatedAt: now }]);
     setPName(""); setPVal(""); setPMemo(""); setPDeposit(""); setPMonthly(""); setPBuy(""); setAddProp(false);
   };
-  const delReProp = (id) => saveReProps(reProps.filter((p) => p.id !== id));
+  const delReProp = (id) => { saveReProps(reProps.filter((p) => p.id !== id)); markDeleted("onehub_re_properties", id); }; // [C-4] 삭제 로그로 다른 기기에서 되살아나지 않게
   // [item1] 부동산 검색 — 상단 🔍를 종목검색이 아니라 단지/관심지역 검색으로.
   const [reSearchOpen, setReSearchOpen] = useState(false);
   const [reSearchQ, setReSearchQ] = useState("");
