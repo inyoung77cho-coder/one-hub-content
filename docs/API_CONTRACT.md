@@ -183,3 +183,42 @@ AI 유동자산 진단(`/pwa/ai-advisor`)은 **예시 데이터를 계산에 넣
 - **경고·리밸런싱**: `region_concentration`(국내 100%)·해외 스왑액은 `region_status==='complete'`일 때만, 테마 상한 경고·희석액은 `sector_status==='complete'`일 때만 생성. 부분/미측정 축으로 확정 경고·금액을 만들지 않는다.
 - **실패 상태**: 원장 실패(`getLedger` 반환 없음/`ok=false`) → `ledgerFailed` 전달 → `data_ok=false`·`measurable=false`. 0원 정상 자산·정상 진단을 만들지 않는다. `equity_measured=false`(주식형 0)면 ‘분산 평가 대상 없음’으로 구분.
 - 소비자: `pages/pwa/ai-advisor.js` 단일. 검증: `node scripts/aiAdvisor.dataquality.test.mjs`.
+
+---
+
+## 패키지 C — 평가·계정·동기화 (2026-09-26 검증·설계)
+
+> 범위: **계약 정의 + 재현 검증 + 점진 설계**. 저장소 전체 교체·사용자 데이터 일괄 변경·운영 배포는 하지 않는다.
+
+### C-1 · ETF 평가 상태 계약 (`lib/etfLive.js` 반환) — 구현됨
+`{ krw, live, source, partial, fully_evaluated, missing[], excluded[], suspect[] }`.
+- `source`: **`live`**(실측 종가 합산) / **`backend_summary`**(실측 하나도 못 얻어 백엔드 요약 폴백·라이브 아님) / **`none`**.
+- `missing`: 시세 못 받음 또는 환율 없어 환산 불가. `excluded`: 평단 10배 이상 어긋남(S22-1). `suspect`: 직전 정상가 대비 급변(S24-3). — **서로 다른 사유이며 각각 배열로 구분**.
+- `partial`: **`missing`만** 반영(`missing.length>0`). ★**`partial=false` 를 '모든 보유 평가 완료'와 동일시하지 말 것** — excluded/suspect 가 남아 있어도 partial=false 다.
+- **`fully_evaluated`**: 모든 보유가 신뢰값으로 합산됐는가 = `missing·excluded·suspect 전부 비었고 live`. '전부 평가됐나'는 이 값으로 판정한다. 검증: `node scripts/etfLive.state.test.mjs`(로직) — partial=false·excluded 있음 → fully_evaluated=false 확인.
+
+### C-2 · 화면 간 합계 일치 — ★검증 결과: 현금(KIS 예수금) 기준 불일치 발견
+자산군(주식·ETF·부동산)은 모든 화면이 `lib/ledger.js` `getLedger().breakdown` 단일 소스를 읽어 일치. 그러나 **현금 기준이 갈린다**:
+- **홈(`index.js`)·AI(`ai-advisor.js`)**: 총자산 = `ledger.total_uk` **+ `dash.balance.cash`(KIS 예수금)**.
+- **자산(`assets.js`)·오늘(`today.js`)**: 총자산 = `ledger.total_uk`만(예수금 미가산).
+→ `ledger.cash_uk`(온보딩/백엔드 cash)에 KIS 예수금이 **이미 포함돼 있으면 홈/AI 이중계상**, 아니면 **자산/오늘 과소**. 어느 쪽이 맞는지는 백엔드 `beUk.cash` 정의 확인이 필요(서버 읽기전용 대조 대상). **이번엔 코드 변경 없이 발견 사항으로 남긴다** — 총자산 정의 변경은 별도 결정. 권고: `ledger` 가 예수금까지 포함해 단일 총자산을 내고 모든 화면이 그대로 쓰도록 통일(N1 확장).
+
+### C-3 · 계정 전환 경쟁 상태 — 부분 조치, 나머지 미재현
+- **조치됨(CD)**: `session.js clearApiCaches()` 가 전환/로그아웃 시 SW `onehub-*-api` 캐시 삭제 → 이전 사용자 GET 응답이 다음 사용자에게 남는 경로 차단. 또 middleware 가 세션 tenant 로 `trader` 를 강제 덮어써(클라 trader 무시) 네트워크 응답 자체는 항상 현재 세션 데이터.
+- **미재현(환경 제약)**: A 로그인 중 시작된 느린 요청이 B 로그인 직후 도착해 캐시에 적히는 초경합, 오프라인 재진입, 초기 동기화 경쟁은 **2계정×배포 PWA×SW 가 필요해 이 환경에서 재현 불가**. ★재현 없이 개인정보 노출이 있다고 단정하지 않는다 — C 후속에서 실제 재현 테스트로 확인. (완화 아이디어: clearApiCaches 를 reload 이전에 await 완료 후, 진행 중 fetch 취소.)
+
+### C-4 · 기기 동기화 손실 — ★재현됨 + 점진 설계
+현재 `syncManager.js` 는 **키 통값 + 단일 전역 `updatedAt` + LWW**. 재현(`node --import ./scripts/extless-loader.mjs scripts/syncMerge.loss.test.mjs`, 실제 `mergePayloads`):
+- **손실1**: 두 기기가 같은 키(예: `onehub_stock_holdings`)에 서로 다른 종목을 각각 추가 → 통값 LWW 로 한쪽 레코드 통째 소실.
+- **손실2**: 한 기기의 삭제가 tombstone 이 없어, 다른 기기(삭제 대상이 아직 있는·더 최근) 값이 이기면 **되살아남**.
+- (대조) 서로 다른 키는 union 으로 보존 — 이 경우엔 정확.
+
+**점진 설계(단번 교체 금지)**:
+1. **1단계(범위 좁게)**: 배열형 고위험 키만(`onehub_stock_holdings`·`onehub_etf_holdings`·`onehub_etf_other`·`onehub_re_properties`) 레코드 단위 병합으로 전환. 스칼라 키는 기존 통값 LWW 유지.
+2. **레코드 계약**: 각 레코드에 `id`(이미 대부분 있음)·`updatedAt`·`deletedAt`(tombstone) 부여. 병합 = id 기준 union, 같은 id 는 `updatedAt` 큰 쪽, `deletedAt` 있으면 삭제 우선(일정 보존기간 후 청소).
+3. **마이그레이션**: 기존 레코드에 `id`/`updatedAt` 없으면 로드시 부여(값 보존, 분할·추정 금지). 서버 payload 는 그대로 두고 클라 병합만 교체.
+4. **검증**: 위 재현 테스트가 '소실 0·삭제 유지'로 바뀌는지로 통과 판정.
+※ 실제 구현은 별도 작업(사용자 데이터 안전 때문에 dry-run·구/신 비교 후 전환).
+
+### C-5 · 과거 증권사 병합 데이터
+CC(S37-4)에서 병합 키에 broker·code 를 넣되 **기존 합쳐진 레코드는 쪼개지 않았다**(원본 근거 없이 추정 분할 금지). 이 원칙 유지 — 복원은 원본 입력 근거가 있을 때만.
