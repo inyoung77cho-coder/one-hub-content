@@ -39,6 +39,7 @@ import dynamic from "next/dynamic";
 const WithdrawCard = dynamic(() => import("../../components/WithdrawCard"), { ssr: false }); // [S31-4] 인출 계획(인출 모드만)
 import PartnerCard from "../../components/PartnerCard"; // [S31-6] 제휴(보유0·KIS미연동일 때만·계약 전 렌더 안 됨)
 import VideoLink from "../../components/VideoLink"; // [S34-6] 막힌 지점 사용법 영상(미발행이면 안 뜸)
+import PensionTodayCard from "../../components/PensionTodayCard"; // [S20-PEN E-3] 연금 오늘 할 일(계좌 없으면 안 뜸)
 import { cachedJson } from "../../lib/quoteCache"; // [S20-3] /api/pwa-ai-daily 중복 GET dedup
 import TraderBadge from "../../components/shared/TraderBadge";
 import AppHeader from "../../components/AppHeader";
@@ -657,6 +658,8 @@ export default function TodayPage({ announcements = [] }) {
         {lifeStage === "withdraw" && (
           <div style={{ order: 0 }}><WithdrawCard operatingUk={headUk != null ? headUk : (totalUk != null ? totalUk : null)} /></div>
         )}
+        {/* [S20-PEN E-3] 연금 오늘 할 일 — 연금 계좌·액션 있을 때만(자체 판단). ?focus=pension 시 스크롤. */}
+        <PensionTodayCard />
         {/* [S31-6] 보유 0건(KIS 미연동+직접입력 없음)일 때만 제휴 자리 — 계약 전엔 렌더 안 됨. AI 판단 화면 아님. */}
         {positions.length === 0 && (
           <div style={{ order: 2 }}><PartnerCard place="today" compact /></div>

@@ -10,13 +10,15 @@ const won = (v) => (v == null ? "-" : Math.round(Number(v)).toLocaleString());
 const man = (v) => (v == null ? "-" : `${Math.round(Number(v) / 1e4).toLocaleString()}만`);
 const pct = (v, d = 2) => (v == null ? "-" : `${Number(v).toFixed(d)}%`);
 
-const ACCOUNTS = [
+// 계좌 목록은 /api/pwa/pension/accounts 로 로드. 미도달 시 폴백.
+const FALLBACK_ACCOUNTS = [
   { id: "A-PEN-01", label: "개인연금", type: "PENSION_SAVINGS" },
   { id: "A-DC-01", label: "퇴직연금", type: "DC" },
 ];
 
 export default function PensionPage() {
-  const [acct, setAcct] = useState(ACCOUNTS[0]);
+  const [accountList, setAccountList] = useState(FALLBACK_ACCOUNTS);
+  const [acct, setAcct] = useState(FALLBACK_ACCOUNTS[0]);
   const [snap, setSnap] = useState(null);
   const [risk, setRisk] = useState(null);
   const [cards, setCards] = useState(null);
@@ -47,6 +49,18 @@ export default function PensionPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // 계좌 목록 로드(있으면 탭을 실제 계좌로 교체)
+  useEffect(() => {
+    let alive = true;
+    P.getAccounts().then((r) => {
+      if (!alive || !r.data?.ok || !r.data.accounts?.length) return;
+      const list = r.data.accounts.map((a) => ({ id: a.account_id, label: a.label, type: a.account_type }));
+      setAccountList(list);
+      setAcct((cur) => list.find((x) => x.id === cur.id) || list[0]);
+    });
+    return () => { alive = false; };
+  }, []);
+
   const doPreview = async () => {
     setMsg("");
     const r = await P.pastePreview(acct.id, pasteText);
@@ -70,7 +84,7 @@ export default function PensionPage() {
         <h1 className="pen-title">🏦 연금 <span className="pen-unit">단위: 원</span></h1>
 
         <div className="pen-tabs" role="tablist">
-          {ACCOUNTS.map((a) => (
+          {accountList.map((a) => (
             <button key={a.id} role="tab" aria-selected={acct.id === a.id}
               className={acct.id === a.id ? "on" : ""} onClick={() => setAcct(a)}>{a.label}</button>
           ))}
