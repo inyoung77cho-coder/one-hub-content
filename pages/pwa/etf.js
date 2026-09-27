@@ -737,64 +737,9 @@ export default function EtfDashboard() {
   // [2026-08-22] 미국 ETF 매매 시 거래시간·환율 참고 — 보유 중일 때만, 목표 배분과 무관한 사실이라 안 잠금.
   if (holdings.some(isOverseasHolding))
     etfTodos.push({ acct: "일반", icon: "🕐", title: "미국 ETF 매매 시간·환율 참고", detail: "미국 정규장은 한국시간 기준 밤 22:30~05:00(서머타임) 또는 23:30~06:00(그 외)에 열립니다. 원화→달러 환전이 필요해 환율 변동분도 실질 매수단가에 영향을 줍니다.", tone: "info" });
-  const hasPension = holdings.some((h) => isPensionAcct(h.account || "일반")) || otherAssets.some((o) => isPensionAcct(o.account || "일반"));
-  if (hasPension) {
-    // 세액공제 한도는 개인연금+IRP 합산(연 900만) — 두 계좌 취득액을 함께 본다
-    const limit = pensionCreditLimitCombined();
-    const penRows = okHoldings.filter((h) => isPensionAcct(h.account || "일반"));
-    const acquired = penRows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
-    const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
-    const room = Math.max(0, limit - contrib);
-    if (room > 0)
-      etfTodos.push({ acct: "연금", icon: "🎁", title: `연금 추가납입 여유 ${won(room)}원`, detail: `개인연금+IRP 합산 세액공제 한도(${won(limit)}원)까지 ${won(room)}원 남았습니다. 추가 납입하면 13.2~16.5% 세액공제를 더 받습니다(연금저축 단독 한도 600만).`, tone: "good" });
-    else
-      etfTodos.push({ acct: "연금", icon: "✅", title: "연금 세액공제 한도 충족", detail: "개인연금+IRP 합산 세액공제 한도를 채웠습니다. 초과 납입분은 내년 이월공제 또는 ISA·일반 활용을 검토하세요.", tone: "good" });
-
-    // [2026-08-23] 연금 운영 제안 — 디폴트옵션 방치·같은 지수 중복 보유·현금 방치를
-    // 실제 보유(티커+기타자산) 데이터에서 감지한다. 세 가지 다 '사실 감지'라 목표
-    // 배분과 무관하게(잠금 없이) 보여준다 — 위 손익통산·해외배당과 같은 원칙.
-    const pensionItems = [
-      ...holdings.filter((h) => isPensionAcct(h.account || "일반"))
-        .map((h) => ({ name: h.ticker, account: h.account, valueKrw: holdingMetrics(h).valueKrw || 0, isCash: false })),
-      ...otherAssets.filter((o) => isPensionAcct(o.account || "일반"))
-        .map((o) => ({ name: o.name, account: o.account, valueKrw: Number(o.valueKrw) || 0, isCash: !!o.isCash })),
-    ];
-
-    // 1) 디폴트옵션 방치 — DC 미지정 가입자용 자동 상품에 큰 금액이 남아있는 경우.
-    const defaultOptItems = pensionItems.filter((x) => /디폴트\s*옵션|default\s*option/i.test(x.name));
-    const defaultOptSum = defaultOptItems.reduce((a, x) => a + x.valueKrw, 0);
-    if (defaultOptSum > 0)
-      etfTodos.push({ acct: "연금", icon: "⚙️", title: `디폴트옵션 방치 ${won(defaultOptSum)}원`, detail: `${[...new Set(defaultOptItems.map((x) => x.account))].join("·")} 계좌에 자동배정(디폴트옵션) 상태로 ${won(defaultOptSum)}원이 있습니다. 가입자가 직접 운용을 지시하지 않았을 때 자동 배정되는 보수적 상품이라, 직접 투자상품을 선택하면 본인 성향에 맞게 조정할 수 있습니다.`, tone: "warn" });
-
-    // 2) 같은 지수를 여러 상품으로 중복 보유 — 계좌별로 그룹핑, 같은 지수 2개 이상이면 표시.
-    const INDEX_KEYWORDS = [
-      { key: "나스닥100", re: /나스닥\s*100|nasdaq\s*100/i },
-      { key: "S&P500", re: /S&P\s*500|에스앤피\s*500/i },
-      { key: "코스피200", re: /코스피\s*200|kospi\s*200/i },
-    ];
-    const detectIndex = (name) => { for (const k of INDEX_KEYWORDS) if (k.re.test(name)) return k.key; return null; };
-    const byIndex = {};
-    pensionItems.filter((x) => !x.isCash).forEach((x) => {
-      const idx = detectIndex(x.name);
-      if (!idx) return;
-      const gkey = `${x.account}::${idx}`;
-      (byIndex[gkey] = byIndex[gkey] || []).push(x);
-    });
-    Object.entries(byIndex).forEach(([gkey, items]) => {
-      if (items.length < 2) return;
-      const [account, idx] = gkey.split("::");
-      const sum = items.reduce((a, x) => a + x.valueKrw, 0);
-      etfTodos.push({ acct: "연금", icon: "🔁", title: `${account} ${idx} 중복 보유 ${items.length}개`, detail: `${items.map((x) => x.name).join(" · ")} — 같은 지수를 여러 상품으로 나눠 보유 중입니다(합계 ${won(sum)}원). 하나로 통합하면 보수(수수료) 중복을 줄일 수 있습니다.`, tone: "warn" });
-    });
-
-    // 3) 계좌 안 현금 방치 — 투자상품으로 옮기지 않으면 사실상 수익이 안 난다.
-    const cashByAcct = {};
-    pensionItems.filter((x) => x.isCash && x.valueKrw > 0).forEach((x) => { cashByAcct[x.account] = (cashByAcct[x.account] || 0) + x.valueKrw; });
-    Object.entries(cashByAcct).forEach(([account, sum]) => {
-      etfTodos.push({ acct: "연금", icon: "💰", title: `${account} 현금 방치 ${won(sum)}원`, detail: `${account} 계좌에 투자되지 않은 현금이 ${won(sum)}원 있습니다. 계좌 안에서는 투자상품으로 옮기지 않으면 수익이 나지 않습니다.`, tone: "warn" });
-    });
-  }
-  const todosForAcct = etfTodos.filter((t) => acctFilter === "전체" || t.acct === "전체" || t.acct === acctFilter || (t.acct === "연금" && isPensionAcct(acctFilter)));
+  // [2026-09-27 사용자 지시] 연금 세액공제·디폴트옵션·중복·현금 방치 등 '연금 운영' 진단은
+  //   전용 연금 페이지(/pwa/pension)로 이전·통합되어 ETF '해야 할 일'에서는 제거.
+  const todosForAcct = etfTodos.filter((t) => acctFilter === "전체" || t.acct === "전체" || t.acct === acctFilter);
 
   return (
     <div className="etf pwa-shell" onTouchStart={etfSwipe.onTouchStart} onTouchMove={etfSwipe.onTouchMove} onTouchEnd={etfSwipe.onTouchEnd}>
@@ -1042,62 +987,8 @@ export default function EtfDashboard() {
         );
       })()}
 
-      {/* [ETF 재구성 Phase1] 연금 운영 제안 — 계좌 배치 최적화(구 E-5) + 연금 세액공제 진행률을 묶음 */}
-      {etfTab === "rec" && (() => {
-        const genAcct = holdings.filter((h) => (h.account || "일반") === "일반");
-        const taxAcct = okHoldings.filter((h) => isPensionAcct(h.account || "일반") || (h.account || "일반") === "ISA");
-        const overseasInGen = genAcct.filter(isOverseasHolding);   // [S18] 통화가 아니라 시장으로
-        const domesticInTax = taxAcct.filter((h) => h.avgCcy === "KRW");
-        const swap = overseasInGen.length > 0 && domesticInTax.length > 0;
-        const hasPen = holdings.some((h) => isPensionAcct(h.account || "일반")) || otherAssets.some((o) => isPensionAcct(o.account || "일반"));
-        const limit = pensionCreditLimitCombined();
-        const penRows = okHoldings.filter((h) => isPensionAcct(h.account || "일반"));
-        const acquired = penRows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
-        const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
-        const prog = Math.max(0, Math.min(1, limit ? contrib / limit : 0));
-        const est = pensionContrib === "";
-        return (
-          <section className="card">
-            <div className="label"><Term term="자산 배치">🏛️ 연금 운영 제안</Term> <span className="sub">계좌 배치 · 세액공제</span></div>
-            {/* 계좌 배치 최적화 */}
-            <div className="op-h">🧮 계좌 배치 최적화</div>
-            {holdings.length > 1 ? (
-              swap ? (
-                <div className="rb-why">
-                  <div className="rb-why-h">💡 배치 개선 여지</div>
-                  <div className="rb-why-row"><span className="rb-why-n">→</span><span className="rb-why-t">세금이 큰 <b>해외 ETF({overseasInGen.map((h) => h.ticker).join("·")})</b>가 일반계좌에, 세금이 작은 <b>국내형({domesticInTax.map((h) => h.ticker).join("·")})</b>이 세제계좌에 있습니다. <b>두 자산의 계좌를 맞바꾸면</b> 세제계좌(ISA·연금) 한도를 세금 큰 자산에 써서 세후 수익을 높일 수 있습니다.</span></div>
-                </div>
-              ) : (
-                <div className="rb-tax sub">현재 계좌 배치에 뚜렷한 개선 여지는 없습니다. 원칙: <b>세제계좌 한도는 세금이 큰 해외·배당형에 우선</b> 배정하고, 매매차익 비과세 성격의 국내주식형은 일반계좌 여지가 큽니다.</div>
-              )
-            ) : (
-              <div className="rb-tax sub">보유 종목이 2개 이상이면 계좌 간 배치 개선 여지를 진단합니다.</div>
-            )}
-            {/* 연금 세액공제 진행률(개인연금+IRP 합산) */}
-            <div className="op-h" style={{ marginTop: 14 }}>🎁 연금 세액공제 진행률 <span className="pc-scope">개인연금+IRP 합산</span></div>
-            {hasPen ? (
-              <div className="pen-credit">
-                <div className="pc-h">
-                  <span className="pc-lbl">납입 대비 한도</span>
-                  <span className={`pc-tag ${est ? "est" : "fix"}`}>{est ? "추정" : "입력"}</span>
-                  <span className="pc-pct">{Math.round(prog * 100)}%</span>
-                </div>
-                <div className="pc-bar"><div className="pc-fill" style={{ width: `${prog * 100}%` }} /></div>
-                <div className="pc-nums">납입 {won(contrib)}원 / 한도 {won(limit)}원 {prog >= 1 ? "· 한도 소진" : `· 여유 ${won(Math.max(0, limit - contrib))}원`}</div>
-                <div className="pc-in-wrap">
-                  <span className="pc-in-lbl">올해 연금 납입액 직접 입력(원)</span>
-                  <input className="pc-in" type="number" inputMode="numeric" placeholder={`${Math.round(acquired).toLocaleString()} (취득 추정)`}
-                    value={pensionContrib} onChange={(e) => changePensionContrib(e.target.value)} />
-                </div>
-                <div className="pc-note">합산 한도(연 {won(limit)}원)는 개인연금+IRP <b>납입액 기준</b>이며 연금저축 단독 한도는 600만원입니다. 미입력 시 연금 계좌 취득원가로 <b>추정</b>합니다.</div>
-              </div>
-            ) : (
-              <div className="rb-tax sub">개인연금·퇴직연금 보유를 입력하면 세액공제 진행률(연 900만 합산 한도)을 추적합니다.</div>
-            )}
-            <div className="rb-tax sub" style={{ marginTop: 8 }}>⚠ 세무자문이 아닙니다. 실제 절세액은 개인 소득·거래·현행 세법에 따라 다릅니다.</div>
-          </section>
-        );
-      })()}
+      {/* [2026-09-27 사용자 지시] '연금 운영 제안'(계좌 배치 최적화 + 세액공제 진행률) 카드는
+          전용 연금 페이지(/pwa/pension)로 이전·통합되어 여기서 삭제. ETF는 ETF 보유/추천에 집중. */}
 
       {/* [2026-08-23] 다음 매수 계좌 추천 — 종목을 검색하면 세제 분류(etf_master.tax_type)
           기반으로 어느 계좌가 유리한지 순위+이유를 보여준다. "이미 산 것"이 아니라
@@ -1498,32 +1389,7 @@ export default function EtfDashboard() {
                     })}
                   </div>
                   <div className="me-tax">{ACCT_TAX[acct]}</div>
-                  {/* [계좌 세분화] 연금 세액공제 진행률 — 개인연금+IRP 합산(연 900만) 기준. 첫 연금 그룹에 1회만 표시 */}
-                  {acct === firstPension && (() => {
-                    const limit = pensionCreditLimitCombined();
-                    const penRows = okHoldings.filter((h) => isPensionAcct(h.account || "일반"));
-                    const acquired = penRows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
-                    const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
-                    const prog = Math.max(0, Math.min(1, contrib / limit));
-                    const est = pensionContrib === ""; // 미입력 시 취득원가 기반 추정
-                    return (
-                      <div className="pen-credit">
-                        <div className="pc-h">
-                          <span className="pc-lbl">🎁 연금 세액공제 진행률 <span className="pc-scope">개인연금+IRP 합산</span></span>
-                          <span className={`pc-tag ${est ? "est" : "fix"}`}>{est ? "추정" : "입력"}</span>
-                          <span className="pc-pct">{Math.round(prog * 100)}%</span>
-                        </div>
-                        <div className="pc-bar"><div className="pc-fill" style={{ width: `${prog * 100}%` }} /></div>
-                        <div className="pc-nums">납입 {won(contrib)}원 / 한도 {won(limit)}원 {prog >= 1 ? "· 한도 소진" : `· 여유 ${won(Math.max(0, limit - contrib))}원`}</div>
-                        <div className="pc-in-wrap">
-                          <span className="pc-in-lbl">올해 연금 납입액 직접 입력(원)</span>
-                          <input className="pc-in" type="number" inputMode="numeric" placeholder={`${Math.round(acquired).toLocaleString()} (취득 추정)`}
-                            value={pensionContrib} onChange={(e) => changePensionContrib(e.target.value)} />
-                        </div>
-                        <div className="pc-note">합산 한도(연 {won(limit)}원)는 개인연금+IRP <b>납입액 기준</b>이며 연금저축 단독 한도는 600만원입니다. 미입력 시 연금 계좌 취득원가로 <b>추정</b>합니다.</div>
-                      </div>
-                    );
-                  })()}
+                  {/* [2026-09-27 사용자 지시] 연금 세액공제 진행률은 전용 연금 페이지(/pwa/pension)로 이전·통합 → 여기서 삭제 */}
                 </div>
               );
             }); })()}
