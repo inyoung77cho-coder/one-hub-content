@@ -808,6 +808,10 @@ export default function EtfDashboard() {
         {/* [ETF 재구성 Phase1] 보유 | 추천 상위 탭 — 주식(보유/추천) 미러. 계좌필터는 두 탭 공통 렌즈. */}
         <SegTabs items={[{ key: "hold", label: "보유" }, { key: "rec", label: "추천" }]}
           index={etfTab === "rec" ? 1 : 0} onChange={(i) => setEtfTab(["hold", "rec"][i])} ariaLabel="ETF 보유/추천" />
+        {/* [사용자 지시] 탭 아래 한 줄 설명(2줄 금지·nowrap) */}
+        <div className="tabnote">{etfTab === "hold"
+          ? <>📊 <b>보유</b> · 내 ETF 평가·수익률·섹터 쏠림</>
+          : <>🔍 <b>추천</b> · 규칙 후보 + AI 이유·절세·연금</>}</div>
       </div>
 
       {/* 1) HERO — ETF 총평가액 + 원화 실질수익 3분해. [사용자 지시] 다른 페이지처럼 밝은 카드로 통일 */}
@@ -1734,6 +1738,8 @@ export default function EtfDashboard() {
         .etf { max-width: 480px; margin: 0 auto; padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); }
         /* [사용자 지시] 상위 메뉴 고정 — 헤더+타이틀바를 뷰포트 상단에 붙인다 */
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
+        .tabnote { margin: 8px 4px 10px; font-size: var(--fs-2); line-height: 1.5; color: var(--color-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tabnote b { color: var(--color-ink); font-weight: 800; }
         /* [ETF 재구성 Phase1] 보유|추천 상위 탭 (index.js .pwa-subtabs 패턴 복제) */
         /* [S26-5] etf-subtabs → 공용 SegTabs 로 이관(정본). 죽은 규칙 제거. */
         /* [ETF 재구성 Phase1] 종목 추천 카드 */

@@ -253,6 +253,10 @@ export default function RealEstateDashboard() {
         {/* [재구성] 분석 | 시나리오 세그먼트 컨트롤 — 주식 보유/추천 패턴 */}
         <SegTabs items={[{ key: "analysis", label: "분석" }, { key: "scenario", label: "시나리오" }]}
           index={reTab === "scenario" ? 1 : 0} onChange={(i) => setReTab(RE_TABS[i])} ariaLabel="부동산 분석/시나리오" />
+        {/* [사용자 지시] 탭 아래 한 줄 설명(2줄 금지·nowrap) */}
+        <div className="tabnote">{reTab === "analysis"
+          ? <>📈 <b>분석</b> · 내 단지 포지션·대장 비교·추세</>
+          : <>🔮 <b>시나리오</b> · 갈아타기·거시 전망(참고)</>}</div>
       </div>
 
       {/* [S28-10] 신고가 — 부동산 화면 최상단(내 단지 우선). 신고가 없는 날엔 렌더 안 함. */}
@@ -590,6 +594,8 @@ export default function RealEstateDashboard() {
         .re { max-width: 480px; margin: 0 auto; padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); }
         /* [사용자 지시] 상위 메뉴 고정 */
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
+        .tabnote { margin: 8px 4px 10px; font-size: var(--fs-2); line-height: 1.5; color: var(--color-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .tabnote b { color: var(--color-ink); font-weight: 800; }
         /* [재구성] 분석 | 시나리오 세그먼트 — assets.js .as-stocktabs 패턴 */
         /* [S26-5] re-tabs → 공용 SegTabs 로 이관(정본). 죽은 규칙 제거. */
         .partner-cta { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-decoration: none; background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 14px 16px; margin: 4px 0 14px; box-shadow: var(--shadow-card); }
