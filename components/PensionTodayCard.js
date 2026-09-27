@@ -40,10 +40,8 @@ export default function PensionTodayCard() {
     }
   }, [router.query.focus, rows]);
 
-  if (!rows || rows.length === 0) return null;
+  if (!rows || rows.length === 0) return null; // 연금 계좌가 있을 때만(비-연금 사용자엔 안 뜸)
   const totalPending = rows.reduce((s, r) => s + r.pending, 0);
-  const hasAny = rows.some((r) => r.total > 0);
-  if (!hasAny) return null;
 
   const summarize = (a) => {
     const f = a.first;

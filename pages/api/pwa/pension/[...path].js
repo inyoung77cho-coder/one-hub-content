@@ -6,7 +6,7 @@ const ETF_API = process.env.ETF_API_URL || "http://54.180.54.132:5003";
 export default async function handler(req, res) {
   const parts = [].concat(req.query.path || []);
   // 경로 화이트리스트(1st 세그먼트) — 임의 프록시 방지
-  const allowed = new Set(["health", "actions", "plan", "household"]);
+  const allowed = new Set(["health", "accounts", "actions", "plan", "household"]);
   const first = parts[0] || "";
   // account_id 기반 경로(<id>/snapshot|risk|diagnose|plan|paste|calendar)도 허용
   const okShape = allowed.has(first) || parts.length >= 2;
