@@ -76,6 +76,12 @@ export default function PensionPage() {
     const r = await P.setActionStatus(id, { status: "DONE" });
     if (r.data?.ok) load();
   };
+  const makePlanNow = async () => {
+    setMsg("계획 생성 중…");
+    const r = await P.makePlan(acct.id, {});
+    if (r.data?.ok) { setMsg(`리밸런싱 계획 생성됨 (조정 ${r.data.moves?.length || 0}건, 액션 ${r.data.actions})`); load(); }
+    else setMsg(r.data?.error || "계획 생성 실패");
+  };
 
   return (
     <div className="pen-wrap">
@@ -134,7 +140,12 @@ export default function PensionPage() {
                   )}
                   {a.status !== "PENDING" && <span className="pen-badge">{a.status}</span>}
                 </div>
-              )) : <p className="pen-muted">오늘은 예정된 매매가 없습니다.</p>}
+              )) : (
+                <div className="pen-plan-cta">
+                  <p className="pen-muted">아직 리밸런싱 계획이 없습니다. 목표 배분으로 분할 실행 계획을 세워보세요.</p>
+                  <button className="pen-btn sm" onClick={makePlanNow}>리밸런싱 계획 세우기</button>
+                </div>
+              )}
             </section>
 
             {/* 진단 카드 */}
@@ -215,6 +226,7 @@ export default function PensionPage() {
         .pen-todo-main { flex: 1; min-width: 0; }
         .pen-todo-why { font-size: var(--fs-1, 12px); color: var(--color-muted); word-break: keep-all; }
         .pen-badge { font-size: var(--fs-0, 11px); color: var(--color-muted); border: 1px solid var(--color-border); border-radius: 6px; padding: 2px 6px; }
+        .pen-plan-cta { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
         .pen-diag { border-left: 3px solid var(--color-border); padding: 6px 0 6px 10px; margin-bottom: 8px; }
         .pen-diag-h { display: flex; justify-content: space-between; align-items: baseline; }
         .pen-sev { font-size: var(--fs-0, 11px); font-weight: 700; }
