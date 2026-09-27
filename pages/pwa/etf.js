@@ -895,16 +895,6 @@ export default function EtfDashboard() {
         })}
       </div>
 
-      {/* [S20-PEN E-1] 연금 계좌 선택 시 — 전용 연금 분석·데일리 액션 화면으로 */}
-      {isPensionAcct(acctFilter) && (
-        <a href="/pwa/pension" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none",
-          background: "var(--color-surface)", border: "1px solid var(--color-primary)", borderRadius: "var(--radius, 10px)",
-          color: "var(--color-primary)", padding: "10px 12px", margin: "0 0 12px", fontWeight: 700, fontSize: "var(--fs-2, 14px)" }}>
-          🏦 {acctFilter} 진단·오늘 할 일·리밸런싱 보기
-          <span style={{ marginLeft: "auto", fontSize: 18 }}>›</span>
-        </a>
-      )}
-
       {/* [S22-1] 이상 평단 확인 — 평단이 현재가와 10배 이상 어긋난 보유는 평가·손익에서 뺐음을 묻는다(주식과 공용 카드). */}
       {etfTab === "hold" && <AvgPriceWarningCard warnings={etfAvgWarnings} onReload={() => { const tr = getTrader(); const l = getHoldings(tr); setHoldings(l); refreshQuotes(l); }} />}
 

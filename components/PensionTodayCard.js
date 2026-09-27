@@ -52,7 +52,7 @@ export default function PensionTodayCard() {
   };
 
   return (
-    <div ref={ref} className={`ptc ${flash ? "flash" : ""}`} style={{ order: 1 }}
+    <div ref={ref} className={`ptc ${flash ? "flash" : ""}`}
       onClick={() => router.push("/pwa/pension")} role="button">
       <div className="ptc-head">
         <span className="ptc-ic">🏦</span>

@@ -658,8 +658,6 @@ export default function TodayPage({ announcements = [] }) {
         {lifeStage === "withdraw" && (
           <div style={{ order: 0 }}><WithdrawCard operatingUk={headUk != null ? headUk : (totalUk != null ? totalUk : null)} /></div>
         )}
-        {/* [S20-PEN E-3] 연금 오늘 할 일 — 연금 계좌·액션 있을 때만(자체 판단). ?focus=pension 시 스크롤. */}
-        <PensionTodayCard />
         {/* [S31-6] 보유 0건(KIS 미연동+직접입력 없음)일 때만 제휴 자리 — 계약 전엔 렌더 안 됨. AI 판단 화면 아님. */}
         {positions.length === 0 && (
           <div style={{ order: 2 }}><PartnerCard place="today" compact /></div>
@@ -1160,6 +1158,9 @@ export default function TodayPage({ announcements = [] }) {
             )}
           </section>
         )}
+
+        {/* [S20-PEN E-3] 연금 오늘 할 일 — ETF 그룹에 포함(계좌 없으면 안 뜸). ?focus=pension 시 스크롤. */}
+        {view === 2 && <PensionTodayCard />}
 
         {/* 카드1.5 — [ETF Phase3] 오늘의 ETF 한 수: 하루 한 종목 추천(규칙기반 회전) + 절세 팁 */}
         {view === 2 && (() => {

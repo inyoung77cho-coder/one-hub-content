@@ -253,14 +253,6 @@ export default function AssetsMapPage() {
       </div>
 
       <SyncStatus />
-      {/* [S20-PEN] 연금 진입 — 항상 노출(정적 링크). 개인연금·퇴직연금 진단·오늘 할 일·가구 목표 */}
-      <a href="/pwa/pension" style={{ display: "flex", alignItems: "center", gap: 10, textDecoration: "none",
-        background: "var(--color-card)", border: "1px solid var(--color-line)", borderRadius: "var(--radius, 12px)",
-        color: "var(--color-ink)", padding: "12px 14px", margin: "10px 0", fontWeight: 700 }}>
-        <span style={{ fontSize: 20 }}>🏦</span>
-        <span style={{ flex: 1, minWidth: 0 }}>연금 <span style={{ fontWeight: 400, color: "var(--color-ink-3)", fontSize: "0.85em" }}>개인연금·퇴직연금 · 진단·오늘 할 일</span></span>
-        <span style={{ color: "var(--color-ink-3)", fontSize: 20 }}>›</span>
-      </a>
       <DataState status={status} hasData={!!assets} onRetry={load} skeletonLines={5} skeletonBlock>
         {/* ── [사용자 지시] 자산 지도 카드를 맨 위로 — "주식" 뷰에서는 계좌현황 요약을 카드 맨 위에 병합 ── */}
         <section className="card">

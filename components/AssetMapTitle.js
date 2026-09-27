@@ -10,6 +10,7 @@ const ASSET_MAP_VIEWS = [
   { label: "주식", href: "/pwa/assets" },
   { label: "ETF", href: "/pwa/etf" },
   { label: "부동산", href: "/pwa/realestate" },
+  { label: "연금", href: "/pwa/pension" },
 ];
 
 // current: "주식" | "ETF" | "부동산" — 지금 보고 있는 자산군(순환 라벨의 시작점).

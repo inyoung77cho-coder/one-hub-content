@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from "react";
 import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
+import AssetMapTitle from "../../components/AssetMapTitle";
 import * as P from "../../lib/pension";
 
 const won = (v) => (v == null ? "-" : Math.round(Number(v)).toLocaleString());
@@ -112,7 +113,8 @@ export default function PensionPage() {
     <div className="pen-wrap">
       <AppHeader />
       <main className="pen-main">
-        <h1 className="pen-title">🏦 연금 <span className="pen-unit">단위: 원</span></h1>
+        <AssetMapTitle current="연금" />
+        <div className="pen-unit-row"><span className="pen-unit">단위: 원 · 개인연금·퇴직연금</span></div>
 
         <div className="pen-tabs" role="tablist">
           {accountList.map((a) => (
@@ -256,7 +258,7 @@ export default function PensionPage() {
       <style jsx>{`
         .pen-wrap { min-height: 100vh; background: var(--color-bg); color: var(--color-ink); padding-bottom: 72px; }
         .pen-main { max-width: 560px; margin: 0 auto; padding: 12px 16px; }
-        .pen-title { font-size: var(--fs-5, 20px); margin: 8px 0 12px; display: flex; align-items: baseline; gap: 8px; }
+        .pen-unit-row { margin: -6px 0 12px; }
         .pen-unit { font-size: var(--fs-1, 12px); color: var(--color-muted); }
         .pen-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
         .pen-tabs button { flex: 1; padding: 10px; border: 1px solid var(--color-border); border-radius: var(--radius, 10px);
