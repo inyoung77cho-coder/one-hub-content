@@ -10,6 +10,12 @@ const won = (v) => (v == null ? "-" : Math.round(Number(v)).toLocaleString());
 const man = (v) => (v == null ? "-" : `${Math.round(Number(v) / 1e4).toLocaleString()}만`);
 const pct = (v, d = 2) => (v == null ? "-" : `${Number(v).toFixed(d)}%`);
 
+const PRESET_DESC = {
+  "안정운영형": "위험자산 55% · 안정과 성장 균형 (분석 권장안)",
+  "성장유지형": "위험자산 60%(운영상한) · 미국 성장주 강화",
+  "균형형": "위험자산 50% · 채권혼합·채권 비중 확대",
+};
+
 // 계좌 목록은 /api/pwa/pension/accounts 로 로드. 미도달 시 폴백.
 const FALLBACK_ACCOUNTS = [
   { id: "A-PEN-01", label: "개인연금", type: "PENSION_SAVINGS" },
@@ -29,6 +35,10 @@ export default function PensionPage() {
   const [pasteText, setPasteText] = useState("");
   const [preview, setPreview] = useState(null);
   const [msg, setMsg] = useState("");
+  const [goalOpen, setGoalOpen] = useState(false);
+  const [presets, setPresets] = useState([]);
+  const [curPreset, setCurPreset] = useState(null);
+  const [allocating, setAllocating] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,6 +58,21 @@ export default function PensionPage() {
   }, [acct]);
 
   useEffect(() => { load(); }, [load]);
+
+  // 가구 정책·프리셋 로드
+  useEffect(() => {
+    P.getHouseholdPolicy("HH-A").then((r) => {
+      if (r.data?.ok) { setPresets(r.data.presets || []); setCurPreset(r.data.policy?.preset || null); }
+    });
+  }, []);
+
+  const applyPreset = async (name) => {
+    setAllocating(true); setMsg("");
+    const r = await P.allocateHousehold("HH-A", { preset: name });
+    setAllocating(false);
+    if (r.data?.ok) { setCurPreset(name); setGoalOpen(false); setMsg(`가구 목표 '${name}' 적용 — 계좌별 DRAFT 계획 재생성`); load(); }
+    else setMsg(r.data?.error || "적용 실패");
+  };
 
   // 계좌 목록 로드(있으면 탭을 실제 계좌로 교체)
   useEffect(() => {
@@ -165,7 +190,10 @@ export default function PensionPage() {
         {/* 가구 요약 */}
         {household && (
           <section className="pen-card pen-house">
-            <h2>가구 합산</h2>
+            <div className="pen-house-h">
+              <h2>가구 합산</h2>
+              <button className="pen-btn sm ghost" onClick={() => setGoalOpen(true)}>목표 설정{curPreset ? ` · ${curPreset}` : ""}</button>
+            </div>
             <div className="pen-total sm">{man(household.total_value)}<span>원</span></div>
             <div className="pen-muted">기준일 {household.base_date || "-"}</div>
             {(household.cards || []).slice(0, 3).map((c, i) => (
@@ -194,6 +222,28 @@ export default function PensionPage() {
                 <button className="pen-btn ghost" onClick={() => { setPasteOpen(false); setPreview(null); }}>닫기</button>
                 <button className="pen-btn ghost" onClick={doPreview}>미리보기</button>
                 <button className="pen-btn" onClick={doSave} disabled={!preview?.verify?.ok}>저장</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {goalOpen && (
+          <div className="pen-sheet" role="dialog">
+            <div className="pen-sheet-in">
+              <h3>가구 목표 설정</h3>
+              <p className="pen-muted">프리셋을 고르면 두 계좌에 맞춰 자산을 배치하고(DC 안전자산 먼저), 계좌별 리밸런싱 계획(DRAFT)을 다시 만듭니다.</p>
+              <div className="pen-presets">
+                {(presets.length ? presets : Object.keys(PRESET_DESC)).map((name) => (
+                  <button key={name} className={`pen-preset ${curPreset === name ? "on" : ""}`}
+                    disabled={allocating} onClick={() => applyPreset(name)}>
+                    <b>{name}{curPreset === name ? " ✓" : ""}</b>
+                    <span>{PRESET_DESC[name] || ""}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="pen-muted" style={{ marginTop: 8 }}>{allocating ? "배치 계산 중…" : "적용하면 DRAFT 계획이 생성되고, 계좌 화면에서 [완료]로 실행합니다(반자동)."}</div>
+              <div className="pen-sheet-btns">
+                <button className="pen-btn ghost" onClick={() => setGoalOpen(false)}>닫기</button>
               </div>
             </div>
           </div>
@@ -232,6 +282,14 @@ export default function PensionPage() {
         .pen-sev { font-size: var(--fs-0, 11px); font-weight: 700; }
         .pen-diag-v { font-size: var(--fs-2, 14px); margin: 2px 0; }
         .pen-hcard { font-size: var(--fs-2, 13px); margin-top: 6px; }
+        .pen-house-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .pen-house-h h2 { margin: 0; }
+        .pen-presets { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+        .pen-preset { text-align: left; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius, 10px); padding: 10px 12px; color: var(--color-ink); display: flex; flex-direction: column; gap: 2px; }
+        .pen-preset.on { border-color: var(--color-primary); }
+        .pen-preset b { font-size: var(--fs-2, 14px); }
+        .pen-preset span { font-size: var(--fs-1, 12px); color: var(--color-muted); }
+        .pen-preset:disabled { opacity: 0.6; }
         .pen-btn { background: var(--color-primary); color: var(--color-on-primary, #fff); border: none; border-radius: var(--radius, 10px);
           padding: 10px 14px; font-weight: 700; }
         .pen-btn.sm { padding: 6px 10px; font-size: var(--fs-1, 12px); }
