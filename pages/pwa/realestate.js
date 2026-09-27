@@ -591,7 +591,7 @@ export default function RealEstateDashboard() {
       <BottomNav active="assets" />
 
       <style jsx>{`
-        .re { max-width: 480px; margin: 0 auto; padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); }
+        .re { max-width: 480px; margin: 0 auto; padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
         /* [사용자 지시] 상위 메뉴 고정 */
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
         .tabnote { margin: 8px 4px 10px; font-size: var(--fs-2); line-height: 1.5; color: var(--color-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

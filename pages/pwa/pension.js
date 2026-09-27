@@ -6,9 +6,11 @@ import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import AssetMapTitle from "../../components/AssetMapTitle";
 import SegTabs from "../../components/shared/SegTabs";
+import useSwipeTabs from "../../components/shared/useSwipeTabs";
 import * as P from "../../lib/pension";
 
 const man = (v) => (v == null ? "-" : `${Math.round(Number(v) / 1e4).toLocaleString()}만`);
+const uk = (v, d = 2) => (v == null ? "-" : `${(Number(v) / 1e8).toFixed(d)}억`);
 const pct = (v, d = 2) => (v == null ? "-" : `${Number(v).toFixed(d)}%`);
 
 const PRESET_DESC = {
@@ -113,9 +115,11 @@ export default function PensionPage() {
   };
 
   const acctIdx = Math.max(0, accountList.findIndex((x) => x.id === acct.id));
+  // [사용자 지시] 개인연금↔퇴직연금 탭 스와이프(ETF·부동산과 통일)
+  const acctSwipe = useSwipeTabs({ index: acctIdx, count: accountList.length, onChange: (i) => setAcct(accountList[i]) });
 
   return (
-    <div className="pension pwa-shell">
+    <div className="pension pwa-shell" onTouchStart={acctSwipe.onTouchStart} onTouchMove={acctSwipe.onTouchMove} onTouchEnd={acctSwipe.onTouchEnd}>
       {/* [사용자 지시] 상위 메뉴 고정 — 다른 자산 페이지와 동일한 sticky 헤더 */}
       <div className="sticky-hdr">
         <AppHeader />
@@ -134,10 +138,11 @@ export default function PensionPage() {
         </section>
       ) : (
         <>
-          {/* 요약 밴드 */}
-          <section className="card">
-            <div className="pen-eyebrow"><span>{acct.label}</span><span className="pen-asof">기준일 {snap.base_date || snap.as_of} · {snap.source}</span></div>
-            <div className="pen-total">{man(snap.total_value)}<span>원</span></div>
+          {/* 요약 히어로 — 다른 자산 페이지 히어로와 동일 스타일 */}
+          <section className="hero">
+            <div className="pen-eyebrow"><span>📊 {acct.label} 평가</span><span className="pen-asof">기준일 {snap.base_date || snap.as_of} · {snap.source}</span></div>
+            <div className="pen-total">{uk(snap.total_value)}<span>원</span></div>
+            <div className="pen-sub">{man(snap.total_value)}원</div>
             <div className="pen-rets">
               <span>누적 {pct(snap.ret_cum_pct)}</span>
               <span>연평균 {pct(snap.ret_annual_pct)}</span>
@@ -259,8 +264,11 @@ export default function PensionPage() {
 
       <style jsx>{`
         /* ── 다른 자산 페이지(etf.js)와 동일한 컨테이너·헤더·카드 ── */
-        .pension { max-width: 480px; margin: 0 auto; padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); }
+        .pension { max-width: 480px; margin: 0 auto; padding: 0 14px var(--nav-clearance-fab); font-family: var(--font-sans); color: var(--color-ink); min-height: 100vh; background: var(--color-bg); }
         .sticky-hdr { position: sticky; top: 0; z-index: 140; background: var(--color-bg); margin: 0 -14px; padding: 0 14px; }
+        /* 히어로 카드 — etf.js .hero 와 동일 */
+        .hero { background: var(--color-card); color: var(--color-ink); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; box-shadow: var(--shadow-card); margin-bottom: 12px; }
+        .pen-sub { font-size: var(--fs-2); color: var(--color-ink-3); font-weight: 600; margin-top: 2px; }
         /* [사용자 지시] 탭 아래 한 줄 설명 — 2줄 금지(nowrap+생략) */
         .pen-lead { margin: 8px 2px 12px; font-size: var(--fs-2); line-height: 1.5; color: var(--color-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .pen-lead b { color: var(--color-ink); font-weight: 800; }

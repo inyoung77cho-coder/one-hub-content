@@ -166,6 +166,9 @@ export default function AssetsMapPage() {
   ];
   const [sumIdx, setSumIdx] = useState(0);
   const sumSwipe = useSwipeTabs({ index: sumIdx, count: summaryCards.length, onChange: setSumIdx });
+  // [사용자 지시] 보유↔추천 탭 스와이프(ETF·부동산과 통일). 요약카드 스와이프와 충돌 방지 위해
+  //   요약카드는 stopPropagation 으로 이 페이지-레벨 스와이프에 이벤트를 넘기지 않는다.
+  const stockSwipe = useSwipeTabs({ index: stockTab === "recommend" ? 1 : 0, count: 2, onChange: (i) => setStockTab(i === 1 ? "recommend" : "hold") });
   // [S22-10] 자산군 교차 인사이트 — 세 자산을 다 아는 앱만 할 수 있는 한 줄(가장 강한 것 하나).
   //   (환노출 규칙용 overseasPct 는 보유 실시세 환산이 필요해 후속 — 지금은 자산군 집중·유동성 규칙이 동작.)
   const overseasPct = 0;
@@ -222,7 +225,7 @@ export default function AssetsMapPage() {
   })();
 
   return (
-    <div className="as">
+    <div className="as" onTouchStart={stockSwipe.onTouchStart} onTouchMove={stockSwipe.onTouchMove} onTouchEnd={stockSwipe.onTouchEnd}>
       {/* [사용자 지시] 상위 메뉴는 고정하고 그 아래 내용만 스크롤 */}
       <div className="sticky-hdr">
         <AppHeader />
@@ -245,8 +248,8 @@ export default function AssetsMapPage() {
               알 수 없었다. 탭 바로 아래에 그 탭에서만 달라지는 한 줄을 둬 전환을 눈으로 확인시킨다. */}
           <div className={`as-tabnote ${stockTab}`}>
             {stockTab === "hold"
-              ? <>📊 <b>보유</b> · KIS {positions.length}종목{manualCount > 0 ? ` + 직접입력 ${manualCount}종목` : ""}{holdActionCnt > 0 ? ` · 오늘 조치 ${holdActionCnt}건` : " · 오늘 조치 없음"}</>
-              : <>🔍 <b>추천</b> · AI 추천 종목과 매수 판단(샀어요·관망)을 이 탭에서 기록합니다</>}
+              ? <>📊 <b>보유</b> · KIS {positions.length}종목{manualCount > 0 ? ` + 직접입력 ${manualCount}` : ""}{holdActionCnt > 0 ? ` · 오늘 조치 ${holdActionCnt}건` : " · 오늘 조치 없음"}</>
+              : <>🔍 <b>추천</b> · AI 추천 종목·매수 판단(샀어요·관망) 기록</>}
           </div>
           </>
         )}
@@ -382,7 +385,10 @@ export default function AssetsMapPage() {
 
         {/* [S25-4] 자산군 요약 카드 — 좌우 스와이프로 주식↔ETF↔부동산 전환. 스와이프는 이 카드 안에서만,
             페이지 이동은 '상세 보기' 버튼 클릭으로만(하단 탭 원칙: 페이지끼리는 클릭). */}
-        <section className="card as-sumcard" onTouchStart={sumSwipe.onTouchStart} onTouchMove={sumSwipe.onTouchMove} onTouchEnd={sumSwipe.onTouchEnd}>
+        <section className="card as-sumcard"
+          onTouchStart={(e) => { e.stopPropagation(); sumSwipe.onTouchStart(e); }}
+          onTouchMove={(e) => { e.stopPropagation(); sumSwipe.onTouchMove(e); }}
+          onTouchEnd={(e) => { e.stopPropagation(); sumSwipe.onTouchEnd(e); }}>
           {(() => {
             const c = summaryCards[sumIdx];
             const ser = (c.series || []).filter((v) => v != null).slice(-30);
@@ -560,7 +566,7 @@ export default function AssetsMapPage() {
         /* [사용자 지시] "주식" 뷰 전용 보유/추천 탭 — 상위 메뉴바(타이틀) 바로 아래 */
         /* [S26-5] as-stocktabs → 공용 SegTabs 로 이관(정본). 죽은 규칙 제거. */
         /* [사용자 지적] 탭 전용 한 줄 — 탭을 눌렀을 때 첫 화면에서 무엇이 달라졌는지 보여주는 유일한 줄 */
-        .as-tabnote { margin: -6px 4px 12px; font-size: var(--fs-2); line-height: 1.5; color: var(--color-ink-2); word-break: keep-all; }
+        .as-tabnote { margin: -6px 4px 12px; font-size: var(--fs-2); line-height: 1.5; color: var(--color-ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .as-tabnote b { color: var(--color-ink); font-weight: 800; }
         .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-card, 14px); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow-card); }
         /* [S25-4] 자산군 요약 카드 캐러셀 */
