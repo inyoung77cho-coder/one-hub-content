@@ -35,7 +35,9 @@ export default function EtfDataStatus() {
   }, []);
 
   if (err) return null;
-  const cols = (st?.collectors || []).filter((c) => c.collector !== "sample_holdings");
+  // [2026-09-27] 'fx'(자동 환율 수집기)는 서버 아웃바운드 DNS 차단으로 복구 불가 + manual_fx 로 대체됨(중복).
+  //   깨진 중복 항목이 '실패'로 보여 혼란을 주므로 목록에서 제외한다. 실제 환율은 manual_fx 가 최신 유지.
+  const cols = (st?.collectors || []).filter((c) => c.collector !== "sample_holdings" && c.collector !== "fx");
 
   return (
     <section className="eds">
@@ -62,6 +64,7 @@ export default function EtfDataStatus() {
           {cols.some((c) => c.status !== "OK") && (
             <div className="eds-warn">일부 수집이 실패했습니다 — 실시간 시세는 조회 시 별도 보정되지만, 최신 종가 반영이 지연될 수 있습니다.</div>
           )}
+          <div className="eds-note">💱 <b>환율(fx)</b>은 원/달러(USD/KRW) 시세입니다 — 해외 ETF 평가액을 원화로 환산할 때 씁니다.</div>
           <div className="eds-note">시세는 화면 조회 시 실시간 재조회됩니다. 위 날짜는 서버 수집 기준 · {st.server_time}.</div>
         </>
       )}
