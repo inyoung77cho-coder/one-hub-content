@@ -38,8 +38,9 @@ const ACCT_EMOJI = { "일반": "💸", "개인연금": "🏦", "퇴직연금": "
 // [계좌 세분화] 연금 계열(개인연금·퇴직연금) 판별 — 세액공제 한도 합산 대상
 const isPensionAcct = (a) => a === "개인연금" || a === "퇴직연금";
 const ACCT_TAX = ACCOUNTS.reduce((m, a) => { m[a] = `${ACCT_EMOJI[a] || ""} ${acctTaxNote(a)}`; return m; }, {});
-// [S4] 계좌 필터 칩. [사용자 지시] "전체"는 "일반"과 혼동돼 삭제 — 기본값은 "일반".
-const ACCT_FILTERS = [...ACCOUNTS];
+// [2026-09-27 사용자 지시] ETF 페이지는 '일반 계좌 ETF 투자'만 다룬다.
+//   개인연금·퇴직연금·ISA(연금·세제계좌)는 전용 연금 페이지(/pwa/pension)에서 운영 → ETF 계좌 탭에서 제외.
+const ACCT_FILTERS = ["일반"];
 
 // [S18] 해외 보유 판정 — 시장(market) 기준. 통화(avgCcy)로 가르면 안 된다.
 //   해외 ETF 를 원화로 매수 기록하면 avgCcy 가 KRW 라 국내로 잡혔다(실측 버그).
@@ -826,23 +827,21 @@ export default function EtfDashboard() {
         </div>
       )}
 
-      {/* [S4] 계좌 유형 필터 — 세제가 근본부터 다르므로 계좌별로 보유·세제를 분리해 본다 */}
-      <div className="acct-filter" role="tablist" aria-label="계좌 유형 필터">
-        {ACCT_FILTERS.map((f) => {
-          // [2026-08-23] 기타 금융자산(펀드 등)도 계좌 보유 개수에 포함 — 종목수는 다르지만
-          // "이 계좌에 뭔가 있다"는 게 안 보이던 문제라 카운트에는 반드시 넣는다.
-          const cnt = f === "전체"
-            ? holdings.length + otherAssets.length
-            : holdings.filter((h) => (h.account || "일반") === f).length + otherAssets.filter((o) => (o.account || "일반") === f).length;
-          return (
-            <button key={f} role="tab" aria-selected={acctFilter === f}
-              className={`acct-chip ${acctFilter === f ? "on" : ""} ${isPensionAcct(f) ? "pension" : f === "ISA" ? "isa" : ""}`}
-              onClick={() => changeAcctFilter(f)}>
-              {f}{cnt > 0 && <span className="acct-chip-n">{cnt}</span>}
-            </button>
-          );
-        })}
-      </div>
+      {/* [2026-09-27] ETF=일반 전용 → 계좌 필터 칩(개인연금/퇴직연금/ISA)은 표시하지 않는다. 여러 계좌일 때만 노출. */}
+      {ACCT_FILTERS.length > 1 && (
+        <div className="acct-filter" role="tablist" aria-label="계좌 유형 필터">
+          {ACCT_FILTERS.map((f) => {
+            const cnt = holdings.filter((h) => (h.account || "일반") === f).length + otherAssets.filter((o) => (o.account || "일반") === f).length;
+            return (
+              <button key={f} role="tab" aria-selected={acctFilter === f}
+                className={`acct-chip ${acctFilter === f ? "on" : ""} ${isPensionAcct(f) ? "pension" : f === "ISA" ? "isa" : ""}`}
+                onClick={() => changeAcctFilter(f)}>
+                {f}{cnt > 0 && <span className="acct-chip-n">{cnt}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* [S22-1] 이상 평단 확인 — 평단이 현재가와 10배 이상 어긋난 보유는 평가·손익에서 뺐음을 묻는다(주식과 공용 카드). */}
       {etfTab === "hold" && <AvgPriceWarningCard warnings={etfAvgWarnings} onReload={() => { const tr = getTrader(); const l = getHoldings(tr); setHoldings(l); refreshQuotes(l); }} />}
@@ -1504,12 +1503,7 @@ export default function EtfDashboard() {
                 </select>
               </label>
             )}
-            <label className="mf-f">
-              <span>계좌</span>
-              <select value={form.account} onChange={(e) => setForm((f) => ({ ...f, account: e.target.value }))}>
-                {ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </label>
+            {/* [2026-09-27] ETF=일반 전용 → 계좌 선택 제거(항상 일반). 연금·ISA는 연금 페이지에서. */}
             {form.side === "buy" && (
               <label className="mf-f">
                 <span>상장 시장</span>

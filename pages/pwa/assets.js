@@ -66,6 +66,7 @@ export default function AssetsMapPage() {
   const [delta, setDelta] = useState(null);      // [추세] 전일 대비 총자산·자산별 변화(브라우저 스냅샷 기반)
   const [hist, setHist] = useState([]);          // [추세] 총자산 일별 스냅샷 시계열
   const [exRes, setExRes] = useState(true);      // [§3.1] 실거주(대표단지) 제외 보기 — 기본 켜짐(운용가능 먼저)
+  const [pensionUk, setPensionUk] = useState(0); // [2026-09-27] 연금(개인연금+퇴직연금) 합산 억 — 자산 지도에 별도 자산군으로 추가(서버 연금 엔진)
   const [invProps, setInvProps] = useState([]);  // [§3.1] 추가 보유 부동산(투자용) = onehub_re_properties
   const [myComplex, setMyComplex] = useState(""); // [§3.1] 대표단지(실거주)명
   const [view, setView] = useState(0); // [OS-2] 0=주식 1=ETF 2=부동산 — 종목변경 순환에 맞춰 아래 카드 필터
@@ -178,13 +179,19 @@ export default function AssetsMapPage() {
   })();
 
   // 자산 지도/쏠림 진단만 뷰에 따라 분모가 바뀐다(총자산 헤드라인은 항상 total 유지 = 단일 소스).
-  const mapDenom = useEx ? opTotal : total;
-  const mapRows = (useEx
-    ? rows.map((r) => (r.k === "realestate"
-        ? { ...r, label: "🏠 부동산(투자)", val: invRealtyUk > 0.005 ? invRealtyUk : null }
-        : r))
-    : rows
-  ).filter((r) => !(useEx && r.k === "realestate" && !(invRealtyUk > 0.005)));
+  // [2026-09-27] 연금(개인연금+퇴직연금)을 자산 지도에 별도 자산군으로 추가(ETF '현재투자'와 구분).
+  const penVal = pensionUk > 0.005 ? pensionUk : 0;
+  const penRow = { k: "pension", label: "🏦 연금", color: "var(--color-ink-3)", href: "/pwa/pension", val: penVal > 0 ? penVal : null };
+  const mapDenom = (useEx ? opTotal : total) + penVal;
+  const mapRows = [
+    ...(useEx
+      ? rows.map((r) => (r.k === "realestate"
+          ? { ...r, label: "🏠 부동산(투자)", val: invRealtyUk > 0.005 ? invRealtyUk : null }
+          : r))
+      : rows
+    ).filter((r) => !(useEx && r.k === "realestate" && !(invRealtyUk > 0.005))),
+    ...(penVal > 0 ? [penRow] : []),
+  ];
   const pctOf = (v) => (mapDenom > 0 && v != null ? (v / mapDenom) * 100 : 0);
   // [S19-1] 값이 없다고 다 '미입력'이 아니다. 실거주만 있고 투자용 부동산이 없으면 '미입력'이 아니라
   //   설계상 운용자산에서 뺀 것이다 — 그 차이를 라벨로 구분한다(사용자 지적: 실거주는 투자자산 제외).
@@ -210,6 +217,16 @@ export default function AssetsMapPage() {
     count();
     window.addEventListener("onehub-assets-change", count);
     return () => window.removeEventListener("onehub-assets-change", count);
+  }, []);
+
+  // [2026-09-27] 연금 합산(개인연금+퇴직연금) — 서버 연금 엔진에서 읽어 자산 지도에 별도 자산군으로 표시.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/pwa/pension/household/HH-A/summary")
+      .then((r) => r.json())
+      .then((d) => { if (alive && d?.ok && d.total_value != null) setPensionUk(Number(d.total_value) / 1e8); })
+      .catch(() => {});
+    return () => { alive = false; };
   }, []);
 
   // 도넛(stroke-dasharray) — 뷰 분모(mapDenom) 기준
@@ -326,17 +343,16 @@ export default function AssetsMapPage() {
         <section className="card as-hero">
           {/* [S22-7] 위계 전환 — 실제 판단 대상인 '운용자산'을 헤드라인으로. 총자산·실거주는 그 아래.
               (실거주가 없으면 운용=총자산이라 종전과 동일하게 총자산만 크게 보인다.) */}
+          {/* [2026-09-27 사용자 지시] 운용자산 라벨(실거주 제외)은 윗줄, 금액은 한 줄로 크게 강조 — 아래 작은 안내문 삭제(툴팁만 유지) */}
+          <div className="as-total-lbl2">{hasResidence ? <>운용자산 <span className="as-ex">· 실거주 제외</span></> : "총자산"}</div>
           <div className="as-total">
-            <span>{hasResidence ? <>운용자산 <span style={{ fontWeight: 600, fontSize: "0.62rem", color: "var(--color-ink-3)" }}>실거주 제외</span></> : "총자산"}</span>
-            <b>{uk(hasResidence ? opTotal : total)}</b>
+            <b title="주식·ETF·부동산·현금·연금 각각을 억 단위 소수 둘째 자리에서 반올림한 뒤 더합니다.">{uk((hasResidence ? opTotal : total) + penVal)}</b>
             {at && <span className="as-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
-            {/* [S37-3] 총자산 정의 명시 — 자산군별로 억 단위 소수 둘째 자리에서 반올림해 합산(J4). */}
-            <span style={{ display: "block", fontSize: "0.62rem", fontWeight: 600, color: "var(--color-ink-3)", marginTop: 2 }}
-              title="주식·ETF·부동산·현금 각각을 억 단위 소수 둘째 자리에서 반올림한 뒤 더합니다. 자산군별 반올림 오차가 총액에 미세하게 쌓일 수 있습니다.">억 단위 표시 · 자산군별 반올림</span>
           </div>
           {hasResidence && (
             <div className="as-subtotals" style={{ display: "flex", gap: 12, flexWrap: "wrap", margin: "2px 0 4px", fontSize: "0.74rem", color: "var(--color-ink-3)" }}>
-              <span>총자산 <b style={{ color: "var(--color-ink-2)", fontVariantNumeric: "tabular-nums" }}>{uk(total)}</b></span>
+              <span>총자산 <b style={{ color: "var(--color-ink-2)", fontVariantNumeric: "tabular-nums" }}>{uk(total + penVal)}</b></span>
+              {penVal > 0 && <span>🏦 연금 {uk(penVal)}</span>}
               <span>🔑 실거주 {uk(residenceUk)} · <span style={{ color: "var(--color-ink-3)" }}>못 파는 자산</span></span>
             </div>
           )}
@@ -579,9 +595,11 @@ export default function AssetsMapPage() {
         .as-sum-row { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
         .as-sum-drift { font-size: var(--fs-2); color: var(--color-ink-2); }
         .as-sum-more { margin-top: 10px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-primary); border-radius: var(--radius-sm); padding: 8px 14px; font-size: var(--fs-2); font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
+        .as-total-lbl2 { font-size: var(--fs-2); font-weight: 700; color: var(--color-ink-2); margin-bottom: 1px; }
+        .as-ex { font-size: 0.66rem; font-weight: 600; color: var(--color-ink-3); }
         .as-total { display: flex; align-items: baseline; gap: 8px; }
         .as-total span { font-size: var(--fs-2); font-weight: 600; color: var(--color-ink-3); }
-        .as-total b { font-size: var(--fs-7); font-weight: 800; color: var(--color-ink); }
+        .as-total b { font-size: var(--fs-8); font-weight: 800; color: var(--color-ink); letter-spacing: -.5px; }
         .as-trend { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
         .as-trend .as-dchip { font-size: var(--fs-3); font-weight: 800; font-variant-numeric: tabular-nums; }
         .as-trend .as-dchip.up { color: var(--color-success, #0E9E6A); }
