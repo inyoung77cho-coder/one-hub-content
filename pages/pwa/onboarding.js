@@ -11,6 +11,7 @@ import { markFunnel } from "../../lib/funnel"; // [S30-8] 가입 깔때기 이�
 import { setLifeStage, getLifeStage, STAGE_LABEL } from "../../lib/withdrawPlan"; // [S31-4] 생애 단계
 import PartnerCard from "../../components/PartnerCard"; // [S31-6] 증권 계좌 개설 제휴(계약 전 렌더 안 됨)
 import VideoLink from "../../components/VideoLink"; // [S34-6] 처음 쓰는 법 영상
+import ConnectAccountGuide from "../../components/ConnectAccountGuide"; // [2026-09-27] 증권계좌 연결 가이드
 
 // 성향(goal) → 목표 배분(%) 매핑 — AI자산 목표% 소스
 const ALLOC_MAP = {
@@ -431,6 +432,12 @@ export default function Onboarding() {
                   <div className="cmp-note">세로선 = 성향 기반 목표 비중. AI 자산운영 탭에서 리밸런싱 플랜이 자동 생성됩니다.</div>
                 </div>
               )}
+              {/* [2026-09-27] 마지막 — 실제 증권계좌를 연결하면 자동으로 최신화된다는 안내(3가지 방법) */}
+              <div className="card" style={{ padding: 14 }}>
+                <div style={{ fontSize: "var(--fs-3)", fontWeight: 800, marginBottom: 2 }}>🔗 이제 실제 계좌를 연결해보세요</div>
+                <div style={{ fontSize: "var(--fs-1)", color: "var(--color-ink-3)", marginBottom: 8, wordBreak: "keep-all" }}>연결하면 방금 입력한 값이 자동으로 최신화됩니다. 나중에 해도 됩니다.</div>
+                <ConnectAccountGuide compact />
+              </div>
               {/* [S30-6] 마지막 첫 판단 — 심판석·주간 리포트가 첫 판단이 있어야 채워진다. 보유 종목 없으면 안 나옴. */}
               {firstStock && (
                 <div className="card fv">

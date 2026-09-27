@@ -658,6 +658,19 @@ export default function TodayPage({ announcements = [] }) {
         {lifeStage === "withdraw" && (
           <div style={{ order: 0 }}><WithdrawCard operatingUk={headUk != null ? headUk : (totalUk != null ? totalUk : null)} /></div>
         )}
+        {/* [2026-09-27] 증권계좌 미연동(KIS 잔고 0)일 때 — 첫 사용자 연결 안내(연동·붙여넣기·직접입력). 연결되면 자동으로 사라짐. */}
+        {positions.length === 0 && (
+          <a href="/pwa/connect" style={{ order: 0, display: "flex", alignItems: "center", gap: 10, textDecoration: "none",
+            background: "var(--color-card)", border: "1px solid var(--color-primary)", borderRadius: "var(--radius-card, 14px)",
+            color: "var(--color-ink)", padding: 14, marginBottom: 12, boxShadow: "var(--shadow-card)" }}>
+            <span style={{ fontSize: 22 }}>🔗</span>
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <b style={{ display: "block", fontSize: "var(--fs-3)" }}>증권계좌 연결하기</b>
+              <span style={{ fontSize: "var(--fs-1)", color: "var(--color-ink-3)", wordBreak: "keep-all" }}>주식·ETF·연금을 자동으로 불러오세요 · 연동/붙여넣기/직접입력</span>
+            </span>
+            <span style={{ color: "var(--color-primary)", fontSize: 20 }}>›</span>
+          </a>
+        )}
         {/* [S31-6] 보유 0건(KIS 미연동+직접입력 없음)일 때만 제휴 자리 — 계약 전엔 렌더 안 됨. AI 판단 화면 아님. */}
         {positions.length === 0 && (
           <div style={{ order: 2 }}><PartnerCard place="today" compact /></div>
