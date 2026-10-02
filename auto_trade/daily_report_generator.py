@@ -1,6 +1,10 @@
 # -*- coding: utf-8 -*-
 
 # daily_report_generator.py - ONE-HUB v1.2
+# [S38 DC-2] 서버 로컬 게시용(OUTPUT_DIR=/home/ubuntu/one-hub-publish/content/daily). 앱은 이 출력을
+#   읽지 않는다 — 앱이 읽는 것은 GitHub Action(daily_publish.yml)이 저장소 content/daily 에 만드는
+#   루트 daily_report_generator.py(v1.0) 쪽이다. 판정: 이 v1.2 가 더 최신·더 많은 정보(거래 상세 +
+#   block_count 포함)를 담지만, 앱이 읽지 않는 경로에 쓴다. 통합·삭제는 이번 범위 밖(S38 DC는 조사·표기만).
 
 import sys, os, re, sqlite3, argparse
 

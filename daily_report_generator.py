@@ -1,5 +1,9 @@
 # -*- coding: utf-8 -*-
 # daily_report_generator.py - ONE-HUB v1.0
+# [S38 DC-2] 앱 게시용 기준본. .github/workflows/daily_publish.yml 이 저장소 체크아웃 루트에서
+#   실행(python daily_report_generator.py)해 content/daily 에 쓰고 커밋한다 — 앱(lib/reports.js)이
+#   읽는 쪽은 여기다. 판정: v1.0(요약만; 거래 상세·block_count 미포함)으로 auto_trade/ 쪽 v1.2보다
+#   정보가 적다. auto_trade/daily_report_generator.py 는 서버 로컬 게시용이며 앱은 그 출력을 읽지 않는다.
 # Windows UTF-8 설정
 import sys
 if sys.platform == "win32":
