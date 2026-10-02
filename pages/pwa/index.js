@@ -6,7 +6,7 @@ import { getLatestDailyReport } from '../../lib/reports';
 import LastUpdated from '../../components/LastUpdated';
 import MarketSession from '../../components/MarketSession';
 import { setTraderGlobal, getTrader } from '../../lib/trader';
-import { recordDecision, getTodayDecision, reconcileAutoWatch, getLedger } from '../../lib/verdictLedger';
+import { recordDecision, getTodayDecision, reconcileAutoWatch, getLedger, matureLedger } from '../../lib/verdictLedger';
 import { recordDecisionWithPrice } from '../../lib/recordDecision'; // [S23 T-1] 가격 확보→기록 공용(today.js 와 공유)
 import { getSeed, wonG } from '../../lib/gameWallet';
 import { initGameSync } from '../../lib/gameSync';
@@ -693,6 +693,28 @@ export default function PWADashboard({ latestReport }) {
     if (!mounted) return;
     loadPending();
   }, [mounted, loadPending]);
+
+  // [S38 DB / ST-01] 판단 성숙(스냅샷 축적) — 지금껏 matureLedger 가 어디서도 호출되지 않아
+  //   저장→채점 체인이 끊겨 있었다(ST-01). 사용자가 매일 들르는 홈에서 '하루 1회만' 돌려
+  //   각 판단의 결과 창(3·7거래일) 부근 현재가를 모은다. matureLedger 자체도 20시간 내 항목은
+  //   건너뛰므로(중복 스냅 방지) 과도 호출이 없고, 시세 실패는 조용히 넘겨 다음 날 재시도한다
+  //   (쓰기 재시도로 중복 기록을 만들지 않는다). 과거 창을 놓친 항목은 현재가로 메우지 않는다.
+  useEffect(() => {
+    if (!mounted) return;
+    const key = `onehub_mature_day_${trader}`;
+    const todayKST = new Date(Date.now() + 9 * 3600000).toISOString().slice(0, 10);
+    try { if (localStorage.getItem(key) === todayKST) return; } catch (e) {}
+    let cancelled = false;
+    (async () => {
+      try {
+        await matureLedger(trader, async (code) => {
+          try { const q = await fetchStockQuote(code); return q?.price || null; } catch (e) { return null; }
+        });
+        if (!cancelled) { try { localStorage.setItem(key, todayKST); } catch (e) {} }
+      } catch (e) {}
+    })();
+    return () => { cancelled = true; };
+  }, [mounted, trader]);
 
   const actOnPending = useCallback(async (code, action) => {
     // [나 vs AI] AI 제안에 대한 내 판단 기록 — 승인/예약=매매(take), 거절/스킵=관망(pass)

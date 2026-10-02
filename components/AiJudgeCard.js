@@ -86,6 +86,19 @@ export default function AiJudgeCard() {
           {/* [S38 DA-2] 성적표의 'AI' 는 엔진의 실제 체결 성과가 아니라 '추천을 전부 샀다고 가정'한 값이다.
               계산식(verdictStats)은 그대로 두고, 그 가정을 화면에 드러내 오인을 막는다. */}
           <p className="ajc-foot">AI 수익은 엔진이 추천한 종목을 모두 샀다고 가정한 수익률입니다.</p>
+          {/* [S38 DB / ST-01] 저장→채점 체인을 드러낸다. 채점 대기/불가를 조용히 비워두지 않는다. */}
+          {(sc.recPending > 0 || sc.recUngradable > 0) && (
+            <p className="ajc-scoring">
+              {sc.recPending > 0 && <span>채점 대기 {sc.recPending}건</span>}
+              {sc.recPending > 0 && sc.recUngradable > 0 && <span> · </span>}
+              {sc.recUngradable > 0 && <span className="ajc-ung">채점 불가 {sc.recUngradable}건</span>}
+              <span className="ajc-scoring-note">
+                {sc.recUngradable > 0
+                  ? "‘채점 불가’는 결과 확인 시점(판단 3거래일 뒤)에 접속 기록이 없어 그때 가격을 알 수 없는 판단입니다. 지난 가격을 현재가로 추정하지 않습니다."
+                  : "판단한 종목은 3거래일 뒤 접속할 때 그 무렵 가격으로 채점됩니다."}
+              </span>
+            </p>
+          )}
         </>
       )}
       <button className="ajc-more" onClick={() => router.push("/pwa/record")}>내 판단 성적표 자세히 →</button>
@@ -105,6 +118,9 @@ export default function AiJudgeCard() {
         .ajc-tbl thead th { color: var(--color-ink-3); font-weight: 700; font-size: 0.74rem; }
         .ajc-asm { display: block; font-size: 0.6rem; font-weight: 600; color: var(--color-ink-3); line-height: 1.2; margin-top: 2px; }
         .ajc-foot { font-size: 0.68rem; color: var(--color-ink-3); margin: 8px 0 0; line-height: 1.5; word-break: keep-all; }
+        .ajc-scoring { font-size: 0.74rem; font-weight: 700; color: var(--color-ink-2); margin: 8px 0 0; word-break: keep-all; }
+        .ajc-scoring .ajc-ung { color: var(--color-warning-ink, var(--color-warning)); }
+        .ajc-scoring-note { display: block; font-size: 0.68rem; font-weight: 500; color: var(--color-ink-3); margin-top: 3px; line-height: 1.5; }
         .ajc-tbl .pos { color: var(--color-success, #16a34a); }
         .ajc-tbl .neg { color: var(--color-danger, #dc2626); }
         .ajc-verdict { font-size: 0.84rem; font-weight: 700; color: var(--color-ink); margin: 10px 0 0; word-break: keep-all; }
