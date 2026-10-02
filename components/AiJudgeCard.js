@@ -73,7 +73,7 @@ export default function AiJudgeCard() {
       ) : (
         <>
           <table className="ajc-tbl">
-            <thead><tr><th></th><th>나</th><th>AI</th></tr></thead>
+            <thead><tr><th></th><th>나</th><th>AI <span className="ajc-asm">전체 추천<br />매수 가정</span></th></tr></thead>
             <tbody>
               <tr><td>판단 건수</td><td>{sc.total}건</td><td>{sc.total}건</td></tr>
               <tr><td>승률</td><td>{sc.winRate == null ? "–" : `${sc.winRate}%`}</td><td>{sc.aiWinRate == null ? "–" : `${sc.aiWinRate}%`}</td></tr>
@@ -83,6 +83,9 @@ export default function AiJudgeCard() {
           </table>
           {verdictLine && <p className={`ajc-verdict ${pol.declareWinner ? "" : "quiet"}`}>{verdictLine}</p>}
           {deltaLine && <p className="ajc-delta">{deltaLine}</p>}
+          {/* [S38 DA-2] 성적표의 'AI' 는 엔진의 실제 체결 성과가 아니라 '추천을 전부 샀다고 가정'한 값이다.
+              계산식(verdictStats)은 그대로 두고, 그 가정을 화면에 드러내 오인을 막는다. */}
+          <p className="ajc-foot">AI 수익은 엔진이 추천한 종목을 모두 샀다고 가정한 수익률입니다.</p>
         </>
       )}
       <button className="ajc-more" onClick={() => router.push("/pwa/record")}>내 판단 성적표 자세히 →</button>
@@ -100,6 +103,8 @@ export default function AiJudgeCard() {
         .ajc-tbl th, .ajc-tbl td { padding: 7px 4px; text-align: center; border-bottom: 1px solid var(--color-line); font-variant-numeric: tabular-nums; }
         .ajc-tbl th:first-child, .ajc-tbl td:first-child { text-align: left; color: var(--color-ink-2); font-weight: 600; }
         .ajc-tbl thead th { color: var(--color-ink-3); font-weight: 700; font-size: 0.74rem; }
+        .ajc-asm { display: block; font-size: 0.6rem; font-weight: 600; color: var(--color-ink-3); line-height: 1.2; margin-top: 2px; }
+        .ajc-foot { font-size: 0.68rem; color: var(--color-ink-3); margin: 8px 0 0; line-height: 1.5; word-break: keep-all; }
         .ajc-tbl .pos { color: var(--color-success, #16a34a); }
         .ajc-tbl .neg { color: var(--color-danger, #dc2626); }
         .ajc-verdict { font-size: 0.84rem; font-weight: 700; color: var(--color-ink); margin: 10px 0 0; word-break: keep-all; }

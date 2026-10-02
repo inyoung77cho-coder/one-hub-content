@@ -31,6 +31,29 @@ const mmss = (s) => {
   return `${m}:${String(sec).padStart(2, "0")}`;
 };
 
+// [S38 DA-3] 매매봇 '가동' 은 프로세스 상태를 '확인했을 때만' 표시한다.
+//   엔드포인트 생존(st.ok)만으로 가동을 띄우면, API 서버는 살아 있고 매매봇(onehub.service)은
+//   죽은 상태에서도 '가동'으로 오인한다(ST-02). 확인하지 못한 상태는 '확인 안 됨'으로 떨어뜨린다(fail-closed).
+//   봇 상태 소스: engine_status_api.get_systemd_status() → { is_active:bool, status:"running"|"stopped" }.
+//   PWA 응답이 평탄화했거나 engine/systemd 아래 중첩됐을 수 있어 알려진 위치를 모두 본다(서버 쪽은 수정하지 않음).
+//   A 테넌트 기준. B에서 '확인 안 됨'은 정상 동작으로 본다(A/B 운영 응답 계약 미확정).
+function engineState(st) {
+  // 응답 자체가 없음(프록시 미도달/실패) → 확인 안 됨
+  if (!st || st.ok === false || st.reachable === false) {
+    return { state: "unknown", label: "확인 안 됨", color: "var(--color-ink-3)" };
+  }
+  const sys = st.engine || st.systemd || st;
+  let running;
+  if (typeof sys.is_active === "boolean") running = sys.is_active;
+  else if (typeof st.is_active === "boolean") running = st.is_active;
+  else if (sys.status === "running" || st.status === "running") running = true;
+  else if (sys.status === "stopped" || st.status === "stopped") running = false;
+  if (running === true) return { state: "up", label: "가동 중", color: "var(--color-success)" };
+  if (running === false) return { state: "down", label: "중단됨", color: "var(--color-danger)" };
+  // 응답은 왔지만 봇 상태 필드를 못 찾음 → 확인 안 됨(가동으로 올리지 않는다)
+  return { state: "unknown", label: "확인 안 됨", color: "var(--color-ink-3)" };
+}
+
 export default function Settings() {
   const router = useRouter();
   // [S34-6] 발행된 사용법 영상만(미발행이면 빈 배열 → 목록 안 뜸)
@@ -487,7 +510,7 @@ export default function Settings() {
               const st = traderStat[t];
               const tok = (health?.tokens || []).find((x) => x.trader_id === t);
               const op = Array.isArray(ops) ? ops.find((x) => String(x.id).toUpperCase() === t) : null;
-              const active = !!(st && st.ok);
+              const eng = engineState(st); // [S38 DA-3] 가동/중단/확인 안 됨 — st.ok 단독 판단 금지
               // 채널 연동: ops.channels 우선, 없으면 텔레그램은 시스템 상태로 추정, 카톡은 미연동 기본
               const tg = op?.channels?.tg ?? (teleConnected ? "on" : "off");
               const kakao = op?.channels?.kakao ?? "off";
@@ -505,7 +528,7 @@ export default function Settings() {
                 <div key={t} style={{ padding: "10px 0", borderTop: t === "B" ? "1px solid var(--color-line)" : "none" }}>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <span style={{ fontWeight: 800, fontSize: "0.9rem", display: "flex", alignItems: "center" }}>
-                      <span className="dot" style={{ width: 8, height: 8, borderRadius: "50%", marginRight: 6, background: active ? "var(--color-success)" : "var(--color-danger)" }} />
+                      <span className="dot" style={{ width: 8, height: 8, borderRadius: "50%", marginRight: 6, background: eng.color }} />
                       Trader {t}
                     </span>
                     <span style={{ fontSize: "0.7rem", fontWeight: 700, padding: "2px 9px", borderRadius: 8, background: (op?.autonomous ?? st?.aimode) ? "var(--color-primary-soft)" : "var(--color-card-soft)", color: (op?.autonomous ?? st?.aimode) ? "var(--color-primary)" : "var(--color-ink-3)" }}>
@@ -513,7 +536,7 @@ export default function Settings() {
                     </span>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8, fontSize: "0.74rem", color: "var(--color-ink-2)" }}>
-                    <div>엔진 <b style={{ color: "var(--color-ink)" }}>{active ? "가동" : "응답없음"}</b></div>
+                    <div>엔진 <b style={{ color: eng.color }}>{eng.label}</b></div>
                     <div>레짐 <b style={{ color: "var(--color-ink)" }}>{st?.regime_current ?? "-"}</b></div>
                     <div>오늘 매수 <b style={{ color: "var(--color-ink)" }}>{op?.buys ?? "-"}건</b></div>
                     <div>오늘 차단 <b style={{ color: "var(--color-ink)" }}>{op?.blocks ?? "-"}건</b></div>

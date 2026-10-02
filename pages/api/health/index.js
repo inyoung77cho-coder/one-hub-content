@@ -11,6 +11,10 @@ const TARGETS = [
   { name: "news",       url: process.env.NEWS_API_URL   || "http://54.180.54.132:5004", critical: false },
 ];
 
+// [S38 DA-3] 주의: 이 엔드포인트의 up/ok 는 '포트(HTTP)가 응답하는가'다 — 매매봇(onehub.service)
+//   프로세스의 가동 여부가 아니다. 봇 가동/중단은 /api/pwa-engine-status + settings.js engineState() 가
+//   systemd 상태 필드로 따로 판정한다. 여기 ok:true 를 '봇 가동'으로 해석하지 말 것.
+//   (503/200 계약은 UptimeRobot 키워드 감시가 의존하므로 변경 금지.)
 async function probe(t) {
   const t0 = Date.now();
   try {

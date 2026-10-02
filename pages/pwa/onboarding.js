@@ -291,7 +291,7 @@ export default function Onboarding() {
             <div className="step">
               <div className="eyebrow">STEP 2 / 4 · 주식</div>
               <h1>보유 주식을<br />넣어주세요</h1>
-              <p className="lead">직접 입력하거나, 증권사 앱에서 받은 거래내역 CSV를 올리면 자동으로 채워집니다.</p>
+              <p className="lead">보유한 종목을 직접 입력해 주세요.</p>
               <div className="card">
                 <div className="field"><label>종목명 또는 코드</label><input placeholder="예: 한국항공우주 / 047810" value={stockForm.name} onChange={(e) => setStockForm((f) => ({ ...f, name: e.target.value }))} /></div>
                 <div className="frow">
