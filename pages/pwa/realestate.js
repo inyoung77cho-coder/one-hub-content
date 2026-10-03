@@ -55,6 +55,9 @@ export default function RealEstateDashboard() {
   const [analyzeReId, setAnalyzeReId] = useState(null);
   const [fbPyeong, setFbPyeong] = useState(""); // 분석에 필요한 평형(전용㎡) 입력
   const [fbMonth, setFbMonth] = useState("");   // 분석에 필요한 취득시점(YYYY-MM) 입력
+  // [S38 RE-03b/C/D] 비과세 판정은 '주택 수'가 필요한데 앱은 등록 안 된 주택을 알 수 없다.
+  //   그래서 사용자가 '현재 1주택'임을 명시 확인했을 때만 비과세를 보여준다(추론 금지). 기기 저장.
+  const [singleHouse, setSingleHouse] = useState(false);
   const saveReProps = (list) => { setReProps(list); try { localStorage.setItem("onehub_re_properties", JSON.stringify(list)); window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {} };
   const addReProp = () => {
     const name = String(pName || "").trim(); const v = Number(pVal);
@@ -68,6 +71,9 @@ export default function RealEstateDashboard() {
     setPName(""); setPVal(""); setPMemo(""); setPDeposit(""); setPMonthly(""); setPBuy(""); setAddProp(false);
   };
   const delReProp = (id) => { saveReProps(reProps.filter((p) => p.id !== id)); markDeleted("onehub_re_properties", id); }; // [C-4] 삭제 로그로 다른 기기에서 되살아나지 않게
+  // [S38 RE-03b] '현재 1주택' 명시 확인 로드·저장(기기 저장). 앱이 주택 수를 추론하지 않는다.
+  useEffect(() => { try { setSingleHouse(localStorage.getItem("onehub_re_single_house") === "1"); } catch (e) {} }, []);
+  const confirmSingleHouse = (v) => { setSingleHouse(v); try { localStorage.setItem("onehub_re_single_house", v ? "1" : "0"); } catch (e) {} };
   // [S40 FB-1] 분석용 평형·취득시점을 '그 추가 보유 레코드에만' 병합 저장(다른 필드·대표 주택·합계 불변).
   const saveAnalyzeFields = (id) => {
     const py = String(fbPyeong || "").trim(), bm = String(fbMonth || "").trim();
@@ -144,7 +150,9 @@ export default function RealEstateDashboard() {
   }, []);
   // [S5+] 선택/보유 단지의 실거래 평형(전용면적)을 백엔드에서 로딩(complex-areas). 미배포 시 feed 폴백.
   useEffect(() => {
-    const names = [wizOpen ? wiz.name : null, myProp?.name].filter(Boolean);
+    // [S40 RE-01] 분석 대상으로 고른 투자용(추가 보유) 집의 평형 시세도 조회해야 매도 분석이 잠기지 않는다.
+    const selProp = analyzeReId != null ? reProps.find((p) => p.id === analyzeReId) : null;
+    const names = [wizOpen ? wiz.name : null, myProp?.name, selProp?.name].filter(Boolean);
     names.forEach((nm) => {
       if (!nm || dbAreas[nm] !== undefined) return;
       setDbAreas((m) => ({ ...m, [nm]: null })); // in-flight 마킹(중복 요청 방지)
@@ -167,7 +175,7 @@ export default function RealEstateDashboard() {
         .catch(() => setDbAreas((m) => ({ ...m, [nm]: null })));
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wizOpen, wiz.name, myProp?.name]);
+  }, [wizOpen, wiz.name, myProp?.name, analyzeReId]);
   const pickMy = (v) => { setMyC(v); try { localStorage.setItem("onehub_re_my", v); } catch (e) {} };
   const pickTgt = (v) => { setTgtC(v); try { localStorage.setItem("onehub_re_target", v); } catch (e) {} };
   const openWiz = () => { setWiz(myProp ? { name: myProp.name || "", pyeong: myProp.pyeong || "", dongfloor: myProp.dongfloor || "", buyUk: myProp.buyUk || "", buyMonth: myProp.buyMonth || "" } : { name: myC || "", pyeong: "", dongfloor: "", buyUk: "", buyMonth: "" }); setWizOpen(true); };
@@ -352,35 +360,45 @@ export default function RealEstateDashboard() {
             );
           }
           const sellUk = pp.uk;
-          // [S40 FB-2] 보유기간·주택수가 실제로 확인되면 매도비용에 전달해 FA-3에서 보류한 비과세 결론을 복구한다.
-          //   buyMonth('YYYY-MM')이 있어야 보유기간 확정, 추가 보유(reProps) 수로 주택수 판단. moveCost 기본값은 그대로.
+          // [S38 RE-03b/C/D] 보유기간은 buyMonth로 확정하되, '주택 수'는 앱이 확인 못 한다(등록 안 된 주택 가능).
+          //   → 비과세/과세는 '주택 수가 확인된 경우'(다주택 등록 OR 사용자가 1주택 명시 확인)에만 단정하고, 아니면 보류.
           const ym = String(myProp?.buyMonth || "");
           const holdingYears = /^\d{4}-\d{2}$/.test(ym)
             ? ((new Date().getFullYear() - Number(ym.slice(0, 4))) * 12 + (new Date().getMonth() + 1 - Number(ym.slice(5, 7)))) / 12
             : null;
-          const condKnown = holdingYears != null;   // 보유기간 확인됨 = 조건 확정 가능
-          const isOneHouse = reProps.length === 0;   // 추가 보유 없으면 1주택으로 간주
-          const sc = condKnown
-            ? estimateSellCost({ sellPriceUk: sellUk, buyPriceUk: Number(myProp?.buyUk) || 0, isOneHouse, holdingYears })
-            : estimateSellCost({ sellPriceUk: sellUk, buyPriceUk: Number(myProp?.buyUk) || 0 });
+          const condKnown = holdingYears != null;                  // 보유기간 확인
+          const housesKnown = reProps.length > 0 || singleHouse;   // 주택 수 확인(다주택 등록 OR 1주택 명시 확인)
+          const isOneHouse = reProps.length === 0 && singleHouse;  // 확정된 1주택만
+          const fullKnown = condKnown && housesKnown;
+          const base = estimateSellCost({ sellPriceUk: sellUk, buyPriceUk: Number(myProp?.buyUk) || 0 }); // 중개보수·차익(조건 무관)
+          const scFull = fullKnown ? estimateSellCost({ sellPriceUk: sellUk, buyPriceUk: Number(myProp?.buyUk) || 0, isOneHouse, holdingYears }) : null;
+          const netTax = fullKnown ? scFull.total : base.broker;   // 확정 시 세금 포함 / 미확정 시 중개보수만(세금 확정 전)
           return (
             <section className="card">
               <div style={{ fontSize: "0.86rem", fontWeight: 800, marginBottom: 8 }}>🔁 갈아타기 참고 <span style={{ fontWeight: 600, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>내 집을 지금 팔면</span></div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: "0.8rem", color: "var(--color-ink-2)" }}>
                 <div style={{ display: "flex" }}><span>예상 매도가</span><b style={{ marginLeft: "auto", color: "var(--color-ink)" }}>{uk(sellUk)}</b></div>
-                <div style={{ display: "flex" }}><span>중개보수(추정)</span><b style={{ marginLeft: "auto" }}>−{uk(sc.broker)}</b></div>
-                {/* [S40 FA-3/FB-2 · S38 C-02] 보유기간은 buyMonth로 확정되나 '주택 수'는 앱이 확정 못한다
-                    (등록 안 된 주택이 있을 수 있음). 그래서 비과세를 단정하지 않고 '1주택 기준' 조건부로만 표시. */}
-                <div style={{ display: "flex" }}><span>양도세(추정)</span><b style={{ marginLeft: "auto" }}>{sc.capGain > 0 ? `−${uk(sc.capGain)}` : sc.gainUk <= 0 ? "양도차익 없음" : condKnown ? "1주택 기준 비과세" : "보유기간·주택수 미확인"}</b></div>
-                {/* [S40 FA-2] '손에 쥐는 금액'은 대출 상환 전 금액이다(대표 주택 저장구조에 대출 잔액 없음 — 순자산 미구현). 오해 방지 라벨. */}
-                <div style={{ display: "flex", borderTop: "1px solid var(--color-line)", paddingTop: 5, marginTop: 2 }}><span style={{ fontWeight: 700 }}>거래비용 차감액 · 대출 상환 전</span><b style={{ marginLeft: "auto", color: "var(--color-primary)" }}>{uk(Math.round((sellUk - sc.total) * 100) / 100)}</b></div>
+                <div style={{ display: "flex" }}><span>중개보수(추정)</span><b style={{ marginLeft: "auto" }}>−{uk(base.broker)}</b></div>
+                {/* [S38 RE-03b/C/D] 주택 수 미확인이면 비과세/과세 어느 쪽도 단정하지 않는다(보류). */}
+                <div style={{ display: "flex" }}><span>양도세(추정)</span><b style={{ marginLeft: "auto" }}>{!condKnown ? "보유기간 미확인" : !housesKnown ? "주택수 미확인" : scFull.capGain > 0 ? `−${uk(scFull.capGain)}` : base.gainUk <= 0 ? "양도차익 없음" : "비과세(1주택·2년)"}</b></div>
+                {/* [S40 FA-2] '손에 쥐는 금액'은 대출 상환 전. 세금 미확정 시 양도세도 빠졌음을 라벨에 명시. */}
+                <div style={{ display: "flex", borderTop: "1px solid var(--color-line)", paddingTop: 5, marginTop: 2 }}><span style={{ fontWeight: 700 }}>{fullKnown ? "거래비용 차감액 · 대출 상환 전" : "거래비용 차감액 · 대출·양도세 확정 전"}</span><b style={{ marginLeft: "auto", color: "var(--color-primary)" }}>{uk(Math.round((sellUk - netTax) * 100) / 100)}</b></div>
               </div>
-              {sc.capGain === 0 && sc.gainUk > 0 && !condKnown && (
-                <div style={{ marginTop: 6, fontSize: "0.66rem", color: "var(--color-warning-ink, var(--color-warning))", lineHeight: 1.4 }}>⚠ 보유기간·주택수가 확인되지 않아 비과세 여부는 판단할 수 없습니다. 매수 시점(연-월)을 등록하면 조건을 반영합니다.</div>
+              {!condKnown && (
+                <div style={{ marginTop: 6, fontSize: "0.66rem", color: "var(--color-warning-ink, var(--color-warning))", lineHeight: 1.4 }}>⚠ 매수 시점(연-월)을 등록하면 보유기간을 반영합니다.</div>
               )}
-              {/* [S40 FB-2 · S38 C-02] 비과세는 '1주택 가정'일 뿐임을 분명히 — 주택 수는 앱이 확인할 수 없다. */}
-              {condKnown && sc.capGain === 0 && sc.gainUk > 0 && (
-                <div style={{ marginTop: 6, fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>매수 {ym} 기준 보유 {holdingYears.toFixed(1)}년(2년 충족). 앱에 등록된 추가 주택이 없어 <b>1주택으로 가정</b>했습니다 — 등록되지 않은 다른 주택이 있으면 다주택으로 <b>과세</b>됩니다.</div>
+              {condKnown && reProps.length > 0 && (
+                <div style={{ marginTop: 6, fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>추가 보유 {reProps.length}채 등록 → <b>다주택</b> 기준으로 계산됩니다.</div>
+              )}
+              {condKnown && reProps.length === 0 && !singleHouse && (
+                <div style={{ marginTop: 6, fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>주택 수는 앱이 확인할 수 없습니다(등록 안 된 주택이 있을 수 있음). 비과세 판정을 보려면 1주택임을 확인해 주세요.
+                  <button onClick={() => confirmSingleHouse(true)} style={{ display: "block", marginTop: 6, border: "1px solid var(--color-line)", background: "var(--color-card)", color: "var(--color-primary)", borderRadius: 8, padding: "6px 12px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>현재 1주택입니다 (비과세로 보기)</button>
+                </div>
+              )}
+              {condKnown && reProps.length === 0 && singleHouse && (
+                <div style={{ marginTop: 6, fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>✓ 1주택으로 설정됨 — 비과세(1주택·2년·12억↓) 기준.
+                  <button onClick={() => confirmSingleHouse(false)} style={{ marginLeft: 6, border: "none", background: "transparent", color: "var(--color-primary)", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer", textDecoration: "underline" }}>해제</button>
+                </div>
               )}
               <div style={{ marginTop: 8, fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>상급지로 갈아타려면 여기에 목표 단지 취득세·중개비와 시세 차액이 더 듭니다. ⚖️ {MOVE_COST_DISCLAIMER}</div>
             </section>

@@ -148,8 +148,13 @@ export default function PensionPage() {
     } catch (e) {}
   }, []);
   const saveContrib = () => {
+    // [S38 EF-02b] 빈 입력 = 지우기 — 저장값을 제거해 재접속 시 복원되지 않게 한다(이전엔 삭제 불가였음).
+    if (contribMan === "") {
+      try { localStorage.removeItem("onehub_pension_contrib"); } catch (e) {}
+      setContribYear(null); setContribEditing(false); return;
+    }
     const n = Number(contribMan);
-    if (!(n >= 0) || contribMan === "") return;
+    if (!(n >= 0)) return;
     const y = new Date().getFullYear();
     try { localStorage.setItem("onehub_pension_contrib", JSON.stringify({ year: y, amount: n })); } catch (e) {}
     setContribYear(y); setContribEditing(false);
@@ -186,7 +191,13 @@ export default function PensionPage() {
               <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                 <input type="number" inputMode="numeric" placeholder={`올해 납입액 (한도 ${limitMan.toLocaleString()}만원)`} value={contribMan} onChange={(e) => setContribMan(e.target.value)} style={inBox} />
                 <span style={{ fontSize: "0.82rem", color: "var(--color-ink-2)", fontWeight: 700 }}>만원</span>
-                <button onClick={saveContrib} disabled={!(Number(contribMan) >= 0 && contribMan !== "")} style={{ border: "none", borderRadius: 8, padding: "10px 16px", fontSize: "0.85rem", fontWeight: 800, color: "var(--color-on-primary)", background: "var(--color-primary)", cursor: "pointer", opacity: (Number(contribMan) >= 0 && contribMan !== "") ? 1 : 0.5 }}>저장</button>
+                {(() => {
+                  const isClear = contribMan === "";                 // 빈 입력 = 지우기
+                  const canAct = isClear ? contribYear != null : Number(contribMan) >= 0; // 지울 값이 있거나 유효 숫자
+                  return (
+                    <button onClick={saveContrib} disabled={!canAct} style={{ border: "none", borderRadius: 8, padding: "10px 16px", fontSize: "0.85rem", fontWeight: 800, color: "var(--color-on-primary)", background: isClear ? "var(--color-ink-3)" : "var(--color-primary)", cursor: "pointer", opacity: canAct ? 1 : 0.5 }}>{isClear ? "지우기" : "저장"}</button>
+                  );
+                })()}
               </div>
             ) : (
               <>

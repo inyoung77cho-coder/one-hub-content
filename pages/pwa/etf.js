@@ -175,7 +175,7 @@ export default function EtfDashboard() {
   const [acctFilter, setAcctFilter] = useState("일반"); // [S4] 계좌 유형 필터([일반][개인연금][퇴직연금][ISA])
   const [detailOpen, setDetailOpen] = useState(false); // [D4] 종목별 수익 분해 접기(페이지 길이 축약)
   const [fcOpen, setFcOpen] = useState(false); // [S7.4] 예측 섹션 기본 접기
-  const [pensionContrib, setPensionContrib] = useState(""); // [S4] 올해 연금 납입액(원, 세액공제 진행률)
+  // [S38 EF-02b] 연금 납입액 입력은 연금 페이지로 이전됨(연도 태깅). ETF의 레거시 pensionContrib state·로드·setter는 죽은 코드라 제거.
   const [targetAlloc, setTargetAlloc] = useState(null); // [E-4] 목표 배분(onehub_target_alloc)
   const [decompOpen, setDecompOpen] = useState(false); // [E-1] Tier3 수익 분해 접힘(기본)
   const toggleDecomp = () => { const n = !decompOpen; setDecompOpen(n); try { localStorage.setItem("onehub_etf_decomp", n ? "1" : "0"); } catch {} };
@@ -200,8 +200,6 @@ export default function EtfDashboard() {
     try {
       const f = localStorage.getItem("onehub_etf_acct_filter");
       if (f && ACCT_FILTERS.includes(f)) setAcctFilter(f);
-      const pc = localStorage.getItem("onehub_pension_contrib");
-      if (pc != null) setPensionContrib(pc);
       const ta = localStorage.getItem("onehub_target_alloc");
       if (ta) setTargetAlloc(JSON.parse(ta));
       setDecompOpen(localStorage.getItem("onehub_etf_decomp") === "1");
@@ -226,7 +224,6 @@ export default function EtfDashboard() {
     if (typeof a === "string" && ACCT_FILTERS.includes(a)) setAcctFilter(a);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, router.query.acct]);
-  const changePensionContrib = (v) => { setPensionContrib(v); try { localStorage.setItem("onehub_pension_contrib", v); } catch (e) {} };
 
   useEffect(() => {
     const load = () => {
