@@ -308,7 +308,7 @@ export default function RealEstateDashboard() {
 
         {/* [S22-9] 분기 리듬 명시 — 부동산은 매일 보는 화면이 아니다. 정직한 주기 표시가 신뢰를 만든다. */}
         {nextQ && (
-          <div style={{ fontSize: "0.72rem", color: "var(--color-ink-3)", margin: "0 2px 10px", lineHeight: 1.5 }}>📅 부동산은 분기·연 단위로 움직입니다 — 다음 데이터 갱신 <b>{nextQ}</b>. 매일 볼 화면이 아니에요.</div>
+          <div style={{ fontSize: "0.72rem", color: "var(--color-ink-3)", margin: "0 2px 10px", lineHeight: 1.5 }}>📅 부동산은 분기·연 단위로 움직입니다 — 다음 분기 점검 기준일 <b>{nextQ}</b>. 매일 볼 화면이 아니에요.</div>
         )}
 
         {/* [§3.7·§3.8] 내 단지 포지션 — 막대+실선(계단)으로 대장 대비 위치·평형별 적정가 */}
@@ -317,17 +317,34 @@ export default function RealEstateDashboard() {
         )}
 
         {/* [S22-9] 갈아타기 참고 — 내 집을 지금 팔 때 드는 거래비용(중개비·양도세 간이 추정). 유료 후보의 씨앗. */}
-        {myProp?.name && repEvalUk > 0 && (() => {
-          const sc = estimateSellCost({ sellPriceUk: repEvalUk, buyPriceUk: Number(myProp?.buyUk) || 0 });
+        {myProp?.name && (() => {
+          // [S40 FA-4] 매도 판단에는 '확인 가능한 시세'(myPyeongPrice)만 쓴다 — 자산 평가용 매수가 대체(repEvalUk)를
+          //   매도가로 흘려보내지 않는다. 실거래 부족으로 시세가 잠기면 예상 매도가·매도비용·잔여금액을 계산도 표시도 않는다.
+          const pp = myPyeongPrice();
+          if (pp.locked || pp.uk == null) {
+            return (
+              <section className="card">
+                <div style={{ fontSize: "0.86rem", fontWeight: 800, marginBottom: 8 }}>🔁 갈아타기 참고 <span style={{ fontWeight: 600, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>내 집을 지금 팔면</span></div>
+                <div style={{ fontSize: "0.78rem", color: "var(--color-ink-2)", lineHeight: 1.5 }}>실거래가 부족해 <b>{myProp?.pyeong ? `${m2ToPyeong(myProp.pyeong)}평` : "이 평형"}</b>의 믿을 만한 시세를 확정하지 못했습니다. 매도비용은 시세가 확인돼야 계산합니다 — 아래 <b>내 단지 포지션</b>에서 시세를 직접 입력해 주세요.</div>
+              </section>
+            );
+          }
+          const sellUk = pp.uk;
+          const sc = estimateSellCost({ sellPriceUk: sellUk, buyPriceUk: Number(myProp?.buyUk) || 0 });
           return (
             <section className="card">
               <div style={{ fontSize: "0.86rem", fontWeight: 800, marginBottom: 8 }}>🔁 갈아타기 참고 <span style={{ fontWeight: 600, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>내 집을 지금 팔면</span></div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: "0.8rem", color: "var(--color-ink-2)" }}>
-                <div style={{ display: "flex" }}><span>예상 매도가</span><b style={{ marginLeft: "auto", color: "var(--color-ink)" }}>{uk(repEvalUk)}</b></div>
+                <div style={{ display: "flex" }}><span>예상 매도가</span><b style={{ marginLeft: "auto", color: "var(--color-ink)" }}>{uk(sellUk)}</b></div>
                 <div style={{ display: "flex" }}><span>중개보수(추정)</span><b style={{ marginLeft: "auto" }}>−{uk(sc.broker)}</b></div>
-                <div style={{ display: "flex" }}><span>양도세(추정)</span><b style={{ marginLeft: "auto" }}>{sc.capGain > 0 ? `−${uk(sc.capGain)}` : "비과세(1주택·2년)"}</b></div>
-                <div style={{ display: "flex", borderTop: "1px solid var(--color-line)", paddingTop: 5, marginTop: 2 }}><span style={{ fontWeight: 700 }}>손에 쥐는 금액(추정)</span><b style={{ marginLeft: "auto", color: "var(--color-primary)" }}>{uk(Math.round((repEvalUk - sc.total) * 100) / 100)}</b></div>
+                {/* [S40 FA-3] 1주택·2년 조건을 확인하지 못하므로 '비과세'를 단정하지 않는다(세금 단정 금지 — 여섯 건 중 가장 비싼 거짓말). */}
+                <div style={{ display: "flex" }}><span>양도세(추정)</span><b style={{ marginLeft: "auto" }}>{sc.capGain > 0 ? `−${uk(sc.capGain)}` : sc.gainUk <= 0 ? "양도차익 없음" : "보유기간·주택수 미확인"}</b></div>
+                {/* [S40 FA-2] '손에 쥐는 금액'은 대출 상환 전 금액이다(대표 주택 저장구조에 대출 잔액 없음 — 순자산 미구현). 오해 방지 라벨. */}
+                <div style={{ display: "flex", borderTop: "1px solid var(--color-line)", paddingTop: 5, marginTop: 2 }}><span style={{ fontWeight: 700 }}>거래비용 차감액 · 대출 상환 전</span><b style={{ marginLeft: "auto", color: "var(--color-primary)" }}>{uk(Math.round((sellUk - sc.total) * 100) / 100)}</b></div>
               </div>
+              {sc.capGain === 0 && sc.gainUk > 0 && (
+                <div style={{ marginTop: 6, fontSize: "0.66rem", color: "var(--color-warning-ink, var(--color-warning))", lineHeight: 1.4 }}>⚠ 보유기간·주택수가 확인되지 않아 비과세 여부는 판단할 수 없습니다. 위 양도세는 조건 미확인 상태의 간이값입니다.</div>
+              )}
               <div style={{ marginTop: 8, fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>상급지로 갈아타려면 여기에 목표 단지 취득세·중개비와 시세 차액이 더 듭니다. ⚖️ {MOVE_COST_DISCLAIMER}</div>
             </section>
           );
