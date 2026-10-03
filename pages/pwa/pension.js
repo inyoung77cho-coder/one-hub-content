@@ -8,6 +8,7 @@ import AssetMapTitle from "../../components/AssetMapTitle";
 import SegTabs from "../../components/shared/SegTabs";
 import useSwipeTabs from "../../components/shared/useSwipeTabs";
 import * as P from "../../lib/pension";
+import { pensionCreditLimitCombined } from "../../lib/taxRules"; // [S39 EB-1] 세액공제 합산 한도(원)
 
 const man = (v) => (v == null ? "-" : `${Math.round(Number(v) / 1e4).toLocaleString()}만`);
 const uk = (v, d = 2) => (v == null ? "-" : `${(Number(v) / 1e8).toFixed(d)}억`);
@@ -41,6 +42,10 @@ export default function PensionPage() {
   const [household, setHousehold] = useState(null);
   const [loading, setLoading] = useState(true);
   const [snapStatus, setSnapStatus] = useState("loading"); // [S39 EA-3] loading|ok|empty|error — 조회 실패와 '데이터 없음'을 구분
+  // [S39 EB-1] 올해 세액공제 납입액(개인연금+퇴직연금 합산, 만원). 연도 태깅 저장 → 작년 값은 '올해 확인 필요'.
+  const [contribMan, setContribMan] = useState("");
+  const [contribYear, setContribYear] = useState(null);
+  const [contribEditing, setContribEditing] = useState(false);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [preview, setPreview] = useState(null);
@@ -128,6 +133,27 @@ export default function PensionPage() {
     else setMsg(r.data?.error || "계획 생성 실패");
   };
 
+  // [S39 EB-1] 납입액 로드 — 연도 태깅 JSON({year,amount}). 올해 값만 채우고, 레거시(단일 문자열)·작년 값은 '확인 필요'로 비운다.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("onehub_pension_contrib");
+      if (!raw) return;
+      let obj = null; try { obj = JSON.parse(raw); } catch (e) { obj = null; }
+      if (obj && typeof obj === "object" && obj.amount != null) {
+        const y = Number(obj.year) || null;
+        setContribYear(y);
+        if (y === new Date().getFullYear()) setContribMan(String(obj.amount));
+      }
+    } catch (e) {}
+  }, []);
+  const saveContrib = () => {
+    const n = Number(contribMan);
+    if (!(n >= 0) || contribMan === "") return;
+    const y = new Date().getFullYear();
+    try { localStorage.setItem("onehub_pension_contrib", JSON.stringify({ year: y, amount: n })); } catch (e) {}
+    setContribYear(y); setContribEditing(false);
+  };
+
   const acctIdx = Math.max(0, accountList.findIndex((x) => x.id === acct.id));
   // [사용자 지시] 개인연금↔퇴직연금 탭 스와이프(ETF·부동산과 통일)
   const acctSwipe = useSwipeTabs({ index: acctIdx, count: accountList.length, onChange: (i) => setAcct(accountList[i]) });
@@ -142,6 +168,44 @@ export default function PensionPage() {
           index={acctIdx} onChange={(i) => setAcct(accountList[i])} ariaLabel="연금 계좌" />
         <div className="pen-lead">{(LEAD[acct.type] || {}).ic} <b>{acct.label}</b> · {(LEAD[acct.type] || {}).t || "진단·오늘 할 일·리밸런싱"}</div>
       </div>
+
+      {/* [S39 EB-1] 올해 세액공제 납입액 입력 — 개인연금+퇴직연금 '합산'·연도 태깅. 계좌/스냅샷 상태와 무관하게 항상 표시. */}
+      {(() => {
+        const y = new Date().getFullYear();
+        const limitMan = Math.round(pensionCreditLimitCombined() / 1e4);
+        const known = contribYear === y && contribMan !== "";
+        const amt = known ? Number(contribMan) : null;
+        const room = amt != null ? Math.max(0, limitMan - amt) : null;
+        const pctDone = amt != null && limitMan > 0 ? Math.min(100, Math.round((amt / limitMan) * 100)) : null;
+        const inBox = { flex: "1 1 120px", minWidth: 0, border: "1px solid var(--color-line)", background: "var(--color-bg)", borderRadius: 8, padding: "10px 11px", fontSize: "0.9rem", color: "var(--color-ink)" };
+        return (
+          <section className="card" style={{ marginTop: 10 }}>
+            <div style={{ fontSize: "0.86rem", fontWeight: 800, marginBottom: 8 }}>💳 올해({y}년) 세액공제 납입액 <span style={{ fontWeight: 600, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>개인연금 + 퇴직연금 합산</span></div>
+            {(contribEditing || !known) ? (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <input type="number" inputMode="numeric" placeholder={`올해 납입액 (한도 ${limitMan.toLocaleString()}만원)`} value={contribMan} onChange={(e) => setContribMan(e.target.value)} style={inBox} />
+                <span style={{ fontSize: "0.82rem", color: "var(--color-ink-2)", fontWeight: 700 }}>만원</span>
+                <button onClick={saveContrib} disabled={!(Number(contribMan) >= 0 && contribMan !== "")} style={{ border: "none", borderRadius: 8, padding: "10px 16px", fontSize: "0.85rem", fontWeight: 800, color: "var(--color-on-primary)", background: "var(--color-primary)", cursor: "pointer", opacity: (Number(contribMan) >= 0 && contribMan !== "") ? 1 : 0.5 }}>저장</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ height: 8, borderRadius: 999, background: "var(--color-card-soft, rgba(0,0,0,0.06))", overflow: "hidden", marginBottom: 8 }}>
+                  <div style={{ width: `${pctDone}%`, height: "100%", background: "var(--color-primary)", borderRadius: 999 }} />
+                </div>
+                <div style={{ display: "flex", fontSize: "0.85rem", color: "var(--color-ink-2)" }}>
+                  <span>올해 납입 <b style={{ color: "var(--color-ink)" }}>{amt.toLocaleString()}만원</b></span>
+                  <b style={{ marginLeft: "auto", color: "var(--color-primary)" }}>세액공제 여유 {room.toLocaleString()}만원</b>
+                </div>
+                <button onClick={() => setContribEditing(true)} style={{ marginTop: 8, border: "1px solid var(--color-line)", background: "var(--color-card)", color: "var(--color-ink-2)", borderRadius: 8, padding: "7px 12px", fontSize: "0.78rem", fontWeight: 700, cursor: "pointer" }}>수정</button>
+              </>
+            )}
+            {contribYear != null && contribYear !== y && (
+              <div style={{ marginTop: 8, fontSize: "0.7rem", color: "var(--color-warning-ink, var(--color-warning))", lineHeight: 1.4 }}>⚠ 마지막 입력은 {contribYear}년 값입니다. 올해({y}년) 납입액을 다시 입력해 주세요.</div>
+            )}
+            <div style={{ marginTop: 8, fontSize: "0.68rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>세액공제 한도(개인연금+퇴직연금 합산) {limitMan.toLocaleString()}만원 기준. 총 납입 가능 한도와는 다릅니다. 참고용 · 세무자문 아님.</div>
+          </section>
+        );
+      })()}
 
       {snapStatus === "loading" ? (
         <div className="pen-skel" aria-busy="true">불러오는 중…</div>
