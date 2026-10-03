@@ -2,21 +2,25 @@ const ENGINE_API = process.env.ENGINE_API_URL || "http://54.180.54.132:5001";
 
 // [S38 후속 Task1] 봇 프로세스 상태(systemd) 조회 — per-trader /api/pwa/engine-status 응답에는
 //   봇 프로세스 가동 여부(is_active/status)가 없다(라이브 확인: aimode·is_analyzing·regime 만 줌).
-//   서버 /api/engine-status 는 get_systemd_status()를 engine 으로 반환하므로, 여기서 그 engine 상태만
-//   가져와 병합한다 → settings.js engineState()가 '가동 중/중단됨'을 '확인'할 수 있다.
+//   서버 /api/engine-status 는 get_systemd_status()를 engine 으로 반환하므로, 그 engine 상태만 가져와
+//   병합한다 → settings.js engineState()가 '가동 중/중단됨'을 '확인'할 수 있다.
 //   주의: /api/engine-status 는 KIS 보유조회(holdings)도 수행하므로 engine 상태만 취하고 나머지는 버린다.
 //   현재 get_systemd_status 는 onehub.service(트레이더 A)만 보므로 A 에만 병합한다(B 는 '확인 안 됨' 유지).
+//   반환: 성공 {ok:true, engine:{is_active,status}} / 실패 {ok:false, reason, keys?}(진단용, 민감값 없음).
 async function fetchBotStatus() {
   try {
-    const r = await fetch(`${ENGINE_API}/api/engine-status`, { signal: AbortSignal.timeout(4000) });
-    if (!r.ok) return null;
+    const r = await fetch(`${ENGINE_API}/api/engine-status`, { signal: AbortSignal.timeout(6000) });
+    if (!r.ok) return { ok: false, reason: `http_${r.status}` };
     const d = await r.json();
     const e = d && d.engine;
     if (e && (typeof e.is_active === "boolean" || e.status)) {
-      return { is_active: e.is_active, status: e.status }; // holdings 등은 의도적으로 버림
+      return { ok: true, engine: { is_active: e.is_active, status: e.status } };
     }
-  } catch (e) {}
-  return null;
+    // engine 필드가 없거나 모양이 다름 — 응답의 '키 이름'만(값 아님) 진단에 싣는다.
+    return { ok: false, reason: "no_engine_field", keys: d && typeof d === "object" ? Object.keys(d).slice(0, 12) : null };
+  } catch (e) {
+    return { ok: false, reason: e && e.name === "TimeoutError" ? "timeout" : (e && e.name) || "error" };
+  }
 }
 
 export default async function handler(req, res) {
@@ -30,8 +34,12 @@ export default async function handler(req, res) {
     ]);
     if (!upstream.ok) throw new Error(`Upstream error: ${upstream.status}`);
     const data = await upstream.json();
-    // [S38 후속 Task1] 봇 프로세스 상태를 engine 으로 병합(서버 무배포). 못 가져오면 생략 → '확인 안 됨' 유지.
-    if (bot) data.engine = bot;
+    // [S38 후속 Task1] 봇 프로세스 상태를 engine 으로 병합(서버 무배포). 못 가져오면 engine_probe 에
+    //   사유만 실어 두고 engine 은 비운다 → settings 는 '확인 안 됨' 유지(회귀 없음), 원인은 진단 가능.
+    if (bot) {
+      if (bot.ok) data.engine = bot.engine;
+      else data.engine_probe = bot;
+    }
     res.setHeader("Cache-Control", "no-store");
     return res.status(200).json(data);
   } catch (err) {
