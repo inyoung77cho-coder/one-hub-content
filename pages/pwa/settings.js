@@ -40,7 +40,7 @@ const mmss = (s) => {
 function engineState(st) {
   // 응답 자체가 없음(프록시 미도달/실패) → 확인 안 됨
   if (!st || st.ok === false || st.reachable === false) {
-    return { state: "unknown", label: "확인 안 됨", color: "var(--color-ink-3)" };
+    return { state: "unknown", label: "확인 안 됨", color: "var(--color-ink-3)", hint: "엔진 상태 응답을 받지 못했습니다." };
   }
   const sys = st.engine || st.systemd || st;
   let running;
@@ -48,10 +48,12 @@ function engineState(st) {
   else if (typeof st.is_active === "boolean") running = st.is_active;
   else if (sys.status === "running" || st.status === "running") running = true;
   else if (sys.status === "stopped" || st.status === "stopped") running = false;
-  if (running === true) return { state: "up", label: "가동 중", color: "var(--color-success)" };
-  if (running === false) return { state: "down", label: "중단됨", color: "var(--color-danger)" };
-  // 응답은 왔지만 봇 상태 필드를 못 찾음 → 확인 안 됨(가동으로 올리지 않는다)
-  return { state: "unknown", label: "확인 안 됨", color: "var(--color-ink-3)" };
+  if (running === true) return { state: "up", label: "가동 중", color: "var(--color-success)", hint: "" };
+  if (running === false) return { state: "down", label: "중단됨", color: "var(--color-danger)", hint: "" };
+  // [S38 DA-3 라이브확인] 응답은 왔지만 매매봇 프로세스 상태 필드(is_active/status)가 없다
+  //   (라이브 /api/pwa/engine-status 가 aimode·is_analyzing·regime 만 주고 봇 프로세스 상태는 안 준다).
+  //   가동으로 올리지 않는다. 서버가 봇 프로세스 상태를 제공하면 자동으로 '가동 중/중단됨'이 된다.
+  return { state: "unknown", label: "확인 안 됨", color: "var(--color-ink-3)", hint: "엔진 응답에 매매봇 프로세스 상태 필드가 없어 가동 여부를 확인하지 못했습니다(서버 상태 미제공 — 봇이 멈췄다는 뜻은 아님)." };
 }
 
 export default function Settings() {
@@ -536,7 +538,7 @@ export default function Settings() {
                     </span>
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8, fontSize: "0.74rem", color: "var(--color-ink-2)" }}>
-                    <div>엔진 <b style={{ color: eng.color }}>{eng.label}</b></div>
+                    <div title={eng.hint || undefined}>엔진 <b style={{ color: eng.color }}>{eng.label}</b></div>
                     <div>레짐 <b style={{ color: "var(--color-ink)" }}>{st?.regime_current ?? "-"}</b></div>
                     <div>오늘 매수 <b style={{ color: "var(--color-ink)" }}>{op?.buys ?? "-"}건</b></div>
                     <div>오늘 차단 <b style={{ color: "var(--color-ink)" }}>{op?.blocks ?? "-"}건</b></div>
