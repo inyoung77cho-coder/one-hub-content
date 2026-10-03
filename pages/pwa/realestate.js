@@ -336,20 +336,34 @@ export default function RealEstateDashboard() {
             );
           }
           const sellUk = pp.uk;
-          const sc = estimateSellCost({ sellPriceUk: sellUk, buyPriceUk: Number(myProp?.buyUk) || 0 });
+          // [S40 FB-2] 보유기간·주택수가 실제로 확인되면 매도비용에 전달해 FA-3에서 보류한 비과세 결론을 복구한다.
+          //   buyMonth('YYYY-MM')이 있어야 보유기간 확정, 추가 보유(reProps) 수로 주택수 판단. moveCost 기본값은 그대로.
+          const ym = String(myProp?.buyMonth || "");
+          const holdingYears = /^\d{4}-\d{2}$/.test(ym)
+            ? ((new Date().getFullYear() - Number(ym.slice(0, 4))) * 12 + (new Date().getMonth() + 1 - Number(ym.slice(5, 7)))) / 12
+            : null;
+          const condKnown = holdingYears != null;   // 보유기간 확인됨 = 조건 확정 가능
+          const isOneHouse = reProps.length === 0;   // 추가 보유 없으면 1주택으로 간주
+          const sc = condKnown
+            ? estimateSellCost({ sellPriceUk: sellUk, buyPriceUk: Number(myProp?.buyUk) || 0, isOneHouse, holdingYears })
+            : estimateSellCost({ sellPriceUk: sellUk, buyPriceUk: Number(myProp?.buyUk) || 0 });
           return (
             <section className="card">
               <div style={{ fontSize: "0.86rem", fontWeight: 800, marginBottom: 8 }}>🔁 갈아타기 참고 <span style={{ fontWeight: 600, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>내 집을 지금 팔면</span></div>
               <div style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: "0.8rem", color: "var(--color-ink-2)" }}>
                 <div style={{ display: "flex" }}><span>예상 매도가</span><b style={{ marginLeft: "auto", color: "var(--color-ink)" }}>{uk(sellUk)}</b></div>
                 <div style={{ display: "flex" }}><span>중개보수(추정)</span><b style={{ marginLeft: "auto" }}>−{uk(sc.broker)}</b></div>
-                {/* [S40 FA-3] 1주택·2년 조건을 확인하지 못하므로 '비과세'를 단정하지 않는다(세금 단정 금지 — 여섯 건 중 가장 비싼 거짓말). */}
-                <div style={{ display: "flex" }}><span>양도세(추정)</span><b style={{ marginLeft: "auto" }}>{sc.capGain > 0 ? `−${uk(sc.capGain)}` : sc.gainUk <= 0 ? "양도차익 없음" : "보유기간·주택수 미확인"}</b></div>
+                {/* [S40 FA-3/FB-2] 조건 미확인이면 비과세 단정 금지. buyMonth·주택수가 확인되면(condKnown) 비과세 결론 복구. */}
+                <div style={{ display: "flex" }}><span>양도세(추정)</span><b style={{ marginLeft: "auto" }}>{sc.capGain > 0 ? `−${uk(sc.capGain)}` : sc.gainUk <= 0 ? "양도차익 없음" : condKnown ? "비과세(1주택·2년)" : "보유기간·주택수 미확인"}</b></div>
                 {/* [S40 FA-2] '손에 쥐는 금액'은 대출 상환 전 금액이다(대표 주택 저장구조에 대출 잔액 없음 — 순자산 미구현). 오해 방지 라벨. */}
                 <div style={{ display: "flex", borderTop: "1px solid var(--color-line)", paddingTop: 5, marginTop: 2 }}><span style={{ fontWeight: 700 }}>거래비용 차감액 · 대출 상환 전</span><b style={{ marginLeft: "auto", color: "var(--color-primary)" }}>{uk(Math.round((sellUk - sc.total) * 100) / 100)}</b></div>
               </div>
-              {sc.capGain === 0 && sc.gainUk > 0 && (
-                <div style={{ marginTop: 6, fontSize: "0.66rem", color: "var(--color-warning-ink, var(--color-warning))", lineHeight: 1.4 }}>⚠ 보유기간·주택수가 확인되지 않아 비과세 여부는 판단할 수 없습니다. 위 양도세는 조건 미확인 상태의 간이값입니다.</div>
+              {sc.capGain === 0 && sc.gainUk > 0 && !condKnown && (
+                <div style={{ marginTop: 6, fontSize: "0.66rem", color: "var(--color-warning-ink, var(--color-warning))", lineHeight: 1.4 }}>⚠ 보유기간·주택수가 확인되지 않아 비과세 여부는 판단할 수 없습니다. 매수 시점(연-월)을 등록하면 조건을 반영합니다.</div>
+              )}
+              {/* [S40 FB-2] 조건 확인 시 근거를 투명하게 — 추가 보유 미등록은 1주택으로 간주함을 밝힌다(간이). */}
+              {condKnown && sc.capGain === 0 && sc.gainUk > 0 && (
+                <div style={{ marginTop: 6, fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>매수 {ym} 기준 보유 {holdingYears.toFixed(1)}년 · 주택수 {reProps.length + 1}채(추가 보유 미등록 시 1주택 간주)로 비과세 판정. 조건이 다르면 실제 세액이 발생합니다.</div>
               )}
               <div style={{ marginTop: 8, fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>상급지로 갈아타려면 여기에 목표 단지 취득세·중개비와 시세 차액이 더 듭니다. ⚖️ {MOVE_COST_DISCLAIMER}</div>
             </section>
