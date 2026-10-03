@@ -1,6 +1,6 @@
 // [S25-2/3] AI 심판석 판정 카드 — 나와 AI를 '같은 자'로 재서 나란히. 숫자는 getVerdictScorecard 하나에서만.
 //   주간 기본(지난주 완료분) + 누적 토글. 주중엔 승패를 매일 갱신하지 않는다(진행 중만). 30건 미만은 승패 단정 금지.
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import { getTrader } from "../lib/trader";
 import { getVerdictScorecard } from "../lib/verdictStats";
@@ -29,6 +29,16 @@ const pctTxt = (v) => (v == null ? "–" : `${v > 0 ? "+" : ""}${v}%`);
 export default function AiJudgeCard() {
   const router = useRouter();
   const [mode, setMode] = useState("week"); // week | cum
+  // [S38 ST-01] 판단 저장·matureLedger 갱신(onehub-game-change) 시 성적표를 즉시 다시 읽는다.
+  //   부모 시드가 같아 재렌더가 보장되지 않는 경우에도, 이 카드가 직접 이벤트를 듣고 재계산한다.
+  //   getVerdictScorecard 는 매 렌더 localStorage 를 다시 읽으므로 tick 증가만으로 최신값이 반영된다.
+  const [, bumpTick] = useState(0);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const h = () => bumpTick((t) => t + 1);
+    window.addEventListener("onehub-game-change", h);
+    return () => window.removeEventListener("onehub-game-change", h);
+  }, []);
   const tr = (() => { try { return getTrader(); } catch (e) { return "A"; } })();
   const { thisMon, lastMon, isMonday } = weekBounds();
 
