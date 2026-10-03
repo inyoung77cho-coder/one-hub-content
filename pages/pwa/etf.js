@@ -938,12 +938,17 @@ export default function EtfDashboard() {
         const curO = totalKrw > 0 ? Math.round(overseasKrw / totalKrw * 1000) / 10 : null;
         const curD = totalKrw > 0 ? Math.round(domesticKrw / totalKrw * 1000) / 10 : null;
         const tgt = targetAlloc?.region || null;
+        // [S39 EB-2] 지역 목표 유효성 — 해외/국내가 숫자이고 합이 100%(±0.5)인지 검증. 깨진 목표로 이탈도를 계산하지 않는다.
+        const tgtValid = !!(tgt && Number.isFinite(Number(tgt.해외)) && Number.isFinite(Number(tgt.국내))
+          && Number(tgt.해외) >= 0 && Number(tgt.국내) >= 0 && Math.abs(Number(tgt.해외) + Number(tgt.국내) - 100) <= 0.5);
         const thr = REBAL_PRESETS.threshold_pp;
         return (
           <section className="card">
             <div className="label">🎯 목표 배분 · 국내/해외 리밸런싱{targetAlloc?.preset ? <span className="sub">{targetAlloc.preset}</span> : null}</div>
-            {!tgt ? (
+            {!tgtValid ? (
               <>
+                {/* [S39 EB-2] 저장된 목표가 깨졌을 때(합≠100·값 누락) 깨진 값으로 판정하지 않고 재설정을 안내 */}
+                {tgt && <div className="rb-tax sub" style={{ marginBottom: 8, color: "var(--color-warning-ink, var(--color-warning))" }}>⚠ 저장된 목표 배분이 올바르지 않습니다(국내+해외 합이 100%가 아니거나 값 누락). 아래에서 다시 설정하세요.</div>}
                 <div className="rb-tax sub" style={{ marginBottom: 8 }}>목표 배분을 정하면 이탈도 기준 <b>구체적 실행안(매도·매수 수량)</b>을 제안합니다. 프리셋으로 시작하세요.</div>
                 <div className="acct-filter" role="group" aria-label="목표 배분 프리셋">
                   {Object.keys(REBAL_PRESETS.presets).map((k) => (
