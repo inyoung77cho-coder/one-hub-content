@@ -51,6 +51,10 @@ export default function RealEstateDashboard() {
   const [pName, setPName] = useState(""); const [pVal, setPVal] = useState(""); const [pMemo, setPMemo] = useState("");
   const [pDeposit, setPDeposit] = useState(""); const [pMonthly, setPMonthly] = useState(""); // [피드백] 전세/월세 보증금(억)·월수익(만원)
   const [pBuy, setPBuy] = useState(""); // [수익] 매수가(억, 선택) — 전체 평가손익 계산용
+  // [S40 FB-1] 투자용(추가 보유) 집 매도 분석 — '보기 수준' 선택. 대표 주택·자산 합계·ledger 는 절대 바꾸지 않는다.
+  const [analyzeReId, setAnalyzeReId] = useState(null);
+  const [fbPyeong, setFbPyeong] = useState(""); // 분석에 필요한 평형(전용㎡) 입력
+  const [fbMonth, setFbMonth] = useState("");   // 분석에 필요한 취득시점(YYYY-MM) 입력
   const saveReProps = (list) => { setReProps(list); try { localStorage.setItem("onehub_re_properties", JSON.stringify(list)); window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {} };
   const addReProp = () => {
     const name = String(pName || "").trim(); const v = Number(pVal);
@@ -64,6 +68,11 @@ export default function RealEstateDashboard() {
     setPName(""); setPVal(""); setPMemo(""); setPDeposit(""); setPMonthly(""); setPBuy(""); setAddProp(false);
   };
   const delReProp = (id) => { saveReProps(reProps.filter((p) => p.id !== id)); markDeleted("onehub_re_properties", id); }; // [C-4] 삭제 로그로 다른 기기에서 되살아나지 않게
+  // [S40 FB-1] 분석용 평형·취득시점을 '그 추가 보유 레코드에만' 병합 저장(다른 필드·대표 주택·합계 불변).
+  const saveAnalyzeFields = (id) => {
+    const py = String(fbPyeong || "").trim(), bm = String(fbMonth || "").trim();
+    saveReProps(reProps.map((x) => (x.id === id ? { ...x, pyeong: py, buyMonth: bm, updatedAt: Date.now() } : x)));
+  };
   // [item1] 부동산 검색 — 상단 🔍를 종목검색이 아니라 단지/관심지역 검색으로.
   const [reSearchOpen, setReSearchOpen] = useState(false);
   const [reSearchQ, setReSearchQ] = useState("");
@@ -223,6 +232,14 @@ export default function RealEstateDashboard() {
     if (userAvm != null) return { uk: userAvm, source: "user", tradeN, locked: false };
     if (!sparse && perUk != null) return { uk: perUk, source: "pyeong", tradeN, locked: false };
     return { uk: null, source: null, tradeN, locked: true };
+  };
+  // [S40 FB-1] 임의 단지·평형의 '확인 가능한 평형 실거래 대표가'(잠금 규칙은 myPyeongPrice 와 동일) — 투자용 집 분석에 재사용.
+  const pyeongPriceFor = (name, pyeong) => {
+    const area = name ? (areaOptsFor(name) || []).find((a) => String(a.m2) === String(pyeong)) : null;
+    const n = area && area.n != null ? area.n : null;
+    const perUk = area ? (area.priceUk ?? area.maxUk ?? null) : null;
+    const sparse = n == null || n < 3;
+    return !sparse && perUk != null ? { uk: perUk, n, date: area?.date || null, locked: false } : { uk: null, n, date: null, locked: true };
   };
   // [#4 평가금액] 부동산 자산가치 = 대표(평형별 평가시세, 없으면 매수가) + 추가 보유 평가금액 합 → 총자산 원장(onboard)에 반영.
   //   주식·ETF와 동일하게 '평가금액' 기준으로 통일. 대표 평형 시세가 잠금이면(희소평형) 매수가로 보수적 대체.
@@ -535,11 +552,57 @@ export default function RealEstateDashboard() {
                   )}
                 </span>
                 <span className="rp-val">{uk(p.valueUk)}<em>평가</em></span>
+                <button onClick={() => { const open = analyzeReId === p.id; setAnalyzeReId(open ? null : p.id); if (!open) { setFbPyeong(p.pyeong || ""); setFbMonth(p.buyMonth || ""); } }} aria-label="이 집으로 분석" style={{ border: "1px solid var(--color-line)", background: analyzeReId === p.id ? "var(--color-primary-soft)" : "var(--color-card)", color: analyzeReId === p.id ? "var(--color-primary)" : "var(--color-ink-2)", borderRadius: 8, padding: "3px 8px", fontSize: "0.68rem", fontWeight: 700, cursor: "pointer", marginLeft: 6, whiteSpace: "nowrap" }}>📊 분석</button>
                 <button className="rp-del" onClick={() => delReProp(p.id)} aria-label="삭제">✕</button>
               </div>
               {fc && (
                 <div className="rp-forecast">🔮 전파 예측 {fc.현재가}억 → {fc.예측가}억 ({fc.괴리율 > 0 ? "+" : ""}{fc.괴리율}%, {fc.괴리율 > 5 ? "저평가" : fc.괴리율 < -5 ? "고평가" : "적정"}) · 대장 시범삼성 기준 · 투자자문 아님</div>
               )}
+              {/* [S40 FB-1] 투자용(추가 보유) 집 매도 분석 — 한 번에 하나(analyzeReId). 대표 주택·합계 불변. */}
+              {analyzeReId === p.id && (() => {
+                const az = { marginTop: 6, background: "var(--color-card-soft, rgba(0,0,0,0.03))", borderRadius: 10, padding: "10px 12px" };
+                const hasFields = p.pyeong && p.buyMonth;
+                if (!hasFields) {
+                  return (
+                    <div style={az}>
+                      <div style={{ fontSize: "0.8rem", fontWeight: 800, marginBottom: 6 }}>📊 이 집으로 분석하려면 평형·취득시점이 필요합니다</div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 6 }}>
+                        <input type="number" inputMode="numeric" placeholder="전용㎡(평형)" value={fbPyeong} onChange={(e) => setFbPyeong(e.target.value)} style={{ flex: "1 1 120px", minWidth: 0, border: "1px solid var(--color-line)", background: "var(--color-bg)", borderRadius: 8, padding: "9px 10px", fontSize: "0.85rem", color: "var(--color-ink)" }} />
+                        <input type="month" value={fbMonth} onChange={(e) => setFbMonth(e.target.value)} style={{ flex: "1 1 120px", minWidth: 0, border: "1px solid var(--color-line)", background: "var(--color-bg)", borderRadius: 8, padding: "9px 10px", fontSize: "0.85rem", color: "var(--color-ink)" }} />
+                        <button disabled={!(Number(fbPyeong) > 0)} onClick={() => { saveAnalyzeFields(p.id); setFbPyeong(""); setFbMonth(""); }} style={{ border: "none", borderRadius: 8, padding: "9px 14px", fontSize: "0.8rem", fontWeight: 800, color: "var(--color-on-primary)", background: "var(--color-primary)", cursor: "pointer", opacity: Number(fbPyeong) > 0 ? 1 : 0.5 }}>저장하고 분석</button>
+                      </div>
+                      <div style={{ fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>이 기기에만 저장됩니다. 대표 주택·자산 합계는 바뀌지 않습니다.</div>
+                    </div>
+                  );
+                }
+                const pr = pyeongPriceFor(p.name, p.pyeong);
+                if (pr.locked || pr.uk == null) {
+                  return (
+                    <div style={az}>
+                      <div style={{ fontSize: "0.8rem", fontWeight: 800, marginBottom: 4 }}>📊 {p.name} 전용 {p.pyeong}㎡ 분석</div>
+                      <div style={{ fontSize: "0.76rem", color: "var(--color-ink-2)", lineHeight: 1.5 }}>실거래가 부족해{pr.n != null ? ` (실거래 ${pr.n}건)` : ""} 믿을 만한 시세를 확정하지 못했습니다. 매도비용은 시세가 확인돼야 계산합니다.</div>
+                    </div>
+                  );
+                }
+                const ym = String(p.buyMonth || "");
+                const hy = /^\d{4}-\d{2}$/.test(ym) ? ((new Date().getFullYear() - Number(ym.slice(0, 4))) * 12 + (new Date().getMonth() + 1 - Number(ym.slice(5, 7)))) / 12 : null;
+                // 대표 주택과 함께 보유 → 다주택. 비과세 단정하지 않는다(FA-3 원칙).
+                const sc = estimateSellCost({ sellPriceUk: pr.uk, buyPriceUk: Number(p.buyUk) || 0, isOneHouse: false, holdingYears: hy ?? 0 });
+                const row = { display: "flex", fontSize: "0.8rem", color: "var(--color-ink-2)" };
+                return (
+                  <div style={az}>
+                    <div style={{ fontSize: "0.8rem", fontWeight: 800, marginBottom: 8 }}>📊 {p.name} 전용 {p.pyeong}㎡ · 투자용 매도 분석 <span style={{ fontWeight: 700, fontSize: "0.64rem", color: "var(--color-warning-ink, var(--color-warning))", background: "var(--color-warning-soft)", borderRadius: 999, padding: "1px 7px", marginLeft: 4 }}>다주택</span></div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+                      <div style={row}><span>예상 매도가</span><b style={{ marginLeft: "auto", color: "var(--color-ink)" }}>{uk(pr.uk)}</b></div>
+                      <div style={{ fontSize: "0.64rem", color: "var(--color-ink-3)", marginTop: -2 }}>{pr.date ? `가격 기준일 ${pr.date} · ` : "가격 기준일 미확인 · "}실거래 {pr.n}건 기준</div>
+                      <div style={row}><span>중개보수(추정)</span><b style={{ marginLeft: "auto" }}>−{uk(sc.broker)}</b></div>
+                      <div style={row}><span>양도세(추정·다주택)</span><b style={{ marginLeft: "auto" }}>{sc.capGain > 0 ? `−${uk(sc.capGain)}` : sc.gainUk <= 0 ? "양도차익 없음" : "과세 대상"}</b></div>
+                      <div style={{ ...row, borderTop: "1px solid var(--color-line)", paddingTop: 5, marginTop: 2 }}><span style={{ fontWeight: 700 }}>거래비용 차감액 · 대출 상환 전</span><b style={{ marginLeft: "auto", color: "var(--color-primary)" }}>{uk(Math.round((pr.uk - sc.total) * 100) / 100)}</b></div>
+                    </div>
+                    <div style={{ marginTop: 8, fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>대표 주택과 함께 보유 중이라 <b>다주택</b> 기준입니다{hy != null ? ` · 보유 ${hy.toFixed(1)}년` : ""}. ⚖️ {MOVE_COST_DISCLAIMER}</div>
+                  </div>
+                );
+              })()}
               </div>
             );
           })}
