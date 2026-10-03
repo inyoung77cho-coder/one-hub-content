@@ -151,16 +151,15 @@ export default function RealEstateDashboard() {
       fetch(`/api/pwa/re/complexAreas?complex=${encodeURIComponent(nm)}`)
         .then((r) => r.json())
         .then((d) => {
-          // [S40 FC-1] 가격 기준일 — 백엔드 응답이 날짜를 주면 보존하고, 없으면 null(화면에서 '미확인' 표시).
-          //   날짜를 추정하지 않는다. 백엔드(onehub-realestate:5002) 코드는 저장소에 없어 필드명을 확정 못하므로
-          //   관례적 이름을 넓게 받되(같은 백엔드의 regionLeaders 가 d.updated 를 주는 관례), 없으면 비운다.
-          const topDate = d?.updated ?? d?.기준일 ?? d?.as_of ?? d?.price_date ?? null;
+          // [S40 FC-1 / S38 C-03] 가격 기준일 — '그 가격이 거래된 날'을 뜻하는 평형별 거래일 필드만 쓴다.
+          //   top-level updated/as_of(데이터 갱신일)는 '가격 기준일'과 의미가 다르므로 여기에 대입하지 않는다
+          //   (다른 용도의 날짜를 가격 기준일로 흘려보내지 않음). 날짜를 추정하지 않으며, 없으면 null → 화면 '미확인'.
           const areas = Array.isArray(d?.areas) ? d.areas.map((a) => ({
             m2: Math.round(Number(a.m2 ?? a.전용면적)),
             priceUk: a.rep_price_uk != null ? Number(a.rep_price_uk) : (a.rep_price_manwon != null ? Number(a.rep_price_manwon) / 10000 : null),
             maxUk: a.max_price_uk != null ? Number(a.max_price_uk) : (a.max_price_manwon != null ? Number(a.max_price_manwon) / 10000 : null),
             n: a.n ?? null,
-            date: a.last_trade_date ?? a.최종거래일 ?? a.거래일 ?? a.계약일 ?? a.price_date ?? a.date ?? topDate ?? null,
+            date: a.last_trade_date ?? a.최종거래일 ?? a.거래일 ?? a.계약일 ?? a.last_trade_ymd ?? null,
           })).filter((a) => a.m2 > 0) : null;
           setDbAreas((m) => ({ ...m, [nm]: areas && areas.length ? areas : null }));
           if (d?.법정동) setDongMap((m) => (m[nm] ? m : { ...m, [nm]: d.법정동 }));
@@ -370,17 +369,18 @@ export default function RealEstateDashboard() {
               <div style={{ display: "flex", flexDirection: "column", gap: 5, fontSize: "0.8rem", color: "var(--color-ink-2)" }}>
                 <div style={{ display: "flex" }}><span>예상 매도가</span><b style={{ marginLeft: "auto", color: "var(--color-ink)" }}>{uk(sellUk)}</b></div>
                 <div style={{ display: "flex" }}><span>중개보수(추정)</span><b style={{ marginLeft: "auto" }}>−{uk(sc.broker)}</b></div>
-                {/* [S40 FA-3/FB-2] 조건 미확인이면 비과세 단정 금지. buyMonth·주택수가 확인되면(condKnown) 비과세 결론 복구. */}
-                <div style={{ display: "flex" }}><span>양도세(추정)</span><b style={{ marginLeft: "auto" }}>{sc.capGain > 0 ? `−${uk(sc.capGain)}` : sc.gainUk <= 0 ? "양도차익 없음" : condKnown ? "비과세(1주택·2년)" : "보유기간·주택수 미확인"}</b></div>
+                {/* [S40 FA-3/FB-2 · S38 C-02] 보유기간은 buyMonth로 확정되나 '주택 수'는 앱이 확정 못한다
+                    (등록 안 된 주택이 있을 수 있음). 그래서 비과세를 단정하지 않고 '1주택 기준' 조건부로만 표시. */}
+                <div style={{ display: "flex" }}><span>양도세(추정)</span><b style={{ marginLeft: "auto" }}>{sc.capGain > 0 ? `−${uk(sc.capGain)}` : sc.gainUk <= 0 ? "양도차익 없음" : condKnown ? "1주택 기준 비과세" : "보유기간·주택수 미확인"}</b></div>
                 {/* [S40 FA-2] '손에 쥐는 금액'은 대출 상환 전 금액이다(대표 주택 저장구조에 대출 잔액 없음 — 순자산 미구현). 오해 방지 라벨. */}
                 <div style={{ display: "flex", borderTop: "1px solid var(--color-line)", paddingTop: 5, marginTop: 2 }}><span style={{ fontWeight: 700 }}>거래비용 차감액 · 대출 상환 전</span><b style={{ marginLeft: "auto", color: "var(--color-primary)" }}>{uk(Math.round((sellUk - sc.total) * 100) / 100)}</b></div>
               </div>
               {sc.capGain === 0 && sc.gainUk > 0 && !condKnown && (
                 <div style={{ marginTop: 6, fontSize: "0.66rem", color: "var(--color-warning-ink, var(--color-warning))", lineHeight: 1.4 }}>⚠ 보유기간·주택수가 확인되지 않아 비과세 여부는 판단할 수 없습니다. 매수 시점(연-월)을 등록하면 조건을 반영합니다.</div>
               )}
-              {/* [S40 FB-2] 조건 확인 시 근거를 투명하게 — 추가 보유 미등록은 1주택으로 간주함을 밝힌다(간이). */}
+              {/* [S40 FB-2 · S38 C-02] 비과세는 '1주택 가정'일 뿐임을 분명히 — 주택 수는 앱이 확인할 수 없다. */}
               {condKnown && sc.capGain === 0 && sc.gainUk > 0 && (
-                <div style={{ marginTop: 6, fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>매수 {ym} 기준 보유 {holdingYears.toFixed(1)}년 · 주택수 {reProps.length + 1}채(추가 보유 미등록 시 1주택 간주)로 비과세 판정. 조건이 다르면 실제 세액이 발생합니다.</div>
+                <div style={{ marginTop: 6, fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>매수 {ym} 기준 보유 {holdingYears.toFixed(1)}년(2년 충족). 앱에 등록된 추가 주택이 없어 <b>1주택으로 가정</b>했습니다 — 등록되지 않은 다른 주택이 있으면 다주택으로 <b>과세</b>됩니다.</div>
               )}
               <div style={{ marginTop: 8, fontSize: "0.66rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>상급지로 갈아타려면 여기에 목표 단지 취득세·중개비와 시세 차액이 더 듭니다. ⚖️ {MOVE_COST_DISCLAIMER}</div>
             </section>

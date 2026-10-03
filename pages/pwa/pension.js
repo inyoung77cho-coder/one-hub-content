@@ -42,6 +42,8 @@ export default function PensionPage() {
   const [household, setHousehold] = useState(null);
   const [loading, setLoading] = useState(true);
   const [snapStatus, setSnapStatus] = useState("loading"); // [S39 EA-3] loading|ok|empty|error — 조회 실패와 '데이터 없음'을 구분
+  const [cardsStatus, setCardsStatus] = useState("loading");   // [S38 EF-05] 진단 요청 상태(ok|error)
+  const [actionsStatus, setActionsStatus] = useState("loading"); // [S38 EF-05] 오늘 할 일 요청 상태(ok|error)
   // [S39 EB-1] 올해 세액공제 납입액(개인연금+퇴직연금 합산, 만원). 연도 태깅 저장 → 작년 값은 '올해 확인 필요'.
   const [contribMan, setContribMan] = useState("");
   const [contribYear, setContribYear] = useState(null);
@@ -60,22 +62,21 @@ export default function PensionPage() {
   //     영구 로딩에 빠졌다. allSettled 로 바꿔 한 요청 실패가 전체를 막지 않게 한다.
   //   ★ 조회 실패를 '데이터 없음'으로 바꾸지 않는다 — 실패는 '불러오지 못함'(재시도), 없음은 '붙여넣기 시작'.
   const load = useCallback(async () => {
-    setSnapStatus("loading"); setLoading(true);
+    setSnapStatus("loading"); setCardsStatus("loading"); setActionsStatus("loading"); setLoading(true);
     const [sR, cR, aR] = await Promise.allSettled([
       P.getSnapshot(acct.id), P.getDiagnose(acct.id), P.getActions(acct.id),
     ]);
-    // 스냅샷(주 게이트): reject → error, HTTP/JSON 실패 또는 ok:false → error, ok+빈값 → empty, ok+값 → ok.
-    if (sR.status !== "fulfilled") { setSnap(null); setSnapStatus("error"); }
-    else {
-      const { status, data } = sR.value;
-      const httpOk = status >= 200 && status < 300;
-      if (!httpOk || !data || data.ok === false) { setSnap(null); setSnapStatus("error"); }
-      else if (!data.snapshot) { setSnap(null); setSnapStatus("empty"); }
-      else { setSnap(data.snapshot); setSnapStatus("ok"); }
-    }
-    // 진단·행동: 실패해도 화면 전체를 막지 않는다(실패·없음 모두 빈 배열로 안전 표시).
-    setCards(cR.status === "fulfilled" && cR.value.data?.ok ? (cR.value.data.cards || []) : []);
-    setActions(aR.status === "fulfilled" && aR.value.data?.ok ? (aR.value.data.actions || []) : []);
+    // [S38 EF-05] 정상 성공은 'ok:true 를 명시한 응답'만 인정한다. HTTP 200 이어도 {}·계약 누락은 성공이 아니라 error 로 본다.
+    const okResp = (r) => r.status === "fulfilled" && r.value.status >= 200 && r.value.status < 300 && r.value.data?.ok === true;
+    // 스냅샷(주 게이트): 성공(ok:true)+값 → ok, 성공+빈값 → empty, 그 외(reject·HTTP실패·계약누락·ok:false) → error.
+    if (!okResp(sR)) { setSnap(null); setSnapStatus("error"); }
+    else if (!sR.value.data.snapshot) { setSnap(null); setSnapStatus("empty"); }
+    else { setSnap(sR.value.data.snapshot); setSnapStatus("ok"); }
+    // [S38 EF-05] 진단·행동도 요청별 상태 구분 — 실패를 '없음'(빈 배열)으로 바꾸지 않는다. 실패 시 null+error.
+    if (okResp(cR)) { setCards(cR.value.data.cards || []); setCardsStatus("ok"); }
+    else { setCards(null); setCardsStatus("error"); }
+    if (okResp(aR)) { setActions(aR.value.data.actions || []); setActionsStatus("ok"); }
+    else { setActions(null); setActionsStatus("error"); }
     if (acct.type === "DC") {
       const r = await P.getRisk(acct.id).catch(() => null);
       setRisk(r && r.data?.ok ? r.data : null);
@@ -258,7 +259,13 @@ export default function PensionPage() {
                 )}
                 {a.status !== "PENDING" && <span className="pen-badge">{a.status}</span>}
               </div>
-            )) : (
+            )) : actionsStatus === "error" ? (
+              /* [S38 EF-05] 조회 실패를 '계획 없음'으로 바꾸지 않는다 — 재시도 경로 제공. */
+              <div className="pen-plan-cta">
+                <p className="pen-muted">오늘 할 일을 불러오지 못했습니다(네트워크·서버 상태).</p>
+                <button className="pen-btn sm" onClick={() => load()}>다시 시도</button>
+              </div>
+            ) : (
               <div className="pen-plan-cta">
                 <p className="pen-muted">아직 리밸런싱 계획이 없습니다. 목표 배분으로 분할 실행 계획을 세워보세요.</p>
                 <button className="pen-btn sm" onClick={makePlanNow}>리밸런싱 계획 세우기</button>
@@ -275,7 +282,10 @@ export default function PensionPage() {
                 <div className="pen-diag-v">{c.value_label}</div>
                 {c.why && <div className="pen-muted">{c.why}</div>}
               </div>
-            )) : <p className="pen-muted">진단할 데이터가 없습니다.</p>}
+            )) : cardsStatus === "error" ? (
+              /* [S38 EF-05] 조회 실패를 '데이터 없음'으로 바꾸지 않는다. */
+              <div className="pen-plan-cta"><p className="pen-muted">진단을 불러오지 못했습니다(네트워크·서버 상태).</p><button className="pen-btn sm" onClick={() => load()}>다시 시도</button></div>
+            ) : <p className="pen-muted">진단할 데이터가 없습니다.</p>}
           </section>
         </>
       )}

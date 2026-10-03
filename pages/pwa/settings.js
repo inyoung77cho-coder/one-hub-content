@@ -43,11 +43,17 @@ function engineState(st) {
     return { state: "unknown", label: "확인 안 됨", color: "var(--color-ink-3)", hint: "엔진 상태 응답을 받지 못했습니다." };
   }
   const sys = st.engine || st.systemd || st;
+  const status = sys.status || st.status || null;
+  // [S38 C-01] status:"error" 는 상태 조회 자체가 실패한 것(get_systemd_status 예외 경로: is_active:false·status:"error").
+  //   '중단됨'으로 단정하지 않는다 — 조회 실패는 '확인 안 됨'이다(조회 오류를 확인된 중단으로 바꾸지 않는다).
+  if (status === "error") {
+    return { state: "unknown", label: "확인 안 됨", color: "var(--color-ink-3)", hint: "봇 프로세스 상태 조회가 실패했습니다(중단 여부 확인 불가)." };
+  }
   let running;
-  if (typeof sys.is_active === "boolean") running = sys.is_active;
+  if (status === "running") running = true;
+  else if (status === "stopped") running = false;            // 확인된 중단만 '중단됨'
+  else if (typeof sys.is_active === "boolean") running = sys.is_active;
   else if (typeof st.is_active === "boolean") running = st.is_active;
-  else if (sys.status === "running" || st.status === "running") running = true;
-  else if (sys.status === "stopped" || st.status === "stopped") running = false;
   if (running === true) return { state: "up", label: "가동 중", color: "var(--color-success)", hint: "" };
   if (running === false) return { state: "down", label: "중단됨", color: "var(--color-danger)", hint: "" };
   // [S38 DA-3 라이브확인] 응답은 왔지만 매매봇 프로세스 상태 필드(is_active/status)가 없다
