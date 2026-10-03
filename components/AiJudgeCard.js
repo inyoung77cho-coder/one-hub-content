@@ -94,7 +94,7 @@ export default function AiJudgeCard() {
               {sc.recUngradable > 0 && <span className="ajc-ung">채점 불가 {sc.recUngradable}건</span>}
               <span className="ajc-scoring-note">
                 {sc.recUngradable > 0
-                  ? "‘채점 불가’는 결과 확인 시점(판단 3거래일 뒤)의 가격이 기록되지 않은 판단입니다(그 무렵 접속이 없었거나 시세 조회가 실패). 지난 가격을 현재가로 추정하지 않습니다."
+                  ? "‘채점 불가’는 결과 확인 시점(판단 3거래일 뒤)의 가격을 정확히 확보하지 못한 판단입니다. 지난 가격을 현재가로 추정하지 않습니다."
                   : "판단한 종목은 3거래일 뒤 접속할 때 그 무렵 가격으로 채점됩니다."}
               </span>
             </p>
