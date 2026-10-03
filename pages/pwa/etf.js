@@ -775,7 +775,7 @@ export default function EtfDashboard() {
             <span className="fx-dot" />
             환율 <b>{liveFx.rate.toLocaleString(undefined, { maximumFractionDigits: 2 })}원</b>
             {liveFx.date === todayKST ? " · 오늘 기준 · 자동 갱신"
-              : liveFx.date ? ` · ${liveFx.date} 기준(최신) · 자동 갱신` : " · 최신 · 자동 갱신"}
+              : liveFx.date ? ` · ${liveFx.date} 기준 · 자동 갱신` : " · 기준일 미확인"}
           </div>
         ) : asof?.fx != null ? (
           <div className={`fx-note ${fxFresh === false ? "stale" : ""}`}>
@@ -1002,17 +1002,17 @@ export default function EtfDashboard() {
           const recs = recommendAccounts(nbSel.taxType, nbSel.market);
           // 연금 추천이 있으면 세액공제 여유도 같이 보여준다(있는 데이터만, 추측 없음).
           const limit = pensionCreditLimitCombined();
-          const penRows = okHoldings.filter((h) => isPensionAcct(h.account || "일반"));
-          const acquired = penRows.reduce((a, h) => a + (h.avgCcy === "KRW" ? h.avgPrice * h.shares : (fxRate ? h.avgPrice * h.shares * fxRate : 0)), 0);
-          const contrib = pensionContrib !== "" ? Number(pensionContrib) : acquired;
-          const room = Math.max(0, limit - contrib);
+          // [S39 EA-2] 취득금액(보유 평가/원가)으로 올해 납입액을 대체하지 않는다 — 취득금액은 당해연도 납입을 입증하지 못한다.
+          // [S39 EB-1] onehub_pension_contrib 는 연도 정보가 없는 개인연금+퇴직연금 '합산' 단일값이라
+          //   당해연도 납입으로 확정할 수 없다 → 세액공제 '여유' 숫자를 단정하지 않고 한도만 안내하며
+          //   '올해 납입액 확인 필요'로 표시한다(연도 태깅·계좌별 한도 계산은 별도 범위).
           return (
             <div className="nb-recs">
               {recs.map((rec, i) => (
                 <div className={`nb-rec ${rec.tone}`} key={i}>
                   <span className="nb-rec-rank">{i + 1}순위</span>
                   <span className="nb-rec-acct">{ACCT_EMOJI[rec.account] || ""} {rec.account}</span>
-                  <span className="nb-rec-why">{rec.reason}{isPensionAcct(rec.account) && i === 0 ? ` (현재 세액공제 여유 ${won(room)}원)` : ""}</span>
+                  <span className="nb-rec-why">{rec.reason}{isPensionAcct(rec.account) && i === 0 ? ` · 개인연금+퇴직연금 세액공제 한도 ${won(limit)}원(올해 납입액 확인 필요)` : ""}</span>
                 </div>
               ))}
               <div className="rb-tax sub" style={{ marginTop: 8 }}>⚠ 투자자문·세무자문이 아닙니다. 실제 유불리는 개인 소득·보유기간·거래 규모에 따라 다르며, 최종 계좌 선택은 본인이 판단하세요.</div>
@@ -1521,7 +1521,7 @@ export default function EtfDashboard() {
           {formMsg && <div className="mf-msg">{formMsg}</div>}
         </div>
         )}
-        <div className="me-foot">시세는 공개 소스(stooq)에서 5분 캐시로 자동 갱신 · USD는 오늘 환율({fxRate ? `${Math.round(fxRate).toLocaleString()}원` : "조회 중"})로 원화 환산 · 참고용 · 신규 매수/매도는 우측 하단 “+”</div>
+        <div className="me-foot">시세는 공개 소스(stooq)에서 5분 캐시로 자동 갱신 · USD는 환율 {fxRate ? `${Math.round(fxRate).toLocaleString()}원` : "조회 중"}{fxRate ? (liveFx?.rate ? (liveFx.date === todayKST ? "(오늘 기준)" : liveFx.date ? `(${liveFx.date} 기준)` : "(기준일 미확인)") : "(기준일 미확인)") : ""}로 원화 환산 · 참고용 · 신규 매수/매도는 우측 하단 “+”</div>
       </section>
       )}
 

@@ -40,6 +40,7 @@ export default function PensionPage() {
   const [actions, setActions] = useState(null);
   const [household, setHousehold] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [snapStatus, setSnapStatus] = useState("loading"); // [S39 EA-3] loading|ok|empty|error — 조회 실패와 '데이터 없음'을 구분
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [preview, setPreview] = useState(null);
@@ -49,20 +50,33 @@ export default function PensionPage() {
   const [curPreset, setCurPreset] = useState(null);
   const [allocating, setAllocating] = useState(false);
 
+  // [S39 EA-3] 요청별 상태 구분 — 로딩 / 조회 실패(네트워크 reject·HTTP·JSON) / 정상 빈 응답 / 정상 데이터.
+  //   ★ 과거 Promise.all 은 한 요청만 reject 돼도 setLoading(false)에 영영 도달하지 못해 화면이
+  //     영구 로딩에 빠졌다. allSettled 로 바꿔 한 요청 실패가 전체를 막지 않게 한다.
+  //   ★ 조회 실패를 '데이터 없음'으로 바꾸지 않는다 — 실패는 '불러오지 못함'(재시도), 없음은 '붙여넣기 시작'.
   const load = useCallback(async () => {
-    setLoading(true);
-    const [s, c, a] = await Promise.all([
+    setSnapStatus("loading"); setLoading(true);
+    const [sR, cR, aR] = await Promise.allSettled([
       P.getSnapshot(acct.id), P.getDiagnose(acct.id), P.getActions(acct.id),
     ]);
-    setSnap(s.data?.ok ? s.data.snapshot : null);
-    setCards(c.data?.ok ? c.data.cards : []);
-    setActions(a.data?.ok ? a.data.actions : []);
+    // 스냅샷(주 게이트): reject → error, HTTP/JSON 실패 또는 ok:false → error, ok+빈값 → empty, ok+값 → ok.
+    if (sR.status !== "fulfilled") { setSnap(null); setSnapStatus("error"); }
+    else {
+      const { status, data } = sR.value;
+      const httpOk = status >= 200 && status < 300;
+      if (!httpOk || !data || data.ok === false) { setSnap(null); setSnapStatus("error"); }
+      else if (!data.snapshot) { setSnap(null); setSnapStatus("empty"); }
+      else { setSnap(data.snapshot); setSnapStatus("ok"); }
+    }
+    // 진단·행동: 실패해도 화면 전체를 막지 않는다(실패·없음 모두 빈 배열로 안전 표시).
+    setCards(cR.status === "fulfilled" && cR.value.data?.ok ? (cR.value.data.cards || []) : []);
+    setActions(aR.status === "fulfilled" && aR.value.data?.ok ? (aR.value.data.actions || []) : []);
     if (acct.type === "DC") {
-      const r = await P.getRisk(acct.id);
-      setRisk(r.data?.ok ? r.data : null);
+      const r = await P.getRisk(acct.id).catch(() => null);
+      setRisk(r && r.data?.ok ? r.data : null);
     } else setRisk(null);
-    const h = await P.getHousehold("HH-A");
-    setHousehold(h.data?.ok ? h.data : null);
+    const h = await P.getHousehold("HH-A").catch(() => null);
+    setHousehold(h && h.data?.ok ? h.data : null);
     setLoading(false);
   }, [acct]);
 
@@ -129,8 +143,14 @@ export default function PensionPage() {
         <div className="pen-lead">{(LEAD[acct.type] || {}).ic} <b>{acct.label}</b> · {(LEAD[acct.type] || {}).t || "진단·오늘 할 일·리밸런싱"}</div>
       </div>
 
-      {loading ? (
+      {snapStatus === "loading" ? (
         <div className="pen-skel" aria-busy="true">불러오는 중…</div>
+      ) : snapStatus === "error" ? (
+        /* [S39 EA-3] 조회 실패 — '데이터 없음'으로 바꾸지 않는다. 재시도 경로를 준다. */
+        <section className="card pen-empty">
+          <p><b>{acct.label}</b> 정보를 불러오지 못했습니다. 네트워크·서버 상태 때문일 수 있어요.</p>
+          <button className="pen-btn" onClick={() => load()}>다시 시도</button>
+        </section>
       ) : !snap ? (
         <section className="card pen-empty">
           <p>아직 <b>{acct.label}</b> 스냅샷이 없습니다. 증권사 화면을 붙여넣어 시작하세요.</p>
