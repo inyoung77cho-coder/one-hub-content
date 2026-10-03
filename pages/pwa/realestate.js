@@ -142,11 +142,16 @@ export default function RealEstateDashboard() {
       fetch(`/api/pwa/re/complexAreas?complex=${encodeURIComponent(nm)}`)
         .then((r) => r.json())
         .then((d) => {
+          // [S40 FC-1] 가격 기준일 — 백엔드 응답이 날짜를 주면 보존하고, 없으면 null(화면에서 '미확인' 표시).
+          //   날짜를 추정하지 않는다. 백엔드(onehub-realestate:5002) 코드는 저장소에 없어 필드명을 확정 못하므로
+          //   관례적 이름을 넓게 받되(같은 백엔드의 regionLeaders 가 d.updated 를 주는 관례), 없으면 비운다.
+          const topDate = d?.updated ?? d?.기준일 ?? d?.as_of ?? d?.price_date ?? null;
           const areas = Array.isArray(d?.areas) ? d.areas.map((a) => ({
             m2: Math.round(Number(a.m2 ?? a.전용면적)),
             priceUk: a.rep_price_uk != null ? Number(a.rep_price_uk) : (a.rep_price_manwon != null ? Number(a.rep_price_manwon) / 10000 : null),
             maxUk: a.max_price_uk != null ? Number(a.max_price_uk) : (a.max_price_manwon != null ? Number(a.max_price_manwon) / 10000 : null),
             n: a.n ?? null,
+            date: a.last_trade_date ?? a.최종거래일 ?? a.거래일 ?? a.계약일 ?? a.price_date ?? a.date ?? topDate ?? null,
           })).filter((a) => a.m2 > 0) : null;
           setDbAreas((m) => ({ ...m, [nm]: areas && areas.length ? areas : null }));
           if (d?.법정동) setDongMap((m) => (m[nm] ? m : { ...m, [nm]: d.법정동 }));
@@ -196,7 +201,8 @@ export default function RealEstateDashboard() {
     (feed?.feed || []).forEach((f) => {
       const nm = f.단지명, a = Math.round(Number(f.전용면적));
       if (!nm || !(a > 0)) return;
-      (m[nm] = m[nm] || new Map()).set(a, { m2: a, priceUk: Number(f.거래금액_억) || null, floor: f.층 });
+      // [S40 FC-1] feed 는 실거래 1건 기반 — 그 거래의 날짜를 가격 기준일로 함께 보존(추정 아님, 있으면만).
+      (m[nm] = m[nm] || new Map()).set(a, { m2: a, priceUk: Number(f.거래금액_억) || null, floor: f.층, date: f.거래일 ?? f.계약일 ?? f.계약년월 ?? f.date ?? null });
     });
     // 값 배열로 변환(면적 오름차순)
     const out = {};
@@ -404,7 +410,9 @@ export default function RealEstateDashboard() {
         const buyUk = Number(myProp.buyUk || 0) || null;
         const pnl = curUk != null && buyUk != null ? curUk - buyUk : null;
         const pnlPct = pnl != null && buyUk ? (pnl / buyUk) * 100 : null;
-        const srcLabel = priceSource === "user" ? "직접 입력" : priceSource === "pyeong" ? `전용 ${myProp.pyeong}㎡ 실거래 ${tradeN}건 기준` : priceSource === "complex" ? "⚠ 단지 평균(내 평형 아님)" : null;
+        // [S40 FC-1] 평형 실거래 대표가에는 '가격 기준일'을 함께 — 날짜를 모르면 '미확인'(추정·'최근 N개월' 금지).
+        const priceDate = (priceSource === "pyeong" && myArea) ? (myArea.date || null) : null;
+        const srcLabel = priceSource === "user" ? "직접 입력" : priceSource === "pyeong" ? `전용 ${myProp.pyeong}㎡ 실거래 ${tradeN}건 기준${priceDate ? ` · 가격 기준일 ${priceDate}` : " · 가격 기준일 미확인"}` : priceSource === "complex" ? "⚠ 단지 평균(내 평형 아님)" : null;
         const locked = curUk == null; // 신뢰 시세 없음 → AI-3 신뢰도 카드
         return (
           <section className="card myprop-card">
