@@ -404,6 +404,15 @@ def get_cache_balance(trader_id):
     }
 
 
+# [S38 Task2 / 2026-10-03 라이브확인] ⚠ 이 함수는 운영 서버보다 '구버전'이다. 배포 금지 대상.
+#   라이브 /api/pwa-dashboard?trader=A 응답은 아래를 '추가로' 반환한다(저장소 이 버전엔 없음):
+#     - screening_candidates[] (추천 화면이 렌더하는 스크리너 후보 — index.js:1737)
+#     - valid_signals[]        (실거래 검증 통과 신호 — index.js:1750)
+#     - recent_decisions[] · stop_states{}
+#     - market 확장: fear_greed · vix · heat_score · regime_days (여기선 regime/block_count/final_value/daily_pnl 뿐)
+#   서버 코드는 scp 로 배포돼 저장소와 갈라져 있다(DC 전제 확인됨). 이 구버전을 deploy_auto_trade.ps1 로
+#   올리면 운영의 추천 후보 제공이 '회귀'한다. 저장소-서버 정합은 서버의 현행 파일을 내려받아 맞춰야 하며
+#   (서버 접근 필요), 그 전까지 이 함수를 서버로 배포하지 말 것.
 def get_dashboard_data(trader_id):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
