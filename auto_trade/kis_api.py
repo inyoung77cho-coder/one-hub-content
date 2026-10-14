@@ -8,6 +8,8 @@
 # ============================================================
 
 import requests
+from requests.exceptions import ConnectTimeout, ReadTimeout  # [S37 CA] 미도달/도달 구분
+from requests.exceptions import ConnectionError as ReqConnectionError
 import json
 import os
 
@@ -55,20 +57,30 @@ def get_api_health() -> str:
         return f"[ERROR] KIS API: 장애 {_api_fail_count}회 연속"
 
 
+# [S37 CA] POST(주문 등 비멱등 요청)에서 '서버에 도달하지 못한' 예외만 재시도를 허용한다.
+#   ConnectTimeout/ConnectionError = 연결 자체 실패 → 주문이 서버에 안 들어감 → 재시도 안전.
+#   ReadTimeout·HTTPError·그 외 = 서버에 도달했을 수 있음 → 재시도 금지(같은 주문 중복 체결 방지).
+#   (ConnectTimeout 은 ConnectionError 의 하위라 ReqConnectionError 만으로도 잡히지만 의도를 명시한다.)
+_POST_RETRYABLE = (ConnectTimeout, ReqConnectionError)
+
+
 def safe_request(method, url, headers=None, params=None,
                  data=None, retries=3, cache_key=None):
     global _api_fail_count, _api_last_fail
+    is_get = (method == 'GET')
 
-    if cache_key and method == 'GET':
+    if cache_key and is_get:
         cached = _api_cache.get(cache_key)
         if cached and (_time.time() - cached[1]) < API_CACHE_TTL:
             print(f"[CACHE HIT] {cache_key}")
             return cached[0]
 
     last_err = None
+    attempt = 0
+    post_reached = False  # [S37 CA] POST가 서버에 도달했을 가능성(ReadTimeout 등) — 실패 알림 문구 구분
     for attempt in range(retries):
         try:
-            if method == 'GET':
+            if is_get:
                 res = requests.get(url, headers=headers,
                                    params=params, timeout=10)
             else:
@@ -77,13 +89,27 @@ def safe_request(method, url, headers=None, params=None,
             res.raise_for_status()
             result = res.json()
             _api_fail_count = 0
-            if cache_key and method == 'GET':
+            if cache_key and is_get:
                 _api_cache[cache_key] = (result, _time.time())
             return result
         except Exception as e:
             last_err = e
-            print(f"[Retry {attempt+1}/{retries}] {e}")
-            _time.sleep(2 ** attempt)
+            if is_get:
+                # GET은 멱등 → 기존대로 retries회 재시도
+                print(f"[Retry {attempt+1}/{retries}] {e}")
+                if attempt < retries - 1:
+                    _time.sleep(2 ** attempt)
+                continue
+            # POST(비멱등): 미도달(연결 실패)만 재시도, 그 외는 즉시 중단.
+            #   print 는 ASCII 로(서버 로케일이 비UTF-8이어도 주문 실패 경로가 터지지 않게).
+            if isinstance(e, _POST_RETRYABLE):
+                print(f"[Retry {attempt+1}/{retries}][POST] conn-fail(not reached), retry-safe: {e}")
+                if attempt < retries - 1:
+                    _time.sleep(2 ** attempt)
+                continue
+            post_reached = True
+            print(f"[No-Retry][POST] reached?/error - no retry (dup-order guard): {e}")
+            break
 
     _api_fail_count += 1
     _api_last_fail = _time.time()
@@ -92,7 +118,16 @@ def safe_request(method, url, headers=None, params=None,
         print(f"[CACHE FALLBACK] {cache_key}")
         return _api_cache[cache_key][0]
 
-    if _api_fail_count >= 3:
+    # [S37 CA] POST(주문) 실패는 조용히 넘기면 사용자가 '체결된 줄' 안다 → 사유를 구분해 항상 알린다.
+    if not is_get:
+        reason = ("응답 없음(체결 여부 불확실 — 중복 방지 위해 재시도 안 함)"
+                  if post_reached else "연결 실패(서버 미도달 — 주문이 안 나감)")
+        try:
+            from telegram_bot import send_critical
+            send_critical(f"[주문 전송 실패] {reason}\n오류: {str(last_err)[:120]}")
+        except Exception:
+            pass
+    elif _api_fail_count >= 3:
         try:
             from telegram_bot import send_critical
             send_critical(
@@ -102,7 +137,7 @@ def safe_request(method, url, headers=None, params=None,
         except Exception:
             pass
 
-    raise Exception(f"API FAILED after {retries} retries: {last_err}")
+    raise Exception(f"API FAILED after {attempt + 1} attempt(s): {last_err}")
 
 
 def get_access_token(trader_id: str = "A", cfg: dict = None) -> str:
