@@ -215,7 +215,7 @@ export default function Onboarding() {
               <p className="lead">지금 보이는 건 샘플이에요. 내 주식·ETF·부동산과 투자 성향을 넣으면, AI가 당신에게 맞는 자산 배분과 리밸런싱을 계산해 드립니다. 각 30초면 충분해요.</p>
               <div className="why">
                 <div className="why-item"><div className="why-ic" style={{ background: "var(--color-primary-soft)" }}>🧭</div><div><div className="wk">투자 성향</div><div className="wd">목표 배분의 기준이 됩니다</div></div></div>
-                <div className="why-item"><div className="why-ic" style={{ background: "var(--color-primary-soft)" }}>📈</div><div><div className="wk">주식 · ETF</div><div className="wd">직접 입력 또는 증권사 CSV</div></div></div>
+                <div className="why-item"><div className="why-ic" style={{ background: "var(--color-primary-soft)" }}>📈</div><div><div className="wk">주식 · ETF</div><div className="wd">직접 입력</div></div></div>
                 <div className="why-item"><div className="why-ic" style={{ background: "var(--color-success-soft)" }}>🏠</div><div><div className="wk">부동산</div><div className="wd">단지만 고르면 시세는 자동</div></div></div>
               </div>
               <div className="foot"><button className="btn-next" onClick={() => go(1)}>시작하기 →</button></div>

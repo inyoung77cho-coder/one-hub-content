@@ -219,7 +219,7 @@ function useEtfMaster(q) {
   return opts;
 }
 
-export function EtfForm({ onSaved }) {
+export function EtfForm({ onSaved, fixedAccount = null }) {
   const [side, setSide] = useState("buy");
   const [market, setMarket] = useState("auto");
   const [ticker, setTicker] = useState("");
@@ -228,7 +228,8 @@ export function EtfForm({ onSaved }) {
   const [shares, setShares] = useState("");
   const [price, setPrice] = useState("");
   const [ccy, setCcy] = useState("USD");
-  const [account, setAccount] = useState("일반");
+  // [S41-0 선행-2] fixedAccount 가 주어지면(연금 페이지) 계좌를 그 값으로 고정 — 연금 추가가 '일반'으로 새지 않게.
+  const [account, setAccount] = useState(fixedAccount || "일반");
   const [broker, setBroker] = useState(STOCK_BROKERS[0]);
   const [buyDate, setBuyDate] = useState("");
   const [msg, setMsg] = useState("");
@@ -279,7 +280,9 @@ export function EtfForm({ onSaved }) {
       <div className="af-row">
         <label className="af-f"><span>수량</span><input type="number" inputMode="decimal" value={shares} onChange={(e) => setShares(e.target.value)} placeholder="10" /></label>
         <label className="af-f"><span>계좌</span>
-          <select value={account} onChange={(e) => setAccount(e.target.value)}>{ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}</select></label>
+          {fixedAccount
+            ? <input value={fixedAccount} readOnly disabled />
+            : <select value={account} onChange={(e) => setAccount(e.target.value)}>{ACCOUNTS.map((a) => <option key={a} value={a}>{a}</option>)}</select>}</label>
       </div>
       {side === "buy" && (
         <>

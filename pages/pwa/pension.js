@@ -9,6 +9,10 @@ import SegTabs from "../../components/shared/SegTabs";
 import useSwipeTabs from "../../components/shared/useSwipeTabs";
 import * as P from "../../lib/pension";
 import { pensionCreditLimitCombined } from "../../lib/taxRules"; // [S39 EB-1] 세액공제 합산 한도(원)
+import { getTrader } from "../../lib/trader";
+// [S41-0 선행-2] 연금 계좌(개인연금·퇴직연금)로 직접 입력한 ETF/펀드 보유를 연금 화면에 표시·수정·삭제·추가.
+import { getHoldings, getOtherAssets, removeEtf, updateEtfAvg, removeOtherAsset, updateOtherAsset, addOtherAsset } from "../../lib/etfHoldings";
+import { EtfForm } from "../../components/shared/AssetForms";
 
 const man = (v) => (v == null ? "-" : `${Math.round(Number(v) / 1e4).toLocaleString()}만`);
 const uk = (v, d = 2) => (v == null ? "-" : `${(Number(v) / 1e8).toFixed(d)}억`);
@@ -48,6 +52,14 @@ export default function PensionPage() {
   const [contribMan, setContribMan] = useState("");
   const [contribYear, setContribYear] = useState(null);
   const [contribEditing, setContribEditing] = useState(false);
+  // [S41-0 선행-2] 로컬 보유(직접 입력) 표시·편집 상태. SSR 불일치 방지 위해 mounted 후에만 localStorage 읽기.
+  const [mounted, setMounted] = useState(false);
+  const [holdTick, setHoldTick] = useState(0);       // 수정/삭제/추가 후 재읽기 트리거
+  const [editKey, setEditKey] = useState(null);      // "etf:<id>" | "oth:<id>"
+  const [editVal, setEditVal] = useState("");
+  const [addMode, setAddMode] = useState(null);      // null | "etf" | "fund"
+  const [fundName, setFundName] = useState("");
+  const [fundMan, setFundMan] = useState("");        // 펀드 평가금액(만원)
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [preview, setPreview] = useState(null);
@@ -160,6 +172,32 @@ export default function PensionPage() {
     setContribYear(y); setContribEditing(false);
   };
 
+  // [S41-0 선행-2] 로컬 보유(onehub_etf_holdings / onehub_etf_other)를 계좌별로 읽어 표시·편집.
+  //   ★ getLedger()·합산은 건드리지 않는다 — etfLive 가 이미 전 계좌를 합산 중(표시 복원일 뿐).
+  useEffect(() => { setMounted(true); }, []);
+  const tr = mounted ? getTrader() : "A";
+  const refreshHold = () => { setHoldTick((t) => t + 1); try { window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {} };
+  const localEtf = mounted ? (getHoldings(tr) || []).filter((h) => (h.account || "일반") === acct.label) : [];
+  const localOther = mounted ? (getOtherAssets(tr) || []).filter((o) => (o.account || "일반") === acct.label) : [];
+  const saveLocalEdit = (kind, id) => {
+    const v = Number(editVal);
+    if (kind === "etf") { if (v > 0) updateEtfAvg({ id, avgPrice: v, trader: tr }); }
+    else { if (v >= 0) updateOtherAsset(id, { valueKrw: Math.round(v * 1e4) }, tr); }
+    setEditKey(null); setEditVal(""); refreshHold();
+  };
+  const delLocal = (kind, row) => {
+    if (kind === "etf") removeEtf({ ticker: row.ticker, account: acct.label, trader: tr });
+    else removeOtherAsset({ id: row.id, trader: tr });
+    refreshHold();
+  };
+  const addFund = () => {
+    const v = Number(fundMan);
+    if (!fundName.trim() || !(v >= 0)) return;
+    addOtherAsset({ name: fundName.trim(), account: acct.label, valueKrw: Math.round(v * 1e4), kind: "fund", trader: tr });
+    setFundName(""); setFundMan(""); setAddMode(null); refreshHold();
+  };
+  void holdTick; // 재읽기 트리거(상태 변경 시 재렌더 → getHoldings 재호출)
+
   const acctIdx = Math.max(0, accountList.findIndex((x) => x.id === acct.id));
   // [사용자 지시] 개인연금↔퇴직연금 탭 스와이프(ETF·부동산과 통일)
   const acctSwipe = useSwipeTabs({ index: acctIdx, count: accountList.length, onChange: (i) => setAcct(accountList[i]) });
@@ -215,6 +253,58 @@ export default function PensionPage() {
               <div style={{ marginTop: 8, fontSize: "0.7rem", color: "var(--color-warning-ink, var(--color-warning))", lineHeight: 1.4 }}>⚠ 마지막 입력은 {contribYear}년 값입니다. 올해({y}년) 납입액을 다시 입력해 주세요.</div>
             )}
             <div style={{ marginTop: 8, fontSize: "0.68rem", color: "var(--color-ink-3)", lineHeight: 1.4 }}>세액공제 한도(개인연금+퇴직연금 합산) {limitMan.toLocaleString()}만원 기준. 총 납입 가능 한도와는 다릅니다. 참고용 · 세무자문 아님.</div>
+          </section>
+        );
+      })()}
+
+      {/* [S41-0 선행-2] 직접 입력한 ETF/펀드 보유(계좌별·로컬) — 서버 스냅샷과 출처 구분. 수정·삭제·추가 그 자리에서. */}
+      {mounted && (() => {
+        const rows = [
+          ...localEtf.map((h) => ({ kind: "etf", id: h.id, ticker: h.ticker, name: h.ticker, meta: `${h.shares}주 · 평단 ${Number(h.avgPrice).toLocaleString()}${h.avgCcy === "USD" ? "$" : "원"}`, cur: h.avgPrice })),
+          ...localOther.map((o) => ({ kind: "oth", id: o.id, name: o.name, meta: `평가 ${man(o.valueKrw)}원`, cur: Math.round((Number(o.valueKrw) || 0) / 1e4) })),
+        ];
+        return (
+          <section className="card" style={{ marginTop: 10 }}>
+            <div style={{ fontSize: "0.86rem", fontWeight: 800, marginBottom: 2 }}>🧾 직접 입력 보유 <span style={{ fontWeight: 600, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>{acct.label} · 로컬</span></div>
+            <div style={{ fontSize: "0.68rem", color: "var(--color-ink-3)", marginBottom: 8, lineHeight: 1.4 }}>아래 증권사 붙여넣기(서버 스냅샷)와 <b>출처가 다른</b>, 직접 입력한 보유입니다. 종합자산에는 이미 합산돼 있습니다.</div>
+            {rows.length === 0 ? (
+              <div style={{ fontSize: "0.76rem", color: "var(--color-ink-3)", lineHeight: 1.5 }}>이 계좌로 직접 입력한 ETF·펀드가 없습니다. 아래에서 추가하세요.</div>
+            ) : rows.map((r) => (
+              <div key={`${r.kind}:${r.id}`} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 0", borderBottom: "1px solid var(--color-line)" }}>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontSize: "0.82rem", fontWeight: 700, color: "var(--color-ink)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.name}</div>
+                  <div style={{ fontSize: "0.7rem", color: "var(--color-ink-3)" }}>{r.meta}</div>
+                </div>
+                {editKey === `${r.kind}:${r.id}` ? (
+                  <>
+                    <input type="number" inputMode="decimal" value={editVal} onChange={(e) => setEditVal(e.target.value)} style={{ width: 92, border: "1px solid var(--color-line)", borderRadius: 8, padding: "6px 8px", fontSize: "0.78rem" }} placeholder={r.kind === "etf" ? "평단" : "만원"} />
+                    <button onClick={() => saveLocalEdit(r.kind, r.id)} style={{ border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", borderRadius: 8, padding: "6px 10px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>저장</button>
+                    <button onClick={() => { setEditKey(null); setEditVal(""); }} style={{ border: "1px solid var(--color-line)", background: "var(--color-card)", color: "var(--color-ink-2)", borderRadius: 8, padding: "6px 8px", fontSize: "0.72rem", cursor: "pointer" }}>취소</button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => { setEditKey(`${r.kind}:${r.id}`); setEditVal(String(r.cur ?? "")); }} style={{ border: "1px solid var(--color-line)", background: "var(--color-card)", color: "var(--color-primary)", borderRadius: 8, padding: "6px 10px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>수정</button>
+                    <button onClick={() => delLocal(r.kind, r)} style={{ border: "1px solid var(--color-line)", background: "var(--color-card)", color: "var(--color-ink-3)", borderRadius: 8, padding: "6px 9px", fontSize: "0.72rem", cursor: "pointer" }}>삭제</button>
+                  </>
+                )}
+              </div>
+            ))}
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <button onClick={() => setAddMode(addMode === "etf" ? null : "etf")} style={{ border: "1px solid var(--color-primary)", background: addMode === "etf" ? "var(--color-primary-soft)" : "var(--color-card)", color: "var(--color-primary)", borderRadius: 999, padding: "6px 12px", fontSize: "0.74rem", fontWeight: 700, cursor: "pointer" }}>＋ ETF 추가</button>
+              <button onClick={() => setAddMode(addMode === "fund" ? null : "fund")} style={{ border: "1px solid var(--color-line)", background: addMode === "fund" ? "var(--color-primary-soft)" : "var(--color-card)", color: "var(--color-ink-2)", borderRadius: 999, padding: "6px 12px", fontSize: "0.74rem", fontWeight: 700, cursor: "pointer" }}>＋ 펀드·기타 추가</button>
+            </div>
+            {addMode === "etf" && (
+              <div style={{ marginTop: 10 }}>
+                <EtfForm fixedAccount={acct.label} onSaved={() => { setAddMode(null); refreshHold(); }} />
+              </div>
+            )}
+            {addMode === "fund" && (
+              <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                <input value={fundName} onChange={(e) => setFundName(e.target.value)} placeholder="상품명(예: 미래에셋 디폴트옵션)" style={{ flex: "1 1 160px", minWidth: 0, border: "1px solid var(--color-line)", borderRadius: 8, padding: "9px 10px", fontSize: "0.85rem" }} />
+                <input type="number" inputMode="numeric" value={fundMan} onChange={(e) => setFundMan(e.target.value)} placeholder="평가금액(만원)" style={{ flex: "1 1 120px", minWidth: 0, border: "1px solid var(--color-line)", borderRadius: 8, padding: "9px 10px", fontSize: "0.85rem" }} />
+                <button onClick={addFund} disabled={!fundName.trim() || !(Number(fundMan) >= 0)} style={{ border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", borderRadius: 8, padding: "9px 14px", fontSize: "0.8rem", fontWeight: 800, cursor: "pointer", opacity: (fundName.trim() && Number(fundMan) >= 0) ? 1 : 0.5 }}>추가</button>
+              </div>
+            )}
           </section>
         );
       })()}
