@@ -1,8 +1,10 @@
 // public/sw.js — ONE-HUB PWA Service Worker
 
 // [V1] 배포마다 갱신 → 구 SW 강제 교체 트리거. 설정 화면에도 표기(사용자가 최신 여부 확인).
-const SW_VERSION = 'v10.3-20260904';
-const CACHE_VERSION = 'onehub-v29';
+const SW_VERSION = 'v10.4-20261014';
+// [S43] v29→v30: 영어 오디오(speak/audio)가 SWR 캐시에 '빈 파일(고장 때)'로 박혀 음성이 안 나오던
+//   사고를 끊는다. 버전을 올리면 activate 에서 구 onehub-v29/-api 캐시(오염분 포함)를 전부 삭제한다.
+const CACHE_VERSION = 'onehub-v30';
 const API_CACHE = CACHE_VERSION + '-api'; // [S29-3] 읽기 전용 GET SWR 런타임 캐시
 
 // [N3] 알림 종류별 착지점 — 백엔드는 kind만 실어 보내면 된다.
@@ -47,7 +49,10 @@ self.addEventListener('fetch', (event) => {
   // [S29-3] API 요청 — 읽기 전용 GET 만 stale-while-revalidate(재방문 즉시 + 백그라운드 갱신).
   //   ★쓰기(POST 등)·인증·개인 상태 변경 경로는 절대 캐시하지 않는다.
   if (url.includes('/api/')) {
-    const noCache = /\/api\/(auth|push-|feedback|.*-pending|queue-|skip-|approve-|user\/state|comments|ops\/|me\/consent|proposals\/decide|pwa\/sell|pwa\/re\/spot)/.test(url);
+    // [S43] 영어 오디오(speak/audio/karaoke-audio)는 SWR 캐시 금지 — 항상 네트워크.
+    //   오디오는 바이너리라 SWR 로 캐시하면 고장 시 '빈 파일'이 박혀 영구 무음이 된다(2026-10-14 사고).
+    //   백엔드 해시캐시 + 프록시 Cache-Control 이 신선도를 이미 담당한다.
+    const noCache = /\/api\/(auth|push-|feedback|.*-pending|queue-|skip-|approve-|user\/state|comments|ops\/|me\/consent|proposals\/decide|pwa\/sell|pwa\/re\/spot|english\/speak|english\/audio|english\/karaoke-audio)/.test(url);
     if (event.request.method === 'GET' && !noCache) {
       event.respondWith(
         caches.open(API_CACHE).then((cache) =>

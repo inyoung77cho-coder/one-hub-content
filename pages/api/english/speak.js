@@ -36,6 +36,12 @@ export default async function handler(req, res) {
     const r = await fetch(url, { signal: ctrl.signal });
     if (!r.ok) return res.status(r.status).json({ error: "speak failed" });
     const buf = Buffer.from(await r.arrayBuffer());
+    // [S43] 빈 오디오(0바이트)는 '성공'이 아니라 합성 실패다 — 30일 캐시로 굳히면 음성이 영구히
+    //   안 나온다(2026-10-14 edge-tts 고장 때 빈 파일이 클라 캐시에 박혔던 사고). no-store 로 502 반환.
+    if (buf.length === 0) {
+      res.setHeader("Cache-Control", "no-store");
+      return res.status(502).json({ error: "empty audio" });
+    }
     res.setHeader("Content-Type", "audio/mpeg");
     res.setHeader("Content-Length", String(buf.length));
     // 같은 텍스트는 같은 발음 — 브라우저 캐시도 오래 유지해 재요청 자체를 줄인다.
