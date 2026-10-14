@@ -30,6 +30,23 @@ const LEAD = {
   DC: { ic: "🏛️", t: "위험자산 70% 한도 · 진단·리밸런싱" },
 };
 
+// [S41-0 선행-4] 거래 리듬 달력 — role 값은 서버가 주는 그대로(check/trade/review) 한글 라벨만 매핑.
+//   지어낸 의미를 덧붙이지 않는다(점검/거래/복기는 role 단어의 직역). role=null 이면 일반 거래일/휴장.
+const CAL_ROLE = {
+  check:  { label: "점검", ic: "🔎", fg: "var(--color-primary)",  bg: "var(--color-primary-soft)" },
+  trade:  { label: "거래", ic: "💱", fg: "var(--color-warning)",  bg: "var(--color-warning-soft, var(--color-primary-soft))" },
+  review: { label: "복기", ic: "📋", fg: "var(--color-success)",  bg: "var(--color-success-soft)" },
+};
+const WD = ["일", "월", "화", "수", "목", "금", "토"];
+// "2026-10-14" → {md:"10/14", wd:"화", dow:3, iso}. 시간대 흔들림 방지 위해 분해해서 생성.
+const calParse = (iso) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ""));
+  if (!m) return { md: String(iso || ""), wd: "", dow: -1, iso };
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  return { md: `${Number(m[2])}/${Number(m[3])}`, wd: WD[d.getDay()], dow: d.getDay(), iso };
+};
+const todayISO = () => { const d = new Date(); const p = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`; };
+
 // 계좌 목록은 /api/pwa/pension/accounts 로 로드. 미도달 시 폴백.
 const FALLBACK_ACCOUNTS = [
   { id: "A-PEN-01", label: "개인연금", type: "PENSION_SAVINGS" },
@@ -60,6 +77,10 @@ export default function PensionPage() {
   const [addMode, setAddMode] = useState(null);      // null | "etf" | "fund"
   const [fundName, setFundName] = useState("");
   const [fundMan, setFundMan] = useState("");        // 펀드 평가금액(만원)
+  // [S41-0 선행-4] 연금 거래 리듬 달력 — /api/pwa/pension/<계좌>/calendar 응답(days:[{date,role,trading,post_holiday}]).
+  //   조회 실패를 '없음'으로 바꾸지 않는다: loading|ok|empty|error 구분(EA-3와 동일 원칙).
+  const [cal, setCal] = useState(null);
+  const [calStatus, setCalStatus] = useState("loading");
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [preview, setPreview] = useState(null);
@@ -105,6 +126,24 @@ export default function PensionPage() {
       if (r.data?.ok) { setPresets(r.data.presets || []); setCurPreset(r.data.policy?.preset || null); }
     });
   }, []);
+
+  // [S41-0 선행-4] 선택 계좌의 거래 리듬 달력 로드(8주). 호출부가 없던 getCalendar 를 연결.
+  //   ★ 실패/빈값/정상 구분(EA-3): reject·HTTP실패·ok:false → error, days 없음/빈배열 → empty, 그 외 → ok.
+  useEffect(() => {
+    let alive = true;
+    setCalStatus("loading");
+    P.getCalendar(acct.id, 8)
+      .then((r) => {
+        if (!alive) return;
+        const okResp = r && r.status >= 200 && r.status < 300 && r.data?.ok === true;
+        if (!okResp) { setCal(null); setCalStatus("error"); return; }
+        const days = Array.isArray(r.data.days) ? r.data.days : [];
+        setCal(days);
+        setCalStatus(days.length ? "ok" : "empty");
+      })
+      .catch(() => { if (alive) { setCal(null); setCalStatus("error"); } });
+    return () => { alive = false; };
+  }, [acct]);
 
   useEffect(() => {
     let alive = true;
@@ -303,6 +342,64 @@ export default function PensionPage() {
                 <input value={fundName} onChange={(e) => setFundName(e.target.value)} placeholder="상품명(예: 미래에셋 디폴트옵션)" style={{ flex: "1 1 160px", minWidth: 0, border: "1px solid var(--color-line)", borderRadius: 8, padding: "9px 10px", fontSize: "0.85rem" }} />
                 <input type="number" inputMode="numeric" value={fundMan} onChange={(e) => setFundMan(e.target.value)} placeholder="평가금액(만원)" style={{ flex: "1 1 120px", minWidth: 0, border: "1px solid var(--color-line)", borderRadius: 8, padding: "9px 10px", fontSize: "0.85rem" }} />
                 <button onClick={addFund} disabled={!fundName.trim() || !(Number(fundMan) >= 0)} style={{ border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", borderRadius: 8, padding: "9px 14px", fontSize: "0.8rem", fontWeight: 800, cursor: "pointer", opacity: (fundName.trim() && Number(fundMan) >= 0) ? 1 : 0.5 }}>추가</button>
+              </div>
+            )}
+          </section>
+        );
+      })()}
+
+      {/* [S41-0 선행-4] 거래 리듬 달력 — getCalendar 연결. 실패는 '없음'으로 바꾸지 않고 조용히 숨긴다(주 정보 아님). */}
+      {calStatus === "ok" && Array.isArray(cal) && cal.length > 0 && (() => {
+        const today = todayISO();
+        const roleDays = cal.filter((d) => d.role && CAL_ROLE[d.role]);
+        return (
+          <section className="card" style={{ marginTop: 10 }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
+              <div style={{ fontSize: "0.86rem", fontWeight: 800 }}>🗓️ 거래 리듬</div>
+              <div style={{ fontSize: "0.68rem", color: "var(--color-ink-3)" }}>{acct.label} · 앞으로 {Math.round(cal.length / 7)}주</div>
+            </div>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 8 }}>
+              {Object.entries(CAL_ROLE).map(([k, v]) => (
+                <span key={k} style={{ fontSize: "0.66rem", color: "var(--color-ink-3)", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: 3, background: v.fg, display: "inline-block" }} />{v.label}
+                </span>
+              ))}
+              <span style={{ fontSize: "0.66rem", color: "var(--color-ink-3)", display: "inline-flex", alignItems: "center", gap: 3 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 3, background: "var(--color-line)", display: "inline-block" }} />휴장
+              </span>
+            </div>
+            {/* 가로 스크롤 스트립(의도적) — 날짜 셀. 휴장=흐리게, role 있으면 색 점. 오늘=테두리. */}
+            <div style={{ display: "flex", gap: 6, overflowX: "auto", paddingBottom: 6, WebkitOverflowScrolling: "touch" }}>
+              {cal.map((d) => {
+                const p = calParse(d.date);
+                const r = d.role && CAL_ROLE[d.role] ? CAL_ROLE[d.role] : null;
+                const isToday = d.date === today;
+                const closed = !d.trading;
+                return (
+                  <div key={d.date} title={`${p.md} (${p.wd})${r ? " · " + r.label : ""}${closed ? " · 휴장" : ""}${d.post_holiday ? " · 연휴 후" : ""}`}
+                    style={{ flex: "0 0 auto", width: 42, textAlign: "center", padding: "6px 2px", borderRadius: 8,
+                      border: isToday ? "2px solid var(--color-primary)" : "1px solid var(--color-line)",
+                      background: r ? r.bg : "var(--color-card)", opacity: closed ? 0.45 : 1 }}>
+                    <div style={{ fontSize: "0.6rem", color: "var(--color-ink-3)" }}>{p.wd}</div>
+                    <div style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--color-ink)" }}>{p.md}</div>
+                    <div style={{ height: 6, marginTop: 3, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                      {r ? <span style={{ width: 6, height: 6, borderRadius: 2, background: r.fg, display: "inline-block" }} /> : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {roleDays.length > 0 && (
+              <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 4 }}>
+                {roleDays.slice(0, 4).map((d) => {
+                  const p = calParse(d.date); const r = CAL_ROLE[d.role];
+                  return (
+                    <div key={`r-${d.date}`} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.76rem" }}>
+                      <span style={{ fontSize: "0.72rem", fontWeight: 700, color: d.date === today ? "var(--color-primary)" : "var(--color-ink-2)", minWidth: 58 }}>{p.md} ({p.wd}){d.date === today ? " · 오늘" : ""}</span>
+                      <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 8px", borderRadius: 999, background: r.bg, color: r.fg, fontSize: "0.72rem", fontWeight: 700 }}>{r.ic} {r.label}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>
