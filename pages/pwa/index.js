@@ -1674,6 +1674,25 @@ export default function PWADashboard({ latestReport }) {
                   ? <>✅ 표시는 텔레그램에 실제로 발송된 <b>실거래 검증 통과 신호</b>입니다. 나머지는 매수 선별 전 기술 스코어링 후보로, 실제 매수 신호와는 별개입니다.</>
                   : 'AI 매수 선별 전 기술 스코어링 상위 후보입니다. 실제 매수 신호와는 별개입니다.'}
               </p>
+              {/* [S42 DC-1 후속] 스크리닝 기준일(후보 created_at) 노출 — 1주 전 스캔을 '오늘 것'처럼
+                  보이지 않게(집 규칙: 확인 못한 값 단정 금지). 기준일을 못 읽으면 표시하지 않는다. */}
+              {(() => {
+                const cands = data?.screening_candidates || [];
+                if (!cands.length) return null;
+                const times = cands.map((c) => c.created_at).filter(Boolean).sort();
+                const latest = times[times.length - 1];
+                const m = latest && /^(\d{4})-(\d{2})-(\d{2})/.exec(latest);
+                if (!m) return null;
+                const scanDate = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+                const today = new Date(); today.setHours(0, 0, 0, 0);
+                const daysAgo = Math.round((today - scanDate) / 86400000);
+                const stale = daysAgo >= 1;
+                return (
+                  <div className="rec-hero-asof" style={{ fontSize: '0.72rem', marginTop: 4, color: stale ? 'var(--color-warning)' : 'var(--text-secondary)' }}>
+                    📅 스크리닝 기준 {Number(m[2])}/{Number(m[3])}{stale ? ` · ${daysAgo}일 전 스캔(최신 아님)` : ' · 오늘'}
+                  </div>
+                );
+              })()}
             </section>
 
             {/* [매매 승인] 추천 탭 상단 — AI 매매 제안 승인/거절 카드 (승인대기 있을 때만) */}
@@ -1732,7 +1751,7 @@ export default function PWADashboard({ latestReport }) {
                 <div className="pwa-loading"><div className="pwa-spinner" /><span>데이터 로딩 중...</span></div>
               )}
               {data && (!data.screening_candidates || data.screening_candidates.length === 0) && (
-                <div className="pwa-empty">오늘 스캔된 관심종목이 없습니다.</div>
+                <div className="pwa-empty">스캔된 관심종목이 없습니다.</div>
               )}
               {data && data.screening_candidates && data.screening_candidates.length > 0 && (() => {
                 // [v9.0][29] 개인 맞춤 대시보드 -- 투자성향별 추천 정렬 기준
