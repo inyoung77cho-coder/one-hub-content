@@ -9,6 +9,10 @@ const TARGETS = [
   { name: "etf",        url: process.env.ETF_API_URL    || "http://54.180.54.132:5003", critical: false },
   // [S33-4] news(:5004) 추가 — 오늘 3시간 죽어 있었는데 감시가 못 잡았다. non-critical(앱 핵심은 돎 → 503 아닌 degraded).
   { name: "news",       url: process.env.NEWS_API_URL   || "http://54.180.54.132:5004", critical: false },
+  // [S42] english(:5005) 추가 — '듣는 경제' 오디오(TTS·일일 생성 녹음)가 전적으로 이 엔진에 의존하는데
+  //   감시 대상에서 빠져 있어 오디오가 끊겨도(2026-10-14 사용자 보고) health 가 ok:true 로 보였다.
+  //   non-critical(매매·핵심 앱은 돎 → 503 아닌 degraded). news(:5004)와 같은 취급.
+  { name: "english",    url: process.env.ENGLISH_API_URL || "http://54.180.54.132:5005", critical: false },
 ];
 
 // [S38 DA-3] 주의: 이 엔드포인트의 up/ok 는 '포트(HTTP)가 응답하는가'다 — 매매봇(onehub.service)
