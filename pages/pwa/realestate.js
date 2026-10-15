@@ -16,6 +16,8 @@ import ReNewHigh from "../../components/ReNewHigh"; // [S28-10] 신고가(없으
 import { estimateSellCost, MOVE_COST_DISCLAIMER } from "../../lib/moveCost"; // [S22-9] 갈아타기 거래비용
 import ReIncomeSummaryCard from "../../components/ReIncomeSummaryCard";
 import { markDeleted } from "../../lib/recordSync"; // [C-4] 삭제 시 tombstone(기기 간 삭제 반영)
+import { getTrader } from "../../lib/trader"; // [S45 SC] 본인 계정 스코프
+import { getAskingsFor, addAsking, removeAsking } from "../../lib/reAsking"; // [S45 SC] 사용자 호가 메모(표시 전용·로컬·격리)
 
 const uk = (n) => (n == null ? "-" : `${Number(n).toFixed(2)}억`);
 const pct = (n) => (n == null ? "-" : `${n > 0 ? "+" : ""}${Number(n).toFixed(1)}%`);
@@ -51,6 +53,19 @@ export default function RealEstateDashboard() {
   const [pName, setPName] = useState(""); const [pVal, setPVal] = useState(""); const [pMemo, setPMemo] = useState("");
   const [pDeposit, setPDeposit] = useState(""); const [pMonthly, setPMonthly] = useState(""); // [피드백] 전세/월세 보증금(억)·월수익(만원)
   const [pBuy, setPBuy] = useState(""); // [수익] 매수가(억, 선택) — 전체 평가손익 계산용
+  // [S45 SC] 사용자 호가 메모 — 본인 등록 단지에만. 입력 폼 상태(어느 단지의 폼이 열렸는지) + 재읽기 틱.
+  const [askOpen, setAskOpen] = useState(null);   // 열린 단지명 | null
+  const [askTick, setAskTick] = useState(0);
+  const [askF, setAskF] = useState({ pyeong: "", low: "", high: "", count: "", date: "", source: "" });
+  // [S45 SC] 본인이 보유로 등록한 단지(대표+추가)만 호가 입력을 연다.
+  const userComplexes = Array.from(new Set([myProp?.name, ...reProps.map((p) => p.name)].filter(Boolean)));
+  const saveAsk = (complex) => {
+    const res = addAsking({ trader: getTrader(), complex, pyeong: askF.pyeong, lowMan: askF.low, highMan: askF.high, count: askF.count, date: askF.date, source: askF.source });
+    if (res.ok) { setAskF({ pyeong: "", low: "", high: "", count: "", date: "", source: "" }); setAskOpen(null); setAskTick((t) => t + 1); }
+  };
+  const delAsk = (id) => { removeAsking({ id, trader: getTrader() }); setAskTick((t) => t + 1); };
+  const todayStr = new Date().toISOString().slice(0, 10);
+  void askTick; // 재읽기 트리거(상태 변경 → getAskingsFor 재호출)
   // [S40 FB-1] 투자용(추가 보유) 집 매도 분석 — '보기 수준' 선택. 대표 주택·자산 합계·ledger 는 절대 바꾸지 않는다.
   const [analyzeReId, setAnalyzeReId] = useState(null);
   const [fbPyeong, setFbPyeong] = useState(""); // 분석에 필요한 평형(전용㎡) 입력
@@ -423,6 +438,64 @@ export default function RealEstateDashboard() {
 
       {/* ══ 시나리오 탭 (입력·계산) — 자산 입력(등록/목록) + 수익 요약 ══ */}
       {reTab === "scenario" && (<>
+      {/* [S45 SC] 내 단지 호가(부르는 값) 기록 — 본인 등록 단지에만. 사람이 조회한 매물 호가를
+          날짜·출처와 함께 기록. ★실거래가 아니라 '미확정·사용자 입력'. ★표시 전용(종합자산 불변).
+          ★본인 계정 로컬 — 같은 단지 보유자에게 공유되지 않음. 운영자 신고가와 다른 저장소. */}
+      {userComplexes.length > 0 && (
+        <section className="card" style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: "0.9rem", fontWeight: 800, color: "var(--color-ink)" }}>📝 내 단지 호가 기록</div>
+          <div style={{ fontSize: "0.7rem", color: "var(--color-ink-3)", margin: "4px 0 10px", lineHeight: 1.5 }}>
+            매물로 <b>부르는 값</b>을 직접 조회해 기록합니다. <b style={{ color: "var(--color-warning)" }}>실거래가 아닌 ‘미확정’ 값</b>이라 추세·자산 평가에 넣지 않고 참고로만 보여드립니다.
+          </div>
+          {userComplexes.map((cx) => {
+            const recs = getAskingsFor(getTrader(), cx);
+            const eok = (m) => (m == null ? "-" : `${(m / 10000).toFixed(2)}억`);
+            return (
+              <div key={cx} style={{ borderTop: "1px solid var(--color-line)", paddingTop: 10, marginTop: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ fontSize: "0.82rem", fontWeight: 700 }}>🏠 {cx}</span>
+                  <button onClick={() => { setAskOpen(askOpen === cx ? null : cx); setAskF({ pyeong: "", low: "", high: "", count: "", date: todayStr, source: "" }); }}
+                    style={{ border: "1px solid var(--color-primary)", background: askOpen === cx ? "var(--color-primary-soft)" : "var(--color-card)", color: "var(--color-primary)", borderRadius: 999, padding: "5px 11px", fontSize: "0.72rem", fontWeight: 700, cursor: "pointer" }}>
+                    {askOpen === cx ? "닫기" : "＋ 시세 기록"}
+                  </button>
+                </div>
+                {askOpen === cx && (
+                  <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <label style={{ fontSize: "0.68rem", color: "var(--color-ink-3)", display: "flex", flexDirection: "column", gap: 3 }}>평형(㎡)
+                      <input value={askF.pyeong} onChange={(e) => setAskF((v) => ({ ...v, pyeong: e.target.value }))} placeholder="84" style={{ border: "1px solid var(--color-line)", borderRadius: 8, padding: "7px 9px", fontSize: "0.82rem" }} /></label>
+                    <label style={{ fontSize: "0.68rem", color: "var(--color-ink-3)", display: "flex", flexDirection: "column", gap: 3 }}>매물 건수
+                      <input type="number" inputMode="numeric" value={askF.count} onChange={(e) => setAskF((v) => ({ ...v, count: e.target.value }))} placeholder="선택" style={{ border: "1px solid var(--color-line)", borderRadius: 8, padding: "7px 9px", fontSize: "0.82rem" }} /></label>
+                    <label style={{ fontSize: "0.68rem", color: "var(--color-ink-3)", display: "flex", flexDirection: "column", gap: 3 }}>최저 호가(만원)
+                      <input type="number" inputMode="numeric" value={askF.low} onChange={(e) => setAskF((v) => ({ ...v, low: e.target.value }))} placeholder="예: 120000" style={{ border: "1px solid var(--color-line)", borderRadius: 8, padding: "7px 9px", fontSize: "0.82rem" }} /></label>
+                    <label style={{ fontSize: "0.68rem", color: "var(--color-ink-3)", display: "flex", flexDirection: "column", gap: 3 }}>최고 호가(만원)
+                      <input type="number" inputMode="numeric" value={askF.high} onChange={(e) => setAskF((v) => ({ ...v, high: e.target.value }))} placeholder="예: 135000" style={{ border: "1px solid var(--color-line)", borderRadius: 8, padding: "7px 9px", fontSize: "0.82rem" }} /></label>
+                    <label style={{ fontSize: "0.68rem", color: "var(--color-ink-3)", display: "flex", flexDirection: "column", gap: 3 }}>조회일
+                      <input type="date" value={askF.date} max={todayStr} onChange={(e) => setAskF((v) => ({ ...v, date: e.target.value }))} style={{ border: "1px solid var(--color-line)", borderRadius: 8, padding: "7px 9px", fontSize: "0.82rem" }} /></label>
+                    <label style={{ fontSize: "0.68rem", color: "var(--color-ink-3)", display: "flex", flexDirection: "column", gap: 3 }}>출처(사이트명)
+                      <input value={askF.source} onChange={(e) => setAskF((v) => ({ ...v, source: e.target.value }))} placeholder="예: 네이버부동산" style={{ border: "1px solid var(--color-line)", borderRadius: 8, padding: "7px 9px", fontSize: "0.82rem" }} /></label>
+                    <button onClick={() => saveAsk(cx)} style={{ gridColumn: "1 / -1", border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", borderRadius: 8, padding: "9px", fontSize: "0.82rem", fontWeight: 800, cursor: "pointer" }}>확인 후 기록</button>
+                  </div>
+                )}
+                {recs.length > 0 ? (
+                  <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 5 }}>
+                    {recs.slice(0, 6).map((r) => (
+                      <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: "0.74rem", borderLeft: "2px dashed var(--color-warning)", paddingLeft: 8 }}>
+                        <span style={{ flex: 1, minWidth: 0, color: "var(--color-ink-2)" }}>
+                          {r.pyeong ? `${r.pyeong}㎡ · ` : ""}{r.lowMan ? eok(r.lowMan) : "?"}~{r.highMan ? eok(r.highMan) : "?"}{r.count != null ? ` · ${r.count}건` : ""}
+                          <span style={{ color: "var(--color-ink-3)", fontSize: "0.68rem" }}> · {r.date || "날짜?"}{r.source ? ` · ${r.source}` : ""} · 미확정·사용자 입력</span>
+                        </span>
+                        <button onClick={() => delAsk(r.id)} style={{ border: "1px solid var(--color-line)", background: "var(--color-card)", color: "var(--color-ink-3)", borderRadius: 7, padding: "3px 8px", fontSize: "0.68rem", cursor: "pointer" }}>삭제</button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  askOpen !== cx && <div style={{ marginTop: 6, fontSize: "0.7rem", color: "var(--color-ink-3)" }}>아직 기록한 호가가 없습니다.</div>
+                )}
+              </div>
+            );
+          })}
+        </section>
+      )}
       {/* [S5] 내 단지 — 미등록: 위저드 CTA / 등록됨: 상세 요약(매수가 vs 현재 추정시세) */}
       {!myProp ? (
         // [R-1] 등록 전 블러 프리뷰 — 라벨은 선명, 값만 가림 + 가치 제안 카드(3개·30초 CTA)

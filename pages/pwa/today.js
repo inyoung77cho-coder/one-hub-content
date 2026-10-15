@@ -5,6 +5,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/router";
 import { getTrader, useTrader } from "../../lib/trader";
+import { latestAskingTs } from "../../lib/reAsking"; // [S45 SC-③] 내 단지 호가 7일 경과 알림
 import { dedupBy } from "../../lib/useDedup";
 import { getLedger as getAssetLedger } from "../../lib/ledger";
 import HoldingsNews from "../../components/HoldingsNews";
@@ -116,6 +117,7 @@ export default function TodayPage({ announcements = [] }) {
   const [ledger, setLedger] = useState(null);
   const [myComplex, setMyComplex] = useState("");
   const [reMyProp, setReMyProp] = useState(null); // [이관] 오늘의 부동산 스크리너용 내 단지 상세(전체 객체)
+  const [reAskStale, setReAskStale] = useState(false); // [S45 SC-③] 내 단지 호가 기록 7일 경과
   const [status, setStatus] = useState("loading");
   const [at, setAt] = useState(null);
   const [aiDaily, setAiDaily] = useState(null); // [S20-3] 오늘 vs 전일 AI 판단 diff(AI 탭과 동일 소스)
@@ -170,11 +172,20 @@ export default function TodayPage({ announcements = [] }) {
     setView(vToIdx(router.query.v));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady, router.query.v]);
-  const goView = (i) => {
+  // [S45 SB] 세그먼트 배지(버블)를 탭하면 그 화면의 '할 일 목록'으로 스크롤한다 —
+  //   숫자만 보이고 뭘 해야 하는지 안 보이던 문제. 배지가 가리키는 실제 목록으로 데려간다.
+  //   자산(0)=주식 할 일 카드, 부동산(1)=신고가(관심단지) 카드. 스와이프 전환은 스크롤하지 않는다.
+  const stockTodoRef = useRef(null);
+  const reNotesRef = useRef(null);
+  const goView = (i, scrollToTodo = false) => {
     // [S24-5 함정6] 탭 전환은 router.replace — push 를 쓰면 뒤로가기를 여러 번 눌러야 페이지를 벗어난다.
     //   뉴스 모달(?news=)만 push 를 유지(openNewsDetail).
     setView(i);
     router.replace({ pathname: router.pathname, query: { ...router.query, v: V_NAMES[i] } }, undefined, { shallow: true, scroll: false });
+    if (scrollToTodo) {
+      const ref = i === 0 ? stockTodoRef : i === 1 ? reNotesRef : null;
+      if (ref) setTimeout(() => { try { ref.current?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch (e) {} }, 60);
+    }
   };
   const swipe = useSwipeTabs({ index: view, count: 4, onChange: goView });
   // [ETF] 오늘의 ETF — 주간 상승률 최고(국내/해외) 실데이터(movers). ETF 뷰 진입 시 1회 로드.
@@ -195,6 +206,12 @@ export default function TodayPage({ announcements = [] }) {
     setStatus((s) => (dash ? "stale" : "loading"));
     let myProp = null;
     try { myProp = JSON.parse(localStorage.getItem("onehub_re_my_property") || "null"); setMyComplex(myProp?.name || ""); setReMyProp(myProp || null); } catch (e) {}
+    // [S45 SC-③] 내 단지가 있는데 호가 기록이 7일 넘게 비었으면 '시세 갱신' 한 줄을 띄운다(주간 주기).
+    try {
+      const hasComplex = !!(myProp && myProp.name);
+      const last = latestAskingTs(tr);
+      setReAskStale(hasComplex && (last == null || (Date.now() - last) > 7 * 86400000));
+    } catch (e) { setReAskStale(false); }
     Promise.all([
       cachedJson(`/api/pwa-dashboard?trader=${tr}`), // [S21-5] 오늘/AI 탭 공유 URL → 중복 GET dedup
       fetch(`/api/pwa-pending?trader=${tr}`).then((r) => r.json()).catch(() => null),
@@ -641,7 +658,7 @@ export default function TodayPage({ announcements = [] }) {
               { key: "story", label: "이야기", badge: segBadges[3] },
             ]}
             index={view}
-            onChange={goView}
+            onChange={(i) => goView(i, (segBadges[i] || 0) > 0)}
             ariaLabel="오늘 화면"
           />
         </div>
@@ -913,7 +930,7 @@ export default function TodayPage({ announcements = [] }) {
 
         {/* 카드3 — 오늘의 할 일 · 주식 [S23 T-1] 각 행에서 바로 매도/보유/관망을 기록(페이지 안 떠남). */}
         {/* [S24-6] 이 앱의 유일한 차별점 — 다섯 장 중 하나만 시각적으로 들어올린다(promote). */}
-        <section className="card sc td-promote" style={{ order: 2 }}>
+        <section className="card sc td-promote" style={{ order: 2 }} ref={stockTodoRef}>
           <div className="sc-h">오늘의 할 일 · 주식</div>
           {todoStock.length === 0 && todoNoti.length === 0 ? (
             /* [S24-7] 조용한 날에도 판단 카드는 비어 있지 않다. 우선순위 폭포: 경과 → 관찰 → 안내. */
@@ -1022,6 +1039,12 @@ export default function TodayPage({ announcements = [] }) {
 
         {/* ══ "오늘의 부동산" — [사용자 지시] 4카드: 내부동산·지역비교 / 신고가 공지 / 뉴스 / 오늘 할일(관심단지) ══ */}
         {view === 1 && (<>
+          {/* [S45 SC-③] 내 단지 호가 기록이 7일 넘게 비었을 때 한 줄(주간 주기). 탭하면 기록 화면으로. */}
+          {reAskStale && (
+            <button type="button" className="td-duel-banner" onClick={() => { try { localStorage.setItem("onehub_re_tab", "scenario"); } catch (e) {} router.push("/pwa/realestate"); }}>
+              📝 내 단지 매물 호가를 한 주에 한 번 기록해 두면 추세가 보입니다 · 지금 기록 →
+            </button>
+          )}
           {/* 카드1 — 내 부동산 및 지역 가격 비교 현황 */}
           <section className="card tile">
             <div className="tile-h">🏠 내 부동산 · 지역 비교</div>
@@ -1055,7 +1078,7 @@ export default function TodayPage({ announcements = [] }) {
 
           {/* 카드2 — 신고가 공지 */}
           {opNotes.length > 0 && (
-            <section className="card tile">
+            <section className="card tile" ref={reNotesRef}>
               <div className="tile-h">🏢 신고가 공지</div>
               <div className="tile-news">
                 {opNotes.slice(0, 4).map((o, i) => (
