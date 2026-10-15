@@ -13,6 +13,30 @@ const SOURCES = [
 ];
 
 export default async function handler(req, res) {
+  // [S45 SA-2] 과거일자 조회 — ?date=YYYY-MM-DD 가 오면 그날(또는 직전 영업일) USD→KRW 환율을
+  //   취득시 환율(acqFx) 자동채움에 쓴다. frankfurter 가 영업일 보정해 실제 적용일을 응답에 담는다.
+  //   ★오늘 환율로 대체하지 않는다 — 과거일 조회가 실패하면 ok:false 를 주고 사용자가 직접 입력한다.
+  const rawDate = typeof req.query.date === "string" ? req.query.date.trim() : "";
+  if (rawDate) {
+    const today = new Date().toISOString().slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(rawDate) || rawDate > today) {
+      return res.status(400).json({ ok: false, error: "유효한 과거 날짜(YYYY-MM-DD)가 아닙니다." });
+    }
+    try {
+      const r = await fetch(`https://api.frankfurter.app/${rawDate}?from=USD&to=KRW`, { signal: AbortSignal.timeout(6000) });
+      if (r.ok) {
+        const d = await r.json();
+        const rate = d?.rates?.KRW;
+        if (rate && Number(rate) > 0) {
+          // 과거일 환율은 변하지 않는다 → 오래 캐시.
+          res.setHeader("Cache-Control", "public, s-maxage=604800, max-age=86400");
+          return res.status(200).json({ ok: true, rate: Number(rate), date: d.date || rawDate, requested: rawDate, source: "frankfurter.app" });
+        }
+      }
+    } catch (e) { /* 아래 실패 응답 */ }
+    return res.status(200).json({ ok: false, error: "과거 환율 조회 실패", requested: rawDate });
+  }
+
   for (const src of SOURCES) {
     try {
       const r = await fetch(src.url, { signal: AbortSignal.timeout(6000) });

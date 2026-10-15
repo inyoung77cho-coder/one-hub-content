@@ -9,7 +9,7 @@ import AppHeader from "../../components/AppHeader";
 import AssetMapTitle from "../../components/AssetMapTitle";
 import EtfDataStatus from "../../components/EtfDataStatus";
 import { getTrader } from "../../lib/trader";
-import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS, getOtherAssets, addOtherAsset, removeOtherAsset, updateOtherAsset, sellOtherAsset, OTHER_KINDS, saneEtfAvg } from "../../lib/etfHoldings";
+import { getHoldings, buyEtf, sellEtf, removeEtf, inferMarket, getPosQtyMap, setPosQty, ACCOUNTS, getOtherAssets, addOtherAsset, removeOtherAsset, updateOtherAsset, sellOtherAsset, OTHER_KINDS, saneEtfAvg, updateEtfAvg, updateEtfAcq } from "../../lib/etfHoldings";
 import AvgPriceWarningCard from "../../components/shared/AvgPriceWarningCard"; // [S22-1] 이상 평단 확인 카드(주식·ETF 공용)
 import useSwipeTabs from "../../components/shared/useSwipeTabs"; // [S25-5] 보유↔추천 스와이프
 import SegTabs from "../../components/shared/SegTabs"; // [S26-5] 공용 세그먼트 탭
@@ -149,6 +149,10 @@ export default function EtfDashboard() {
   const [form, setForm] = useState({ side: "buy", ticker: "", shares: "", price: "", ccy: "USD", account: "일반", market: "auto" });
   const [formMsg, setFormMsg] = useState("");
   const [editingHolding, setEditingHolding] = useState(null); // [사용자 지시] 수정 클릭 시에만 인라인 폼 노출
+  // [S45 SA-1·SA-2] 제자리 수정 — 평단(대체)·취득일·취득환율. 매수폼 가중평균이 아니라 '값 대체'.
+  const [editHold, setEditHold] = useState(null);             // 수정 중인 보유 객체(ticker/account/avgCcy 참조)
+  const [editVals, setEditVals] = useState({ avgPrice: "", buyDate: "", acqFx: "" });
+  const [fxBusy, setFxBusy] = useState(false);                // 취득일 환율 조회 중
   // [2026-08-23] 증권사 계좌내역(.xls=HTML) 파일로 일괄 입력 — 미래에셋 등 "계좌별잔고" 내보내기 형식.
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkRows, setBulkRows] = useState([]); // [{id,name,ticker,account,shares,avgPrice,ccy,market,skip}]
@@ -365,19 +369,45 @@ export default function EtfDashboard() {
     setHoldings(getHoldings(tr));
     try { window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {}
   };
-  // [S18 D-1] 수정 = 기존값 프리필 후 매수 폼 재사용. 재입력을 요구하지 않는다.
-  //   buyEtf 는 같은 티커+통화+계좌+증권사를 가중평균으로 합친다 → 값을 "대체"하려면
-  //   삭제 후 재입력이 맞다. 그래서 프리필과 함께 그 사실을 안내한다(조용히 합쳐지면 오해).
-  // [사용자 지시] 신규 매수/매도 등록은 "+" 버튼(EtfForm)으로 옮기고, 이 인라인 폼은
-  //   기존 보유 "수정" 전용으로만 남긴다 — 평소엔 숨어 있다가 수정 클릭 시에만 나타난다.
+  // [S45 SA-1] 수정 = 그 자리에서 '값 대체'(가중평균 아님). pension.js 패턴을 따른다.
+  //   평단은 updateEtfAvg(대체), 취득일·취득환율은 updateEtfAcq. 수량 변경은 "+"의 매수/매도로.
   const editHolding = (h) => {
     setEditingHolding(h.id);
-    setForm({ side: "buy", ticker: h.ticker, shares: String(h.shares), price: String(h.avgPrice),
-              ccy: h.avgCcy || "USD", account: h.account || "일반", market: h.market || "auto" });
-    setFormMsg("수정: 값을 고쳐 기록하면 가중평균으로 합쳐집니다. 값을 대체하려면 먼저 삭제하세요.");
+    setEditHold(h);
+    setEditVals({ avgPrice: String(h.avgPrice ?? ""), buyDate: h.buyDate || "", acqFx: h.acqFx != null ? String(h.acqFx) : "" });
+    setFormMsg("");
     setTimeout(() => { try { document.querySelector(".me-form")?.scrollIntoView({ behavior: "smooth", block: "center" }); } catch (e) {} }, 0);
   };
-  const closeEditForm = () => { setEditingHolding(null); setFormMsg(""); };
+  const closeEditForm = () => { setEditingHolding(null); setEditHold(null); setFormMsg(""); };
+  // [S45 SA-2] 취득일 입력 시 그날 USD→KRW 환율을 조회해 취득환율을 채운다(사용자가 고칠 수 있음).
+  //   ★오늘 환율로 대체하지 않는다 — 조회 실패면 비워두고 직접 입력하게 둔다(집 규칙).
+  const autoFillAcqFx = async (date) => {
+    if (!editHold || editHold.avgCcy !== "USD") return;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ""))) return;
+    setFxBusy(true);
+    try {
+      const d = await fetch(`/api/fx/usdkrw?date=${encodeURIComponent(date)}`).then((r) => r.json());
+      if (d?.ok && d.rate > 0) setEditVals((v) => ({ ...v, acqFx: String(Math.round(d.rate * 100) / 100) }));
+    } catch (e) { /* 실패 시 사용자 직접 입력 */ }
+    finally { setFxBusy(false); }
+  };
+  const saveEdit = () => {
+    if (!editHold) return;
+    const tr = getTrader();
+    const px = Number(editVals.avgPrice);
+    if (editVals.avgPrice !== "" && px > 0 && px !== Number(editHold.avgPrice)) {
+      updateEtfAvg({ id: editHold.id, avgPrice: px, trader: tr });
+    }
+    updateEtfAcq({
+      id: editHold.id,
+      buyDate: editVals.buyDate || "",
+      acqFx: editHold.avgCcy === "USD" ? (editVals.acqFx === "" ? null : Number(editVals.acqFx)) : undefined,
+      trader: tr,
+    });
+    const l = getHoldings(tr); setHoldings(l); refreshQuotes(l);
+    try { window.dispatchEvent(new Event("onehub-assets-change")); } catch (e) {}
+    closeEditForm();
+  };
 
   // ══════════════════════════════════════════════════════
   // [2026-08-23] 증권사 계좌내역 일괄 입력 — 미래에셋증권 "계좌별잔고" 내보내기(.xls, 실제론 HTML).
@@ -1373,6 +1403,9 @@ export default function EtfDashboard() {
                               })()}
                             </span>
                             <span className="me-qty">{h.shares}주 · 평단 {h.avgCcy === "USD" ? "$" : ""}{h.avgPrice.toLocaleString()}{h.avgCcy === "KRW" ? "원" : ""}</span>
+                            {(h.buyDate || h.acqFx != null) && (
+                              <span className="me-acq">취득 {h.buyDate || "—"}{h.avgCcy === "USD" && h.acqFx != null ? ` · ${Math.round(h.acqFx).toLocaleString()}원/$` : ""}</span>
+                            )}
                           </div>
                           <div className="me-r">
                             <span className="me-px">{m.curPx != null ? `${m.curCcy === "USD" ? "$" : ""}${m.curPx.toLocaleString()}${m.curCcy === "KRW" ? "원" : ""}` : "시세 조회 중…"}</span>
@@ -1468,58 +1501,38 @@ export default function EtfDashboard() {
         {/* [사용자 지시] 신규 매수/매도 등록용 상시 노출 폼은 "+" 버튼과 중복이라 삭제하고,
             기존 보유 "수정" 전용으로만 남긴다 — editHolding 클릭 시에만 나타난다.
             보유 목록(이 보유 탭)에서만 트리거되므로 이 카드 안에 유지한다. */}
-        {editingHolding && (
+        {editingHolding && editHold && (
         <div className="me-form">
           <div className="mf-tabs">
-            <span className="mf-editing">✎ 보유 수정 중</span>
-            {[["buy", "매수 기록"], ["sell", "매도 기록"]].map(([k, l]) => (
-              <button key={k} type="button" className={`mf-tab ${form.side === k ? "on" : ""}`}
-                onClick={() => { setForm((f) => ({ ...f, side: k })); setFormMsg(""); }}>{l}</button>
-            ))}
+            <span className="mf-editing">✎ {editHold.ticker} 수정 <span className="mf-editing-sub">· 값을 그 자리에서 대체합니다</span></span>
             <button type="button" className="mf-close" onClick={closeEditForm} aria-label="수정 닫기">✕</button>
           </div>
           <div className="mf-grid">
-            <label className="mf-f mf-tk">
-              <span>티커 또는 이름 검색</span>
-              <TickerSearchBox value={form.ticker} placeholder="SCHD / 069500 / 삼성전자"
-                onChange={(v) => setForm((f) => ({ ...f, ticker: v }))}
-                onSelect={(r) => setForm((f) => ({ ...f, ticker: r.ticker, market: r.market }))} />
+            <label className="mf-f">
+              <span>평단 {editHold.avgCcy === "USD" ? "(USD)" : "(원)"}</span>
+              <input type="number" inputMode="decimal" value={editVals.avgPrice} placeholder={String(editHold.avgPrice ?? "")}
+                onChange={(e) => setEditVals((v) => ({ ...v, avgPrice: e.target.value }))} />
             </label>
             <label className="mf-f">
-              <span>수량</span>
-              <input type="number" inputMode="decimal" value={form.shares} placeholder="10"
-                onChange={(e) => setForm((f) => ({ ...f, shares: e.target.value }))} />
+              <span>취득일</span>
+              <input type="date" value={editVals.buyDate} max={todayKST}
+                onChange={(e) => setEditVals((v) => ({ ...v, buyDate: e.target.value }))}
+                onBlur={(e) => { if (editHold.avgCcy === "USD" && !editVals.acqFx) autoFillAcqFx(e.target.value); }} />
             </label>
-            {form.side === "buy" && (
+            {editHold.avgCcy === "USD" && (
               <label className="mf-f">
-                <span>평단</span>
-                <input type="number" inputMode="decimal" value={form.price} placeholder="78"
-                  onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} />
-              </label>
-            )}
-            {form.side === "buy" && (
-              <label className="mf-f">
-                <span>통화</span>
-                <select value={form.ccy} onChange={(e) => setForm((f) => ({ ...f, ccy: e.target.value }))}>
-                  <option value="USD">USD</option><option value="KRW">KRW</option>
-                </select>
-              </label>
-            )}
-            {/* [2026-09-27] ETF=일반 전용 → 계좌 선택 제거(항상 일반). 연금·ISA는 연금 페이지에서. */}
-            {form.side === "buy" && (
-              <label className="mf-f">
-                <span>상장 시장</span>
-                <select value={form.market} onChange={(e) => setForm((f) => ({ ...f, market: e.target.value }))}>
-                  <option value="auto">자동(티커로 판단)</option>
-                  <option value="kr">국내 상장</option>
-                  <option value="us">해외 상장</option>
-                </select>
+                <span>취득시 환율 {fxBusy ? "(조회 중…)" : "(원/$)"}</span>
+                <input type="number" inputMode="decimal" value={editVals.acqFx} placeholder="취득일 넣으면 자동"
+                  onChange={(e) => setEditVals((v) => ({ ...v, acqFx: e.target.value }))} />
               </label>
             )}
           </div>
-          <button className="mf-submit" onClick={submitTrade}>
-            {form.side === "buy" ? "매수 기록" : "매도 기록"}
-          </button>
+          <div className="mf-note">
+            {editHold.avgCcy === "USD"
+              ? "취득일·취득시 환율은 해외 ETF 양도차익의 ‘취득원가’ 계산에 쓰입니다. 평가액 표시는 지금처럼 오늘 환율을 씁니다(두 값은 별개). 수량 변경은 아래 ‘＋’의 매수·매도로."
+              : "국내 ETF는 환율이 없습니다. 취득일만 기록됩니다. 수량 변경은 아래 ‘＋’의 매수·매도로."}
+          </div>
+          <button className="mf-submit" onClick={saveEdit}>저장</button>
           {formMsg && <div className="mf-msg">{formMsg}</div>}
         </div>
         )}
@@ -1913,6 +1926,9 @@ export default function EtfDashboard() {
         .me-form { border-top: 1px solid var(--color-line); margin-top: 12px; padding-top: 12px; }
         .mf-tabs { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
         .mf-editing { font-size: var(--fs-2); font-weight: 800; color: var(--color-ink-2); }
+        .mf-editing-sub { font-size: var(--fs-1); font-weight: 600; color: var(--color-ink-3); }
+        .mf-note { font-size: var(--fs-1); color: var(--color-ink-3); line-height: 1.5; margin-top: 8px; word-break: keep-all; }
+        .me-acq { font-size: var(--fs-1); color: var(--color-ink-3); font-variant-numeric: tabular-nums; }
         .mf-close { flex: none; width: 26px; height: 26px; border: none; background: var(--color-card-soft, var(--color-line)); border-radius: 50%; color: var(--color-ink-2); font-size: var(--fs-2); cursor: pointer; }
         .mf-tab { flex: 1 1 0; min-height: 36px; border: 1px solid var(--color-line); background: var(--color-card); color: var(--color-ink-2); border-radius: var(--radius-sm); font-size: var(--fs-2); font-weight: 700; font-family: var(--font-sans); cursor: pointer; }
         .mf-tab.on { border-color: var(--color-primary); color: var(--color-primary); background: var(--color-card-soft); }
