@@ -11,8 +11,9 @@ import * as P from "../../lib/pension";
 import { pensionCreditLimitCombined } from "../../lib/taxRules"; // [S39 EB-1] 세액공제 합산 한도(원)
 import { getTrader } from "../../lib/trader";
 // [S41-0 선행-2] 연금 계좌(개인연금·퇴직연금)로 직접 입력한 ETF/펀드 보유를 연금 화면에 표시·수정·삭제·추가.
-import { getHoldings, getOtherAssets, removeEtf, updateEtfAvg, removeOtherAsset, updateOtherAsset, addOtherAsset } from "../../lib/etfHoldings";
+import { getHoldings, getOtherAssets, removeEtf, updateEtfAvg, removeOtherAsset, updateOtherAsset, addOtherAsset, inferMarket } from "../../lib/etfHoldings";
 import { EtfForm } from "../../components/shared/AssetForms";
+import { classifyEtf } from "../../lib/etfClassify"; // [S45 SE] 투자지역(국내/해외) 분류
 
 const man = (v) => (v == null ? "-" : `${Math.round(Number(v) / 1e4).toLocaleString()}만`);
 const uk = (v, d = 2) => (v == null ? "-" : `${(Number(v) / 1e8).toFixed(d)}억`);
@@ -81,6 +82,9 @@ export default function PensionPage() {
   //   조회 실패를 '없음'으로 바꾸지 않는다: loading|ok|empty|error 구분(EA-3와 동일 원칙).
   const [cal, setCal] = useState(null);
   const [calStatus, setCalStatus] = useState("loading");
+  // [S45 SE] 연금 리밸런싱 — 계좌 ETF를 현재가로 평가해 국내/해외 배분 vs 목표 → 조정 금액.
+  const [penQuotes, setPenQuotes] = useState({}); // ticker → { price, currency }
+  const [penFx, setPenFx] = useState(null);
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState("");
   const [preview, setPreview] = useState(null);
@@ -237,6 +241,51 @@ export default function PensionPage() {
   };
   void holdTick; // 재읽기 트리거(상태 변경 시 재렌더 → getHoldings 재호출)
 
+  // [S45 SE] 이 계좌 ETF 티커의 현재가(원)를 조회 — 국내/해외 배분 평가용. etf.js 와 같은 공개 소스.
+  useEffect(() => {
+    if (!mounted) return;
+    const tickers = [...new Set(localEtf.map((h) => h.ticker).filter(Boolean))];
+    if (!tickers.length) { setPenQuotes({}); return; }
+    let alive = true;
+    (async () => {
+      const fx = await fetch("/api/fx/usdkrw").then((r) => r.json()).catch(() => null);
+      if (alive) setPenFx(fx?.ok ? fx.rate : null);
+      const byMkt = {};
+      localEtf.forEach((h) => { const m = inferMarket(h.ticker, h.market); (byMkt[m] = byMkt[m] || []).push(h.ticker); });
+      const q = {};
+      await Promise.all(Object.entries(byMkt).map(async ([m, tks]) => {
+        const uniq = [...new Set(tks)];
+        const d = await fetch(`/api/etf/quote?tickers=${encodeURIComponent(uniq.join(","))}&market=${m}`).then((r) => r.json()).catch(() => null);
+        if (d?.ok && d.quotes) uniq.forEach((tk) => { const raw = d.quotes[String(tk).toUpperCase()] || d.quotes[tk]; if (raw && Number(raw.price) > 0) q[tk] = { price: raw.price, currency: raw.currency }; });
+      }));
+      if (alive) setPenQuotes(q);
+    })();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, acct.label, holdTick]);
+
+  // [S45 SE] 계좌 ETF를 현재가로 평가해 국내/해외 금액을 집계(시세 못 받은 종목은 '평가 보류'로 제외·단정 금지).
+  const seEval = (() => {
+    let dm = 0, os = 0, priced = 0, pending = 0;
+    localEtf.forEach((h) => {
+      const qt = penQuotes[h.ticker];
+      if (!qt) { pending += 1; return; }
+      const krw = qt.currency === "USD" ? (penFx ? qt.price * penFx : null) : qt.price;
+      if (krw == null) { pending += 1; return; }
+      const val = krw * (Number(h.shares) || 0);
+      const c = classifyEtf(h.ticker);
+      const region = c ? c.r : null;
+      if (region === "국내") dm += val; else if (region === "해외") os += val; else { /* 미분류 ETF는 국내/해외 배분에서 제외 */ }
+      priced += 1;
+    });
+    return { dm, os, tot: dm + os, priced, pending };
+  })();
+  // [S45 SE] 국내/해외 목표(onehub_target_alloc.region). 미설정이면 null → '목표 미설정'.
+  const seTarget = (() => {
+    if (!mounted) return null;
+    try { const t = JSON.parse(localStorage.getItem("onehub_target_alloc") || "null"); const r = t?.region || t || null; return r && (Number(r.국내) > 0 || Number(r.해외) > 0) ? r : null; } catch { return null; }
+  })();
+
   const acctIdx = Math.max(0, accountList.findIndex((x) => x.id === acct.id));
   // [사용자 지시] 개인연금↔퇴직연금 탭 스와이프(ETF·부동산과 통일)
   const acctSwipe = useSwipeTabs({ index: acctIdx, count: accountList.length, onChange: (i) => setAcct(accountList[i]) });
@@ -343,6 +392,47 @@ export default function PensionPage() {
                 <input type="number" inputMode="numeric" value={fundMan} onChange={(e) => setFundMan(e.target.value)} placeholder="평가금액(만원)" style={{ flex: "1 1 120px", minWidth: 0, border: "1px solid var(--color-line)", borderRadius: 8, padding: "9px 10px", fontSize: "0.85rem" }} />
                 <button onClick={addFund} disabled={!fundName.trim() || !(Number(fundMan) >= 0)} style={{ border: "none", background: "var(--color-primary)", color: "var(--color-on-primary)", borderRadius: 8, padding: "9px 14px", fontSize: "0.8rem", fontWeight: 800, cursor: "pointer", opacity: (fundName.trim() && Number(fundMan) >= 0) ? 1 : 0.5 }}>추가</button>
               </div>
+            )}
+          </section>
+        );
+      })()}
+
+      {/* [S45 SE] 연금 리밸런싱 — 이 계좌 ETF의 국내/해외 현재 배분 vs 목표 → 자산군 단위 조정 금액.
+          ★종목 지정 추천 안 함. ★목표 미설정이면 '미설정'. ★시세 못 받은 종목은 평가 보류(단정 금지). */}
+      {mounted && localEtf.length > 0 && (() => {
+        const e = seEval;
+        return (
+          <section className="card" style={{ marginTop: 10 }}>
+            <div style={{ fontSize: "0.86rem", fontWeight: 800, marginBottom: 2 }}>⚖️ 리밸런싱 <span style={{ fontWeight: 600, fontSize: "0.72rem", color: "var(--color-ink-3)" }}>{acct.label} · 국내/해외</span></div>
+            {e.tot <= 0 ? (
+              <div style={{ fontSize: "0.74rem", color: "var(--color-ink-3)", lineHeight: 1.5 }}>
+                {e.pending > 0 ? "ETF 시세를 불러오는 중입니다 — 잠시 후 배분이 표시됩니다." : "국내/해외로 분류되는 ETF가 없어 배분을 계산할 수 없습니다."}
+              </div>
+            ) : !seTarget ? (
+              <div style={{ fontSize: "0.74rem", color: "var(--color-ink-3)", lineHeight: 1.5 }}>
+                목표 배분이 <b>미설정</b>입니다. ETF 화면에서 국내/해외 목표를 정하면 조정 금액을 계산해 드립니다.
+              </div>
+            ) : (
+              <>
+                {[["국내", e.dm, Number(seTarget.국내) || 0], ["해외", e.os, Number(seTarget.해외) || 0]].map(([label, val, tgtPct]) => {
+                  const curPct = e.tot > 0 ? (val / e.tot) * 100 : 0;
+                  const deltaWon = Math.round(e.tot * (tgtPct - curPct) / 100);
+                  const near = Math.abs(tgtPct - curPct) < 3;
+                  return (
+                    <div key={label} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 0", borderBottom: "1px solid var(--color-line)", fontSize: "0.8rem" }}>
+                      <span style={{ minWidth: 40, fontWeight: 700 }}>{label}</span>
+                      <span style={{ flex: 1, color: "var(--color-ink-2)" }}>{curPct.toFixed(0)}% <span style={{ color: "var(--color-ink-3)", fontSize: "0.72rem" }}>(목표 {tgtPct}%)</span></span>
+                      <span style={{ fontWeight: 800, color: near ? "var(--color-ink-3)" : deltaWon >= 0 ? "var(--color-primary)" : "var(--color-warning)" }}>
+                        {near ? "맞음" : `${deltaWon >= 0 ? "+" : "−"}${man(Math.abs(deltaWon))}원`}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div style={{ fontSize: "0.68rem", color: "var(--color-ink-3)", marginTop: 8, lineHeight: 1.5 }}>
+                  평가 {man(e.tot)}원 기준 · <b>자산군(국내/해외) 단위 조정 금액</b>까지만 안내합니다(종목은 지정하지 않습니다).{e.pending > 0 ? ` · 시세 미확보 ${e.pending}종목은 평가에서 제외했습니다.` : ""}
+                  <br />연금 계좌 안에서 ETF를 갈아타는 것은 인출이 아니라 <b>교체</b>라 일반계좌와 세금 취급이 다릅니다(구체 세액은 계산하지 않습니다).
+                </div>
+              </>
             )}
           </section>
         );
