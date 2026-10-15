@@ -301,7 +301,14 @@ export default function PWADashboard({ latestReport }) {
   const aiSwipe = useSwipeTabs({ index: Math.min(TRUST_TABS.indexOf(trustSec), visibleCount - 1), count: visibleCount, onChange: (i) => setTrustSec(TRUST_TABS[i]) });
   const [recSort, setRecSort] = useState('interest'); // [S7.2] 추천 정렬(interest/upside)
   const [autoWatchNote, setAutoWatchNote] = useState([]); // [S-6] 추천해제→자동 관망 편입 알림
-  const [buyNotice, setBuyNotice] = useState(null); // [S-6] 바로매수 핸드오프 { name, code }
+  const [buyNotice, setBuyNotice] = useState(null); // [S-6] 바로매수 핸드오프 { name, code, price? }
+  // [S45 SF] 주문서 — 수량·지정가는 사람이 고친다(앱이 자동 결정 안 함). 실주문은 넣지 않는다.
+  const [orderQty, setOrderQty] = useState("");
+  const [orderPx, setOrderPx] = useState("");
+  const [orderCopied, setOrderCopied] = useState(false);
+  useEffect(() => {
+    if (buyNotice) { setOrderQty(""); setOrderPx(buyNotice.price != null ? String(buyNotice.price) : ""); setOrderCopied(false); }
+  }, [buyNotice]);
   const [decFeedback, setDecFeedback] = useState(null); // [S-5] 판단 기록 직후 즉시 피드백 { name, decision, date }
   const [companyInfo, setCompanyInfo] = useState({}); // [S-7] 기업개요 캐시(code→summary)
   const [notis, setNotis] = useState([]); // [T-04] 텔레그램/리포트/큐 동기화 알림 피드
@@ -1927,7 +1934,7 @@ export default function PWADashboard({ latestReport }) {
                             <div className="vs-teaser">AI는 <b style={{ color: m.verdict.color }}>{m.verdict.short}</b> · 당신의 선택은?</div>
                             {/* [N8] 이 버튼은 주문을 넣지 않는다(실주문 연동 없음) — 라벨이 하는 일과 같아야 한다.
                                 '매수하기'는 앱이 지킬 수 없는 약속이라 '주문 방법'으로 낮춘다. */}
-                            <button className="buy-now-btn" onClick={(e) => { e.stopPropagation(); setBuyNotice({ name: s.name, code: s.code }); }}>주문 방법 →</button>
+                            <button className="buy-now-btn" onClick={(e) => { e.stopPropagation(); setBuyNotice({ name: s.name, code: s.code, price: s.price ?? s.current_price ?? null }); }}>주문서 →</button>
                             {(() => { const dec = (decTick, getTodayDecision(s.code, trader)); const held = isHeld(s.code); return (<>
                               <div className="dec-mini" onClick={(e) => e.stopPropagation()}>
                                 {held
@@ -3108,12 +3115,25 @@ export default function PWADashboard({ latestReport }) {
         {buyNotice && (
           <div onClick={() => setBuyNotice(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1100, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
             <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 360, background: 'var(--color-card)', color: 'var(--color-text)', borderRadius: 16, padding: 18, boxShadow: '0 12px 40px rgba(0,0,0,.3)' }}>
-              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 8 }}>주문 방법 · {buyNotice.name} <span style={{ color: 'var(--color-ink-3)', fontWeight: 500 }}>({buyNotice.code})</span></div>
-              <div style={{ fontSize: 13, color: 'var(--color-ink-2)', lineHeight: 1.55, wordBreak: 'keep-all' }}>실주문 자동연동은 준비 중입니다. <b>증권사 앱에서 매수 주문</b>을 완료하신 뒤 아래 <b>‘샀어요로 기록’</b>을 누르면 <b>나 vs AI</b> 채점에 반영됩니다.</div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
-                <button onClick={() => { logDecision(buyNotice.code, buyNotice.name, 'take'); setBuyNotice(null); }} style={{ flex: 1, border: 'none', borderRadius: 10, padding: '11px 0', fontWeight: 800, background: 'var(--color-primary)', color: 'var(--color-on-primary)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>샀어요로 기록</button>
-                <button onClick={() => setBuyNotice(null)} style={{ flex: '0 0 auto', border: '1px solid var(--color-line)', borderRadius: 10, padding: '11px 16px', fontWeight: 700, background: 'var(--color-card)', color: 'var(--color-ink-2)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>닫기</button>
+              <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 4 }}>📝 주문서 · {buyNotice.name} <span style={{ color: 'var(--color-ink-3)', fontWeight: 500 }}>({buyNotice.code})</span></div>
+              <div style={{ fontSize: 12, color: 'var(--color-ink-3)', lineHeight: 1.5, wordBreak: 'keep-all', marginBottom: 10 }}>수량·지정가를 <b>직접 정하세요</b>(앱이 자동으로 정하지 않습니다). 복사해 <b>KIS 앱에서 주문</b>하시면 됩니다 — <b>이 앱은 실제 주문을 넣지 않습니다.</b></div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-ink-3)', display: 'flex', flexDirection: 'column', gap: 3 }}>수량(주)
+                  <input type="number" inputMode="numeric" value={orderQty} onChange={(e) => setOrderQty(e.target.value)} placeholder="예: 10" style={{ border: '1px solid var(--color-line)', borderRadius: 8, padding: '8px 9px', fontSize: 14, fontFamily: 'var(--font-body)' }} /></label>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--color-ink-3)', display: 'flex', flexDirection: 'column', gap: 3 }}>지정가(원)
+                  <input type="number" inputMode="numeric" value={orderPx} onChange={(e) => setOrderPx(e.target.value)} placeholder="예: 70000" style={{ border: '1px solid var(--color-line)', borderRadius: 8, padding: '8px 9px', fontSize: 14, fontFamily: 'var(--font-body)' }} /></label>
               </div>
+              <div style={{ marginTop: 10, fontSize: 12.5, color: 'var(--color-ink-2)', background: 'var(--color-card-soft, rgba(0,0,0,.03))', borderRadius: 8, padding: '9px 11px', lineHeight: 1.5, fontVariantNumeric: 'tabular-nums' }}>
+                매수 · {buyNotice.name}({buyNotice.code}) · {orderQty ? `${orderQty}주` : '수량?'} · {orderPx ? `지정가 ${Number(orderPx).toLocaleString()}원` : '지정가?'}
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button onClick={() => {
+                  const txt = `매수 ${buyNotice.name}(${buyNotice.code}) ${orderQty || '?'}주 지정가 ${orderPx ? Number(orderPx).toLocaleString() + '원' : '?'}`;
+                  try { navigator.clipboard?.writeText(txt); setOrderCopied(true); setTimeout(() => setOrderCopied(false), 2000); } catch (e) {}
+                }} style={{ flex: 1, border: '1px solid var(--color-primary)', borderRadius: 10, padding: '11px 0', fontWeight: 800, background: orderCopied ? 'var(--color-primary-soft)' : 'var(--color-card)', color: 'var(--color-primary)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>{orderCopied ? '✓ 복사됨' : '📋 복사'}</button>
+                <button onClick={() => { logDecision(buyNotice.code, buyNotice.name, 'take'); setBuyNotice(null); }} style={{ flex: 1, border: 'none', borderRadius: 10, padding: '11px 0', fontWeight: 800, background: 'var(--color-primary)', color: 'var(--color-on-primary)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>샀어요로 기록</button>
+              </div>
+              <button onClick={() => setBuyNotice(null)} style={{ width: '100%', marginTop: 8, border: '1px solid var(--color-line)', borderRadius: 10, padding: '9px 0', fontWeight: 700, background: 'var(--color-card)', color: 'var(--color-ink-3)', cursor: 'pointer', fontFamily: 'var(--font-body)' }}>닫기</button>
             </div>
           </div>
         )}
