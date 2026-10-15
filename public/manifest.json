@@ -7,8 +7,13 @@
   "scope": "/pwa",
   "display": "standalone",
   "background_color": "#f0f6ff",
-  "theme_color": "#2563eb",
+  "theme_color": "#2F6BFF",
   "orientation": "portrait",
+  "share_target": {
+    "action": "/pwa/share",
+    "method": "GET",
+    "params": { "title": "title", "text": "text", "url": "url" }
+  },
   "icons": [
     {
       "src": "/icons/icon-192.png",
