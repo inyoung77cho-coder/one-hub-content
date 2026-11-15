@@ -27,6 +27,16 @@ const WARN_ORDER = [
 ];
 const warnRank = (c) => { const i = WARN_ORDER.indexOf(c); return i < 0 ? WARN_ORDER.length : i; };
 
+// [S46 사용자 지시] 시세를 못 받은 ETF — 현재가를 직접 확인할 외부 시세 페이지.
+//   국내 종목코드(숫자 6자리, 2024년부터 쓰는 영문 섞인 신규 코드 예: 0080G0 포함) → 네이버 증권, 그 외 → Yahoo Finance.
+const KR_CODE = /^[0-9][0-9A-Z]{5}$/;
+function quoteLink(tk) {
+  const t = String(tk || "").trim().toUpperCase();
+  return KR_CODE.test(t)
+    ? { href: `https://finance.naver.com/item/main.naver?code=${encodeURIComponent(t)}`, site: "네이버 증권" }
+    : { href: `https://finance.yahoo.com/quote/${encodeURIComponent(t)}`, site: "Yahoo Finance" };
+}
+
 // [S46 R1] assets.js:146 과 같은 식 — 투자용 부동산 순액(평가 − 보증금, 음수 0).
 function readInvRealtyUk() {
   try {
@@ -93,6 +103,8 @@ export default function HomeSimplePage() {
   const warns = ((L && L.warnings) || [])
     .filter((w) => w && w.excluded_from_totals === true)
     .sort((a, b) => warnRank(a.code) - warnRank(b.code));
+  // ETF 시세 누락 종목(원장이 실어 준 티커). 경고가 맨 위가 아니어도 안내는 보여준다.
+  const etfMissing = [...new Set(warns.filter((w) => w.code === "ETF_PRICE_MISSING").flatMap((w) => (Array.isArray(w.tickers) ? w.tickers : [])))];
 
   // R2 — 탭 시 이동은 assets.js summaryCards 의 href 를 그대로 쓴다(새 상세 화면 없음).
   const mainRows = [
@@ -128,6 +140,24 @@ export default function HomeSimplePage() {
         {warns.length > 0 && (
           <p className="hm-warn" role="status">⚠ {warns[0].message}{warns.length > 1 ? ` 외 ${warns.length - 1}건` : ""}</p>
         )}
+        {etfMissing.length > 0 && (
+          <details className="hm-guide">
+            <summary>시세를 못 받은 ETF {etfMissing.length}종목 확인하기</summary>
+            <p className="hm-guide-p">앱의 시세 조회에서 아래 종목의 현재가를 받지 못해 ETF 금액에서 빠졌습니다. 현재가는 링크에서 직접 확인할 수 있고, 종목코드(티커)를 잘못 입력했다면 ETF 화면에서 고칠 수 있습니다.</p>
+            <ul className="hm-guide-l">
+              {etfMissing.map((tk) => {
+                const q = quoteLink(tk);
+                return (
+                  <li key={tk}>
+                    <b>{tk}</b>
+                    <a href={q.href} target="_blank" rel="noopener noreferrer">{q.site}에서 현재가 보기 ↗</a>
+                  </li>
+                );
+              })}
+            </ul>
+            <Link href="/pwa/etf" className="hm-guide-fix">ETF 화면에서 보유 종목 확인·수정 ›</Link>
+          </details>
+        )}
         {status === "error" && (
           <p className="hm-warn" role="status">⚠ 자산 원장을 불러오지 못했습니다. <button type="button" className="hm-retry" onClick={load}>다시 시도</button></p>
         )}
@@ -138,7 +168,7 @@ export default function HomeSimplePage() {
           </div>
         )}
         {hasResidence && <div className="hm-ex">실거주 {uk(residenceUk)} 제외</div>}
-        {at && <div className="hm-fresh"><LastUpdated timestamp={at} onRefresh={load} /></div>}
+        {at && <div className="hm-fresh"><LastUpdated timestamp={at} onRefresh={load} absolute /></div>}
       </section>
 
       <nav className="hm-card" aria-label="자산군">
@@ -171,6 +201,14 @@ export default function HomeSimplePage() {
         .hm-big { font-size: clamp(44px, 17vw, 66px); font-weight: 900; letter-spacing: -3.5px; line-height: 1.08; font-variant-numeric: tabular-nums; color: var(--color-ink); white-space: nowrap; margin: 4px 0 6px; }
         .hm-wait { font-size: var(--fs-6); font-weight: 700; letter-spacing: 0; color: var(--color-ink-3); }
         .hm-warn { margin: 2px auto 8px; max-width: 360px; font-size: var(--fs-2); line-height: 1.5; font-weight: 700; color: var(--color-warning-ink); background: var(--color-warning-soft); border-radius: var(--radius-pill); padding: 6px 12px; overflow-wrap: anywhere; }
+        .hm-guide { margin: 0 auto 10px; max-width: 360px; text-align: left; font-size: var(--fs-2); color: var(--color-ink-2); background: var(--color-card); border: 1px solid var(--color-line); border-radius: var(--radius-sm); padding: 8px 12px; }
+        .hm-guide summary { cursor: pointer; font-weight: 800; color: var(--color-primary); list-style-position: inside; }
+        .hm-guide-p { margin: 8px 0 6px; line-height: 1.55; }
+        .hm-guide-l { list-style: none; margin: 0 0 8px; padding: 0; }
+        .hm-guide-l li { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 0; border-top: 1px solid var(--color-line); }
+        .hm-guide-l b { color: var(--color-ink); font-variant-numeric: tabular-nums; }
+        .hm-guide-l a { color: var(--color-primary); font-weight: 700; text-decoration: none; white-space: nowrap; }
+        .hm :global(.hm-guide-fix) { display: inline-block; font-weight: 800; color: var(--color-primary); text-decoration: none; padding: 2px 0; }
         .hm-retry { border: none; background: none; color: var(--color-primary); font: inherit; font-weight: 800; cursor: pointer; padding: 0; }
         .hm-delta { display: flex; justify-content: center; align-items: baseline; gap: 6px; flex-wrap: wrap; }
         .hm-dchip { font-size: var(--fs-4); font-weight: 800; font-variant-numeric: tabular-nums; }

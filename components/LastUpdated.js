@@ -24,7 +24,19 @@ function relTimeKo(ts) {
   }
 }
 
-export default function LastUpdated({ timestamp, staleAfterSeconds = 120, label, onRefresh }) {
+// [S46 사용자 지시] '방금' 대신 정확한 시각 — absolute 를 주면 상대시간 없이 'M월 D일 HH:MM 기준'(KST).
+function absTimeKo(ts) {
+  try {
+    const p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
+    }).formatToParts(ts).map((x) => [x.type, x.value]));
+    return `${p.month}월 ${p.day}일 ${p.hour}:${p.minute} 기준`;
+  } catch (e) {
+    return relTimeKo(ts);
+  }
+}
+
+export default function LastUpdated({ timestamp, staleAfterSeconds = 120, label, onRefresh, absolute = false }) {
   if (!timestamp) return null;
   const ts = timestamp instanceof Date ? timestamp : new Date(timestamp);
   if (isNaN(ts.getTime())) return null;
@@ -35,7 +47,7 @@ export default function LastUpdated({ timestamp, staleAfterSeconds = 120, label,
   return (
     <Tag className="lu" onClick={onRefresh || undefined} type={onRefresh ? "button" : undefined} aria-label={onRefresh ? "새로고침" : undefined}>
       <span className={`lu-dot ${stale ? "stale" : ""}`} aria-hidden="true" />
-      {label ? <span className="lu-lbl">{label} </span> : null}⟳ {relTimeKo(ts)}
+      {label ? <span className="lu-lbl">{label} </span> : null}⟳ {absolute ? absTimeKo(ts) : relTimeKo(ts)}
       <style jsx>{`
         .lu { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--color-ink-3, #94a3b8); font-family: var(--font-sans, inherit); font-variant-numeric: tabular-nums; background: none; border: none; padding: 0; cursor: ${onRefresh ? "pointer" : "default"}; }
         .lu-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-success, #22c55e); flex-shrink: 0; }
