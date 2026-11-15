@@ -71,7 +71,7 @@ export default function Settings() {
   const [tokenSec, setTokenSec] = useState(null);
   const [theme, setTheme] = useState("light");
   const [allowZoom, setAllowZoom] = useState(false); // [S24-4] 화면 확대 허용(핀치 탈출구)
-  const [homeScreen, setHomeScreenState] = useState("full"); // [S46 R3] simple=/pwa/home · full=/pwa/assets(기본)
+  const [homeScreen, setHomeScreenState] = useState("simple"); // [S46 R3] simple=/pwa/home(기본) · full=/pwa/assets
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMsg, setPushMsg] = useState("");
@@ -329,11 +329,11 @@ export default function Settings() {
             <div className="hint">기본은 앱처럼 확대를 막습니다. 글자를 크게 보려면 켜세요(OS 글자 크기 설정은 항상 반영됩니다).</div>
           </div>
 
-          {/* [S46 R3] '자산' 탭의 첫 화면 — 기기별 취향(동기화 안 함). 기본 '전체'(종전 화면) = 무회귀. */}
+          {/* [S46 R3] 앱 시작·'자산' 탭의 첫 화면 — 기기별 취향(동기화 안 함). 기본 '간단히'(사용자 지시). */}
           <div className="card">
             <div className="k">첫 화면</div>
             <div className="row">
-              <span className="l">자산 탭을 누르면</span>
+              <span className="l">앱을 켜거나 자산 탭을 누르면</span>
               <div className="tt" role="group" aria-label="자산 첫 화면">
                 <button className={homeScreen === "simple" ? "on" : ""} aria-pressed={homeScreen === "simple"} onClick={() => setHomeScreenState(setHomeScreen("simple"))}>간단히</button>
                 <button className={homeScreen === "full" ? "on" : ""} aria-pressed={homeScreen === "full"} onClick={() => setHomeScreenState(setHomeScreen("full"))}>전체</button>

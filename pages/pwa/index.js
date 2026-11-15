@@ -16,6 +16,7 @@ import { getLedger as getAssetLedger } from '../../lib/ledger';
 import { cachedJson } from '../../lib/quoteCache'; // [S20-1] 중복 GET 30초 캐시·동시요청 dedup
 import { computeAiFreshness } from '../../lib/aiFreshness'; // [S20-3] AI 갱신 상태(오늘 탭과 공유)
 import { recordSnapshot as recordAssetSnapshot, getDelta as getAssetDelta } from '../../lib/assetHistory';
+import { assetsHref } from '../../lib/homeScreen'; // [S46] 앱 시작 = 설정의 첫 화면
 import { dedupBy } from '../../lib/useDedup';
 import { useTabState } from '../../lib/pwa/useTabState';
 import { samplePolicy, verdictColor as sampleVerdictColor, canAutoML, ML_MIN_SAMPLE } from '../../lib/sampleSize';
@@ -372,7 +373,10 @@ export default function PWADashboard({ latestReport }) {
         onboarded = !!window.localStorage.getItem('onehub_profile')
           || window.localStorage.getItem('onehub_onboarded') === '1';
       } catch (e) {}
-      if (onboarded) { router.replace('/pwa?tab=report&sec=vs'); return; }
+      // [S46 사용자 지시 2026-11-15] 앱을 켜면 항상 '첫 화면'으로 — 설정 첫 화면(기본 간단히=/pwa/home,
+      //   '전체'를 고르면 /pwa/assets). manifest start_url(/pwa)은 그대로 두고 여기서 앱 안 리다이렉트만 한다.
+      //   (종전 진입점이던 오늘의 대결은 AI 탭 /pwa?tab=report&sec=vs 에 그대로 있다.)
+      if (onboarded) { router.replace(assetsHref()); return; }
       // 최초 사용자(프로필·온보딩 모두 없음) → 위저드 1회 진입.
       //   ★ 딥링크(?tab=·?code=)로 들어온 경우엔 절대 튕기지 않는다. isReady 이후라 판정이 정확하다.
       router.replace('/pwa/onboarding');
