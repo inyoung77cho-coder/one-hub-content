@@ -368,6 +368,11 @@ export default function TodayPage({ announcements = [] }) {
   const hasResidence = residenceUk != null && residenceUk > 0.005;
   const operatingUk = bd.operating_uk != null ? Number(bd.operating_uk) : totalUk;
   const headUk = hasResidence ? operatingUk : totalUk;               // 1행 큰 숫자
+  // [S46 R0] 인출 계산기 기준 자산 — operating_uk 에 연금 잔액이 들어갔지만, 인출 계산은 '연금 월수령'을
+  //   따로 받는다. 잔액까지 넣으면 이중 계산이라 원장의 구 정의(연금 제외) 필드를 그대로 읽는다.
+  const withdrawBaseUk = hasResidence
+    ? (bd.operating_ex_pension_uk != null ? Number(bd.operating_ex_pension_uk) : operatingUk)
+    : totalUk;
   // [S24-1] 전일 대비 — 운용 델타 우선, 없으면(구 스냅샷) 총자산 델타로 폴백하되 라벨에 기준을 밝힌다.
   const headDelta = hasResidence ? (assetDelta?.operating ?? assetDelta?.total ?? null) : (assetDelta?.total ?? null);
   const headDeltaBasis = (hasResidence && assetDelta?.operating == null && headDelta != null) ? " · 총자산 기준" : "";
@@ -414,7 +419,7 @@ export default function TodayPage({ announcements = [] }) {
     if (lifeStage !== "withdraw") return null;
     try {
       const w = getWithdrawInputs();
-      const plan = computeWithdrawPlan({ operatingUk: headUk != null ? headUk : totalUk, monthlyExpense: Number(w.expense) || 0, monthlyPension: Number(w.pension) || 0, monthlyDividend: Number(w.dividend) || 0 });
+      const plan = computeWithdrawPlan({ operatingUk: withdrawBaseUk != null ? withdrawBaseUk : totalUk, monthlyExpense: Number(w.expense) || 0, monthlyPension: Number(w.pension) || 0, monthlyDividend: Number(w.dividend) || 0 });
       return { stage: "withdraw", coverRate: plan.coverRate, years: plan.years };
     } catch (e) { return null; }
   })();
@@ -673,7 +678,7 @@ export default function TodayPage({ announcements = [] }) {
         {view === 0 && (<div className="td-v0">
         {/* [S31-4] 인출기 — 이번 달 인출 계획을 맨 위(order 0). 축적기 사용자에겐 안 뜸(회귀 없음). */}
         {lifeStage === "withdraw" && (
-          <div style={{ order: 0 }}><WithdrawCard operatingUk={headUk != null ? headUk : (totalUk != null ? totalUk : null)} /></div>
+          <div style={{ order: 0 }}><WithdrawCard operatingUk={withdrawBaseUk != null ? withdrawBaseUk : (totalUk != null ? totalUk : null)} /></div>
         )}
         {/* [2026-09-27] 증권계좌 미연동(KIS 잔고 0)일 때 — 첫 사용자 연결 안내(연동·붙여넣기·직접입력). 연결되면 자동으로 사라짐. */}
         {positions.length === 0 && (

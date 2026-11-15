@@ -66,7 +66,6 @@ export default function AssetsMapPage() {
   const [delta, setDelta] = useState(null);      // [추세] 전일 대비 총자산·자산별 변화(브라우저 스냅샷 기반)
   const [hist, setHist] = useState([]);          // [추세] 총자산 일별 스냅샷 시계열
   const [exRes, setExRes] = useState(true);      // [§3.1] 실거주(대표단지) 제외 보기 — 기본 켜짐(운용가능 먼저)
-  const [pensionUk, setPensionUk] = useState(0); // [2026-09-27] 연금(개인연금+퇴직연금) 합산 억 — 자산 지도에 별도 자산군으로 추가(서버 연금 엔진)
   const [invProps, setInvProps] = useState([]);  // [§3.1] 추가 보유 부동산(투자용) = onehub_re_properties
   const [myComplex, setMyComplex] = useState(""); // [§3.1] 대표단지(실거주)명
   const [view, setView] = useState(0); // [OS-2] 0=주식 1=ETF 2=부동산 — 종목변경 순환에 맞춰 아래 카드 필터
@@ -180,9 +179,12 @@ export default function AssetsMapPage() {
 
   // 자산 지도/쏠림 진단만 뷰에 따라 분모가 바뀐다(총자산 헤드라인은 항상 total 유지 = 단일 소스).
   // [2026-09-27] 연금(개인연금+퇴직연금)을 자산 지도에 별도 자산군으로 추가(ETF '현재투자'와 구분).
-  const penVal = pensionUk > 0.005 ? pensionUk : 0;
+  // [S46 R0] 연금은 원장(breakdown.pension_uk)에서 읽는다. opTotal(operating_uk)엔 이미 연금이 들어 있으므로
+  //   운용 뷰에서는 다시 더하지 않는다(더하면 연금 이중계산). 총자산 뷰의 '+ penVal' 은 total_uk 가 아직 연금
+  //   제외라 남겨 둔다(total_uk 정의 변경 = S46 §6 결정 대기).
+  const penVal = bd.pension_uk != null && Number(bd.pension_uk) > 0.005 ? Number(bd.pension_uk) : 0;
   const penRow = { k: "pension", label: "🏦 연금", color: "var(--color-ink-3)", href: "/pwa/pension", val: penVal > 0 ? penVal : null };
-  const mapDenom = (useEx ? opTotal : total) + penVal;
+  const mapDenom = useEx ? opTotal : total + penVal;
   const mapRows = [
     ...(useEx
       ? rows.map((r) => (r.k === "realestate"
@@ -219,15 +221,7 @@ export default function AssetsMapPage() {
     return () => window.removeEventListener("onehub-assets-change", count);
   }, []);
 
-  // [2026-09-27] 연금 합산(개인연금+퇴직연금) — 서버 연금 엔진에서 읽어 자산 지도에 별도 자산군으로 표시.
-  useEffect(() => {
-    let alive = true;
-    fetch("/api/pwa/pension/household/HH-A/summary")
-      .then((r) => r.json())
-      .then((d) => { if (alive && d?.ok && d.total_value != null) setPensionUk(Number(d.total_value) / 1e8); })
-      .catch(() => {});
-    return () => { alive = false; };
-  }, []);
+  // [S46 R0] 연금 직접 fetch 제거 — lib/ledger.js 가 cachedJson 으로 한 번 읽어 breakdown.pension_uk 로 준다.
 
   // 도넛(stroke-dasharray) — 뷰 분모(mapDenom) 기준
   const donut = (() => {
@@ -346,7 +340,7 @@ export default function AssetsMapPage() {
           {/* [2026-09-27 사용자 지시] 운용자산 라벨(실거주 제외)은 윗줄, 금액은 한 줄로 크게 강조 — 아래 작은 안내문 삭제(툴팁만 유지) */}
           <div className="as-total-lbl2">{hasResidence ? <>운용자산 <span className="as-ex">· 실거주 제외</span></> : "총자산"}</div>
           <div className="as-total">
-            <b title="주식·ETF·부동산·현금·연금 각각을 억 단위 소수 둘째 자리에서 반올림한 뒤 더합니다.">{uk((hasResidence ? opTotal : total) + penVal)}</b>
+            <b title="주식·ETF·부동산·현금·연금 각각을 억 단위 소수 둘째 자리에서 반올림한 뒤 더합니다.">{uk(opTotal)}</b>
             {at && <span className="as-fresh"><LastUpdated timestamp={at} onRefresh={load} /></span>}
           </div>
           {hasResidence && (
@@ -384,6 +378,10 @@ export default function AssetsMapPage() {
           {/* [S37-2] 일부 ETF 시세를 못 받아 합산에서 빠졌으면 숫자와 같은 카드에서 바로 알린다(예전엔 조용히 과소표시됐다). */}
           {(assets?.warnings || []).filter((w) => w.code === "ETF_PRICE_MISSING").map((w, i) => (
             <p className="as-incomplete" key={`etfmiss${i}`}>⚠ ETF {w.count}종목의 시세를 받지 못했습니다 — 이 총자산은 <b>실제보다 적습니다</b>.</p>
+          ))}
+          {/* [S46 R0] 연금 엔진 응답이 없으면 운용자산이 연금만큼 조용히 줄어든다 — 원장 message 를 그대로 보여준다. */}
+          {(assets?.warnings || []).filter((w) => w.code === "PENSION_UNAVAILABLE").map((w, i) => (
+            <p className="as-incomplete" key={`penna${i}`}>⚠ {w.message}</p>
           ))}
           {/* [S19-1] 기기 동기화가 아직 안 끝난 채로 확정된 총자산이면 숫자 옆에서 바로 말한다.
               (이 경고가 뜨는 상태에서는 다른 기기 입력분이 빠져 있을 수 있다.) */}
