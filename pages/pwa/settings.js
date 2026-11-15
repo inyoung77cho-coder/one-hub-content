@@ -15,6 +15,7 @@ import { APP_VERSION, BUILD_STAMP } from "../../lib/version";
 import { logout } from "../../lib/session";
 import ExitScreen from "../../components/ExitScreen";
 import FeedbackButton from "../../components/FeedbackButton";
+import { getHomeScreen, setHomeScreen } from "../../lib/homeScreen"; // [S46 R3] '자산' 첫 화면 선택(기기별·동기화 안 함)
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
@@ -70,6 +71,7 @@ export default function Settings() {
   const [tokenSec, setTokenSec] = useState(null);
   const [theme, setTheme] = useState("light");
   const [allowZoom, setAllowZoom] = useState(false); // [S24-4] 화면 확대 허용(핀치 탈출구)
+  const [homeScreen, setHomeScreenState] = useState("full"); // [S46 R3] simple=/pwa/home · full=/pwa/assets(기본)
   const [pushOn, setPushOn] = useState(false);
   const [pushBusy, setPushBusy] = useState(false);
   const [pushMsg, setPushMsg] = useState("");
@@ -117,6 +119,7 @@ export default function Settings() {
   useEffect(() => {
     try { setTheme(localStorage.getItem("onehub_theme") || "light"); } catch {}
     try { setAllowZoom(localStorage.getItem("onehub_allow_zoom") === "1"); } catch {}
+    setHomeScreenState(getHomeScreen());
     try { setTrader(localStorage.getItem("onehub_trader") || "A"); } catch {}
     try { setOpsView(localStorage.getItem("onehub_ops_view") === "1"); } catch {}
     loadHealth();
@@ -324,6 +327,20 @@ export default function Settings() {
               }}>{allowZoom ? "켜짐" : "꺼짐"}</button>
             </div>
             <div className="hint">기본은 앱처럼 확대를 막습니다. 글자를 크게 보려면 켜세요(OS 글자 크기 설정은 항상 반영됩니다).</div>
+          </div>
+
+          {/* [S46 R3] '자산' 탭의 첫 화면 — 기기별 취향(동기화 안 함). 기본 '전체'(종전 화면) = 무회귀. */}
+          <div className="card">
+            <div className="k">첫 화면</div>
+            <div className="row">
+              <span className="l">자산 탭을 누르면</span>
+              <div className="tt" role="group" aria-label="자산 첫 화면">
+                <button className={homeScreen === "simple" ? "on" : ""} aria-pressed={homeScreen === "simple"} onClick={() => setHomeScreenState(setHomeScreen("simple"))}>간단히</button>
+                <button className={homeScreen === "full" ? "on" : ""} aria-pressed={homeScreen === "full"} onClick={() => setHomeScreenState(setHomeScreen("full"))}>전체</button>
+              </div>
+            </div>
+            <div className="hint">간단히: 운용자산 숫자 하나와 자산군 몇 줄만. 전체: 지금까지의 자산 화면. 이 기기에만 적용됩니다.</div>
+            {homeScreen === "simple" && <div className="hint"><Link href="/pwa/home" style={{ color: "var(--color-primary)", fontWeight: 700 }}>간단한 첫 화면 열기 ›</Link></div>}
           </div>
 
           {/* 계정 */}

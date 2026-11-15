@@ -5,6 +5,7 @@
 import { useRouter } from "next/router";
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { assetsHref } from "../lib/homeScreen"; // [S46 R3] '자산' 탭 = 설정의 첫 화면(simple → /pwa/home, 기본 full → /pwa/assets)
 // [S29-2] 빠른입력 시트는 FAB 을 누르는 순간에만 필요 → 동적 로드(초기 번들에서 제외).
 const QuickAddSheet = dynamic(() => import("./shared/QuickAddSheet"), { ssr: false });
 
@@ -52,7 +53,7 @@ export default function BottomNav({ active }) {
             type="button"
             className={`bn-t ${active === key ? "on" : ""}`}
             aria-current={active === key ? "page" : undefined}
-            onClick={() => router.push(href)}
+            onClick={() => router.push(key === "assets" ? assetsHref() : href)}
           >
             <span className="bn-ic" aria-hidden="true">{ic}</span>
             <span className="bn-l">{label}</span>
