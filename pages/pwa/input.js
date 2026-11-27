@@ -1,4 +1,5 @@
-// ONE-HUB PWA — 통합 입력 화면(WO-INPUT). 주식/ETF/부동산 간편 입력 + 운영자 신고가.
+// ONE-HUB PWA — 통합 입력 화면(WO-INPUT). 주식/ETF/부동산 간편 입력 + 운영자 신고가 읽기.
+//   [S47-3] 신고가·속보 '입력'은 /pwa/operator(설정 > 운영자 뷰 > 콘텐츠 운영)로 옮겼다.
 import Head from "next/head";
 import TopNav from "../../components/TopNav";
 import InputSheet from "../../components/input/InputSheet";

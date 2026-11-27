@@ -1,4 +1,5 @@
-// ONE-HUB — 입력 간편화 시트(WO-INPUT). 주식/ETF/부동산 3탭 + 운영자 신고가.
+// ONE-HUB — 입력 간편화 시트(WO-INPUT). 주식/ETF/부동산 3탭 + 운영자 신고가 '읽기'.
+//   [S47-3] 운영자 신고가 '입력'(구 운영자 모드 토글·패널)은 components/input/SpotOpPanel.js → /pwa/operator 로 옮겼다.
 // 참조 UX: onehub-input-demo.html. 색상은 PWA data-theme 토큰(var(--color-*))만 사용.
 // 백엔드: /api/input/* 프록시 (RE 5002 / ENG 5001). 저장 즉시 보유목록 낙관적 갱신.
 import { useEffect, useRef, useState } from "react";
@@ -23,7 +24,6 @@ const TABS = [
 
 export default function InputSheet({ trader = "A" }) {
   const [tab, setTab] = useState("stock");
-  const [op, setOp] = useState(false);
   const [toast, setToast] = useState("");
   const toastRef = useRef();
   const flash = (m) => {
@@ -55,11 +55,8 @@ export default function InputSheet({ trader = "A" }) {
   const [reHint, setReHint] = useState("");
   const [spots, setSpots] = useState([]); // 운영자 신고가/속보(참고 전용)
 
-  // ── 운영자 속보 ──
-  const [opCx, setOpCx] = useState("");
-  const [opPrice, setOpPrice] = useState("");
-  const [opKind, setOpKind] = useState("report");
-  const [opSrc, setOpSrc] = useState("kakao");
+  // [S47-3] 운영자 신고가·속보 입력은 components/input/SpotOpPanel.js 로 옮겨 /pwa/operator 에서 연다.
+  //   여기(일반 입력 화면)에는 '읽기'(아래 spots 목록)만 남긴다 — 결정 2: 운영자가 쓰고 전원이 읽는다.
 
   // 보유목록 로딩
   useEffect(() => {
@@ -185,18 +182,6 @@ export default function InputSheet({ trader = "A" }) {
     setReSel(null); setReQ(""); setAreas([]); setAreaIdx(""); setRePrice("");
   };
 
-  const addSpot = async () => {
-    if (!opCx.trim() || !opPrice) return flash("단지·면적과 가격을 입력하세요");
-    try {
-      const d = await j(`/api/input/re-spot`, {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ complex_name: opCx.trim(), price_manwon: Number(opPrice), kind: opKind, source: opSrc }),
-      });
-      if (d.ok) { flash(`속보 등록 · ${opCx} ${eok(opPrice)} — 미확정 레이어`); setOpCx(""); setOpPrice(""); }
-      else flash(d.error === "operator only" ? "운영자 키 미설정/불일치" : `실패: ${d.error || ""}`);
-    } catch (_) { flash("네트워크 오류"); }
-  };
-
   const isRE = tab === "re";
   // 주식탭: KIS 불러온 보유 + 직접입력(비KIS) 보유 병합 표시. (stManualTick으로 갱신)
   // stManualTick: 저장 후 setState로 재렌더 → getStockHoldings가 최신 localStorage를 다시 읽는다.
@@ -210,9 +195,6 @@ export default function InputSheet({ trader = "A" }) {
     <div className="sheet">
       <div className="top">
         <div className="brand">ONE<span>·</span>HUB <em>입력</em></div>
-        <div className={`optog ${op ? "on" : ""}`} onClick={() => { setOp(!op); flash(!op ? "운영자 모드 ON" : "운영자 모드 OFF"); }}>
-          <span className="oplab">운영자 모드</span><div className="switch" />
-        </div>
       </div>
 
       <div className="tabs">
@@ -328,31 +310,6 @@ export default function InputSheet({ trader = "A" }) {
 
             <button className="btn" onClick={addRE}>내 단지로 추가</button>
 
-            {op ? (
-              <div className="oppanel">
-                <div className="oph">🔒 신고가 · 속보 입력 <span>운영자 전용</span></div>
-                <div className="opnote">정보원 반영이 늦는 신고가/매물을 수시 입력. 확정 실거래와 분리 저장 · 엔진(ONE Score·갭)에 미반영.</div>
-                <div className="field"><label>단지 · 면적</label><input value={opCx} onChange={(e) => setOpCx(e.target.value)} placeholder="예: 시범삼성 84.7㎡" /></div>
-                <div className="field"><label>가격 (만원)</label><input type="number" value={opPrice} onChange={(e) => setOpPrice(e.target.value)} placeholder="0" /></div>
-                <div className="field"><label>유형</label>
-                  <div className="chips">
-                    {[["report", "신고가"], ["listing", "매물호가"], ["rumor", "소문"]].map(([k, l]) => (
-                      <div key={k} className={`chip ${opKind === k ? "sel" : ""}`} onClick={() => setOpKind(k)}>{l}</div>
-                    ))}
-                  </div>
-                </div>
-                <div className="field"><label>출처</label>
-                  <div className="chips">
-                    {[["kakao", "카카오톡"], ["sns", "SNS"], ["naver", "네이버"], ["manual", "수동"]].map(([k, l]) => (
-                      <div key={k} className={`chip ${opSrc === k ? "sel" : ""}`} onClick={() => setOpSrc(k)}>{l}</div>
-                    ))}
-                  </div>
-                </div>
-                <button className="btn amber" onClick={addSpot}>속보 등록</button>
-              </div>
-            ) : (
-              <div className="lock">🔒 신고가·속보 입력란은 <b>운영자 모드</b>에서만 열립니다. (우측 상단 토글)</div>
-            )}
           </>
         )}
       </div>
@@ -365,12 +322,6 @@ export default function InputSheet({ trader = "A" }) {
         .brand { font-weight: 800; letter-spacing: -.02em; font-size: 19px; }
         .brand span { color: var(--color-primary); }
         .brand em { font-style: normal; font-size: 13px; color: var(--color-muted); font-weight: 600; }
-        .optog { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-muted); cursor: pointer; user-select: none; }
-        .switch { width: 40px; height: 22px; border-radius: 99px; background: var(--color-line); position: relative; transition: .2s; }
-        .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: .2s; }
-        .optog.on .switch { background: var(--color-warning, var(--amber)); }
-        .optog.on .switch::after { left: 20px; }
-        .optog.on .oplab { color: var(--color-warning, var(--amber)); font-weight: 700; }
         .tabs { display: flex; gap: 6px; background: var(--color-card); padding: 5px; border-radius: 14px; margin-bottom: 14px; border: 1px solid var(--color-line); }
         .tab { flex: 1; text-align: center; padding: 9px 0; border-radius: 10px; font-weight: 600; font-size: 14px; color: var(--color-muted); cursor: pointer; transition: .15s; }
         .tab.active { background: var(--color-primary); color: #fff; }
@@ -408,17 +359,8 @@ export default function InputSheet({ trader = "A" }) {
         .btn { display: block; width: 100%; margin-top: 14px; padding: 13px; border: none; border-radius: 12px; background: var(--color-primary); color: #fff; font-weight: 700; font-size: 15px; font-family: inherit; cursor: pointer; transition: .15s; }
         .btn:active { transform: scale(.99); }
         .btn.ghost { background: var(--color-primary-soft); color: var(--color-primary); }
-        .btn.amber { background: var(--color-warning, var(--amber)); }
         .btnrow { display: flex; gap: 10px; }
         .btnrow .btn { margin-top: 14px; }
-        .oppanel { border: 1.5px dashed var(--color-warning, var(--amber)); background: var(--color-warning-soft, transparent); border-radius: 14px; padding: 14px; margin-top: 14px; }
-        .oph { display: flex; align-items: center; gap: 6px; font-weight: 800; color: var(--color-warning-ink, var(--color-warning)); font-size: 13.5px; }
-        .oph span { font-weight: 600; font-size: 11px; opacity: .8; }
-        .opnote { font-size: 12px; color: var(--color-warning-ink, var(--color-warning)); opacity: .85; margin: 2px 0 4px; }
-        .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
-        .chip { padding: 7px 12px; border: 1.5px solid var(--color-line); border-radius: 99px; font-size: 13px; cursor: pointer; background: var(--color-bg); }
-        .chip.sel { border-color: var(--color-warning, var(--amber)); color: var(--color-warning-ink, var(--color-warning)); font-weight: 700; }
-        .lock { font-size: 11px; color: var(--color-muted); background: var(--color-bg); border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
         .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--color-ink, #1f2a37); color: #fff; padding: 12px 18px; border-radius: 12px; font-size: 14px; font-weight: 600; z-index: 50; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
       `}</style>
     </div>

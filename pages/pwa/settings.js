@@ -518,14 +518,17 @@ export default function Settings() {
             <Link href="/pwa/board-admin" className="detail">보드 관리 열기 →</Link>
           </div>
 
-          {/* [2026-08-10] 신고가·속보 입력(InputSheet 운영자 모드) — 화면 어디서도 연결이 안 돼
-              있던 걸 발견해 여기 운영자 섹션에 연결. 확정 실거래와 분리 저장, 엔진 미반영(참고 전용). */}
+          {/* [S47-6] 콘텐츠 운영(/pwa/operator) 진입 — 결정 4: 설정 > 운영자 뷰 안에 숨긴다(showOps = admin 만).
+              이력: [2026-08-10] 신고가·속보 입력(InputSheet 운영자 모드)이 화면 어디서도 연결이 안 돼 있던 걸
+              발견해 여기 연결했었다. S47 에서 그 입력 패널을 components/input/SpotOpPanel.js 로 떼어
+              /pwa/operator '현장 메모' 탭으로 옮겼다 — 이 링크가 그 유일한 진입점이다. 지우면 다시 고아가 된다.
+              시스템 진단 항목(위 시스템 상태·Token·Scheduler·Circuit Breaker·버전, 보드 관리)은 옮기지 않는다. */}
           <div className="card">
-            <div className="k">신고가 · 속보 입력</div>
+            <div className="k">콘텐츠 운영 · 현장 메모 / 리포트 요점 / 사용자 니즈</div>
             <p style={{ fontSize: "0.8rem", color: "#64748B", margin: "6px 0 10px", lineHeight: 1.6 }}>
-              정보원 반영이 늦는 부동산 신고가·매물호가를 수시로 입력합니다. 확정 실거래와 분리 저장되며 엔진에는 반영되지 않습니다.
+              신고가·속보 입력(현장 메모), 주간 리포트 요점, 사용자 니즈 집계를 한 화면에서 다룹니다.
             </p>
-            <Link href="/pwa/input" className="detail">입력 화면 열기 →</Link>
+            <Link href="/pwa/operator" className="detail">콘텐츠 운영 열기 →</Link>
           </div>
 
           {/* [v11 #18 / §3-9] 트레이더 A/B 관리 — engine-status + /api/ops/traders(있으면) 병합 */}

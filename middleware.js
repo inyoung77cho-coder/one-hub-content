@@ -35,7 +35,7 @@ const PROTECTED_API_PREFIXES = [
 ];
 
 // NI-5-c: 운영자(admin) 전용 — 지인(beta)은 접근 불가(서버 강제).
-const ADMIN_ONLY_PAGES = ["/pwa/system-health", "/pwa/board-admin", "/pwa/weekly-report"]; // [S32-3] 주간 리포트 화면
+const ADMIN_ONLY_PAGES = ["/pwa/system-health", "/pwa/board-admin", "/pwa/weekly-report", "/pwa/operator"]; // [S32-3] 주간 리포트 화면 · [S47-2] 콘텐츠 운영
 const ADMIN_ONLY_API = ["/api/ops", "/api/weekly/"]; // [S32-2] 주간 다이제스트
 
 function isProtectedApi(path) {
