@@ -85,6 +85,7 @@ function fmtDate(iso) {
 }
 
 function LessonCard({ lesson, lang }) {
+  const router = useRouter(); // [S49-5] 4단계 버튼 이동용
   const [revealed, setRevealed] = useState(false);
   const [speed, setSpeed] = useState(1);
   const audioRef = useRef(null);
@@ -203,6 +204,12 @@ function LessonCard({ lesson, lang }) {
           {lesson.has_audio && (
             <button type="button" className="lc-again" onClick={replay}>
               🎧 3단계 · 다시 듣기
+            </button>
+          )}
+          {/* [S49-5] 수업 후 버니 선생님과 대화(영어만 — 중국어 레슨에는 버튼 자체를 그리지 않는다) */}
+          {lang === "en" && (
+            <button type="button" className="lc-again" onClick={() => router.push("/pwa/tutor?lesson=" + lesson.id)}>
+              4단계 · 버니 선생님과 대화
             </button>
           )}
         </>
