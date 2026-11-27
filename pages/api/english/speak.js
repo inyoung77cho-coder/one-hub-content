@@ -22,7 +22,7 @@ export default async function handler(req, res) {
   const VOICE_ALLOW = {
     "zh-male": "zh-CN-YunxiNeural",
     "zh-female": "zh-CN-XiaoxiaoNeural",
-    "en-male": "en-US-GuyNeural",
+    "en-male": "en-US-BrianMultilingualNeural", // [S49] 남자 버니 — 대화 톤(사용자 지정 2026-11-27, 이전 Guy)
     "en-female": "en-US-AriaNeural",
   };
   // 중국어 기본값을 남성으로 고정한다(요청이 없어도 남성으로 나가게).
