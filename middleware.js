@@ -5,7 +5,7 @@
 //  · 그 외 공개 API(auth·health·og·시세 등)는 통과.
 import { NextResponse } from "next/server";
 import { verifySession, SESSION_COOKIE } from "./lib/auth";
-import { tenantFromSession } from "./lib/tenant";
+import { tenantFromSession, isSessionLoginBlocked } from "./lib/tenant";
 
 export const config = {
   matcher: ["/pwa", "/pwa/:path*", "/api/:path*"],
@@ -78,6 +78,31 @@ export async function middleware(req) {
 
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const session = await verifySession(token);
+
+  // [S47-0] B 앱 접근 차단 — 이중 차단(fail-closed). 콜백만 막으면 이미 발급된 세션(최대 30일)으로
+  //   그대로 들어오므로, 세션이 있고 차단 대상이면 여기서 막고 쿠키도 지운다.
+  //   · /pwa 페이지 → /login?error=access_ended
+  //   · /api → 401 (로그인 흐름 /api/auth/kakao/*·/api/auth/logout 만 예외 — 콜백이 다시 막는다)
+  //   ★카카오 id 는 로그·URL 에 넣지 않는다. 매매봇·DB 의 B 데이터와 무관(로그인만).
+  if (session && isSessionLoginBlocked(session)) {
+    const isPage = pathname === "/pwa" || pathname.startsWith("/pwa/");
+    const isAuthFlow = pathname.startsWith("/api/auth/kakao/") || pathname === "/api/auth/logout";
+    if (isPage || (pathname.startsWith("/api/") && !isAuthFlow)) {
+      let res;
+      if (isPage) {
+        const url = req.nextUrl.clone();
+        url.pathname = "/login";
+        url.search = "?error=access_ended";
+        res = NextResponse.redirect(url);
+      } else {
+        res = unauthorized();
+      }
+      res.cookies.set(SESSION_COOKIE, "", {
+        path: "/", maxAge: 0, httpOnly: true, secure: true, sameSite: "lax",
+      });
+      return res;
+    }
+  }
 
   // 1) 페이지 게이트: /pwa
   if (pathname === "/pwa" || pathname.startsWith("/pwa/")) {

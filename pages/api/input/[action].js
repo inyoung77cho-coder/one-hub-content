@@ -29,6 +29,15 @@ export default async function handler(req, res) {
   if (!cfg.methods.includes(req.method))
     return res.status(405).json({ ok: false, error: "method not allowed" });
 
+  // [S47-1] 운영자 액션(re-spot 등)의 '쓰기'는 admin 만. 읽기(GET)는 로그인 사용자 전원(결정 2).
+  //   ★ADMIN_ONLY_API 에 넣지 않는 이유: 경로 단위라 GET 까지 막힌다 → 여기서 메서드별로 가른다.
+  //   역할은 middleware 가 주입·덮어쓰는 x-oh-role 헤더. 헤더가 없으면 거부(fail-closed) —
+  //   미들웨어를 거치지 않은 경로를 신뢰하지 않는다.
+  if (cfg.operator && req.method !== "GET") {
+    if (req.headers["x-oh-role"] !== "admin")
+      return res.status(403).json({ ok: false, error: "forbidden" });
+  }
+
   // 쿼리 전달(action 제외) + RE 미들웨어 키
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(req.query)) {

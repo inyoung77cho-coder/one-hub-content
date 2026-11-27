@@ -5,6 +5,7 @@
 // [S36-4] 실패를 구조화해서 남긴다(PII 없이) — 며칠 뒤 로그로 진짜 원인 확정.
 import { createSession, SESSION_COOKIE, SESSION_MAX_AGE } from "../../../../lib/auth";
 import { verifyState } from "../../../../lib/kakaoState";
+import { isLoginBlocked } from "../../../../lib/tenant";
 
 function parseCookies(header) {
   const out = {};
@@ -89,6 +90,11 @@ export default async function handler(req, res) {
       // 프로필 조회 실패 — 재시도해도 같음. 상태코드만 남긴다(프로필 본문=PII 제외).
       return fail("profile", false, next, { status: meRes.status });
     }
+
+    // [S47-0] B 계정 앱 접근 차단(TENANT_B_LOGIN=off). 세션을 발급하지 않고 안내 화면으로.
+    //   ★createSession 보다 앞, 그리고 accounts.db upsert 보다도 앞 — B 의 회원 레코드도 건드리지 않는다.
+    //   ★fail() 은 reason 만 남긴다(카카오 id 는 로그·URL 어디에도 안 들어감). 재시도 대상 아님.
+    if (isLoginBlocked(me.id)) return fail("access_ended", false, next);
 
     const nickname = me.properties?.nickname || me.kakao_account?.profile?.nickname || "";
     const picture = me.properties?.profile_image || me.kakao_account?.profile?.profile_image_url || null;
