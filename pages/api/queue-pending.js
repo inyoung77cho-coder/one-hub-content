@@ -1,8 +1,9 @@
 // 장외 예약 승인 프록시 — 5001 /api/pwa/queue-pending (status=queued, 다음장 09:00 릴리스)
-import { bodyWithTenant } from "../../lib/reqTenant";
+import { bodyWithTenant, requireTenant } from "../../lib/reqTenant";
 const ENGINE_API = process.env.ENGINE_API_URL || "http://54.180.54.132:5001";
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
+  if (!requireTenant(req, res)) return;
   try {
     const upstream = await fetch(`${ENGINE_API}/api/pwa/queue-pending`, {
       method: "POST",

@@ -2,11 +2,13 @@
 //   GET  /api/user/state?trader=A          → { ok, device, updatedAt, payload }
 //   POST /api/user/state?trader=A  body{device,updatedAt,payload} → { ok }
 //   ⚠️ 백엔드 미도달 시 ok:false → 클라이언트(syncManager)는 로컬만 사용(회귀 없음).
+import { requireTenant } from "../../../lib/reqTenant";
 const RE_API = process.env.RE_API_URL || "http://54.180.54.132:5002";
 const RE_KEY = process.env.RE_ACCESS_KEY || "";
 
 export default async function handler(req, res) {
-  const trader = (req.query.trader || "A").toString();
+  const trader = requireTenant(req, res); // [S47 후속] x-oh-tenant 만 신뢰(쿼리·A 기본값 금지)
+  if (!trader) return;
   const q = new URLSearchParams({ trader_id: trader });
   if (RE_KEY) q.set("key", RE_KEY);
   const url = `${RE_API}/api/v2/user-state?${q.toString()}`;

@@ -2,7 +2,7 @@
 //  · RE(:5002)  검색/면적/보유추가/운영자속보  → ?key=RE_ACCESS_KEY (+ 속보는 X-Operator-Key)
 //  · ENG(:5001) 주식검색/KIS불러오기/ETF검색/ETF추가 → X-API-Key=PWA_API_KEY
 // 로컬 개발: SSH 터널(localhost:5001/5002) + .env.local 에 RE_API_URL/ENGINE_API_URL/키 설정.
-import { bodyWithTenant } from "../../../lib/reqTenant";
+import { bodyWithTenant, requireTenant, tenantQuery } from "../../../lib/reqTenant";
 const RE = process.env.RE_API_URL || "http://54.180.54.132:5002";
 const ENG = process.env.ENGINE_API_URL || "http://54.180.54.132:5001";
 const RE_KEY = process.env.RE_ACCESS_KEY || "";
@@ -38,12 +38,12 @@ export default async function handler(req, res) {
       return res.status(403).json({ ok: false, error: "forbidden" });
   }
 
+  // [S47 후속] 테넌트는 x-oh-tenant 만 신뢰 — 쿼리 trader/trader_id 는 서버 테넌트로 덮어쓴다.
+  const tenant = requireTenant(req, res);
+  if (!tenant) return;
+
   // 쿼리 전달(action 제외) + RE 미들웨어 키
-  const q = new URLSearchParams();
-  for (const [k, v] of Object.entries(req.query)) {
-    if (k === "action" || v == null) continue;
-    q.set(k, Array.isArray(v) ? v[0] : String(v));
-  }
+  const q = tenantQuery(req, tenant, ["action", "key"]);
   if (cfg.reKey && RE_KEY) q.set("key", RE_KEY);
   const qs = q.toString();
   const url = `${cfg.base}${cfg.path}${qs ? "?" + qs : ""}`;

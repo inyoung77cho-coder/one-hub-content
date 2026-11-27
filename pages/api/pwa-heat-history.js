@@ -1,6 +1,7 @@
 // pages/api/pwa-heat-history.js
 // Proxy route: /api/pwa-heat-history?trader=A|B&limit=50
 // Forwards to Flask engine_status_api.py /api/pwa/heat-history
+import { requireTenant } from "../../lib/reqTenant";
 
 const ENGINE_API = 'http://54.180.54.132:5001';
 
@@ -9,7 +10,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { trader = 'A', limit = '50' } = req.query;
+  const trader = requireTenant(req, res); // [S47 후속] x-oh-tenant 만 신뢰(쿼리·A 기본값 금지)
+  if (!trader) return;
+  const { limit = '50' } = req.query;
 
   try {
     const apiKey = process.env.PWA_API_KEY;

@@ -2,6 +2,7 @@
 // ETF 프록시와 동일 패턴. 프로덕션(Vercel)은 RE_API_URL/RE_ACCESS_KEY 환경변수 사용.
 // ⚠️ 5002는 Lightsail 방화벽 인바운드가 열려야 Vercel에서 도달 가능. RE_ACCESS_KEY(?key=)로 보호됨.
 //    로컬 개발은 SSH 터널(localhost:5002) + RE_API_URL=http://localhost:5002 로 테스트.
+import { requireTenant, tenantQuery } from "../../../../lib/reqTenant";
 const RE_API = process.env.RE_API_URL || "http://54.180.54.132:5002";
 const RE_KEY = process.env.RE_ACCESS_KEY || "";
 
@@ -29,23 +30,17 @@ const PATH_PARAM_ENDPOINTS = {
   trend: (query) => `/api/trend/${encodeURIComponent(query.apt || "")}`,
 };
 
-// fn·key 외 추가 쿼리(complex 등)는 백엔드로 그대로 전달
-function passThroughQuery(query, skipKeys) {
-  const p = new URLSearchParams();
-  for (const [k, v] of Object.entries(query)) {
-    if (k === "fn" || k === "key" || v == null || (skipKeys && skipKeys.includes(k))) continue;
-    p.set(k, Array.isArray(v) ? v[0] : String(v));
-  }
-  return p;
-}
+// fn·key 외 추가 쿼리(complex 등)는 백엔드로 그대로 전달 — 단 trader/trader_id 는 tenantQuery 가 서버값으로 강제.
 
 export default async function handler(req, res) {
   const fn = req.query.fn;
   const pathBuilder = PATH_PARAM_ENDPOINTS[fn];
   const path = pathBuilder ? pathBuilder(req.query) : ENDPOINTS[fn];
   if (!path) return res.status(404).json({ error: "unknown endpoint" });
+  const tenant = requireTenant(req, res); // [S47 후속] trader/trader_id 는 서버 테넌트로 강제
+  if (!tenant) return;
   try {
-    const p = passThroughQuery(req.query, pathBuilder ? ["apt"] : null);
+    const p = tenantQuery(req, tenant, ["fn", "key", ...(pathBuilder ? ["apt"] : [])]);
     if (RE_KEY) p.set("key", RE_KEY);
     const qs = p.toString();
     const url = `${RE_API}${path}${qs ? `?${qs}` : ""}`;

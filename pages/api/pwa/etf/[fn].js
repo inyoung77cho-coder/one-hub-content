@@ -4,6 +4,7 @@
 //    로컬 개발은 SSH 터널(localhost:5003) + ETF_API_URL=http://localhost:5003 로 테스트.
 // fallback = 프로덕션(Lightsail 54.180:5003)과 일치. 실제 배포는 Vercel env ETF_API_URL로 지정됨(추적검증 2026-07-09: report 요청이 54.180으로 도달).
 // (구 기본값 3.36.171.171은 별개 구/스테이징 박스 → 정리대상. fallback으로 두면 EC2 폐기 시 ETF 깨짐)
+import { requireTenant } from "../../../../lib/reqTenant";
 const ETF_API = process.env.ETF_API_URL || "http://54.180.54.132:5003";
 
 const ENDPOINTS = { report: "report", tax: "tax", overlap: "overlap", positions: "positions", rebalance: "rebalance", status: "status", movers: "movers" };
@@ -11,9 +12,10 @@ const ENDPOINTS = { report: "report", tax: "tax", overlap: "overlap", positions:
 export default async function handler(req, res) {
   const fn = ENDPOINTS[req.query.fn];
   if (!fn) return res.status(404).json({ error: "unknown endpoint" });
-  const trader = req.query.trader || "A";
+  const trader = requireTenant(req, res); // [S47 후속] x-oh-tenant 만 신뢰(쿼리·A 기본값 금지)
+  if (!trader) return;
   try {
-    const resp = await fetch(`${ETF_API}/api/etf/${fn}?trader=${trader}`, {
+    const resp = await fetch(`${ETF_API}/api/etf/${fn}?trader=${encodeURIComponent(trader)}`, {
       headers: { "X-API-Key": process.env.ETF_API_KEY || "" },
     });
     const data = await resp.json();

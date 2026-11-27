@@ -1,7 +1,10 @@
+import { bodyWithTenant, requireTenant } from "../../lib/reqTenant";
 const ENGINE_API = process.env.ENGINE_API_URL || "http://54.180.54.132:5001";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ ok: false, error: "Method not allowed" });
+  // [S47 후속] 본문 trader 는 서버 테넌트로 강제(클라 기본값 A → 남의 알림 구독 차단)
+  if (!requireTenant(req, res)) return;
   try {
     const upstream = await fetch(`${ENGINE_API}/api/push/subscribe`, {
       method: "POST",
@@ -9,7 +12,7 @@ export default async function handler(req, res) {
         "Content-Type": "application/json",
         "X-API-Key": process.env.PWA_API_KEY || "",
       },
-      body: JSON.stringify(req.body),
+      body: JSON.stringify(bodyWithTenant(req)),
       signal: AbortSignal.timeout(8000),
     });
     const data = await upstream.json();

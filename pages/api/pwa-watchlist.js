@@ -1,4 +1,4 @@
-import { reqTenant, bodyWithTenant } from "../../lib/reqTenant";
+import { requireTenant, bodyWithTenant } from "../../lib/reqTenant";
 const ENGINE_API = process.env.ENGINE_API_URL || "http://54.180.54.132:5001";
 const RE_API = process.env.RE_API_URL || "http://54.180.54.132:5002";
 const RE_KEY = process.env.RE_ACCESS_KEY || "";
@@ -29,7 +29,8 @@ async function checkWatchlistLimit(req, trader) {
 }
 
 export default async function handler(req, res) {
-  const trader = reqTenant(req);
+  const trader = requireTenant(req, res); // [S47 후속] x-oh-tenant 만 신뢰(쿼리·A 기본값 금지)
+  if (!trader) return;
 
   try {
     if (req.method === "GET") {

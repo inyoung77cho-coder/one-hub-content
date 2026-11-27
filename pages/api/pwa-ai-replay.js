@@ -1,9 +1,11 @@
+import { requireTenant } from "../../lib/reqTenant";
 const ENGINE_API = process.env.ENGINE_API_URL || 'http://54.180.54.132:5001';
 
 export default async function handler(req, res) {
-  const trader = req.query.trader === 'B' ? 'B' : 'A';
+  const trader = requireTenant(req, res); // [S47 후속] x-oh-tenant 만 신뢰(쿼리·A 기본값 금지)
+  if (!trader) return;
   try {
-    const upstream = await fetch(`${ENGINE_API}/api/pwa/ai-replay/${trader}`, {
+    const upstream = await fetch(`${ENGINE_API}/api/pwa/ai-replay/${encodeURIComponent(trader)}`, {
       signal: AbortSignal.timeout(8000),
     });
     const data = await upstream.json();

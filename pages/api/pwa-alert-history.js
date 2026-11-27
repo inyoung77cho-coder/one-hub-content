@@ -1,10 +1,12 @@
 // pages/api/pwa-alert-history.js — 관심단지 알림 이력(P1-b) 프록시 → RE(:5002) /api/alerts/history.
 //   /api/pwa- 프리픽스라 middleware 가 로그인 강제 + trader 를 세션 테넌트로 덮어씀.
+import { requireTenant } from "../../lib/reqTenant";
 const RE_API = process.env.RE_API_URL || "http://54.180.54.132:5002";
 const RE_KEY = process.env.RE_ACCESS_KEY || "";
 
 export default async function handler(req, res) {
-  const trader = (req.query.trader || req.query.trader_id || "A").toString();
+  const trader = requireTenant(req, res); // [S47 후속] x-oh-tenant 만 신뢰(쿼리·A 기본값 금지)
+  if (!trader) return;
   const limit = Math.min(parseInt(req.query.limit, 10) || 30, 100);
   const auth = RE_KEY ? `&key=${encodeURIComponent(RE_KEY)}` : "";
   try {

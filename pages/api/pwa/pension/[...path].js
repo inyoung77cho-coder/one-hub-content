@@ -1,6 +1,7 @@
 // ONE-HUB — 연금(S20-PEN) 엔진 프록시. /api/pwa/pension/* → :5003 /api/pension/*
 //   ETF 프록시와 동일 백엔드(onehub-etf.service, Flask). 다양한 경로/메서드를 포괄(catch-all).
 //   ⚠️ 5003 SG 인바운드 개방 또는 SSH 터널 필요. 프로덕션은 Vercel env ETF_API_URL.
+import { tenantQuery } from "../../../../lib/reqTenant";
 const ETF_API = process.env.ETF_API_URL || "http://54.180.54.132:5003";
 
 export default async function handler(req, res) {
@@ -46,7 +47,9 @@ export default async function handler(req, res) {
     }
   }
 
-  const qs = req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "";
+  // [S47 후속] 클라 쿼리의 trader/trader_id 는 버리고 서버 테넌트로(accounts?trader= 위조 차단).
+  const qsp = tenantQuery(req, tenant, ["path"]);
+  const qs = qsp.toString() ? "?" + qsp.toString() : "";
   const url = `${ETF_API}/api/pension/${parts.map(encodeURIComponent).join("/")}${qs}`;
   try {
     const init = {

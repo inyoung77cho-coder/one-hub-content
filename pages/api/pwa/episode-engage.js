@@ -3,13 +3,14 @@
 //   POST body{episode,kind,value}   → 갱신된 집계 즉시 반환(참여의 보상)
 //   trader 는 세션 기반(reqTenant) — 클라가 보낸 값 신뢰 안 함, 1인 1표. GitHub 아님(accounts.db).
 //   ⚠️ 백엔드 미도달 시 ok:false → 화면은 "반응은 잠시 후 다시" 로 조용히 죽지 않게.
-import { reqTenant } from "../../../lib/reqTenant";
+import { requireTenant } from "../../../lib/reqTenant";
 
 const RE_API = process.env.RE_API_URL || "http://54.180.54.132:5002";
 const RE_KEY = process.env.RE_ACCESS_KEY || "";
 
 export default async function handler(req, res) {
-  const trader = reqTenant(req);
+  const trader = requireTenant(req, res); // [S47 후속] x-oh-tenant 만 신뢰(쿼리·A 기본값 금지)
+  if (!trader) return;
   const q = new URLSearchParams({ trader_id: trader });
   if (RE_KEY) q.set("key", RE_KEY);
   if (req.method === "GET") {

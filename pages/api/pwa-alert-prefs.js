@@ -1,11 +1,13 @@
 // pages/api/pwa-alert-prefs.js — 관심단지 저평가 알림 설정(P1-b) 프록시 → RE(:5002) /api/alerts/prefs.
 //   /api/pwa- 프리픽스라 middleware 가 로그인 강제 + trader 를 세션 테넌트로 덮어씀(위조 불가).
 //   GET  → 현재 설정  ·  POST { gap_enabled, gap_threshold } → 저장(trader 는 서버 강제값 사용)
+import { requireTenant } from "../../lib/reqTenant";
 const RE_API = process.env.RE_API_URL || "http://54.180.54.132:5002";
 const RE_KEY = process.env.RE_ACCESS_KEY || "";
 
 export default async function handler(req, res) {
-  const trader = (req.query.trader || req.query.trader_id || "A").toString();
+  const trader = requireTenant(req, res); // [S47 후속] x-oh-tenant 만 신뢰(쿼리·A 기본값 금지)
+  if (!trader) return;
   const auth = RE_KEY ? `&key=${encodeURIComponent(RE_KEY)}` : "";
   const hdr = { "Content-Type": "application/json", "X-API-Key": RE_KEY };
   try {
