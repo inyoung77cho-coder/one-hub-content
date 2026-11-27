@@ -5,7 +5,8 @@
 //     그래서 assets.js 와 index.js(portfolio 탭)가 이 파일 하나를 함께 쓴다.
 //   ★ 매도 확인은 window.confirm/alert 을 쓰지 않는다 — 모달이 뜨면 PWA 이벤트가 막히고,
 //     결과를 카드 안에서 보여주는 편이 "무슨 일이 일어났나"가 더 분명하다.
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { logInterest, markBadgeShown } from "../../lib/interestLog"; // [S48-2] 관심 센싱(배지 노출·펼침 tap·매도 성공 act)
 
 const n = (x) => (x == null || isNaN(Number(x)) ? null : Number(x));
 const won = (v) => `${Math.round(Number(v) || 0).toLocaleString()}원`;
@@ -51,6 +52,8 @@ export default function KisHoldingsCard({ positions = [], trader = "A", title = 
 
   const sorted = sort === "value" ? positions : [...positions].sort((a, b) => deriveUrgency(a).rank - deriveUrgency(b).rank);
   const actionCnt = positions.filter((p) => deriveUrgency(p).rank <= 2).length;
+  // [S48-2] '지금 할 일' 배지(손절 임박·익절 검토·점검 필요)가 뜬 종목을 노출 기록 → 다음 날 미열람이면 ignored(−2).
+  useEffect(() => { positions.forEach((p) => { if (p.code && deriveUrgency(p).rank <= 2) markBadgeShown("stock", p.code, trader); }); }, [positions, trader]);
 
   const sell = async (key, p) => {
     if (confirmKey !== key) {
@@ -69,6 +72,7 @@ export default function KisHoldingsCard({ positions = [], trader = "A", title = 
       setResult((r) => ({ ...r, [key]: d.ok
         ? { ok: true, msg: `${p.name} 매도 주문을 자동매매 엔진에 전송했습니다.` }
         : { ok: false, msg: `매도 실패 — ${d.error || "엔진이 주문을 받지 못했습니다"}` } }));
+      if (d.ok) logInterest("act", "stock", p.code, trader); // [S48-2] 엔진이 매도 주문을 받은 경우만(실패·오류는 관심 아님)
       if (d.ok && onSold) onSold(p);
     } catch (e) {
       setResult((r) => ({ ...r, [key]: { ok: false, msg: `매도 요청 중 오류 — ${e.message}` } }));
@@ -108,7 +112,7 @@ export default function KisHoldingsCard({ positions = [], trader = "A", title = 
             return (
               <div className={`kh-card u-${u.level}`} key={key} style={u.bar ? { borderLeft: `3px solid ${u.bar}` } : undefined}>
                 {/* 접힌 상태에서도 '이 종목을 어떻게 할 것인가'가 보이도록 이름·배지·수익률은 항상 노출 */}
-                <button className="kh-top" onClick={() => setOpenKey(open ? null : key)} aria-expanded={open}>
+                <button className="kh-top" onClick={() => { if (!open && p.code) logInterest("tap", "stock", p.code, trader); setOpenKey(open ? null : key); }} aria-expanded={open}>
                   <span className="kh-name" title={p.name}>{p.name}</span>
                   <span className="kh-urg" style={{ color: u.color, borderColor: u.color, opacity: u.level === "normal" ? 0.55 : 1 }}>{u.badge}</span>
                   <span className={`kh-pnl ${p.pnl_rate >= 0 ? "up" : "dn"}`}>{p.pnl_rate >= 0 ? "+" : ""}{p.pnl_rate}%</span>

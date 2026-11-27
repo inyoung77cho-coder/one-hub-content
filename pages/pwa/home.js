@@ -13,6 +13,7 @@ import { recordSnapshot, getDelta } from "../../lib/assetHistory";
 import AppHeader from "../../components/AppHeader";
 import BottomNav from "../../components/BottomNav";
 import LastUpdated from "../../components/LastUpdated";
+import { logInterest } from "../../lib/interestLog"; // [S48-2] 자산군 줄 탭(tap 1) — 화면 변화 없음
 
 const uk = (v) => (v == null || !Number.isFinite(Number(v)) ? "—" : `${Number(v).toFixed(2)}억`);
 const num = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Number(v));
@@ -173,7 +174,7 @@ export default function HomeSimplePage() {
 
       <nav className="hm-card" aria-label="자산군">
         {mainRows.map((r) => (
-          <Link key={r.key} href={r.href} className="hm-row tap">
+          <Link key={r.key} href={r.href} className="hm-row tap" onClick={() => logInterest("tap", "class", r.key)}>
             <RowInner r={r} chevron />
           </Link>
         ))}
@@ -181,7 +182,7 @@ export default function HomeSimplePage() {
 
       <div className="hm-card sub">
         {subRows.map((r) => (r.href ? (
-          <Link key={r.key} href={r.href} className="hm-row tap sm">
+          <Link key={r.key} href={r.href} className="hm-row tap sm" onClick={() => logInterest("tap", "class", r.key)}>
             <RowInner r={r} chevron />
           </Link>
         ) : (

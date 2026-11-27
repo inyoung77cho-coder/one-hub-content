@@ -33,6 +33,7 @@ import { getSnapshots as getDuelSnapshots } from "../../lib/portfolioDuel"; // [
 import { getTodayDecision, getLedger as getVerdictLedger } from "../../lib/verdictLedger"; // [S23 T-1/T-5] 판단 기록·재등장 판정
 import { getVerdictScorecard } from "../../lib/verdictStats"; // [S24-8] 성적표 상시 진입 요약
 import { recordDecisionWithPrice } from "../../lib/recordDecision"; // [S23 T-1] 가격 확보→기록(추천 카드와 공유)
+import { logInterest } from "../../lib/interestLog"; // [S48-2] 할 일 실행 act(10)
 import { getAllStockPositions, getAllEtfPositions } from "../../lib/allHoldings"; // [S30-1/4] KIS+직접입력 통합·ETF 판단 대상
 import { markFunnel, checkD7Return } from "../../lib/funnel"; // [S30-8] 가입 깔때기 이정표
 import { getLifeStage, getWithdrawInputs, computeWithdrawPlan } from "../../lib/withdrawPlan"; // [S31-4/5] 생애 단계·인출 계획
@@ -583,6 +584,7 @@ export default function TodayPage({ announcements = [] }) {
     setDecErr((m) => { const n = { ...m }; delete n[item.code]; return n; });
     try {
       await recordDecisionWithPrice({ code: item.code, name: item.name, decision, trader, source: "today", priceHint: item.entry });
+      logInterest("act", item.source === "etf" ? "etf" : "stock", item.code, trader); // [S48-2] 기록 성공 후에만(예외 시 catch 로 빠짐)
       const now = new Date();
       setRecorded((m) => ({ ...m, [item.code]: { label: choice, at: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}` } }));
     } catch (e) {

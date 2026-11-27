@@ -14,6 +14,7 @@ import { getTrader } from "../../lib/trader";
 import { getHoldings, getOtherAssets, removeEtf, updateEtfAvg, removeOtherAsset, updateOtherAsset, addOtherAsset, inferMarket } from "../../lib/etfHoldings";
 import { EtfForm } from "../../components/shared/AssetForms";
 import { classifyEtf } from "../../lib/etfClassify"; // [S45 SE] 투자지역(국내/해외) 분류
+import { logInterest } from "../../lib/interestLog"; // [S48-2] 연금 할 일 [완료] 성공 act(10)
 
 const man = (v) => (v == null ? "-" : `${Math.round(Number(v) / 1e4).toLocaleString()}만`);
 const uk = (v, d = 2) => (v == null ? "-" : `${(Number(v) / 1e8).toFixed(d)}억`);
@@ -180,7 +181,7 @@ export default function PensionPage() {
   };
   const complete = async (id) => {
     const r = await P.setActionStatus(id, { status: "DONE" });
-    if (r.data?.ok) load();
+    if (r.data?.ok) { const a = (actions || []).find((x) => x.action_id === id); logInterest("act", a?.ticker ? "pension" : "class", a?.ticker || "pension"); load(); } // [S48-2] 서버가 DONE 을 받은 경우만
   };
   const makePlanNow = async () => {
     setMsg("계획 생성 중…");

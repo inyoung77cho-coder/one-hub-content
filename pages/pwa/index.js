@@ -43,6 +43,7 @@ import { recordAccuracySnapshot, getAccuracyHistory } from '../../lib/aiAccuracy
 import { getHoldings as getEtfHoldings } from '../../lib/etfHoldings';
 import QuickAddSheet from '../../components/shared/QuickAddSheet';
 import KisHoldingsCard from '../../components/shared/KisHoldingsCard';
+import { logInterest } from '../../lib/interestLog'; // [S48-2] 승인 주문 성공 act(10)
 import ManualHoldingsCard from '../../components/shared/ManualHoldingsCard';
 
 // [v9.0] 안전 숫자 포맷 — INVALID_PRICE/STOP/NaN/undefined → '-'
@@ -766,6 +767,7 @@ export default function PWADashboard({ latestReport }) {
       });
       const d = await res.json();
       if (d.ok) {
+        if (action === 'approve') logInterest('act', 'stock', code, trader); // [S48-2] 즉시 승인이 엔진에 접수된 경우만(스킵·예약·실패 제외)
         // 낙관적 업데이트: 처리된 항목 즉시 목록에서 제거
         setPendingList(prev => prev.filter(p => p.code !== code));
       } else {

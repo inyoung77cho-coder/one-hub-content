@@ -12,6 +12,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { initSync } from "../lib/syncManager";
 import { getTrader } from "../lib/trader";
 import { enforceUserBoundary, clearApiCaches } from "../lib/session";
+import { attachInterestRouteHooks } from "../lib/interestLog"; // [S48-2] 관심 센싱(detail·dwell) — 화면 없음, 기기 안에만
 
 // 페이지 로드당 1회만 로그인 경계 검사(사용자 전환 시 로컬 상태 초기화).
 let boundaryChecked = false;
@@ -122,6 +123,9 @@ export default function App({ Component, pageProps }) {
     router.events.on("routeChangeComplete", onDone);
     return () => { clearTimeout(t); router.events.off("routeChangeComplete", onDone); };
   }, [router.events]);
+
+  // [S48-2] 관심 센싱 — 자산군 상세 진입(detail 3)·15초 체류(dwell 2). 하루 1회 굴리기(ignored 판정)도 여기서.
+  useEffect(() => attachInterestRouteHooks(router.events), [router.events]);
 
   // [S29-4] 설정으로 들어갈 때 '직전 화면' 경로를 기억 — 설정의 의견 보내기가 정확한 화면 이름을 첨부하도록.
   useEffect(() => {
